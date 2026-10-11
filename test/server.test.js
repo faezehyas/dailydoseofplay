@@ -109,6 +109,25 @@ test("privacy page: served, and it names every localStorage key in public/", asy
   for (const key of keys) assert.ok(page.includes(`<code>${key}</code>`), `public/privacy/index.html lists ${key}`);
 });
 
+test("web manifest: served as a manifest, and every icon it lists exists at its size", async (t) => {
+  const srv = await startServer();
+  t.after(() => srv.close());
+  const res = await fetch(`${srv.base}/manifest.webmanifest`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "application/manifest+json");
+  const { icons } = await res.json();
+  assert.ok(icons.some((i) => i.purpose === "maskable"), "has a maskable icon");
+  for (const icon of icons) {
+    const file = await fetch(`${srv.base}${icon.src}`);
+    assert.equal(file.status, 200, icon.src);
+    assert.equal(file.headers.get("content-type"), icon.type, icon.src);
+    if (icon.type !== "image/png") continue;
+    // A PNG's width and height are the big-endian words at bytes 16 and 20.
+    const png = Buffer.from(await file.arrayBuffer());
+    assert.equal(`${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`, icon.sizes, icon.src);
+  }
+});
+
 test("sea battle: every recorded sound exists and is credited", () => {
   const main = fs.readFileSync(new URL("../public/sea-battle/sounds.js", import.meta.url), "utf8");
   const credits = fs.readFileSync(new URL("../public/sea-battle/sounds/LICENSE.txt", import.meta.url), "utf8");
