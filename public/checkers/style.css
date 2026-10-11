@@ -246,7 +246,9 @@
   box-shadow:
     inset 0 0 0 2px color-mix(in srgb, var(--pc) 65%, var(--sunk)),
     0 2px 3px color-mix(in srgb, var(--sunk) 40%, transparent);
-  transition: transform 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 .piece.b {
@@ -271,15 +273,21 @@
   stroke-linejoin: round;
 }
 
+/* A piece that can move wears a soft halo; a picked one lifts off the board
+   with a firm ring. Both hug the piece, so its square never clips them. */
 .ck-sq.can .piece {
-  outline: 2px dashed var(--focus);
-  outline-offset: 2px;
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--pc) 65%, var(--sunk)),
+    0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent),
+    0 2px 3px color-mix(in srgb, var(--sunk) 40%, transparent);
 }
 
 .ck-sq.picked .piece {
-  outline: 3px solid var(--focus);
-  outline-offset: 2px;
-  transform: scale(1.06);
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--pc) 65%, var(--sunk)),
+    0 0 0 3px var(--focus),
+    0 6px 8px color-mix(in srgb, var(--sunk) 45%, transparent);
+  transform: translateY(-3px) scale(1.06);
 }
 
 .ck-sq.taking .piece {
