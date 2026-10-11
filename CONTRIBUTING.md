@@ -5,6 +5,15 @@ inspired by papergames.io's gameplay. It is one Node server on Wasmer Edge
 (pages, `/ws` signaling, `/healthz`). Gameplay runs browser to browser over
 WebRTC. Read `ARCHITECTURE.md` once before your first change.
 
+Everyone here follows the [Code of Conduct](CODE_OF_CONDUCT.md). Issues have
+forms for a [bug](https://github.com/Faezehyas/dailydoseofplay/issues/new?template=bug.yml),
+an [idea](https://github.com/Faezehyas/dailydoseofplay/issues/new?template=idea.yml)
+and a [game proposal](https://github.com/Faezehyas/dailydoseofplay/issues/new?template=game-proposal.yml),
+and a blank issue for anything else. Security problems go privately, as
+[SECURITY.md](SECURITY.md) describes. A new PR starts from the
+[PR template](.github/pull_request_template.md), and
+[CODEOWNERS](.github/CODEOWNERS) asks the maintainer to review it.
+
 ## Ground rules
 
 - **Language:** plain JavaScript only. Node ES modules on the server; browser JS, HTML and CSS in `public/`. No TypeScript, no frameworks, no build step, no bundler.
@@ -482,7 +491,7 @@ windows (one private).
 - In `README.md`, add the game to the list.
 - If you changed anything in `public/engine/`, update `ARCHITECTURE.md` too. Avoid engine changes unless the game cannot work without them; if you must, keep them backward compatible and run Sea Battle's tests.
 - Work on a branch, e.g. `feat/<slug>`, commit with Conventional Commits, and open one PR titled `feat: add <Name>`. Open it as a draft early (see step 1) and mark it ready for review when the checklist below is done.
-- The PR body needs:
+- The PR body, which the [PR template](.github/pull_request_template.md) lays out, needs:
   - a summary and the proposal issue it closes (`Closes #<number>`);
   - a rules summary with any deviation from the rules source;
   - the protocol choice (TurnMatch or custom) and why;
@@ -490,6 +499,8 @@ windows (one private).
   - a manual test checklist (step 8).
 
 ## Checklist before opening the PR
+
+The [PR template](.github/pull_request_template.md) repeats these lines, shortened.
 
 - [ ] `public/<slug>/` contains `index.html`, `style.css`, `main.js`, `rules.js`, `robot.js`, `how-to-play.js`, `icon.svg` and tests
 - [ ] `rules.js` is pure and fully unit-tested; illegal moves throw `RuleError`

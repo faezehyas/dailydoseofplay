@@ -1,0 +1,37 @@
+name: Bug
+description: Something on the site doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! A security problem goes privately, as [SECURITY.md](https://github.com/Faezehyas/dailydoseofplay/blob/main/SECURITY.md) describes, never here.
+  - type: input
+    id: game
+    attributes:
+      label: Game
+      description: The game or page, e.g. Ludo, the home page, the lobby.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: What you did, step by step, what you expected and what happened instead. Say if you played a friend or the robot, and with how many players.
+      placeholder: |
+        1. Created a room and joined from a second window
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: Safari 19 on an iPhone 15
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Drop an image or a short video here, and copy any red lines from the browser console.
