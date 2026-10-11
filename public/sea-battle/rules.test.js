@@ -29,6 +29,7 @@ import {
   auditBoard,
   normalizeFleet,
   normalizeConfig,
+  robotConfig,
   applyTimeout,
   WEAPONS,
   isTimed,
@@ -258,6 +259,15 @@ test("room settings: unknown values fall back to the defaults", () => {
   assert.deepEqual(normalizeConfig({ shotSeconds: 7, gameSeconds: "600" }), DEFAULT_CONFIG);
   assert.deepEqual(normalizeConfig({ shotSeconds: 0, gameSeconds: 180 }), { shotSeconds: 0, gameSeconds: 180 });
   assert.equal(isTimed(newMatchState(0)), false, "no config, no clocks");
+});
+
+test("robot games have no clocks unless the player picked one", () => {
+  assert.deepEqual(robotConfig(DEFAULT_CONFIG, []), { ...DEFAULT_CONFIG, shotSeconds: 0, gameSeconds: 0 });
+  const custom = { shotSeconds: 10, gameSeconds: 180 };
+  assert.deepEqual(robotConfig(custom, []), { ...custom, shotSeconds: 0, gameSeconds: 0 });
+  assert.deepEqual(robotConfig(custom, ["shotSeconds"]), { ...custom, gameSeconds: 0 });
+  assert.deepEqual(robotConfig(custom, ["gameSeconds"]), { ...custom, shotSeconds: 0 });
+  assert.deepEqual(robotConfig(DEFAULT_CONFIG, ["shotSeconds", "gameSeconds"]), DEFAULT_CONFIG, "a picked default still counts");
 });
 
 test("clocks: each shot spends its time; over the limit is refused; a clock running out loses", () => {

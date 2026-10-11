@@ -17,7 +17,7 @@ export const howToPlay = {
   settings: [
     "Time per shot: if it runs out, a random shot is fired for you.",
     "Time for each player: if your clock runs out, you lose.",
-    "In a friend game, the settings of whoever creates the room apply to both players. Against the robot, only your clock runs.",
+    "In a friend game, the settings of whoever creates the room apply to both players. Against the robot there are no clocks unless you pick one, and then only your clock runs.",
   ],
   fairPlay: "Your fleet never leaves your browser until the game ends. Both sides lock in their fleet with a cryptographic commitment and check each other's answers afterwards. Every random event (who starts, gifts, missile rain) is drawn jointly by both browsers.",
   keyboard: [

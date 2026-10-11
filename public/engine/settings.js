@@ -14,28 +14,42 @@ import { el, segGroup } from "./shell.js";
 // summary(value, label, config) is the text of the group's chip in the
 // summary (default: the label; "" leaves it out).
 // normalize(raw) returns a complete, valid config (defaults for anything else).
-export function gameSettings({ key, prefix, groups, normalize, hint }) {
-  let config = load();
+// robot(config, picked), optional, is the config for a robot game, given the
+// names of the groups the player picked an option in: a game whose clocks are
+// on by default turns off the ones not picked.
+export function gameSettings({ key, prefix, groups, normalize, hint, robot }) {
+  let { config, picked } = load();
   let locked = false;
+  let mode = "friend"; // the game that's on while locked
   const shown = new Map(); // what is on screen (summaries, options) → how to bring it up to date
   const scopeOf = (g) => g.scope ?? (g.robot ? "device" : "room");
+  // The picks are kept next to the config. Settings saved before that: a
+  // value other than the default can only have been picked.
   function load() {
+    let raw = null;
     try {
-      return normalize(JSON.parse(localStorage.getItem(key)));
-    } catch {
-      return normalize(null);
-    }
+      raw = JSON.parse(localStorage.getItem(key));
+    } catch {}
+    const config = normalize(raw);
+    const defaults = normalize(null);
+    const picked = Array.isArray(raw?.picked) ? raw.picked : groups.map((g) => g.name).filter((name) => config[name] !== defaults[name]);
+    return { config, picked: new Set(picked) };
   }
   function save() {
     try {
-      localStorage.setItem(key, JSON.stringify(config));
+      localStorage.setItem(key, JSON.stringify({ ...config, picked: [...picked] }));
     } catch {}
+  }
+  function pick(name) {
+    picked.add(name);
+    save();
   }
   function set(name, value) {
     config = normalize({ ...config, [name]: value });
-    save();
+    pick(name);
     refresh();
   }
+  const current = (gameMode) => (gameMode === "robot" && robot ? robot(config, [...picked]) : config);
   function refresh() {
     for (const [node, update] of shown) {
       if (node.isConnected) update();
@@ -56,20 +70,25 @@ export function gameSettings({ key, prefix, groups, normalize, hint }) {
     return parts.flatMap(({ text, robot }, i) => [i ? el("span", { class: "sr-only" }, ", ") : "", el("span", { class: robot ? "chip robot" : "chip" }, text)]);
   }
   // The options, one group per fieldset. While a game is on (lock), only
-  // "view" options can change. Each copy on screen names its radio buttons
-  // after `id`, and follows changes made in the others.
+  // "view" options can change, and they show the game's config. Each copy on
+  // screen names its radio buttons after `id`, and follows changes made in
+  // the others. Choosing the option already shown fires no change, but counts
+  // as picking it.
   function form(id = prefix) {
     const note = el("p", { class: "notice", id: `${id}-locked` }, "Locked during a game: rematches keep the room's settings. Change them in the lobby for your next game.");
     const sets = groups.map((g) => {
       const tag = scopeOf(g) === "device" && el("small", { class: "chip robot robot-only" }, "vs robot only");
-      return segGroup({ name: `${id}-${g.name}`, legend: [g.legend, tag], options: g.options, value: config[g.name], onChange: (value) => set(g.name, value) });
+      const fieldset = segGroup({ name: `${id}-${g.name}`, legend: [g.legend, tag], options: g.options, value: config[g.name], onChange: (value) => set(g.name, value) });
+      fieldset.addEventListener("click", (e) => e.target.checked && pick(g.name));
+      return fieldset;
     });
     const body = el("div", { class: "settings-body" }, note, sets, hint && el("p", { class: "hint" }, hint));
     const update = () => {
+      const values = locked ? current(mode) : config;
       note.hidden = !locked;
       groups.forEach((g, i) => {
         sets[i].disabled = locked && scopeOf(g) !== "view";
-        for (const input of sets[i].querySelectorAll("input")) input.checked = input.value === String(config[g.name]);
+        for (const input of sets[i].querySelectorAll("input")) input.checked = input.value === String(values[g.name]);
       });
     };
     update();
@@ -90,10 +109,12 @@ export function gameSettings({ key, prefix, groups, normalize, hint }) {
     details.addEventListener("toggle", () => (change.textContent = details.open ? "Done" : "Change"));
     return details;
   }
-  // lock(true) while a game is on; the lobby calls it.
-  function lock(on) {
+  // lock(true, mode) while a game is on; the lobby calls it.
+  function lock(on, gameMode = "friend") {
     locked = on;
+    mode = gameMode;
     refresh();
   }
-  return { get: () => ({ ...config }), summary, panel, form, lock };
+  // get("robot") is the config for a robot game.
+  return { get: (gameMode) => ({ ...current(gameMode) }), summary, panel, form, lock };
 }

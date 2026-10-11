@@ -120,7 +120,7 @@ export const howToPlay = {
   setup: "…", // the board, pieces or deal at the start
   turn: ["…", "…"], // what you do on your turn, special rules, tap and drag
   winning: ["…", "…"], // wins, draws, scoring, Rematch
-  settings: ["…", "…"], // each setting and clock, and whose apply in a friend game
+  settings: ["…", "…"], // each setting and clock, whose apply in a friend game, and "Against the robot there are no clocks unless you pick one."
   fairPlay: "…", // what the browsers check, and how randomness is drawn
   keyboard: "…", // every key
 };
@@ -292,12 +292,21 @@ Each group has a `scope` (see **Settings** in `ARCHITECTURE.md`):
 - `"room"`, the default: the rules (clocks, board size, who starts, house
   rules). Read `settings.get()` when a game starts: the host sends it to its
   guests as `setup {config}` (see **Room settings** under Tic Tac Toe in
-  `ARCHITECTURE.md`), and a robot game uses it directly. Locked during a game.
+  `ARCHITECTURE.md`); a robot game reads `settings.get("robot")` (below).
+  Locked during a game.
 - `"device"`: only matters against robots (their level and number; older
   games say `robot: true`). Locked during a game.
 - `"view"`: how this player sees the game (coordinates, legal-move hints).
   Never sent; read `settings.get()` each time you draw or decide, so a change
   made in the settings panel mid-game applies at once.
+
+**Clocks against the robot.** A robot game has no clocks unless the player
+picks one; friend games keep your defaults. If any clock is on by default,
+export `robotConfig(config, picked)` from `rules.js`, which turns off each clock
+whose group isn't in `picked` (the groups the player chose an option in), pass
+it to `gameSettings()` as `robot`, and read `settings.get("robot")` in a robot
+game, both in `createRobot` and in `onSession`. Test `robotConfig` in
+`rules.test.js`. Games whose clocks are off by default need none of this.
 
 **More than two players.** Pass `minPlayers` and `maxPlayers` to
 `startGameShell()` (and `robots`, the robot seats in a robot game: a number,

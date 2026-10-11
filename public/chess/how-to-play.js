@@ -21,6 +21,7 @@ export const howToPlay = {
     "Who plays White: a coin toss drawn by both browsers, you, or your opponent.",
     "Robot level: Easy, Medium or Hard.",
     "In a friend game, the settings of whoever creates the room apply to both players.",
+    "Against the robot there are no clocks unless you pick one.",
   ],
   fairPlay: "Both browsers check every move with the same rules, so a move that breaks them stops the match. Each browser keeps its own player's clock.",
   keyboard: "Move with the arrow keys; press Enter or Space to pick up and put down a piece.",

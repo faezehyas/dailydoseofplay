@@ -24,7 +24,7 @@ startGameShell({
   layout: "narrow",
   settings,
   createRobot: (session) => {
-    const config = settings.get();
+    const config = settings.get("robot");
     return startTurnRobot(session, {
       rules: makeRules(config),
       choose: (state, me, rng) => ({ ...chooseMove(state, me, rng, { level: config.level }), ms: ROBOT_DELAY }),
@@ -318,7 +318,7 @@ function mountConnect4(session, root, shell) {
     offMsg,
     session.on("rematch-start", () => config && newMatch()),
   ];
-  if (session.mode === "robot") begin(settings.get());
+  if (session.mode === "robot") begin(settings.get("robot"));
   else if (me === 0) {
     const c = settings.get();
     session.send({ t: "setup", config: c });

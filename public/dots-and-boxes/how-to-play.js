@@ -16,6 +16,7 @@ export const howToPlay = {
     "First line: a coin toss drawn by both browsers, you, or your opponent.",
     "Robot level: Easy, Medium or Hard.",
     "In a friend game, the settings of whoever creates the room apply to both players.",
+    "Against the robot there are no clocks unless you pick one.",
   ],
   fairPlay: "Both browsers check every line with the same rules, and the coin toss for who starts is drawn by both together.",
   keyboard: "Tab to the board, move with the arrow keys and press Enter or Space to draw.",
