@@ -172,6 +172,7 @@ flowchart TB
   g_lessons --> g_art
   g_lessons --> g_rules
   g_tutorial --> e_shell
+  g_tutorial --> e_turn_match
   g_tutorial --> g_art
   g_tutorial --> g_lessons
   g_tutorial --> g_rules
@@ -919,8 +920,9 @@ colour, and nothing moves. The colours stay while the panel is up; it calls
 tutorial, learnt by making moves on the real board rather than by reading.
 `startTutorial()` in `tutorial.js` runs it in the page: no server, no timer
 and no score. It is a lesson list, 3 to 6 lessons of 1 to 4 steps, and each
-step shows a sentence or two, lights up squares (`.tut-lit`), may draw arrows
-and waits for one move.
+step shows a sentence or two, lights up squares (`.tut-lit`; a board drawn in
+SVG draws its own `.tut-ring` round the spot), may draw arrows and waits for
+one move.
 
 ```mermaid
 flowchart LR
@@ -937,10 +939,15 @@ flowchart LR
   position, highlight, arrows, expect, reply }] }]`, in the game's own
   position and move format. `expect` is one move or a list of accepted
   moves, and a move matches when it has every field of one of them (a list
-  field, such as Checkers' `path`, holds the same items in order); `reply`
-  is a move the teacher plays back. A step without a `position` goes on from
-  the last one. A dice game can put its roll on the step: the adapter's
-  `play` gets the step and can hand `applyMove` an `rng` that rolls it.
+  field, such as Checkers' `path`, holds the same items in order, and so do
+  lists in it, such as Backgammon's `steps`); `reply` is a move the teacher
+  plays back. A step without a `position` goes on from the last one. Dice
+  are fixed, so everyone sees the same lesson. Where the roll is the move
+  (Chutes and Ladders' spin), it goes on the step: the adapter's `play` gets
+  the step and hands `applyMove` an `rng` that rolls it. Where the dice come
+  before a choice (Backgammon, Ludo), the roll is part of the position, and
+  `load` rolls it through `applyMove`, so the learner sees the dice before
+  moving.
 - **The adapter** (`public/<slug>/tutorial.js`) exports the lessons, the
   chime's `flavour`, `load(position)` (a rules state whose side to move is
   the learner), `play(state, move, step)` (`applyMove` for the side to move),
@@ -979,9 +986,16 @@ pieces, capture, check and checkmate, castling, en passant and promotion),
 Connect 4 (dropping a disc, four in a row each way, blocking, two threats),
 Gomoku (placing a stone, five in a row, blocking, an open four), Checkers
 (moving, capturing, forced captures and multi-jumps, crowning) and Dots and
-Boxes (drawing a line, closing a box, long chains) have tutorials;
+Boxes (drawing a line, closing a box, long chains), Backgammon (moving by
+the dice, doubles, hitting a blot, entering from the bar, bearing off), Sea
+Battle (placing ships, firing, hits and misses, sinking a ship), Chutes and
+Ladders (spinning, a ladder, a chute, the exact spin to finish) and Ludo
+(leaving the yard, moving round, capturing, safe squares, reaching home)
+have tutorials. Sea Battle's runs in the page with both fleets fixed and
+known to it, firing through `rules.js` alone; `match.js` and its
+commitments don't come into it.
 `test/browser/tutorial.test.js` plays the first Chess and Connect 4 lessons
-by keyboard and the first of Gomoku, Checkers and Dots and Boxes by tap.
+by keyboard and the first of every other game by tap.
 
 **Player colours.** A player has the same colour on every screen, so "I'm the
 coral one" is true for everyone at the table. In a two-player game whoever
@@ -1050,7 +1064,7 @@ checks that no game opens its own audio context or output.
 | `icon.svg` | Card art for the home page (16:10) |
 | `preview.svg` | Optional: the tile's short animated preview (see **Tile previews**) |
 | `tutorial.js`, `lessons.js` | Optional: the tutorial (see **Tutorials**). `lessons.js` is its lessons as data; `tutorial.js` exports them with the adapter the engine plays them through, and `main.js` passes `tutorial: () => import("./tutorial.js")`. |
-| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo, Chutes and Ladders), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces, Gomoku's grid and point names, Checkers' crown, Dots and Boxes' paper, lines and boxes) |
+| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo; Chutes and Ladders, with its spinner), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces, Gomoku's grid and point names, Checkers' crown, Dots and Boxes' paper, lines and boxes, Backgammon's cells, checkers and dice, Sea Battle's boards, ships and marks) |
 
 ## Card games (`CardMatch`)
 

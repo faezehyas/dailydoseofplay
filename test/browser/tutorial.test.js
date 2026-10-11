@@ -3,8 +3,8 @@
 // springs back, a second one that brings the hint, and a tick saved for the
 // finished lesson; the Learn button and Back; Tic Tac Toe's last lesson,
 // whose end screen starts a robot game; and the first lesson of Connect 4
-// (by keyboard), Gomoku, Checkers and Dots and Boxes. Skips if Playwright is
-// missing.
+// (by keyboard), Gomoku, Checkers, Dots and Boxes, Backgammon, Sea Battle,
+// Chutes and Ladders and Ludo. Skips if Playwright is missing.
 //
 //   npm run test:browser
 import test from "node:test";
@@ -220,3 +220,50 @@ test("Dots and Boxes' first lesson: the lit line, then any free one", { skip, ti
       await page.click('.tut-stage .hit[data-line="1"]');
     },
   ]));
+
+test("Backgammon's first lesson: a 3 and a 1 make a point, then one checker takes 6 and 5", { skip, timeout: 60_000 }, (t) => {
+  const tap = (page, n) => page.click(`.tut-stage .bg-cell[data-n="${n}"]`);
+  return firstLesson(t, "backgammon", [
+    async (page) => {
+      for (const n of [8, 5, 6]) await tap(page, n);
+      assert.equal(await page.locator(".tut-stage .die.used").count(), 1, "the 3 is played");
+      await tap(page, 5);
+    },
+    async (page) => {
+      assert.equal(await page.locator(".tut-stage .die:not(.used)").count(), 2, "a fresh roll");
+      for (const n of [24, 18, 13]) await tap(page, n);
+    },
+  ]);
+});
+
+test("Sea Battle's first lesson: the Destroyer moves to the lit squares, then turns upright", { skip, timeout: 60_000 }, (t) => {
+  const tap = (page, i) => page.click(`.tut-stage .own .cell[data-i="${i}"]`);
+  return firstLesson(t, "sea-battle", [
+    async (page) => {
+      await tap(page, 54);
+      assert.equal(await page.locator(".tut-stage .ship.selected").count(), 1, "the Destroyer is picked");
+      await tap(page, 23);
+    },
+    (page) => tap(page, 23),
+  ]);
+});
+
+test("Chutes and Ladders' first lesson: two spins with the fixed numbers", { skip, timeout: 60_000 }, (t) =>
+  firstLesson(t, "chutes-and-ladders", [
+    (page) => page.click(".tut-stage .cl-spin-btn"),
+    async (page) => {
+      assert.equal(await page.locator(".tut-stage .cl-spin-value").textContent(), "6", "the spinner stopped on the lesson's 6");
+      await page.click(".tut-stage .cl-spin-btn");
+    },
+  ]));
+
+test("Ludo's first lesson: a 6 brings a token out, then a 4 moves it on", { skip, timeout: 60_000 }, (t) => {
+  const tap = (page, token) => page.click(`.tut-stage .hit-token[data-token="${token}"]`);
+  return firstLesson(t, "ludo", [
+    (page) => tap(page, 0),
+    async (page) => {
+      assert.equal(await page.locator(".tut-stage .ld-die .face").getAttribute("data-value"), "4", "the lesson's 4");
+      await tap(page, 0);
+    },
+  ]);
+});

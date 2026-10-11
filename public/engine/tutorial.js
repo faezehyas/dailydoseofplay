@@ -13,7 +13,7 @@
 //                            (lessons.js). A step without a position goes on from the last one.
 //                            expect is a move or a list of accepted moves; a move matches when it
 //                            has every field of one of them (a list field, such as a path, holds
-//                            the same items in order). reply is a move played back.
+//                            the same items in order, lists in it too). reply is a move played back.
 //   flavour                  the timbre of its chimes (chimes.js)
 //   load(position)           a rules state for a position; its side to move is the learner
 //   play(state, move, step)  applies a move for the side to move with rules.js, or throws RuleError
@@ -52,7 +52,7 @@ function saveDone(slug, index) {
 }
 const doneIn = (slug) => new Set(loadDone()[slug] ?? []);
 
-const same = (a, b) => (Array.isArray(b) ? Array.isArray(a) && a.length === b.length && a.every((x, i) => x === b[i]) : a === b);
+const same = (a, b) => (Array.isArray(b) ? Array.isArray(a) && a.length === b.length && a.every((x, i) => same(x, b[i])) : a === b);
 const matches = (move, want) => Object.keys(want).every((k) => same(move?.[k], want[k]));
 const expected = (step) => [].concat(step.expect);
 
