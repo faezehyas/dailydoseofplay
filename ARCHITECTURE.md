@@ -782,7 +782,7 @@ box keeps whatever width it sets, and its rules panel matches the column.
 **Player bar.** Every game shows the same bar above its board, built by
 `playerBar()` in `players.js` and styled in `theme.css`: a pill per player
 (you first, "(you)" after your name, found by your seat and never by comparing names, then the others in seat order), a ring
-on whoever's turn it is, React at the top left (see **Reactions**), and Leave (`id="leave"`, outlined, with an exit arrow) at the top right. Under it
+on whoever's turn it is, and at the top right React (see **Reactions**) and Leave (`id="leave"`, outlined, with an exit arrow; under 600 px only the arrow, like the header's buttons, with its word kept for screen readers). Under it
 the score (`#score`) shows wins per player and, for games whose score has a
 `draws` field, a Draws box (Dots and Boxes adds it with the first draw,
 since only some boards can be drawn). The game creates it once and calls
@@ -791,26 +791,29 @@ by seat: `turn` is a seat or -1, `score` is `{ wins, draws }`, a badge is a
 node of the game's own (a mark, disc, stone or swatch, which the game may
 keep changing), and a note is a short line under the name (pips, boxes, a
 square), as text or a node. With three or four players the pills wrap, at
-most two to a row; under 600 px they sit in a 2×2 grid beside Leave over a
-slimmer score, so four fit a 360 px phone. A pill and its score read
+most two to a row; under 600 px they sit in a 2×2 grid beside Leave (React
+under it) over a slimmer score, so four fit a 360 px phone. A pill and its score read
 `--seat` and `--seat-text`, which are `--mine` and `--theirs` unless the game
 gives each seat a class of its own that sets them (Chutes and Ladders `p0`
 to `p3`, Ludo its board colours, Crazy Eights, Go Fish and Gin Rummy `p-0` to `p-3`).
 
 **Reactions.** Players can't type to each other: there would be nothing to
 stop a stranger's words reaching a child. Instead the player bar's React
-(`#react`, a face, with its word hidden under 600 px where it sits at the end
-of the score row) opens a tray (`#reactions`) of 8 emoji (👋 😄 😮 😅 🤔 🔥 👏
-😢) and 8 phrases ("Good luck!", "Nice move!", "Oops!", "Hmm…", "Your turn!",
-"So close!", "Good game!", "Rematch?"). Arrow keys (wrapping round), Home and
-End move through it, Enter or a tap picks, and Esc, a pick or a tap outside
-closes it and gives focus back to React. A pick sends `$react {i}`, the index
-into that list, so there is nothing to moderate.
+(`#react`, a round smiling face beside Leave) opens a tray (`#reactions`)
+under the bar, so names, bubbles and score stay in sight. It holds 8 emoji
+(👋 😄 😮 😅 🤔 🔥 👏 😢), which grow under the pointer or focus, and 8
+phrases as chips that light up coral ("Good luck!", "Nice move!", "Oops!",
+"Hmm…", "Your turn!", "So close!", "Good game!", "Rematch?"). Arrow keys
+(wrapping round), Home and End move through it, Enter or a tap picks, and
+Esc, a pick or a tap outside closes it and gives focus back to React. A pick
+sends `$react {i}`, the index into that list, so there is nothing to
+moderate.
 
-- A reaction shows as a bubble under the sender's pill, over the score and
-  never the board, for 3 s, with a soft synthesized `pop` (role `ui`, 4 dB
-  under it) that follows the sound setting, and is read out from a polite live
-  line ("Bo: Nice move!"). You see your own as well.
+- A reaction shows as a speech bubble under the sender's pill, over the
+  score and never the board, for 3 s (an emoji larger than a phrase), with a
+  soft synthesized `pop` (role `ui`, 4 dB under it) that follows the sound
+  setting, and is read out from a polite live line ("Bo: Nice move!"). You
+  see your own as well.
 - Each seat may react once every 2 s: the sender's page holds back a second
   one, and every receiver drops one that comes sooner, and any `i` that is
   not a whole number in the list.

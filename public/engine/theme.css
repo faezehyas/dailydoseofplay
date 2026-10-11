@@ -814,13 +814,12 @@ input::placeholder {
   gap: 8px;
 }
 
-/* The players stay together, centred over the score, with React at the top
-   left and Leave at the top right, balancing each other. No grid gap, so on
-   a phone, where React moves to the score row, the empty first column takes
-   no room from the names. */
+/* The players stay together, centred over the score, with React and Leave at
+   the top right; the empty first column balances them. No grid gap, so on a
+   phone that empty column takes no room from the names. */
 .pb-top {
   display: grid;
-  grid-template-columns: minmax(max-content, 1fr) minmax(0, max-content) minmax(max-content, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, max-content) minmax(max-content, 1fr);
   align-items: start;
 }
 
@@ -828,27 +827,21 @@ input::placeholder {
   grid-column: 2;
 }
 
-.pb-top > .btn {
+.pb-top > .pb-actions {
   grid-column: 3;
   justify-self: end;
+  display: flex;
+  gap: 6px;
   margin-left: 8px;
 }
 
-.pb-top > .pb-react {
-  grid-column: 1;
-  justify-self: start;
-  margin: 0 8px 0 0;
-}
-
-/* React and Leave look like buttons on every board: an outline and an icon. */
-.pb-react,
+/* Leave looks like a button on every board: an outline and an exit arrow. */
 .pb-leave {
   gap: 6px;
   border-color: var(--control-border);
   background: var(--surface);
 }
 
-.pb-react svg,
 .pb-leave svg {
   width: 18px;
   height: 18px;
@@ -975,69 +968,129 @@ input::placeholder {
 }
 
 /* ---------- reactions (engine/reactions.js) ---------- */
-/* The tray opens under the bar, over the board until a reaction is picked,
-   so the bubbles stay in sight; a bubble shows under the sender's pill, over
-   the score, never the board. */
+/* React is a round face beside Leave. Its tray opens under the bar, so the
+   names, bubbles and score stay in sight: big emoji that grow under the
+   pointer, and phrases as chips that light up coral. A bubble is a speech
+   bubble under the sender's pill, over the score, never the board. */
+.pb-react {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--control-border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+.pb-react svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.pb-react .eye {
+  fill: currentColor;
+  stroke: none;
+}
+
+.pb-react:hover {
+  background: var(--surface-2);
+}
+
+.pb-react:active {
+  transform: scale(0.92);
+}
+
+.pb-react[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
 .rx-tray {
   position: absolute;
   z-index: 30;
-  top: calc(100% + 6px);
-  left: 0;
+  top: calc(100% + 8px);
+  right: 0;
   display: grid;
-  gap: 8px;
-  width: min(336px, 100%);
-  padding: 10px;
-  border-radius: var(--radius);
+  gap: 12px;
+  width: min(360px, 100%);
+  padding: 12px;
+  border-radius: 20px;
   border: 1px solid var(--border);
   background: var(--surface);
   box-shadow: var(--shadow);
+  transform-origin: 90% 0;
 }
 
 .rx-emojis {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 2px;
-}
-
-.rx-phrases {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.rx-tray button {
-  min-height: 36px;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-}
-
-.rx-tray button:hover {
-  background: var(--surface-2);
 }
 
 .rx-emoji {
-  font-size: 1.3rem;
+  aspect-ratio: 1;
+  min-width: 0;
   padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform var(--dur-med) var(--ease-spring), background var(--dur-fast) var(--ease-out);
+}
+
+.rx-emoji:hover,
+.rx-emoji:focus-visible {
+  background: var(--surface-2);
+  transform: scale(1.25) translateY(-3px);
+}
+
+.rx-phrases {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
 }
 
 .rx-phrase {
-  border-color: var(--control-border);
-  font-weight: 700;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
   font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.rx-phrase:hover,
+.rx-phrase:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  transform: translateY(-2px);
 }
 
 .rx-bubble {
   position: absolute;
   z-index: 20;
-  top: calc(100% + 4px);
+  top: calc(100% + 8px);
   left: 50%;
-  max-width: 160px;
-  padding: 4px 10px;
-  border-radius: 12px;
+  padding: 5px 12px;
+  border-radius: 14px;
   border: 2px solid var(--seat);
   background: var(--surface);
   color: var(--text);
@@ -1049,41 +1102,100 @@ input::placeholder {
   pointer-events: none;
 }
 
+.rx-bubble.emoji {
+  padding: 2px 8px;
+  font-size: 1.6rem;
+  line-height: 1.2;
+}
+
+/* The tail, pointing up at the pill. */
+.rx-bubble::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: calc(50% - 5px);
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid var(--seat);
+  border-left: 2px solid var(--seat);
+  background: var(--surface);
+  transform: rotate(45deg);
+}
+
+.rx-bubble.out {
+  opacity: 0;
+  transition: opacity var(--dur-med) var(--ease-out);
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  .rx-tray:not([hidden]) {
+    animation: rx-open var(--dur-med) var(--ease-spring);
+  }
+
+  .rx-tray:not([hidden]) button {
+    animation: rx-item var(--dur-slow) var(--ease-spring) calc(var(--i) * 15ms) backwards;
+  }
+
   .rx-bubble {
-    animation: rx-pop var(--dur-med) var(--ease-spring);
+    animation: rx-pop var(--dur-slow) var(--ease-spring);
+  }
+
+  .pb-react:hover svg {
+    animation: rx-wiggle var(--dur-slow) var(--ease-out);
+  }
+}
+
+@keyframes rx-open {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.92);
+  }
+}
+
+@keyframes rx-item {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.8);
   }
 }
 
 @keyframes rx-pop {
   from {
     opacity: 0;
-    transform: translateX(-50%) scale(0.6);
+    transform: translateX(-50%) translateY(-6px) scale(0.5);
   }
 }
 
-/* Phones: React shows only its face, at the end of the score row, so the
-   names keep their room. Three or four players: the pills in a 2×2 grid
-   beside Leave, a slimmer score. */
+@keyframes rx-wiggle {
+  33% {
+    transform: rotate(-14deg);
+  }
+  66% {
+    transform: rotate(10deg);
+  }
+}
+
+/* Phones: Leave shows only its arrow, like the header's buttons, so React
+   fits beside it and the names keep their room. Three or four players: the
+   pills in a 2×2 grid beside the two buttons, React under Leave, and a
+   slimmer score. */
 @media (max-width: 600px) {
-  .btn.pb-react {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    padding: 0 8px;
+  .btn.pb-leave {
+    width: 36px;
+    padding: 0;
   }
 
-  .pb-score {
-    margin-right: 42px;
-  }
-
-  .pb-react-label {
+  .pb-leave-label {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  .player-bar.many .pb-actions {
+    flex-direction: column-reverse;
   }
 
   .player-bar.many .pb-top {

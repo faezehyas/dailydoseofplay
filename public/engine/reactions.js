@@ -20,6 +20,7 @@ const PHRASES = ["Good luck!", "Nice move!", "Oops!", "Hmm…", "Your turn!", "S
 export const REACTIONS = [...EMOJI, ...PHRASES];
 export const GAP_MS = 2000;
 const SHOW_MS = 3000;
+const OUT_MS = 200; // the bubble fades for the last --dur-med of SHOW_MS
 
 // The game's own robot lines by event ({ strongMove, lead, end }), flattened
 // so every tab numbers them the same.
@@ -61,8 +62,9 @@ export function reactionLink(session, now = () => Date.now()) {
 export function reactionControls(session, pillOf) {
   const link = reactionLink(session);
   const live = el("span", { class: "sr-only", "aria-live": "polite" });
+  // --i staggers the items as the tray opens.
   const items = REACTIONS.map((text, i) =>
-    el("button", { class: i < EMOJI.length ? "rx-emoji" : "rx-phrase", type: "button", tabindex: "-1", onclick: () => send(i) }, text),
+    el("button", { class: i < EMOJI.length ? "rx-emoji" : "rx-phrase", type: "button", tabindex: "-1", style: `--i: ${i}`, onclick: () => send(i) }, text),
   );
   const tray = el(
     "div",
@@ -70,7 +72,7 @@ export function reactionControls(session, pillOf) {
     el("div", { class: "rx-emojis" }, items.slice(0, EMOJI.length)),
     el("div", { class: "rx-phrases" }, items.slice(EMOJI.length)),
   );
-  const button = el("button", { class: "btn small pb-react", type: "button", id: "react", "aria-expanded": "false", "aria-controls": "reactions", onclick: () => (tray.hidden ? open() : close()) }, el("span", { class: "pb-react-label" }, "React"));
+  const button = el("button", { class: "pb-react", type: "button", id: "react", title: "React", "aria-label": "React", "aria-expanded": "false", "aria-controls": "reactions", onclick: () => (tray.hidden ? open() : close()) });
   button.insertAdjacentHTML("afterbegin", REACT_ICON);
 
   let focused = 0;
@@ -116,9 +118,15 @@ export function reactionControls(session, pillOf) {
     const pill = pillOf(seat);
     pill.querySelector(".rx-bubble")?.remove();
     clearTimeout(timers.get(seat));
-    const bubble = el("span", { class: "rx-bubble", "aria-hidden": "true" }, text);
+    const bubble = el("span", { class: `rx-bubble ${EMOJI.includes(text) ? "emoji" : ""}`, "aria-hidden": "true" }, text);
     pill.append(bubble);
-    timers.set(seat, setTimeout(() => bubble.remove(), SHOW_MS));
+    timers.set(
+      seat,
+      setTimeout(() => {
+        bubble.classList.add("out");
+        timers.set(seat, setTimeout(() => bubble.remove(), OUT_MS));
+      }, SHOW_MS - OUT_MS),
+    );
     live.textContent = `${seat === session.index ? "You" : session.players[seat].name}: ${text}`;
     sounds.play("pop");
   }
@@ -127,8 +135,8 @@ export function reactionControls(session, pillOf) {
   return { button, tray, live };
 }
 
-// A face, so React reads as a reaction at a glance.
-const REACT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4 4 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/></svg>';
+// A smiling face, so React reads as a reaction at a glance.
+const REACT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M8 13.5a4.5 4.5 0 0 0 8 0"/><circle class="eye" cx="9" cy="9.5" r="1.3"/><circle class="eye" cx="15" cy="9.5" r="1.3"/></svg>';
 
 // ---------- robot banter ----------
 //

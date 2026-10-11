@@ -82,9 +82,9 @@ test("a reaction shows in the other browser, goes away, and mute hides it", { sk
   assert.ok(await noHorizontalScroll(guest), "no sideways scroll with the tray open at 360 px");
   const tray = await guest.locator("#reactions").boundingBox();
   assert.ok(tray.x >= 0 && tray.x + tray.width <= 360, "the tray fits the phone");
-  await guest.screenshot({ path: `${ARTIFACTS}/reactions-2p-360-light.png` });
+  await guest.screenshot({ path: `${ARTIFACTS}/reactions-2p-360-light.png`, animations: "disabled" });
   await host.click("#react");
-  await host.screenshot({ path: `${ARTIFACTS}/reactions-2p-1280-dark.png` });
+  await host.screenshot({ path: `${ARTIFACTS}/reactions-2p-1280-dark.png`, animations: "disabled" });
   await host.keyboard.press("Escape");
   assert.ok(await host.locator("#reactions").isHidden(), "Esc closes the tray");
 
@@ -147,7 +147,7 @@ test("four players: the tray and bubbles fit, at 360 px and 1280 px", { skip: !p
     const board = await page.locator("#ld-board").boundingBox();
     const pill = await page.locator(".pb-who .rx-bubble").first().boundingBox();
     assert.ok(pill.y + pill.height <= board.y, `${name}: the bubble stays above the board`);
-    await page.screenshot({ path: `${ARTIFACTS}/${name}.png` });
+    await page.screenshot({ path: `${ARTIFACTS}/${name}.png`, animations: "disabled" });
   }
   assert.deepEqual(errors, []);
 });
