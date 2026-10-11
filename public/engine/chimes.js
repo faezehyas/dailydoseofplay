@@ -1,6 +1,7 @@
 // The result chimes (see celebrate.js): one short melody for the whole site,
 // a part of it for each outcome, played in a timbre that fits the game's
-// pieces. Synthesized, so there is nothing to download.
+// pieces, and a soft bit of it for a tutorial's right move. Synthesized, so
+// there is nothing to download.
 import { defineSounds } from "./sound.js";
 import { tone, noise, pentatonic } from "./synth.js";
 
@@ -16,6 +17,9 @@ export const MELODY = {
   over: [0, 2],
 };
 export const GAP = 0.18; // seconds between notes
+// A tutorial's right move (tutorial.js): the win's last two notes, quick and
+// soft, at the ui level.
+export const RIGHT = [2, 5];
 // dB from the fanfare role: a loss, a draw and "over" are gentler than a win.
 export const OFFSET = { win: 0, loss: -2, draw: -2, over: -4 };
 
@@ -50,8 +54,9 @@ export const TIMBRES = {
 // dB that brings each timbre's chimes to their level, as
 // test/browser/sound-levels.test.js measures them.
 const TRIM = { wood: 8.1, paper: 12.6, plastic: 12.9, bell: 7.7, water: 7.7 };
+const RIGHT_TRIM = { wood: -2.9, paper: 1.7, plastic: 1.6, bell: -3.4, water: -3.4 };
 
-// The sound for an outcome in a game's flavour, e.g. "win-wood".
+// The sound for an outcome (or "right") in a game's flavour, e.g. "win-wood".
 export const chime = (outcome, flavour) => `${outcome}-${flavour}`;
 
 const defs = {};
@@ -64,5 +69,10 @@ for (const flavour of Object.keys(TIMBRES)) {
       synth: (a, o, t) => steps.forEach((s, k) => TIMBRES[flavour](a, o, t + k * GAP, note(s))),
     };
   }
+  defs[chime("right", flavour)] = {
+    role: "ui",
+    trim: RIGHT_TRIM[flavour],
+    synth: (a, o, t) => RIGHT.forEach((s, k) => TIMBRES[flavour](a, o, t + (k * GAP) / 2, note(s))),
+  };
 }
 export const sounds = defineSounds(defs);
