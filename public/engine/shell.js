@@ -93,7 +93,7 @@ export function nicknameField(id = "nickname") {
   return el("label", { class: "field" }, el("span", {}, "Nickname"), input, problem, el("small", {}, "Saved on this device only."));
 }
 
-// Whether Leave asks first during a live friend match ("Leaving a game with friends" in the settings panel).
+// Whether Leave asks first during a live friend match ("Ask before leaving" in the settings panel).
 export const askBeforeLeaving = () => getPrefs().askBeforeLeaving;
 
 const systemDark = () => matchMedia("(prefers-color-scheme: dark)").matches;
@@ -114,6 +114,9 @@ const ICONS = {
   moon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>',
   soundOn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
   soundOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>',
+  monitor: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>',
+  volumeLow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/></svg>',
+  close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linejoin="round" d="M18.7 10.1L21.4 10.5L21.4 13.5L18.7 13.9L18.1 15.4L19.7 17.6L17.6 19.7L15.4 18.1L13.9 18.7L13.5 21.4L10.5 21.4L10.1 18.7L8.6 18.1L6.4 19.7L4.3 17.6L5.9 15.4L5.3 13.9L2.6 13.5L2.6 10.5L5.3 10.1L5.9 8.6L4.3 6.4L6.4 4.3L8.6 5.9L10.1 5.3L10.5 2.6L13.5 2.6L13.9 5.3L15.4 5.9L17.6 4.3L19.7 6.4L18.1 8.6z"/><circle cx="12" cy="12" r="3"/></svg>',
 };
 
@@ -200,10 +203,17 @@ export function segGroup({ name, legend, options, value, onChange }) {
   );
 }
 
+const icon = (name) => {
+  const node = el("span", { class: "icon" });
+  node.innerHTML = ICONS[name];
+  return node;
+};
+
 // The settings panel, opened by the header's gear: "General", this device's
 // preferences for every page (prefs.js), and on a game page "This game", the
-// game's settings as in the lobby card. Focus moves in; Esc or Done closes it
-// and focus goes back where it was.
+// game's settings as in the lobby card. A sheet from the bottom on a phone, a
+// card in the middle on wider screens. Changes apply at once. Focus moves to
+// Close; Close, Esc or a tap outside closes it and focus goes back where it was.
 function openSettings(game) {
   const back = document.activeElement;
   const pages = [["general", "General", generalSettings()]];
@@ -232,18 +242,24 @@ function openSettings(game) {
     e.preventDefault();
     select((to + tabs.length) % tabs.length);
   };
+  const close = el("button", { class: "icon-btn settings-close", type: "button", id: "settings-close", title: "Close", "aria-label": "Close", onclick: () => dialog.close() });
+  close.innerHTML = ICONS.close;
+  // The dialog box itself is only the backdrop's edge: its content fills a sheet inside.
   const dialog = el(
     "dialog",
-    { class: "card settings-panel", id: "settings", "aria-labelledby": "settings-title" },
+    { class: "settings-panel", id: "settings", "aria-labelledby": "settings-title" },
     el(
       "div",
-      { class: "settings-head" },
-      el("h2", { id: "settings-title" }, "Settings"),
-      el("form", { method: "dialog" }, el("button", { class: "btn small", id: "settings-done" }, "Done")),
+      { class: "settings-sheet" },
+      el("div", { class: "settings-head" }, el("h2", { id: "settings-title" }, "Settings"), close),
+      tabbed && el("div", { class: "settings-tabs", role: "tablist", "aria-label": "Settings", onkeydown }, tabs),
+      panels,
     ),
-    tabbed && el("div", { class: "settings-tabs", role: "tablist", "aria-label": "Settings", onkeydown }, tabs),
-    panels,
   );
+  // A tap that starts and ends outside the sheet closes the panel.
+  let outside = false;
+  dialog.addEventListener("pointerdown", (e) => (outside = e.target === dialog));
+  dialog.addEventListener("click", (e) => outside && e.target === dialog && dialog.close());
   document.body.append(dialog);
   dialog.showModal();
   dialog.addEventListener("close", () => {
@@ -252,19 +268,44 @@ function openSettings(game) {
   });
 }
 
-// The General tab. Each change applies and is saved at once.
+// The General tab: the nickname, the theme as a segmented control with
+// icons, and switches for sound (with its volume) and asking before leaving.
 function generalSettings() {
   const prefs = getPrefs();
-  const group = (key, legend, options) => segGroup({ name: `settings-${key}`, legend, options, value: prefs[key], onChange: (value) => setPrefs({ [key]: value }) });
-  const volume = el("input", { type: "range", id: "settings-volume", min: "0", max: "100", step: "5", value: String(prefs.volume) });
+  const theme = el(
+    "fieldset",
+    { class: "pref-block" },
+    el("legend", {}, "Theme"),
+    el(
+      "div",
+      { class: "seg-control" },
+      [["system", "System", "monitor"], ["light", "Light", "sun"], ["dark", "Dark", "moon"]].map(([value, label, name]) => {
+        const input = el("input", { type: "radio", name: "settings-theme", value, checked: prefs.theme === value });
+        input.addEventListener("change", () => setPrefs({ theme: value }));
+        return el("label", {}, input, icon(name), el("span", {}, label));
+      }),
+    ),
+  );
+  const toggle = (id, label, note, on, onChange) => {
+    const input = el("input", { type: "checkbox", role: "switch", class: "switch", id, checked: on });
+    input.addEventListener("change", () => onChange(input.checked));
+    return el("label", { class: "pref-row" }, el("span", { class: "pref-label" }, label, note && el("small", {}, note)), input);
+  };
+  const volume = el("input", { type: "range", id: "settings-volume", min: "0", max: "100", step: "5", value: String(prefs.volume), "aria-label": "Volume", disabled: !prefs.sound });
   volume.addEventListener("input", () => setPrefs({ volume: Number(volume.value) }));
-  const sound = group("sound", "Sound", [[true, "On"], [false, "Off"]]);
-  sound.append(el("label", { class: "volume" }, el("span", {}, "Volume"), volume));
+  const sound = toggle("settings-sound", "Sound", null, prefs.sound, (on) => {
+    setPrefs({ sound: on });
+    volume.disabled = !on;
+  });
   return [
     nicknameField("settings-nickname"),
-    group("theme", "Theme", [["system", "System"], ["light", "Light"], ["dark", "Dark"]]),
-    sound,
-    group("askBeforeLeaving", "Leaving a game with friends", [[true, "Ask first"], [false, "Leave at once"]]),
+    theme,
+    el("div", { class: "pref-list" }, sound, el("div", { class: "pref-row volume" }, icon("volumeLow"), volume, icon("soundOn"))),
+    el(
+      "div",
+      { class: "pref-list" },
+      toggle("settings-ask", "Ask before leaving", "When you leave a game with friends", prefs.askBeforeLeaving, (on) => setPrefs({ askBeforeLeaving: on })),
+    ),
   ];
 }
 

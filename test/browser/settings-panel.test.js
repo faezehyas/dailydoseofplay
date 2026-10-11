@@ -53,7 +53,7 @@ test("theme and volume set on the home page apply in a game", { skip: !pw && "Pl
 
   await page.tap("#settings-open");
   await page.locator("#settings").waitFor();
-  assert.equal(await focused(page), "settings-done", "focus moves into the panel");
+  assert.equal(await focused(page), "settings-close", "focus moves into the panel");
   assert.equal(await page.locator("#settings [role=tab]").count(), 0, "no game tab on the home page");
   assert.equal(await page.locator("#settings-nickname").inputValue(), "Ada");
   await page.tap(option("settings-theme", "dark"));
@@ -64,9 +64,15 @@ test("theme and volume set on the home page apply in a game", { skip: !pw && "Pl
   assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), lightBg);
   assert.equal(await page.locator("#theme-toggle").getAttribute("aria-pressed"), "true", "the header's toggle follows");
   assert.deepEqual(await prefs(page), { theme: "dark", sound: true, volume: 40, askBeforeLeaving: true });
-  await page.tap("#settings-done");
+  await page.tap("#settings-close");
   await page.locator("#settings").waitFor({ state: "detached" });
   assert.equal(await focused(page), "settings-open", "focus goes back to the gear");
+  // A tap inside the sheet keeps it open; a tap above it closes it.
+  await page.tap("#settings-open");
+  await page.tap("#settings-title");
+  assert.ok(await page.locator("#settings[open]").isVisible());
+  await page.touchscreen.tap(180, 20);
+  await page.locator("#settings").waitFor({ state: "detached" });
 
   // In a robot game: dark, and sounds through a master gain of 0.4² = 0.16.
   await page.goto(`${srv.base}/tic-tac-toe/?robot=1`);
@@ -148,7 +154,7 @@ test("the panel works with the keyboard alone", { skip: !pw && "Playwright not i
   assert.equal(await focused(page), "settings-open", "the gear is reachable with Tab");
   await page.keyboard.press("Enter");
   await page.locator("#settings").waitFor();
-  assert.equal(await focused(page), "settings-done");
+  assert.equal(await focused(page), "settings-close");
 
   // Tabs: arrow keys move between them and show their page.
   await page.keyboard.press("Tab");
@@ -171,15 +177,18 @@ test("the panel works with the keyboard alone", { skip: !pw && "Playwright not i
   assert.equal(await page.locator("#nickname").inputValue(), "Bo", "the lobby's field follows");
   await page.keyboard.press("ArrowRight"); // System → Light
   assert.equal((await html(page)).theme, "light");
-  await page.keyboard.press("Tab"); // sound on/off
+  await page.keyboard.press("Tab"); // the sound switch
+  assert.equal(await focused(page), "settings-sound");
   await page.keyboard.press("Tab"); // volume
   assert.equal(await focused(page), "settings-volume");
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("ArrowLeft");
   assert.equal((await prefs(page)).volume, 90);
-  await page.keyboard.press("Tab"); // leaving
-  await page.keyboard.press("ArrowRight"); // Ask first → Leave at once
+  await page.keyboard.press("Tab"); // ask before leaving
+  assert.equal(await focused(page), "settings-ask");
+  await page.keyboard.press("Space");
   assert.equal((await prefs(page)).askBeforeLeaving, false);
+  assert.equal(await page.locator("#settings-ask").getAttribute("role"), "switch");
   await page.screenshot({ path: `${ARTIFACTS}/settings-4-keyboard-mobile-light.png` });
 
   await page.keyboard.press("Escape");

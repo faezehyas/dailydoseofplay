@@ -434,7 +434,7 @@ a blocked name over WebRTC either. Nicknames are never logged.
 
 | Module | Job |
 |---|---|
-| `shell.js` | Header with the home link in a `nav` landmark, a "Skip to content" link to the page's `<main>` (shown on focus), and light/dark and sound toggles (each keeps one label, "Dark mode" or "Mute sounds", and gives its state through `aria-pressed`) next to the gear that opens the settings panel (see **Settings**), the footer every page ends with (how games run, then links to this file, the repository and the privacy page; more links join `FOOTER_LINKS`), nickname in `localStorage` (`getNickname()` picks and saves a default when there is none) and the nickname field (`nicknameField()`, in the lobby and the panel), `segGroup()` (a group of segmented options), the theme on `<html data-theme>`, toasts (just below the header; a repeated one is announced again), a tab-title alert ("Your turn"), `el()` DOM helper, and `askBeforeLeaving()`, the panel's "Leaving a game with friends" |
+| `shell.js` | Header with the home link in a `nav` landmark, a "Skip to content" link to the page's `<main>` (shown on focus), and light/dark and sound toggles (each keeps one label, "Dark mode" or "Mute sounds", and gives its state through `aria-pressed`) next to the gear that opens the settings panel (see **Settings**), the footer every page ends with (how games run, then links to this file, the repository and the privacy page; more links join `FOOTER_LINKS`), nickname in `localStorage` (`getNickname()` picks and saves a default when there is none) and the nickname field (`nicknameField()`, in the lobby and the panel), `segGroup()` (a group of segmented options), the theme on `<html data-theme>`, toasts (just below the header; a repeated one is announced again), a tab-title alert ("Your turn"), `el()` DOM helper, and `askBeforeLeaving()`, the panel's "Ask before leaving" switch |
 | `prefs.js` | The general settings (see **Settings**): `getPrefs()`, `setPrefs(patch)`, `onPrefsChange(fn)`, and `normalizePrefs()` and `loadPrefs(storage)`, which moves the old `ddp-theme` and `ddp-sound` into `ddp-settings`. No DOM; runs in node too. |
 | `names.js` | `checkName()` and `cleanName()`: the nickname rules (see **Nicknames**), shared with the server; `defaultName()`, a friendly default name |
 | `theme.css` | Design tokens for light and dark, fonts and motion (see **Type and motion**), chips and `.mono`, buttons, cards, lobby, the home hero with its steps and its game-table scene, the home grid (tiles whose name links to the lobby, with Play friends and Play the robot links), the moves the tiles' previews use (see **Tile previews**) and its loading tiles (see **Colours and contrast**), the game page column (see **Page column**), the player bar, the result panel, the result moment, the confirm dialog, the settings panel and `.text-page` (the privacy page's reading column) |
@@ -584,9 +584,8 @@ stopped; while it is on in a friend game, `shell.leave()` opens
 `confirmDialog()`: "Leave the game? Bo will be told you left." with two
 players, "Leave the game? It ends for everyone." with more. Cancel keeps
 playing. Robot games, finished matches and a game that never calls
-`setInProgress` leave at once, and so does a player who set "Leaving a game
-with friends" to "Leave at once" in the settings panel (`askBeforeLeaving()`
-in `shell.js`). The browser's Back (or a phone's back gesture) is
+`setInProgress` leave at once, and so does a player who turned off "Ask
+before leaving" in the settings panel (`askBeforeLeaving()` in `shell.js`). The browser's Back (or a phone's back gesture) is
 Leave too: a game gets a history entry of its own when it starts, so Back
 returns to the lobby, asking first in the same cases; Back while the question
 is open closes it, like Esc. Closing or reloading the tab in those cases gets the
@@ -637,14 +636,18 @@ which buffers until a handler is attached. The handshake's protocol version is
 2; a page from before groups gets "a different version of this page".
 
 **Settings.** The gear at the right of every page's header opens one panel,
-a modal `<dialog>` built by `shell.js`: focus moves to its Done button, and
-Esc, Done or (during a game) the browser's Back closes it and returns focus
-to the gear. Arrow keys, Home and End move between its two tabs:
+a modal `<dialog>` built by `shell.js`: a sheet from the bottom on a phone
+(520 px and under), a card in the middle on wider screens. Changes apply as
+they are made, so there is no Save or Done. Focus moves to its close (×)
+button; the close button, Esc, a tap outside the sheet or (during a game) the
+browser's Back closes it and returns focus to the gear. Arrow keys, Home and
+End move between its two tabs:
 
 - **General**, this device's preferences for every page: nickname
-  (`ddp-name`), theme (System, Light or Dark), sound on or off and its volume,
-  and "Leaving a game with friends" (Ask first or Leave at once, see
-  **Leaving**). Each applies at once. Animations follow the device's
+  (`ddp-name`); theme (System, Light or Dark, a segmented control with
+  icons); sound, a switch, with its volume slider; and "Ask before leaving",
+  a switch (see **Leaving**). The switches are checkboxes with
+  `role="switch"`. Animations follow the device's
   `prefers-reduced-motion` (see **Type and motion**).
   `prefs.js` keeps them together in `ddp-settings`; on the first read it moves
   the older `ddp-theme` and `ddp-sound` keys there. `onPrefsChange(fn)` hears
