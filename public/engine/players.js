@@ -1,10 +1,11 @@
 // The player bar every game shows above its board: a pill per player (you
 // first, then the others in seat order) with an optional badge and note, a
 // ring on whoever's turn it is, the wins so far (and draws, for games that
-// have them), and Leave, always at the top right. Colours come from --seat
-// and --seat-text: .mine and .theirs by default, or a game's own class per
-// seat (see "player bar" in theme.css).
+// have them), React (reactions.js) at the top left, and Leave, always at the
+// top right. Colours come from --seat and --seat-text: .mine and .theirs by
+// default, or a game's own class per seat (see "player bar" in theme.css).
 import { el } from "./shell.js";
+import { reactionControls } from "./reactions.js";
 
 // An arrow out of a door, so Leave reads as a way out at a glance.
 const LEAVE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M15 8l4 4-4 4M19 12H9"/></svg>';
@@ -32,8 +33,9 @@ export function playerBar(session, { onLeave, classes = () => "" }) {
   const players = el("div", { class: "pb-players" }, duel ? [pills[0].node, el("span", { class: "pb-vs" }, "vs"), pills[1].node] : pills.map((p) => p.node));
   const leave = el("button", { class: "btn small pb-leave", type: "button", id: "leave", onclick: onLeave }, "Leave");
   leave.insertAdjacentHTML("afterbegin", LEAVE_ICON);
+  const react = reactionControls(session, (seat) => pills.find((p) => p.seat === seat).node);
   const scoreBox = el("dl", { class: "pb-score", id: "score", "aria-label": "Score" }, wins.map((w) => w.node));
-  const node = el("div", { class: `player-bar ${duel ? "" : "many"}` }, el("div", { class: "pb-top" }, players, leave), scoreBox);
+  const node = el("div", { class: `player-bar ${duel ? "" : "many"}` }, el("div", { class: "pb-top" }, react.button, players, leave), react.tray, scoreBox, react.live);
 
   // A slot shows a node of the game's (kept as is when it is already there) or text.
   const put = (slot, v) => {

@@ -809,16 +809,18 @@ input::placeholder {
 }
 
 .player-bar {
+  position: relative;
   display: grid;
   gap: 8px;
 }
 
-/* The players stay together, centred over the score, with Leave at the top
-   right; the empty first column balances Leave. No grid gap, so on a phone
-   that empty column takes no room from the names. */
+/* The players stay together, centred over the score, with React at the top
+   left and Leave at the top right, balancing each other. No grid gap, so on
+   a phone, where React moves to the score row, the empty first column takes
+   no room from the names. */
 .pb-top {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, max-content) minmax(max-content, 1fr);
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, max-content) minmax(max-content, 1fr);
   align-items: start;
 }
 
@@ -832,13 +834,21 @@ input::placeholder {
   margin-left: 8px;
 }
 
-/* Leave looks like a button on every board: an outline and an exit arrow. */
+.pb-top > .pb-react {
+  grid-column: 1;
+  justify-self: start;
+  margin: 0 8px 0 0;
+}
+
+/* React and Leave look like buttons on every board: an outline and an icon. */
+.pb-react,
 .pb-leave {
   gap: 6px;
   border-color: var(--control-border);
   background: var(--surface);
 }
 
+.pb-react svg,
 .pb-leave svg {
   width: 18px;
   height: 18px;
@@ -871,6 +881,7 @@ input::placeholder {
 }
 
 .pb-who {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -963,9 +974,131 @@ input::placeholder {
   color: var(--seat-text, var(--text));
 }
 
-/* Phones, three or four players: the pills in a 2×2 grid beside Leave, a
-   slimmer score. */
+/* ---------- reactions (engine/reactions.js) ---------- */
+/* The tray opens under the bar, over the board until a reaction is picked,
+   so the bubbles stay in sight; a bubble shows under the sender's pill, over
+   the score, never the board. */
+.rx-tray {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  gap: 8px;
+  width: min(336px, 100%);
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.rx-emojis {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.rx-phrases {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.rx-tray button {
+  min-height: 36px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.rx-tray button:hover {
+  background: var(--surface-2);
+}
+
+.rx-emoji {
+  font-size: 1.3rem;
+  padding: 0;
+}
+
+.rx-phrase {
+  border-color: var(--control-border);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.rx-mute {
+  justify-self: start;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.rx-mute[aria-pressed="true"] {
+  border-color: var(--control-border);
+  color: var(--text);
+}
+
+.rx-bubble {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 50%;
+  max-width: 160px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 2px solid var(--seat);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rx-bubble {
+    animation: rx-pop var(--dur-med) var(--ease-spring);
+  }
+}
+
+@keyframes rx-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.6);
+  }
+}
+
+/* Phones: React shows only its face, at the end of the score row, so the
+   names keep their room. Three or four players: the pills in a 2×2 grid
+   beside Leave, a slimmer score. */
 @media (max-width: 600px) {
+  .btn.pb-react {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    padding: 0 8px;
+  }
+
+  .pb-score {
+    margin-right: 42px;
+  }
+
+  .pb-react-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   .player-bar.many .pb-top {
     grid-template-columns: minmax(0, 1fr) auto;
   }

@@ -87,6 +87,8 @@ startGameShell({
   layout: "wide",
   settings,
   createRobot: (session) => startRobot(session, { delay: AI_DELAY, config: settings.get() }),
+  // A seat's score: the ships it has sunk.
+  banter: { score: (st, p) => st.boards[R.other(p)].sunk.length, lines: { strongMove: ["Direct hit!"], lead: ["Splash!"] } },
   onSession: (session, root, shell) => mountSeaBattle(session, root, shell),
 });
 

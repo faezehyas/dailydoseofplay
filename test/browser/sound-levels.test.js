@@ -1,5 +1,5 @@
-// Headless-browser test: every sound of every game, and the engine's result
-// chimes (engine/chimes.js), lands at its role's loudness (engine/sound.js),
+// Headless-browser test: every sound of every game, the engine's result
+// chimes (engine/chimes.js) and the reactions' pop (engine/reactions.js), lands at its role's loudness (engine/sound.js),
 // so no sound is much louder or quieter than the others that do the same
 // job, here or in another game. Each sound is
 // rendered offline through the site's output, every recording and every
@@ -18,7 +18,7 @@ const PUBLIC = new URL("../../public/", import.meta.url);
 const GAMES = readdirSync(PUBLIC, { withFileTypes: true })
   .filter((d) => d.isDirectory() && existsSync(new URL(`${d.name}/sounds.js`, PUBLIC)))
   .map((d) => d.name);
-const SOURCES = [...GAMES.map((g) => [g, `/${g}/sounds.js`]), ["engine", "/engine/chimes.js"]];
+const SOURCES = [...GAMES.map((g) => [g, `/${g}/sounds.js`]), ["engine", "/engine/chimes.js"], ["reactions", "/engine/reactions.js"]];
 
 async function measure(page, url) {
   return page.evaluate(async (url) => {

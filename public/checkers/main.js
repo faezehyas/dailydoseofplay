@@ -33,6 +33,7 @@ startGameShell({
       delay: ROBOT_DELAY,
     });
   },
+  banter: { score: (st, p) => countPieces(st.board, p), strong: 2 },
   onSession: (session, root, shell) => mountCheckers(session, root, shell),
 });
 

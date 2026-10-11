@@ -9,7 +9,7 @@ import { el, toast, setTabAlert } from "../engine/shell.js";
 import { playerBar } from "../engine/players.js";
 import { resultPanel } from "../engine/result.js";
 import { celebrate } from "../engine/celebrate.js";
-import { makeRules, normalizeConfig, distinctMoves, legalMoves, colorsFor, COLORS, MAX_PLAYERS, YARD, HOME, LAST_LOOP, TOKENS } from "./rules.js";
+import { makeRules, normalizeConfig, distinctMoves, legalMoves, progress, colorsFor, COLORS, MAX_PLAYERS, YARD, HOME, LAST_LOOP, TOKENS } from "./rules.js";
 import { chooseMove, startRobot } from "./robot.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
@@ -59,6 +59,8 @@ startGameShell({
       },
     });
   },
+  // A capture usually costs the robot 10 squares or more; a move gains at most 6.
+  banter: { score: progress, strong: 10, lines: { strongMove: ["Back to the yard…"], lead: ["Coming through!"] } },
   onSession: (session, root, shell) => mountGame(session, root, shell),
 });
 
