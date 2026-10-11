@@ -786,14 +786,14 @@ stop a stranger's words reaching a child. Instead the player bar's React
 (`#react`, a face, with its word hidden under 600 px where it sits at the end
 of the score row) opens a tray (`#reactions`) of 8 emoji (👋 😄 😮 😅 🤔 🔥 👏
 😢) and 8 phrases ("Good luck!", "Nice move!", "Oops!", "Hmm…", "Your turn!",
-"So close!", "Good game!", "Rematch?"). Arrow keys, Home and End move through
-it (wrapping round), Enter or a tap picks, and Esc, a pick or a tap outside closes it and
-gives focus back to React. A pick sends `$react {i}`, the index into that
-list, so there is nothing to moderate.
+"So close!", "Good game!", "Rematch?"). Arrow keys (wrapping round), Home and
+End move through it, Enter or a tap picks, and Esc, a pick or a tap outside
+closes it and gives focus back to React. A pick sends `$react {i}`, the index
+into that list, so there is nothing to moderate.
 
 - A reaction shows as a bubble under the sender's pill, over the score and
   never the board, for 3 s, with a soft synthesized `pop` (role `ui`, 4 dB
-  under it) that follows the mute toggle, and is read out from a polite live
+  under it) that follows the sound setting, and is read out from a polite live
   line ("Bo: Nice move!"). You see your own as well.
 - Each seat may react once every 2 s: the sender's page holds back a second
   one, and every receiver drops one that comes sooner, and any `i` that is

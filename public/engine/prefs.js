@@ -1,8 +1,8 @@
 // General settings: this device's preferences for every page (theme, sound
 // and volume, asking before leaving, muting reactions), kept together under
-// one key. The
-// nickname keeps its own key (ddp-name, in shell.js). onPrefsChange() is
-// where syncing them to an account can hook in later. No DOM; runs in node too.
+// one key. The nickname keeps its own key (ddp-name, in shell.js).
+// onPrefsChange() is where syncing them to an account can hook in later. No
+// DOM; runs in node too.
 const KEY = "ddp-settings";
 // Before ddp-settings, the theme and the mute had keys of their own.
 const OLD_THEME = "ddp-theme";
