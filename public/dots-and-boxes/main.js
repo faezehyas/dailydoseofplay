@@ -39,6 +39,7 @@ startGameShell({
     const config = settings.get();
     return startRobot(session, { rules: makeRules(config), level: config.level });
   },
+  banter: { score: (st, p) => st.score[p], strong: 2, lines: { strongMove: ["What a chain!"], lead: ["Mine now!"] } },
   onSession: (session, root, shell) => mountGame(session, root, shell),
 });
 

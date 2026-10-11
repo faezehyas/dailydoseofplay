@@ -177,6 +177,7 @@ the audit at the end.
 - Make it decent rather than perfect: win if it can, block an immediate loss, then use a heuristic or a shallow search. It must answer in well under 100 ms.
 - Wire it up: `createRobot: (session) => startTurnRobot(session, { rules, choose: chooseMove, delay: 600 })`.
 - For a card game, `chooseMove(state, me, rng, face)` gets `face(slot)`, the faces the robot may know, and you wire it up with `startPacedRobot()` from `engine/cards/paced-robot.js`, which pauses like a person (or `startCardRobot()` from `engine/card-match.js`, with a fixed delay). A robot only sees its own seat's cards.
+- Banter (optional): every robot says "Good game!" at the end. To have it react after a strong move of the player's and when it takes the lead too, pass `banter` to `startGameShell()` with `score(state, seat)`, how well a seat is doing (boxes, ships sunk, squares), and `strong`, how much one of the player's moves must gain to count (default 1). `lines` adds 2 to 4 short lines of the game's own, by moment: `banter: { score: (st, p) => st.score[p], strong: 2, lines: { strongMove: ["What a chain!"], lead: ["Mine now!"] } }`. Keep them friendly; they are fixed strings, like the reactions.
 
 ### 5. Write `main.js`
 
@@ -544,7 +545,8 @@ The [PR template](.github/pull_request_template.md) repeats these lines, shorten
 | `public/engine/settings.js` | `gameSettings()`: a game's settings, shown in the lobby card and the settings panel |
 | `public/engine/how-to-play.js` | `howToPlayPanel()`: the "How to play" panel, the same sections in every game |
 | `public/engine/tutorial.js` | `startTutorial()`: a game's lessons on its own board, from its `tutorial.js` |
-| `public/engine/players.js` | `playerBar()`: names, whose turn it is, the score and Leave, above every game |
+| `public/engine/players.js` | `playerBar()`: names, whose turn it is, the score, React and Leave, above every game |
+| `public/engine/reactions.js` | Quick reactions: the React tray, bubbles, mute, and the robots' banter |
 | `public/engine/result.js` | `resultPanel()`: the game-over panel with the result, Rematch and Leave, in every game |
 | `public/engine/celebrate.js` | `celebrate()`: the win, loss and draw moment as the result panel opens, with its chimes from `chimes.js` |
 | `public/engine/confirm.js` | `confirmDialog()`: a yes-or-no question in a modal dialog, such as "Leave the game?" |

@@ -103,6 +103,7 @@ flowchart TB
     e_channel["channel.js"]
     e_shell["shell.js"]
     e_players["players.js"]
+    e_reactions["reactions.js"]
     e_result["result.js"]
     e_celebrate["celebrate.js"]
     e_chimes["chimes.js"]
@@ -219,11 +220,17 @@ flowchart TB
   e_confirm --> e_shell
   e_lobby --> e_confirm
   e_lobby --> e_how_to_play
+  e_lobby --> e_reactions
   e_lobby --> e_room
   e_lobby --> e_shell
   e_lobby --> e_tutorial
   e_peer --> e_channel
+  e_players --> e_reactions
   e_players --> e_shell
+  e_reactions --> e_prefs
+  e_reactions --> e_shell
+  e_reactions --> e_sound
+  e_reactions --> e_synth
   e_result --> e_celebrate
   e_result --> e_shell
   e_room --> e_channel
@@ -452,13 +459,13 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `shell.js` | Header with the home link in a `nav` landmark, a "Skip to content" link to the page's `<main>` (shown on focus), and light/dark and sound toggles (each keeps one label, "Dark mode" or "Mute sounds", and gives its state through `aria-pressed`) next to the gear that opens the settings panel (see **Settings**), the footer every page ends with (how games run, then links to this file, the repository and the privacy page; more links join `FOOTER_LINKS`), nickname in `localStorage` (`getNickname()` picks and saves a default when there is none) and the nickname field (`nicknameField()`, in the lobby and the panel), `segGroup()` (a group of segmented options), the theme on `<html data-theme>`, toasts (just below the header; a repeated one is announced again), a tab-title alert ("Your turn"), `el()` DOM helper, and `askBeforeLeaving()`, the panel's "Ask before leaving" switch |
 | `prefs.js` | The general settings (see **Settings**): `getPrefs()`, `setPrefs(patch)`, `onPrefsChange(fn)`, and `normalizePrefs()` and `loadPrefs(storage)`, which moves the old `ddp-theme` and `ddp-sound` into `ddp-settings`. No DOM; runs in node too. |
 | `names.js` | `checkName()` and `cleanName()`: the nickname rules (see **Nicknames**), shared with the server; `defaultName()`, a friendly default name |
-| `theme.css` | Design tokens for light and dark, fonts and motion (see **Type and motion**), chips and `.mono`, buttons, cards, lobby, the home hero with its steps and its game-table scene, the home grid (tiles whose name links to the lobby, with Play friends and Play the robot links), the moves the tiles' previews use (see **Tile previews**) and its loading tiles (see **Colours and contrast**), the game page column (see **Page column**), the player bar, the result panel, the result moment, the tutorial (see **Tutorials**), the confirm dialog, the settings panel and `.text-page` (the privacy page's reading column) |
+| `theme.css` | Design tokens for light and dark, fonts and motion (see **Type and motion**), chips and `.mono`, buttons, cards, lobby, the home hero with its steps and its game-table scene, the home grid (tiles whose name links to the lobby, with Play friends and Play the robot links), the moves the tiles' previews use (see **Tile previews**) and its loading tiles (see **Colours and contrast**), the game page column (see **Page column**), the player bar with the reactions' tray and bubbles, the result panel, the result moment, the tutorial (see **Tutorials**), the confirm dialog, the settings panel and `.text-page` (the privacy page's reading column) |
 | `signaling.js` | `RoomClient`: create, join (with or without the invite key), admit, decline, signal, leave. It uses the global `WebSocket`, so it also runs in Node 22 for the integration test. |
 | `peer.js` | `PeerChannel`: one ordered, reliable DataChannel to one other browser, pre-negotiated (`negotiated: true, id: 0`) on both sides; buffers early ICE candidates; detects ICE failure, a 20 s timeout and a 10 s disconnect grace. Refuses a message over `MAX_MESSAGE_LENGTH` before parsing it and closes with `message_too_big` (see **Message size**). |
 | `channel.js` | `Emitter` and `localPair()`, an in-memory two-ended channel with the same interface as `PeerChannel` (used for robots and tests). `MAX_MESSAGE_LENGTH` (64 K characters of JSON) and `MESSAGE_TOO_BIG`: the local pair refuses an oversized message the same way, so robot games and tests behave like WebRTC. |
 | `group.js` | The group transport every layer above talks to: `send(msg)` to all other seats, `message (msg, from)`, `leave (seat)`, `close`. `HubGroup` and `SpokeGroup` are today's star over links; `localGroup(n)` connects n seats in memory. The hub measures each frame it would forward and cuts off a guest whose frame is over the cap; `leave` and `close` carry `message_too_big` when that was the reason. |
 | `room.js` | How players get seated in a group: `HostRoom` (create, `accept()` / `decline()` knocks, admit guests over WebRTC, `start()`), `GuestRoom` (join, wait for the start) and `localRoom()` (robots). The only engine file that knows about signaling and WebRTC. |
-| `session.js` | `Session`: the seated players (`players`, `index`, `me`, `others`, `opponent`), buffering of game messages, rematch votes (`$rematch`, every seat must vote), goodbye (`$bye`). The handshake (`$hello` with a protocol version, `$welcome`, `$roster`, `$start`) that turns links into a group. No DOM. |
+| `session.js` | `Session`: the seated players (`players`, `index`, `me`, `others`, `opponent`), buffering of game messages, rematch votes (`$rematch`, every seat must vote), goodbye (`$bye`), reactions (`$react`, emitted as `react` for `reactions.js`). The handshake (`$hello` with a protocol version, `$welcome`, `$roster`, `$start`) that turns links into a group. No DOM. |
 | `session.js` → `matchRouter()` | Routes game messages to the current match by match number `m`, with the sender's seat, and holds messages for a rematch that hasn't started yet |
 | `robot-pace.js` | `robotPause(ms)`: every robot's pause before it moves goes through it, so browser tests can speed robots up by setting `globalThis.ddpRobotPace` (1 for players) |
 | `turn-match.js` | `TurnMatch` and `startTurnRobot()`: a generic protocol for open-information turn games, for two or more players. Agreed coin toss for who starts, every peer validates every move with the same rules (only the seat on turn may move), and luck moves (dice) use `SharedRandom`. A rules object may set `draws`, the most shared draws one match needs (default 256). This is the default for future games. Card games use `card-match.js`; Sea Battle hides a fleet, not cards, so it has its own `match.js`. |
@@ -471,6 +478,7 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `lobby.js` | `startGameShell()`: the game's `description` from `games.json` under its name (the lobby shows at once and the text fills in when the file arrives), a "How to play" link under it that opens the game's `howToPlay` panel (see `how-to-play.js`, put under `#game`) and moves focus to its summary, the "Play with a friend" / "Play vs robot" / join-by-code UI with a quiet line under the Play buttons that games connect browsers directly, invite link with copy and share, the waiting room (a player list and a Start button when a game allows more than two; Accept / Decline for anyone knocking), `?room=CODE&key=KEY` auto-join, `?robot=1` (a robot game), `?friend=1` (a new room at once, as if "Play with a friend" was pressed; dropped from the address bar so a reload doesn't make another) and `?learn` (the game's tutorial, also opened by a Learn button under the Play buttons and a link at the top of "How to play"; see **Tutorials**), connection-failure and player-left screens. It hands the game a `shell` with `leave()` and `setInProgress(on)` (see **Leaving**). With a game's `settings` it shows them inside the home screen's card, between the nickname and the Play buttons, and their summary on the host's waiting screen, so friends see the rules before the game starts; it passes them to the settings panel and locks them while a game is on. Each new screen moves focus to its heading (not on page load); progress such as "Creating a room…" or "Bo joined" is read out from one `role="status"` line, and the connection-problem screen uses `role="alert"`. The code field takes only the server's code letters (uppercased, spaces and dashes dropped, anything else refused with a hint) and joins by itself at four; a join that fails returns to it with the code still in, the error under the field and read out from the status line. It also sets which view is on show for the page column. |
 | `fair.js` | `commit` and `verifyCommit` (SHA-256 commitments), `HashChain` and `SharedRandom` (random draws all peers agree on). SHA-256 uses WebCrypto where the page has it, else a plain-JS copy (see below). |
 | `players.js` | `playerBar(session, { onLeave, classes })`: the bar above every game (see **Player bar**). |
+| `reactions.js` | Quick reactions in the player bar (see **Reactions**): the React tray, the bubbles with their pop, the checks on `$react`, and `robotBanter()`, which the lobby starts for every robot seat. |
 | `result.js` | `resultPanel(session, { onLeave, onShow, classes })`: the game-over panel of every game, with Rematch and Leave (see **Result panel**). |
 | `celebrate.js` | `celebrate({ outcome, flavour, highlight, anchor, board })`: the result moment a game plays from the panel's `onShow`, and `calm()`, which the panel calls when it hides (see **Result moment**). |
 | `chimes.js` | The result chimes: the site's jingle for each outcome in each game's timbre, through `sound.js` (see **Result moment**), and a tutorial's right move (`right-<flavour>`, see **Tutorials**). No DOM. |
@@ -651,6 +659,15 @@ game receives messages through `session.onMessage((msg, fromSeat) => …)`,
 which buffers until a handler is attached. The handshake's protocol version is
 2; a page from before groups gets "a different version of this page".
 
+| Engine message, during a game | Meaning |
+|---|---|
+| `$bye` | I am leaving: the session ends for everyone. |
+| `$rematch` | My vote for a rematch. |
+| `$react {i}` | A reaction: `i` indexes the fixed list in `reactions.js`, never text. |
+
+A page from before reactions ignores `$react`, as it ignores any `$` message
+it doesn't know, so the protocol version stays 2.
+
 **Settings.** The gear at the right of every page's header opens one panel,
 a modal `<dialog>` built by `shell.js`: a sheet from the bottom on a phone
 (520 px and under), a card in the middle on wider screens. Changes apply as
@@ -661,8 +678,9 @@ End move between its two tabs:
 
 - **General**, this device's preferences for every page: nickname
   (`ddp-name`); theme (System, Light or Dark, a segmented control with
-  icons); sound, a switch, with its volume slider; and "Ask before leaving",
-  a switch (see **Leaving**). The switches are checkboxes with
+  icons); sound, a switch, with its volume slider; "Ask before leaving",
+  a switch (see **Leaving**); and "Mute reactions", a switch (see
+  **Reactions**). The switches are checkboxes with
   `role="switch"`. Animations follow the device's
   `prefers-reduced-motion` (see **Type and motion**).
   `prefs.js` keeps them together in `ddp-settings`; on the first read it moves
@@ -764,7 +782,7 @@ box keeps whatever width it sets, and its rules panel matches the column.
 **Player bar.** Every game shows the same bar above its board, built by
 `playerBar()` in `players.js` and styled in `theme.css`: a pill per player
 (you first, "(you)" after your name, found by your seat and never by comparing names, then the others in seat order), a ring
-on whoever's turn it is, and Leave (`id="leave"`, outlined, with an exit arrow) at the top right. Under it
+on whoever's turn it is, and at the top right React (see **Reactions**) and Leave (`id="leave"`, outlined, an exit arrow like the header's buttons, with its word for screen readers and as a tooltip). Under it
 the score (`#score`) shows wins per player and, for games whose score has a
 `draws` field, a Draws box (Dots and Boxes adds it with the first draw,
 since only some boards can be drawn). The game creates it once and calls
@@ -773,11 +791,56 @@ by seat: `turn` is a seat or -1, `score` is `{ wins, draws }`, a badge is a
 node of the game's own (a mark, disc, stone or swatch, which the game may
 keep changing), and a note is a short line under the name (pips, boxes, a
 square), as text or a node. With three or four players the pills wrap, at
-most two to a row; under 600 px they sit in a 2×2 grid beside Leave over a
-slimmer score, so four fit a 360 px phone. A pill and its score read
+most two to a row; under 600 px they sit in a 2×2 grid beside Leave (React
+under it) over a slimmer score, so four fit a 360 px phone. A pill and its score read
 `--seat` and `--seat-text`, which are `--mine` and `--theirs` unless the game
 gives each seat a class of its own that sets them (Chutes and Ladders `p0`
 to `p3`, Ludo its board colours, Crazy Eights, Go Fish and Gin Rummy `p-0` to `p-3`).
+
+**Reactions.** Players can't type to each other: there would be nothing to
+stop a stranger's words reaching a child. Instead the player bar's React
+(`#react`, a round smiling face beside Leave) opens a tray (`#reactions`)
+under the bar, so names, bubbles and score stay in sight. It holds 8 emoji
+(👋 😄 😮 😅 🤔 🔥 👏 😢), which grow under the pointer or focus, and 8
+phrases as chips that light up coral ("Good luck!", "Nice move!", "Oops!",
+"Hmm…", "Your turn!", "So close!", "Good game!", "Rematch?"). Arrow keys
+(wrapping round), Home and End move through it, Enter or a tap picks, and
+Esc, a pick or a tap outside closes it and gives focus back to React. A pick
+sends `$react {i}`, the index into that list, so there is nothing to
+moderate.
+
+- A reaction shows as a speech bubble under the sender's pill, over the
+  score and never the board, for 3 s (an emoji larger than a phrase), with a
+  soft synthesized `pop` (role `ui`, 4 dB under it) that follows the sound
+  setting, and is read out from a polite live line ("Bo: Nice move!"). You
+  see your own as well.
+- Each seat may react once every 2 s: the sender's page holds back a second
+  one, and every receiver drops one that comes sooner, and any `i` that is
+  not a whole number in the list.
+- "Mute reactions", a switch in the settings panel's General tab (see
+  **Settings**), hides other players' bubbles, their pop and their read-out
+  on this device (`muteReactions` in `ddp-settings`).
+
+**Robot banter.** In a robot game the lobby calls `robotBanter()` for each
+robot seat, which sends `$react` like any player. It watches the robot's
+match (`robot.match`, which every robot loop exposes) and says something at
+the end ("Good game!", after a 2 s pause) and, for games that pass
+`banter.score(state, seat)` to `startGameShell()`, when a move of yours cuts
+its lead by `banter.strong` or more (😮, 👏, "Nice move!", "Oops!") or when it
+takes the lead (😄, 🔥), at most once every four turns. A game may add a few
+lines of its own by moment (`banter.lines`), numbered after the fixed list in
+every tab, so they still travel as an index:
+
+| Game | `score` | `strong` | Own lines |
+|---|---|---|---|
+| Sea Battle | ships sunk | 1 | "Direct hit!", "Splash!" |
+| Chutes and Ladders | square | 10 (a ladder) | "What a ladder!", "Up I go!" |
+| Dots and Boxes | boxes | 2 | "What a chain!", "Mine now!" |
+| Ludo | tokens' progress | 10 (a capture) | "Back to the yard…", "Coming through!" |
+| Checkers | pieces left | 2 | none |
+| Go Fish | books | 1 | none |
+
+The other games' robots only say "Good game!".
 
 **Result panel.** Every game shows its result the same way, in a panel
 built by `resultPanel()` in `result.js` and pinned to the bottom of the

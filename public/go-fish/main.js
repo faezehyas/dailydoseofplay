@@ -73,6 +73,7 @@ startGameShell({
       delay: (st, me, move, face) => robotDelay(st, me, move, face, config.level),
     });
   },
+  banter: { score: (st, p) => st.books[p].length },
   onSession: (session, root, shell) => mountGame(session, root, shell),
 });
 
