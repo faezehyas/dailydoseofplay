@@ -1,0 +1,21 @@
+name: Idea
+description: Suggest a change to the site, the lobby or a game. To build a new game, use Game proposal.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: What you'd like, and the problem it solves.
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: The game or page it's for, if any.
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Sketches, screenshots, or how another site does it.

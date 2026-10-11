@@ -10,7 +10,7 @@
 [Games](#games) ·
 [Run it locally](#play-locally) ·
 [Add a game](#add-a-game-in-five-steps) ·
-[Report a bug](https://github.com/Faezehyas/dailydoseofplay/issues/new?labels=bug)
+[Report a bug](https://github.com/Faezehyas/dailydoseofplay/issues/new?template=bug.yml)
 
 [![Tests](https://github.com/Faezehyas/dailydoseofplay/actions/workflows/test.yml/badge.svg)](https://github.com/Faezehyas/dailydoseofplay/actions/workflows/test.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -186,8 +186,13 @@ don't touch the server.
 [ARCHITECTURE.md](ARCHITECTURE.md) explains how rooms, WebRTC and fair play
 work.
 
+Everyone follows the [Code of Conduct](CODE_OF_CONDUCT.md). Found a bug or
+have an idea? Open a [bug](https://github.com/Faezehyas/dailydoseofplay/issues/new?template=bug.yml)
+or [idea](https://github.com/Faezehyas/dailydoseofplay/issues/new?template=idea.yml) issue.
+
 ## How PRs are reviewed
 
+- **The template.** A new PR starts from the [PR template](.github/pull_request_template.md): summary, rules, protocol, screenshots, tests and the checklist. [CODEOWNERS](.github/CODEOWNERS) requests the maintainer's review.
 - **The checklist.** Reviewers go through the checklist at the end of [CONTRIBUTING.md](CONTRIBUTING.md#checklist-before-opening-the-pr): pure, tested rules; a robot that finishes its games; a friend match with rematch; no hidden information on the wire; 360 px wide in light and dark; original art and text; no new dependencies and no server changes.
 - **CI.** Every PR runs `npm test`, a dependency audit and the browser tests in Chromium ([.github/workflows/test.yml](.github/workflows/test.yml)). They must pass.
 - **Timing.** A review usually comes within a few days. Once the PR is merged, the game goes live on the site.
