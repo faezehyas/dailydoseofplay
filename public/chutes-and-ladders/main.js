@@ -5,7 +5,7 @@
 import { startGameShell } from "../engine/lobby.js";
 import { matchRouter } from "../engine/session.js";
 import { TurnMatch, startTurnRobot } from "../engine/turn-match.js";
-import { el, toast, setTabAlert, reducedMotion } from "../engine/shell.js";
+import { el, toast, setTabAlert } from "../engine/shell.js";
 import { playerBar } from "../engine/players.js";
 import { resultPanel } from "../engine/result.js";
 import { celebrate } from "../engine/celebrate.js";
@@ -30,7 +30,8 @@ const SPIN_SPEED = 1100; // degrees per second at full spin
 const PACE = { hop: 230, rung: 120, between: 380 };
 const FINISH_TEXT = { exact: "exact spin to finish", bounce: "bounce back off 100", any: "any spin past 100 wins" };
 
-const still = reducedMotion;
+const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+const still = () => reduced.matches;
 
 startGameShell({
   slug: "chutes-and-ladders",

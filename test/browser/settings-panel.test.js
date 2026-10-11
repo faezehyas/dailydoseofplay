@@ -1,5 +1,5 @@
 // Headless-browser test for the settings panel behind the header's gear: the
-// theme, volume and animations chosen on the home page apply in a game; a
+// theme and volume chosen on the home page apply in a game; a
 // room setting is locked during a game until the next one, while a view
 // setting stays open; and the panel works with the keyboard alone. Skips if
 // Playwright is missing.
@@ -44,12 +44,11 @@ const prefs = (page) => page.evaluate(() => JSON.parse(localStorage.getItem("ddp
 const focused = (page) => page.evaluate(() => document.activeElement?.id);
 const option = (name, value) => `#settings label:has(input[name="${name}"][value="${value}"])`;
 
-test("theme, volume and animations set on the home page apply in a game", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
+test("theme and volume set on the home page apply in a game", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
   const { srv, open, errors } = await setup(t);
-  // The device asks for reduced motion; the player wants full animations.
-  const page = await open({ colorScheme: "light", reducedMotion: "reduce" });
+  const page = await open({ colorScheme: "light" });
   await page.goto(`${srv.base}/`);
-  assert.deepEqual(await html(page), { motion: "reduce" }, "follows the device: light, reduced motion");
+  assert.deepEqual(await html(page), {}, "follows the device: light");
   const lightBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
   await page.tap("#settings-open");
@@ -58,33 +57,30 @@ test("theme, volume and animations set on the home page apply in a game", { skip
   assert.equal(await page.locator("#settings [role=tab]").count(), 0, "no game tab on the home page");
   assert.equal(await page.locator("#settings-nickname").inputValue(), "Ada");
   await page.tap(option("settings-theme", "dark"));
-  await page.tap(option("settings-motion", "full"));
   await page.locator("#settings-volume").fill("40");
   assert.ok(await noHorizontalScroll(page), "no sideways scroll at 360 px");
   await page.screenshot({ path: `${ARTIFACTS}/settings-1-home-mobile-light.png` });
-  assert.deepEqual(await html(page), { theme: "dark", motion: "full" }, "applied at once");
+  assert.deepEqual(await html(page), { theme: "dark" }, "applied at once");
   assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), lightBg);
-  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector(".hero-scene .glow")).animationName), "scene-glow", "the hero scene moves");
   assert.equal(await page.locator("#theme-toggle").getAttribute("aria-pressed"), "true", "the header's toggle follows");
-  assert.deepEqual(await prefs(page), { theme: "dark", sound: true, volume: 40, motion: "full", askBeforeLeaving: true });
+  assert.deepEqual(await prefs(page), { theme: "dark", sound: true, volume: 40, askBeforeLeaving: true });
   await page.tap("#settings-done");
   await page.locator("#settings").waitFor({ state: "detached" });
   assert.equal(await focused(page), "settings-open", "focus goes back to the gear");
 
-  // In a robot game: dark, full motion, and sounds through a master gain of 0.4² = 0.16.
+  // In a robot game: dark, and sounds through a master gain of 0.4² = 0.16.
   await page.goto(`${srv.base}/tic-tac-toe/?robot=1`);
   await page.locator(".ttt-cell").first().waitFor();
-  assert.deepEqual(await html(page), { theme: "dark", motion: "full" });
+  assert.deepEqual(await html(page), { theme: "dark" });
   await page.tap('.ttt-cell[data-i="4"]');
   await page.waitForFunction(() => window.ddpMaster);
   assert.ok(Math.abs((await page.evaluate(() => window.ddpMaster.gain.value)) - 0.16) < 1e-6, "the volume reaches the game's sound");
 
   // Changed mid-game, it applies at once there too.
   await page.tap("#settings-open");
-  await page.tap(option("settings-motion", "reduce"));
+  await page.tap(option("settings-theme", "system"));
   await page.locator("#settings-volume").fill("100");
-  assert.equal((await html(page)).motion, "reduce");
-  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector(".btn")).transitionDuration), "1e-06s", "transitions stop");
+  assert.deepEqual(await html(page), {}, "back to the device's theme");
   await page.waitForFunction(() => window.ddpMaster.gain.value > 0.99);
   await page.keyboard.press("Escape");
   await page.locator("#settings").waitFor({ state: "detached" });
@@ -181,9 +177,6 @@ test("the panel works with the keyboard alone", { skip: !pw && "Playwright not i
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("ArrowLeft");
   assert.equal((await prefs(page)).volume, 90);
-  await page.keyboard.press("Tab"); // animations
-  await page.keyboard.press("ArrowRight"); // Follow system → Reduced
-  assert.equal((await html(page)).motion, "reduce");
   await page.keyboard.press("Tab"); // leaving
   await page.keyboard.press("ArrowRight"); // Ask first → Leave at once
   assert.equal((await prefs(page)).askBeforeLeaving, false);

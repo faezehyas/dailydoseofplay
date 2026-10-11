@@ -434,7 +434,7 @@ a blocked name over WebRTC either. Nicknames are never logged.
 
 | Module | Job |
 |---|---|
-| `shell.js` | Header with the home link in a `nav` landmark, a "Skip to content" link to the page's `<main>` (shown on focus), and light/dark and sound toggles (each keeps one label, "Dark mode" or "Mute sounds", and gives its state through `aria-pressed`) next to the gear that opens the settings panel (see **Settings**), the footer every page ends with (how games run, then links to this file, the repository and the privacy page; more links join `FOOTER_LINKS`), nickname in `localStorage` (`getNickname()` picks and saves a default when there is none) and the nickname field (`nicknameField()`, in the lobby and the panel), `segGroup()` (a group of segmented options), the theme and animations on `<html>` (`data-theme`, `data-motion`) and `reducedMotion()`, toasts (just below the header; a repeated one is announced again), a tab-title alert ("Your turn"), `el()` DOM helper, and `askBeforeLeaving()`, the panel's "Leaving a game with friends" |
+| `shell.js` | Header with the home link in a `nav` landmark, a "Skip to content" link to the page's `<main>` (shown on focus), and light/dark and sound toggles (each keeps one label, "Dark mode" or "Mute sounds", and gives its state through `aria-pressed`) next to the gear that opens the settings panel (see **Settings**), the footer every page ends with (how games run, then links to this file, the repository and the privacy page; more links join `FOOTER_LINKS`), nickname in `localStorage` (`getNickname()` picks and saves a default when there is none) and the nickname field (`nicknameField()`, in the lobby and the panel), `segGroup()` (a group of segmented options), the theme on `<html data-theme>`, toasts (just below the header; a repeated one is announced again), a tab-title alert ("Your turn"), `el()` DOM helper, and `askBeforeLeaving()`, the panel's "Leaving a game with friends" |
 | `prefs.js` | The general settings (see **Settings**): `getPrefs()`, `setPrefs(patch)`, `onPrefsChange(fn)`, and `normalizePrefs()` and `loadPrefs(storage)`, which moves the old `ddp-theme` and `ddp-sound` into `ddp-settings`. No DOM; runs in node too. |
 | `names.js` | `checkName()` and `cleanName()`: the nickname rules (see **Nicknames**), shared with the server; `defaultName()`, a friendly default name |
 | `theme.css` | Design tokens for light and dark, fonts and motion (see **Type and motion**), chips and `.mono`, buttons, cards, lobby, the home hero with its steps and its game-table scene, the home grid (tiles whose name links to the lobby, with Play friends and Play the robot links), the moves the tiles' previews use (see **Tile previews**) and its loading tiles (see **Colours and contrast**), the game page column (see **Page column**), the player bar, the result panel, the result moment, the confirm dialog, the settings panel and `.text-page` (the privacy page's reading column) |
@@ -643,8 +643,9 @@ to the gear. Arrow keys, Home and End move between its two tabs:
 
 - **General**, this device's preferences for every page: nickname
   (`ddp-name`), theme (System, Light or Dark), sound on or off and its volume,
-  animations (Follow system, Reduced or Full) and "Leaving a game with
-  friends" (Ask first or Leave at once, see **Leaving**). Each applies at once.
+  and "Leaving a game with friends" (Ask first or Leave at once, see
+  **Leaving**). Each applies at once. Animations follow the device's
+  `prefers-reduced-motion` (see **Type and motion**).
   `prefs.js` keeps them together in `ddp-settings`; on the first read it moves
   the older `ddp-theme` and `ddp-sound` keys there. `onPrefsChange(fn)` hears
   every change: the place to sync them to an account once there are accounts.
@@ -662,16 +663,6 @@ to the gear. Arrow keys, Home and End move between its two tabs:
 The header keeps its quick theme and sound toggles beside the gear: at 360 px
 the brand and three buttons still fit (6 px to spare), and muting mid-game
 stays one tap.
-
-Animations: `shell.js` sets `<html data-motion>` to `reduce` or `full` from
-the setting, or from `prefers-reduced-motion` while it follows the system.
-`theme.css` and the games' styles use it instead of the media query: motion
-that plays only in full sits under `:where(:root[data-motion="full"])` (the
-result moment, the hero scene, the room code), and
-`:where(:root[data-motion="reduce"])` stops the rest; `:where()` keeps each
-rule's specificity. Scripts ask `reducedMotion()`: the result moment, the home
-tiles' previews and every game's own animations. Where this file says "with
-`prefers-reduced-motion`", that means with reduced animations.
 
 **Colours and contrast.** The shared colours are tokens in `theme.css`, defined for
 light and dark, and both themes meet WCAG 2.2 AA: 4.5:1 for text and 3:1 for
@@ -698,7 +689,7 @@ Transitions use `--dur-fast`, `--dur-med` or `--dur-slow` and `--ease-out` or
 `--ease-spring`. The rules, at the top of the motion section in `theme.css`:
 animate only transform and opacity; nothing loops forever except the home
 hero's scene and a tile's preview while it is hovered, focused or, on a touch
-screen, in view; everything stops when animations are reduced (see **Settings**); no motion starts
+screen, in view; everything stops under `prefers-reduced-motion`; no motion starts
 without a user action, except the room code, whose letters settle in one by
 one (350 ms) when the waiting room opens, the result moment when a match
 ends (see **Result moment**), the hero's scene, and a tile's preview on a

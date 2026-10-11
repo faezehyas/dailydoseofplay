@@ -450,7 +450,7 @@
   }
 }
 
-:where(:root[data-motion="reduce"]) {
+@media (prefers-reduced-motion: reduce) {
   .db-board .line.fresh .ink,
   .player-bar .count.bump {
     animation: none;

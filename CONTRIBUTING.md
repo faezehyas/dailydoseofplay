@@ -332,10 +332,7 @@ font; give timers and counts the `mono` class; use `.chip` for a seat
 or a fact; time transitions with `var(--dur-fast)`, `var(--dur-med)` or
 `var(--dur-slow)` and ease them with `var(--ease-out)` or `var(--ease-spring)`.
 Animate only `transform` and `opacity`, start motion only on a player's action,
-and check it stops with reduced motion on. Reduced motion is the Animations
-setting, not only the device's: in CSS put the rules that stop motion under
-`:where(:root[data-motion="reduce"])`, not `@media (prefers-reduced-motion)`, and
-in scripts ask `reducedMotion()` from `engine/shell.js`.
+and check it stops with reduced motion on.
 
 ### 5b. Sounds (optional)
 
@@ -476,8 +473,8 @@ windows (one private).
 | `vendor/`, `scripts/build-mental-poker.sh` | The mental-poker library (submodule), our patches and lock file, and the script that builds it into `public/engine/vendor/mental-poker/` |
 | `public/engine/robot-pace.js` | `robotPause()`: robots' pauses, which browser tests shorten |
 | `public/engine/fair.js` | Commitments and `SharedRandom` |
-| `public/engine/shell.js` | Header, footer, theme and sound toggles, the settings panel, nickname, `reducedMotion()`, `el()`, `toast()` |
-| `public/engine/prefs.js` | The general settings (theme, sound, volume, animations, asking before leaving) in `ddp-settings` |
+| `public/engine/shell.js` | Header, footer, theme and sound toggles, the settings panel, nickname, `el()`, `toast()` |
+| `public/engine/prefs.js` | The general settings (theme, sound, volume, asking before leaving) in `ddp-settings` |
 | `public/engine/settings.js` | `gameSettings()`: a game's settings, shown in the lobby card and the settings panel |
 | `public/engine/how-to-play.js` | `howToPlayPanel()`: the "How to play" panel, the same sections in every game |
 | `public/engine/players.js` | `playerBar()`: names, whose turn it is, the score and Leave, above every game |

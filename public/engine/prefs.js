@@ -1,7 +1,7 @@
 // General settings: this device's preferences for every page (theme, sound
-// and volume, animations, asking before leaving), kept together under one
-// key. The nickname keeps its own key (ddp-name, in shell.js). onPrefsChange()
-// is where syncing them to an account can hook in later. No DOM; runs in node too.
+// and volume, asking before leaving), kept together under one key. The
+// nickname keeps its own key (ddp-name, in shell.js). onPrefsChange() is
+// where syncing them to an account can hook in later. No DOM; runs in node too.
 const KEY = "ddp-settings";
 // Before ddp-settings, the theme and the mute had keys of their own.
 const OLD_THEME = "ddp-theme";
@@ -10,14 +10,13 @@ const OLD_SOUND = "ddp-sound";
 const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
 
 // A complete, valid set of preferences: defaults for anything missing or wrong.
-// theme and motion: "system" follows the device; volume: 0 to 100.
+// theme: "system" follows the device; volume: 0 to 100.
 export function normalizePrefs(raw) {
   const p = raw && typeof raw === "object" ? raw : {};
   return {
     theme: pick(p.theme, ["system", "light", "dark"], "system"),
     sound: p.sound !== false,
     volume: Number.isFinite(p.volume) ? Math.round(Math.min(100, Math.max(0, p.volume))) : 100,
-    motion: pick(p.motion, ["system", "reduce", "full"], "system"),
     askBeforeLeaving: p.askBeforeLeaving !== false,
   };
 }

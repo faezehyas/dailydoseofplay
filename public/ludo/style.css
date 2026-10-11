@@ -812,7 +812,7 @@
   fill: #fff;
 }
 
-:where(:root[data-motion="reduce"]) {
+@media (prefers-reduced-motion: reduce) {
   .ld-board .pawn.movable .pawn-lift,
   .ld-board .pawn.movable .pawn-ring,
   .ld-board .dest-disc,

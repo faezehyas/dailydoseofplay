@@ -1151,7 +1151,7 @@ input::placeholder {
   background: var(--accent-2);
 }
 
-:where(:root[data-motion="full"]) {
+@media (prefers-reduced-motion: no-preference) {
   .celebrate-lit {
     animation: celebrate-light var(--dur-slow) var(--ease-out) calc(var(--i) * var(--dur-fast)) backwards;
   }
@@ -1384,7 +1384,7 @@ input::placeholder {
   transform-origin: 50% 100%;
 }
 
-:where(:root[data-motion="full"]) {
+@media (prefers-reduced-motion: no-preference) {
   .hero-scene .piece {
     cursor: pointer;
   }
@@ -2056,10 +2056,7 @@ input.mono {
    - nothing loops forever except the home hero's scene, which pauses off
      screen and in a hidden tab, and a tile's preview while it is hovered,
      focused or, on a touch screen, in view;
-   - everything stops when animations are reduced: <html data-motion="reduce">,
-     which shell.js sets from the Animations setting or, when that follows
-     the system, prefers-reduced-motion (motion that plays only for "full"
-     goes under :where(:root[data-motion="full"]));
+   - everything stops under prefers-reduced-motion;
    - no motion starts without a user action, except the room code settling,
      the result moment when a match ends, the hero's scene and, on a touch
      screen, a tile's preview.
@@ -2069,7 +2066,7 @@ input.mono {
    --ease-out and --ease-spring. */
 
 /* The waiting room's code: its letters settle in one by one, 350 ms in all. */
-:where(:root[data-motion="full"]) {
+@media (prefers-reduced-motion: no-preference) {
   .room-code span {
     display: inline-block;
     animation: settle var(--dur-med) var(--ease-spring) calc(var(--i) * 50ms) both;
@@ -2083,7 +2080,7 @@ input.mono {
   }
 }
 
-:where(:root[data-motion="reduce"]) {
+@media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {

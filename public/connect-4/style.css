@@ -271,7 +271,7 @@
   --disc-fill: color-mix(in srgb, var(--disc) 65%, var(--sunk));
 }
 
-:where(:root[data-motion="reduce"]) {
+@media (prefers-reduced-motion: reduce) {
   .c4-disc {
     animation: none;
   }

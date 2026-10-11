@@ -102,22 +102,11 @@ function effectiveDark() {
   return theme === "system" ? systemDark() : theme === "dark";
 }
 
-// Whether to keep motion to a minimum: the Animations setting, or the
-// device's preference while it says "Follow system".
-export function reducedMotion() {
-  const { motion } = getPrefs();
-  return motion === "system" ? matchMedia("(prefers-reduced-motion: reduce)").matches : motion === "reduce";
-}
-
-// The theme as <html data-theme> ("light" or "dark"; none follows the
-// system) and animations as <html data-motion> ("reduce" or "full"), which
-// theme.css and the games' styles read.
-function applyPrefs() {
-  const root = document.documentElement;
+// The theme as <html data-theme>: "light" or "dark", none to follow the system.
+function applyTheme() {
   const { theme } = getPrefs();
-  if (theme === "system") delete root.dataset.theme;
-  else root.dataset.theme = theme;
-  root.dataset.motion = reducedMotion() ? "reduce" : "full";
+  if (theme === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
 }
 
 const ICONS = {
@@ -134,7 +123,7 @@ export function logoSvg() {
 
 // settings: a game's gameSettings() (settings.js), shown in the settings panel's "This game" tab.
 export function initShell({ title, settings } = {}) {
-  applyPrefs();
+  applyTheme();
   const header = el("header", { class: "site-header" });
   const brand = el("a", { class: "brand", href: "/" });
   brand.innerHTML = `${logoSvg()}<span>Daily Dose <em>of</em> Play</span>`;
@@ -151,7 +140,6 @@ export function initShell({ title, settings } = {}) {
     setPrefs({ theme: (next === "dark") === systemDark() ? "system" : next });
   });
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", renderThemeBtn);
-  matchMedia("(prefers-reduced-motion: reduce)").addEventListener?.("change", applyPrefs);
   renderThemeBtn();
   const settingsBtn = el("button", { class: "icon-btn", type: "button", id: "settings-open", title: "Settings", "aria-label": "Settings", "aria-haspopup": "dialog", onclick: () => openSettings(settings) });
   settingsBtn.innerHTML = ICONS.gear;
@@ -170,7 +158,7 @@ export function initShell({ title, settings } = {}) {
   }
   right.append(themeBtn, settingsBtn);
   onPrefsChange(() => {
-    applyPrefs();
+    applyTheme();
     renderThemeBtn();
     renderSoundBtn();
   });
@@ -276,7 +264,6 @@ function generalSettings() {
     nicknameField("settings-nickname"),
     group("theme", "Theme", [["system", "System"], ["light", "Light"], ["dark", "Dark"]]),
     sound,
-    group("motion", "Animations", [["system", "Follow system"], ["reduce", "Reduced"], ["full", "Full"]]),
     group("askBeforeLeaving", "Leaving a game with friends", [[true, "Ask first"], [false, "Leave at once"]]),
   ];
 }

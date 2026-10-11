@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizePrefs, loadPrefs } from "./prefs.js";
 
-const DEFAULTS = { theme: "system", sound: true, volume: 100, motion: "system", askBeforeLeaving: true };
+const DEFAULTS = { theme: "system", sound: true, volume: 100, askBeforeLeaving: true };
 
 // localStorage's interface over a Map.
 function storage(entries = {}) {
@@ -17,14 +17,8 @@ function storage(entries = {}) {
 
 test("normalizePrefs fills in defaults and drops anything invalid", () => {
   for (const raw of [null, undefined, "dark", 42, [], {}]) assert.deepEqual(normalizePrefs(raw), DEFAULTS, String(raw));
-  assert.deepEqual(normalizePrefs({ theme: "dark", sound: false, volume: 35, motion: "reduce", askBeforeLeaving: false }), {
-    theme: "dark",
-    sound: false,
-    volume: 35,
-    motion: "reduce",
-    askBeforeLeaving: false,
-  });
-  assert.deepEqual(normalizePrefs({ theme: "pink", sound: "no", volume: "50", motion: "slow", askBeforeLeaving: 0 }), DEFAULTS);
+  assert.deepEqual(normalizePrefs({ theme: "dark", sound: false, volume: 35, askBeforeLeaving: false }), { theme: "dark", sound: false, volume: 35, askBeforeLeaving: false });
+  assert.deepEqual(normalizePrefs({ theme: "pink", sound: "no", volume: "50", askBeforeLeaving: 0 }), DEFAULTS);
   assert.equal(normalizePrefs({ volume: 140 }).volume, 100);
   assert.equal(normalizePrefs({ volume: -3 }).volume, 0);
   assert.equal(normalizePrefs({ volume: 33.6 }).volume, 34);
