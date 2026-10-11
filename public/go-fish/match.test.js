@@ -163,8 +163,8 @@ const LIES = [
 
 for (const lie of LIES) {
   test(`${lie.name} goes unseen in play and is caught by the audit, which names the liar`, { timeout: 300_000 }, async () => {
-    // A few seeds: the chance to lie comes up in most games, and the test needs one.
-    for (let attempt = 0; attempt < 6; attempt++) {
+    // Up to 20 games: the chance to lie comes up in half of them or more, and the test needs one.
+    for (let attempt = 0; attempt < 20; attempt++) {
       const cheat = liar(1, lie.when);
       const { matches } = await play({ players: 3, config: { first: attempt % 3 === 0 ? "host" : "random" }, choose: cheat.make });
       if (!cheat.lies()) continue;

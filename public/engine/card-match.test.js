@@ -81,7 +81,8 @@ test("once the audit passes, every seat can read every card; a failed audit show
     const live = m.slots.flatMap((s, id) => (s.gone ? [] : [m.face(id)]));
     assert.deepEqual(live.sort((a, b) => a - b), [...Array(15).keys()]);
   }
-  const { matches: failed } = await play({ before: (s) => tap(s[1], (msg) => (msg.t === "audit" ? { ...msg, key: toBase64(new Uint8Array(32).fill(9)) } : msg)) });
+  // Four turns: seat 1 plays at most two of its three cards, so seat 0 never sees one.
+  const { matches: failed } = await play({ rules: makeRules({ deckSize: 10, maxTurns: 4 }), before: (s) => tap(s[1], (msg) => (msg.t === "audit" ? { ...msg, key: toBase64(new Uint8Array(32).fill(9)) } : msg)) });
   assert.equal(failed[0].verdict.ok, false);
   assert.equal(failed[0].audited, null);
   const hidden = failed[0].slots.flatMap((s, id) => (s.face === null ? [id] : []));
