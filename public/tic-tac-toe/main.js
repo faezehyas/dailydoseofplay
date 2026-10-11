@@ -11,11 +11,8 @@ import { makeRules, normalizeConfig, markOf, isTimed, timeLeft, EMPTY, DRAW, IN_
 import { chooseMove } from "./robot.js";
 import { settings } from "./settings.js";
 import { howToPlay } from "./how-to-play.js";
+import { MARK_SVG } from "./art.js";
 
-const MARK_SVG = {
-  X: '<svg viewBox="0 0 100 100" class="mark x" aria-hidden="true"><path d="M24 24 76 76"/><path d="M76 24 24 76"/></svg>',
-  O: '<svg viewBox="0 0 100 100" class="mark o" aria-hidden="true"><circle cx="50" cy="50" r="28"/></svg>',
-};
 const ROBOT_DELAY = 600;
 const CLAIM_GRACE_MS = 5000; // past the opponent's limit before we stop waiting for their forfeit
 const IN_A_ROW_WORD = { 3: "three", 4: "four" };
@@ -24,6 +21,7 @@ startGameShell({
   slug: "tic-tac-toe",
   title: "Tic Tac Toe",
   howToPlay,
+  tutorial: () => import("./tutorial.js"),
   layout: "narrow",
   settings,
   createRobot: (session) =>
