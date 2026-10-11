@@ -169,6 +169,7 @@ flowchart TB
   p_main --> g_tutorial
   g_art --> e_shell
   g_art --> g_rules
+  g_lessons --> g_art
   g_lessons --> g_rules
   g_tutorial --> e_shell
   g_tutorial --> g_art
@@ -923,7 +924,8 @@ flowchart LR
 - **Lessons are data** (`public/<slug>/lessons.js`): `[{ title, steps: [{ text,
   position, highlight, arrows, expect, reply }] }]`, in the game's own
   position and move format. `expect` is one move or a list of accepted
-  moves, and a move matches when it has every field of one of them; `reply`
+  moves, and a move matches when it has every field of one of them (a list
+  field, such as Checkers' `path`, holds the same items in order); `reply`
   is a move the teacher plays back. A step without a `position` goes on from
   the last one. A dice game can put its roll on the step: the adapter's
   `play` gets the step and can hand `applyMove` an `rng` that rolls it.
@@ -960,10 +962,14 @@ flowchart LR
   `prefers-reduced-motion` the arrows, the check mark and the hint don't
   move and wrong moves don't spring back.
 
-Tic Tac Toe (placing a mark, three in a row, blocking) and Chess (the
-pieces, capture, check and checkmate, castling, en passant and promotion)
-have tutorials; `test/browser/tutorial.test.js` plays the first Chess lesson
-by keyboard.
+Tic Tac Toe (placing a mark, three in a row, blocking), Chess (the
+pieces, capture, check and checkmate, castling, en passant and promotion),
+Connect 4 (dropping a disc, four in a row each way, blocking, two threats),
+Gomoku (placing a stone, five in a row, blocking, an open four), Checkers
+(moving, capturing, forced captures and multi-jumps, crowning) and Dots and
+Boxes (drawing a line, closing a box, long chains) have tutorials;
+`test/browser/tutorial.test.js` plays the first Chess and Connect 4 lessons
+by keyboard and the first of Gomoku, Checkers and Dots and Boxes by tap.
 
 **Player colours.** A player has the same colour on every screen, so "I'm the
 coral one" is true for everyone at the table. In a two-player game whoever
@@ -1032,7 +1038,7 @@ checks that no game opens its own audio context or output.
 | `icon.svg` | Card art for the home page (16:10) |
 | `preview.svg` | Optional: the tile's short animated preview (see **Tile previews**) |
 | `tutorial.js`, `lessons.js` | Optional: the tutorial (see **Tutorials**). `lessons.js` is its lessons as data; `tutorial.js` exports them with the adapter the engine plays them through, and `main.js` passes `tutorial: () => import("./tutorial.js")`. |
-| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo, Chutes and Ladders), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces) |
+| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo, Chutes and Ladders), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces, Gomoku's grid and point names, Checkers' crown, Dots and Boxes' paper, lines and boxes) |
 
 ## Card games (`CardMatch`)
 
