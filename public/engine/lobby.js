@@ -2,7 +2,7 @@
 // waiting room, and hand-off of a Session to the game. How players get
 // connected lives in room.js; this file is only the UI around it.
 //
-//   startGameShell({ slug, title, tagline, createRobot, onSession, minPlayers, maxPlayers, robots, layout, settings })
+//   startGameShell({ slug, title, tagline, createRobot, onSession, minPlayers, maxPlayers, robots, layout, settings, howToPlay })
 //
 // onSession(session, root, shell) mounts the game in `root` and returns { destroy }.
 // shell.leave() goes back to the lobby; while the game says a friend match is
@@ -18,9 +18,12 @@
 // settings is the game's gameSettings() (settings.js): the home screen shows
 // them inside the lobby card and the host's waiting screen their summary; the
 // settings panel shows them again in its "This game" tab, locked during a game.
+// howToPlay is the game's "How to play" text (how-to-play.js), shown under the
+// game and linked from the lobby card.
 import { initShell, el, $, toast, copyText, getNickname, setNickname, nicknameField, setTabAlert, askBeforeLeaving } from "./shell.js";
 import { confirmDialog } from "./confirm.js";
 import { HostRoom, GuestRoom, RoomError, localRoom } from "./room.js";
+import { howToPlayPanel } from "./how-to-play.js";
 
 const ERRORS = {
   no_such_room: "That room doesn't exist any more. Ask your friend for a fresh invite link.",
@@ -55,10 +58,11 @@ const LAYOUTS = ["narrow", "medium", "wide"];
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 4;
 
-export function startGameShell({ slug, title, tagline = "", createRobot, onSession, minPlayers = 2, maxPlayers = 2, robots = 1, layout = "wide", settings }) {
+export function startGameShell({ slug, title, tagline = "", createRobot, onSession, minPlayers = 2, maxPlayers = 2, robots = 1, layout = "wide", settings, howToPlay }) {
   initShell({ title, settings });
   const lobbyRoot = $("#lobby");
   const gameRoot = $("#game");
+  if (howToPlay) gameRoot.after(howToPlayPanel(howToPlay));
   // The lobby, game and "How to play" share one column (theme.css).
   const page = lobbyRoot.closest(".page");
   const showView = (name) => {
@@ -111,10 +115,23 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     $("h1", lobbyRoot).focus();
   }
 
-  function currentName(fallback) {
+  // Opens the page's "How to play" panel and moves focus to it.
+  function howToPlayLink() {
+    const panel = $("details.rules");
+    if (!panel) return null;
+    const open = (e) => {
+      e.preventDefault();
+      panel.open = true;
+      $("summary", panel).focus({ preventScroll: true });
+      panel.scrollIntoView({ block: "start" });
+    };
+    return el("p", { class: "how-to-play" }, el("a", { href: "#how-to-play", id: "how-to-play-link", onclick: open }, "How to play"));
+  }
+
+  // The typed nickname, or the saved default when the field is empty or refused.
+  function currentName() {
     const input = $("#nickname");
-    if (input) setNickname(input.value);
-    return getNickname() || fallback;
+    return (input && setNickname(input.value)) || getNickname();
   }
 
   // error: why the last join failed, shown under the code field, which keeps `code`.
@@ -156,6 +173,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     view(
       el("h1", {}, title),
       taglineEl,
+      howToPlayLink(),
       nicknameField(),
       settings?.panel(),
       el(
@@ -332,7 +350,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   }
 
   async function host() {
-    const name = currentName("Host");
+    const name = currentName();
     cleanupConnection();
     const attempt = state.attempt;
     const current = () => attempt === state.attempt;
@@ -391,7 +409,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   // key comes only from an invite link; a typed code asks the host to let us in.
   async function join(rawCode, key) {
     const code = String(rawCode).trim().toUpperCase();
-    const name = currentName("Guest");
+    const name = currentName();
     // Keep ?room= until the join settles so a reload retries it.
     state.attempt += 1;
     state.room?.close();
@@ -430,7 +448,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
 
   function playRobot() {
     cleanupConnection();
-    const name = currentName("You");
+    const name = currentName();
     const count = typeof robots === "function" ? robots() : robots;
     const names = [name, ...Array.from({ length: count }, (_, i) => (count === 1 ? "Robot" : `Robot ${i + 1}`))];
     const [session, ...robotSessions] = localRoom({ game: slug, names, mode: "robot" });

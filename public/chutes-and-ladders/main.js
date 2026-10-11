@@ -14,6 +14,7 @@ import { chooseMove } from "./robot.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
 import { s, icon, VIGNETTES } from "./art.js";
+import { howToPlay } from "./how-to-play.js";
 
 const ROBOT_DELAY = 700;
 const AUTO_SPIN_DELAY = 700; // "Spins by itself": a beat after the board settles
@@ -34,6 +35,7 @@ const still = reducedMotion;
 startGameShell({
   slug: "chutes-and-ladders",
   title: "Chutes and Ladders",
+  howToPlay,
   layout: "wide",
   settings,
   minPlayers: 2,

@@ -2,7 +2,7 @@
 // sound toggles, the settings panel, nickname storage and field, toasts,
 // tab-title alerts and tiny DOM helpers.
 import { getPrefs, setPrefs, onPrefsChange } from "./prefs.js";
-import { checkName, cleanName } from "./names.js";
+import { checkName, cleanName, defaultName } from "./names.js";
 
 const NAME_KEY = "ddp-name";
 const REPO = "https://github.com/Faezehyas/dailydoseofplay";
@@ -43,9 +43,10 @@ function load(key) {
   }
 }
 
-// A name the rules in names.js refuse is never stored or used.
+// A name the rules in names.js refuse is never stored or used. Without a
+// nickname, a friendly default is picked and stored, so it can be changed.
 export function getNickname() {
-  return cleanName(load(NAME_KEY), "");
+  return cleanName(load(NAME_KEY), "") || setNickname(defaultName());
 }
 export function setNickname(name) {
   const clean = cleanName(name, "");
