@@ -16,15 +16,15 @@
 // layout is the page column while the game is on show: "narrow", "medium" or
 // "wide" (the default); the lobby is always narrow. Sizes live in theme.css.
 // settings is the game's gameSettings() (settings.js): the home screen shows
-// them inside the lobby card, and the host's waiting screen their summary.
+// them inside the lobby card and the host's waiting screen their summary; the
+// settings panel shows them again in its "This game" tab, locked during a game.
 // howToPlay is the game's "How to play" text (how-to-play.js), shown under the
 // game and linked from the lobby card.
 // banter is optional: how robots react during a game ({ score, strong, lines },
 // see robotBanter() in reactions.js). Without it robots say "Good game!" at the end.
-import { initShell, el, $, toast, copyText, getNickname, setNickname, setTabAlert, askBeforeLeaving } from "./shell.js";
+import { initShell, el, $, toast, copyText, getNickname, setNickname, nicknameField, setTabAlert, askBeforeLeaving } from "./shell.js";
 import { confirmDialog } from "./confirm.js";
 import { HostRoom, GuestRoom, RoomError, localRoom } from "./room.js";
-import { checkName } from "./names.js";
 import { howToPlayPanel } from "./how-to-play.js";
 import { robotBanter, setGameLines } from "./reactions.js";
 
@@ -50,13 +50,6 @@ const ERRORS = {
   message_too_big: "A player's browser sent something unexpected.",
 };
 
-// Why a nickname isn't used (see names.js); the player then plays under the default name.
-const NAME_PROBLEMS = {
-  link: "Not used: no links or @handles, please.",
-  word: "Not used: please pick a kinder nickname.",
-  chars: "Not used: only letters, numbers, spaces and . _ - ' are allowed.",
-};
-
 const NO_TURN_HELP =
   "Couldn't connect to your friend. Games here run directly between your browsers, and some networks " +
   "(mobile data, office or school Wi-Fi, VPNs, strict firewalls) block direct connections. We don't run a relay " +
@@ -69,7 +62,7 @@ const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 4;
 
 export function startGameShell({ slug, title, tagline = "", createRobot, onSession, minPlayers = 2, maxPlayers = 2, robots = 1, layout = "wide", settings, howToPlay, banter = {} }) {
-  initShell({ title });
+  initShell({ title, settings });
   const lobbyRoot = $("#lobby");
   const gameRoot = $("#game");
   if (howToPlay) gameRoot.after(howToPlayPanel(howToPlay));
@@ -137,27 +130,6 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
       panel.scrollIntoView({ block: "start" });
     };
     return el("p", { class: "how-to-play" }, el("a", { href: "#how-to-play", id: "how-to-play-link", onclick: open }, "How to play"));
-  }
-
-  function nicknameField() {
-    const input = el("input", {
-      id: "nickname",
-      type: "text",
-      maxlength: "20",
-      autocomplete: "nickname",
-      placeholder: "Your nickname (optional)",
-      value: getNickname(),
-      "aria-describedby": "nickname-problem",
-    });
-    const problem = el("small", { id: "nickname-problem", class: "field-problem", "aria-live": "polite" });
-    const check = () => {
-      problem.textContent = NAME_PROBLEMS[checkName(input.value).problem] ?? "";
-      problem.hidden = !problem.textContent;
-    };
-    input.addEventListener("input", check);
-    input.addEventListener("change", () => (setNickname(input.value), check()));
-    check();
-    return el("label", { class: "field" }, el("span", {}, "Nickname"), input, problem, el("small", {}, "Saved on this device only."));
   }
 
   // The typed nickname, or the saved default when the field is empty or refused.
@@ -504,6 +476,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     gameRoot.replaceChildren();
     // The game has a history entry of its own, so Back leaves it as Leave does.
     history.pushState({ game: slug }, "");
+    settings?.lock(true);
     let inProgress = false;
     state.mustAsk = () => inProgress && session.mode === "friend" && askBeforeLeaving();
     state.leave = async () => {
@@ -551,6 +524,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     for (const robot of state.robots) robot?.destroy?.();
     state.robots = [];
     state.robot = null;
+    settings?.lock(false);
     showHome(message);
   }
 
@@ -564,11 +538,11 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   });
 
   // Back during a game: stay on the game's entry and leave as Leave does. Back
-  // while the question is open closes it, like Esc.
+  // while the question or the settings panel is open closes it, like Esc.
   addEventListener("popstate", () => {
     if (!state.session) return;
     history.pushState({ game: slug }, "");
-    const open = $("#confirm");
+    const open = $("dialog[open]");
     if (open) open.close();
     else state.leave();
   });

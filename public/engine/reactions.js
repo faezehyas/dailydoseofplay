@@ -4,12 +4,14 @@
 // nothing to moderate: peers send only an index into the fixed list
 // ($react {i}, see session.js), and an index nobody knows is ignored. Each
 // seat may react once every GAP_MS, checked when sending and when receiving.
-// "Mute reactions" hides other players' bubbles on this device.
+// "Mute reactions" (the settings panel's General tab, prefs.js) hides other
+// players' bubbles on this device.
 //
 // Robots banter through the same message (robotBanter() below), and a game
 // may add a few lines of its own for them (setGameLines()), numbered after
 // the fixed ones.
 import { el } from "./shell.js";
+import { getPrefs } from "./prefs.js";
 import { defineSounds } from "./sound.js";
 import { tone } from "./synth.js";
 
@@ -18,7 +20,6 @@ const PHRASES = ["Good luck!", "Nice move!", "Oops!", "Hmm…", "Your turn!", "S
 export const REACTIONS = [...EMOJI, ...PHRASES];
 export const GAP_MS = 2000;
 const SHOW_MS = 3000;
-const MUTE_KEY = "ddp-reactions";
 
 // The game's own robot lines by event ({ strongMove, lead, end }), flattened
 // so every tab numbers them the same.
@@ -32,21 +33,6 @@ const reactionText = (i) => (Number.isInteger(i) ? (REACTIONS[i] ?? gameLines[i 
 export const sounds = defineSounds({
   pop: { role: "ui", offset: -4, trim: 5.1, synth: (a, o, t) => tone(a, o, t, { freq: 520, to: 880, dur: 0.09, gain: 0.12 }) },
 });
-
-function reactionsMuted() {
-  try {
-    return localStorage.getItem(MUTE_KEY) === "muted";
-  } catch {
-    return false;
-  }
-}
-
-function setMuted(on) {
-  try {
-    if (on) localStorage.setItem(MUTE_KEY, "muted");
-    else localStorage.removeItem(MUTE_KEY);
-  } catch {}
-}
 
 // Sends and receives reactions over a session, with the checks: a known
 // index, and at most one per seat every GAP_MS. No DOM.
@@ -75,27 +61,24 @@ export function reactionLink(session, now = () => Date.now()) {
 export function reactionControls(session, pillOf) {
   const link = reactionLink(session);
   const live = el("span", { class: "sr-only", "aria-live": "polite" });
-  const mute = el("button", { class: "rx-mute", type: "button", "aria-pressed": String(reactionsMuted()), onclick: () => toggleMute() }, "Mute reactions");
   const items = REACTIONS.map((text, i) =>
     el("button", { class: i < EMOJI.length ? "rx-emoji" : "rx-phrase", type: "button", tabindex: "-1", onclick: () => send(i) }, text),
   );
-  const keys = [...items, mute];
   const tray = el(
     "div",
     { class: "rx-tray", id: "reactions", role: "group", "aria-label": "Reactions", hidden: true, onkeydown },
     el("div", { class: "rx-emojis" }, items.slice(0, EMOJI.length)),
     el("div", { class: "rx-phrases" }, items.slice(EMOJI.length)),
-    mute,
   );
   const button = el("button", { class: "btn small pb-react", type: "button", id: "react", "aria-expanded": "false", "aria-controls": "reactions", onclick: () => (tray.hidden ? open() : close()) }, el("span", { class: "pb-react-label" }, "React"));
   button.insertAdjacentHTML("afterbegin", REACT_ICON);
 
   let focused = 0;
   function focusItem(k) {
-    keys[focused].tabIndex = -1;
-    focused = (k + keys.length) % keys.length;
-    keys[focused].tabIndex = 0;
-    keys[focused].focus();
+    items[focused].tabIndex = -1;
+    focused = (k + items.length) % items.length;
+    items[focused].tabIndex = 0;
+    items[focused].focus();
   }
   function open() {
     tray.hidden = false;
@@ -115,18 +98,12 @@ export function reactionControls(session, pillOf) {
   }
   function onkeydown(e) {
     const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-    if (step) focusItem(keys.indexOf(document.activeElement) + step);
+    if (step) focusItem(items.indexOf(document.activeElement) + step);
     else if (e.key === "Home") focusItem(0);
-    else if (e.key === "End") focusItem(keys.length - 1);
+    else if (e.key === "End") focusItem(items.length - 1);
     else if (e.key === "Escape") close();
     else return;
     e.preventDefault();
-  }
-  function toggleMute() {
-    const on = !reactionsMuted();
-    setMuted(on);
-    mute.setAttribute("aria-pressed", String(on));
-    if (on) for (const seat of session.others.map((p) => p.seat)) pillOf(seat).querySelector(".rx-bubble")?.remove();
   }
   function send(i) {
     close();
@@ -135,7 +112,7 @@ export function reactionControls(session, pillOf) {
 
   const timers = new Map();
   function show(seat, text) {
-    if (seat !== session.index && reactionsMuted()) return;
+    if (seat !== session.index && getPrefs().muteReactions) return;
     const pill = pillOf(seat);
     pill.querySelector(".rx-bubble")?.remove();
     clearTimeout(timers.get(seat));

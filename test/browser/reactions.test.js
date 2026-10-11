@@ -1,7 +1,7 @@
 // Headless-browser test for quick reactions (engine/reactions.js): in a
 // friend game of Tic Tac Toe, a reaction picked by keyboard in one browser
 // shows as a bubble by its sender's name in the other, then goes away, and
-// "Mute reactions" hides the next one; a robot says "Good game!" at the end;
+// "Mute reactions" in the settings panel hides the next one; a robot says "Good game!" at the end;
 // and Ludo's four players keep the tray and bubbles on screen at 360 px.
 // Screenshots go to test-artifacts/. Skips if Playwright is missing.
 //
@@ -64,7 +64,7 @@ test("a reaction shows in the other browser, goes away, and mute hides it", { sk
   assert.equal(await host.locator("#react").getAttribute("aria-expanded"), "true");
   assert.equal(await host.evaluate(() => document.activeElement.textContent), "👋");
   await host.keyboard.press("ArrowLeft");
-  assert.equal(await host.evaluate(() => document.activeElement.textContent), "Mute reactions", "the arrows wrap around");
+  assert.equal(await host.evaluate(() => document.activeElement.textContent), "Rematch?", "the arrows wrap around");
   for (let k = 0; k < 10; k++) await host.keyboard.press("ArrowRight");
   assert.equal(await host.evaluate(() => document.activeElement.textContent), "Nice move!");
   await host.keyboard.press("Enter");
@@ -92,12 +92,15 @@ test("a reaction shows in the other browser, goes away, and mute hides it", { sk
   const [added, removed] = await guest.evaluate(() => window.bubbleTimes);
   assert.ok(Math.abs(removed - added - 3000) < 300, `the bubble showed for about 3 s (${Math.round(removed - added)} ms)`);
 
-  // Bo mutes reactions; it is saved on the device. Ada's next one shows only for her.
-  await guest.tap("#reactions .rx-mute");
-  assert.equal(await guest.locator("#reactions .rx-mute").getAttribute("aria-pressed"), "true");
-  assert.equal(await guest.evaluate(() => localStorage.getItem("ddp-reactions")), "muted");
   await guest.tap("main", { position: { x: 10, y: 600 } });
   assert.ok(await guest.locator("#reactions").isHidden(), "a tap outside closes the tray");
+
+  // Bo mutes reactions in the settings panel; it is saved on the device. Ada's next one shows only for her.
+  await guest.tap("#settings-open");
+  await guest.locator("#settings-reactions").check();
+  assert.equal(await guest.evaluate(() => JSON.parse(localStorage.getItem("ddp-settings")).muteReactions), true);
+  await guest.keyboard.press("Escape");
+  await guest.locator("#settings").waitFor({ state: "detached" });
   await host.click("#react");
   await host.click("#reactions .rx-emoji >> nth=0");
   assert.equal(await bubble(host, 0), "👋");
