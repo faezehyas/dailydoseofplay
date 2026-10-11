@@ -782,7 +782,7 @@ box keeps whatever width it sets, and its rules panel matches the column.
 **Player bar.** Every game shows the same bar above its board, built by
 `playerBar()` in `players.js` and styled in `theme.css`: a pill per player
 (you first, "(you)" after your name, found by your seat and never by comparing names, then the others in seat order), a ring
-on whoever's turn it is, and at the top right React (see **Reactions**) and Leave (`id="leave"`, outlined, with an exit arrow; under 600 px only the arrow, like the header's buttons, with its word kept for screen readers). Under it
+on whoever's turn it is, and at the top right React (see **Reactions**) and Leave (`id="leave"`, outlined, an exit arrow like the header's buttons, with its word for screen readers and as a tooltip). Under it
 the score (`#score`) shows wins per player and, for games whose score has a
 `draws` field, a Draws box (Dots and Boxes adds it with the first draw,
 since only some boards can be drawn). The game creates it once and calls

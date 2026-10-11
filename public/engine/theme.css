@@ -835,11 +835,23 @@ input::placeholder {
   margin-left: 8px;
 }
 
-/* Leave looks like a button on every board: an outline and an exit arrow. */
-.pb-leave {
-  gap: 6px;
+/* Leave looks like a button on every board: an outline and an exit arrow,
+   like the header's buttons, with its word for screen readers and as a
+   tooltip. */
+.btn.pb-leave {
+  width: 36px;
+  padding: 0;
   border-color: var(--control-border);
   background: var(--surface);
+}
+
+.pb-leave-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .pb-leave svg {
@@ -1175,25 +1187,9 @@ input::placeholder {
   }
 }
 
-/* Phones: Leave shows only its arrow, like the header's buttons, so React
-   fits beside it and the names keep their room. Three or four players: the
-   pills in a 2×2 grid beside the two buttons, React under Leave, and a
-   slimmer score. */
+/* Phones, three or four players: the pills in a 2×2 grid beside the two
+   buttons, React under Leave, and a slimmer score. */
 @media (max-width: 600px) {
-  .btn.pb-leave {
-    width: 36px;
-    padding: 0;
-  }
-
-  .pb-leave-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
   .player-bar.many .pb-actions {
     flex-direction: column-reverse;
   }

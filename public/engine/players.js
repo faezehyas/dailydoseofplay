@@ -30,7 +30,7 @@ export function playerBar(session, { onLeave, classes = () => "" }) {
   const draws = box("draws", "Draws");
   const duel = order.length === 2;
   const players = el("div", { class: "pb-players" }, duel ? [pills[0].node, el("span", { class: "pb-vs" }, "vs"), pills[1].node] : pills.map((p) => p.node));
-  const leave = el("button", { class: "btn small pb-leave", type: "button", id: "leave", onclick: onLeave }, el("span", { class: "pb-leave-label" }, "Leave"));
+  const leave = el("button", { class: "btn small pb-leave", type: "button", id: "leave", title: "Leave", onclick: onLeave }, el("span", { class: "pb-leave-label" }, "Leave"));
   leave.insertAdjacentHTML("afterbegin", LEAVE_ICON);
   const react = reactionControls(session, (seat) => pills.find((p) => p.seat === seat).node);
   const scoreBox = el("dl", { class: "pb-score", id: "score", "aria-label": "Score" }, wins.map((w) => w.node));
