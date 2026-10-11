@@ -57,6 +57,7 @@ test("the five-in-a-row steps win, the blocks stop real threats, and an open fou
   }
   const [four, three] = lessons.find((l) => l.title === "Blocking").steps;
   assert.deepEqual(wins(load(four.position), 1), [four.expect.cell], "the ringed stones would win where X blocks");
+  assert.deepEqual(wins(load(four.position), 0), [], "the solid stones have no win of their own, so blocking is the move");
   for (const { cell } of three.expect) {
     const state = load(three.position);
     state.turn = 1;

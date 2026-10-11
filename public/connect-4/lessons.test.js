@@ -55,9 +55,11 @@ test("the four-in-a-row steps win, the blocks stop real threats, and two threats
   const blocking = lessons.find((l) => l.title === "Blocking").steps;
   const state = load(blocking[0].position);
   assert.deepEqual(wins(state, 1), [blocking[0].expect.col], "teal would win in the column X blocks");
+  assert.deepEqual(wins(state, 0), [], "X has no win of its own, so blocking is the move");
   play(state, blocking[0].expect);
   play(state, blocking[0].reply);
   assert.deepEqual(wins(state, 1), [blocking[1].expect.col], "and then in the column X blocks next");
+  assert.deepEqual(wins(state, 0), [], "X still has no win of its own");
 
   const [setUp, finish] = lessons.find((l) => l.title === "Two threats").steps;
   const threats = load(setUp.position);

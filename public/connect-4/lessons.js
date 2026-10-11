@@ -60,7 +60,7 @@ export const lessons = [
     steps: [
       {
         text: "Teal has three in a row. Block the gap, or teal wins on its next turn.",
-        position: "X.XX..O XOOO.XO",
+        position: "...X... X..X..O XOOO.XO",
         highlight: [at(1, 1), at(2, 1), at(3, 1)],
         expect: { col: 4 },
         reply: { col: 6 },
