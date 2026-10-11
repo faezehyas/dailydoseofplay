@@ -428,7 +428,7 @@ function mountGame(session, root, shell) {
   const nameOf = (p) => (p === me ? "You" : session.players[p].name);
   const listOf = (names) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
   const score = { wins: Array(count).fill(0) };
-  const spinMode = settings.get().spin; // each player's own choice
+  const spinMode = () => settings.get().spin; // each player's own choice, which can change mid-game
   let config = null;
   let rules = null;
   let match = null;
@@ -767,7 +767,7 @@ function mountGame(session, root, shell) {
           return mine ? "Hop, hop…" : `${who} is moving…`;
         }
         if (match.phase === "over") return st.winner === me ? "You reached 100. You win!" : `${nameOf(st.winner)} reached 100 first.`;
-        if (st.turn === me) return spinMode === "auto" ? "Your turn. The spinner goes by itself…" : "Your turn. Spin!";
+        if (st.turn === me) return spinMode() === "auto" ? "Your turn. The spinner goes by itself…" : "Your turn. Spin!";
         return `${nameOf(st.turn)}'s turn…`;
       default:
         return "Match stopped.";
@@ -808,7 +808,7 @@ function mountGame(session, root, shell) {
     if (myTurn && cuedPly !== st.ply) {
       cuedPly = st.ply;
       if (st.ply > 0 && st.last?.player !== me) play("turn");
-      if (spinMode === "auto") {
+      if (spinMode() === "auto") {
         clearTimeout(autoTimer);
         autoTimer = setTimeout(spinNow, AUTO_SPIN_DELAY);
       }
