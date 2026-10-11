@@ -63,7 +63,7 @@ test("theme and volume set on the home page apply in a game", { skip: !pw && "Pl
   assert.deepEqual(await html(page), { theme: "dark" }, "applied at once");
   assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), lightBg);
   assert.equal(await page.locator("#theme-toggle").getAttribute("aria-pressed"), "true", "the header's toggle follows");
-  assert.deepEqual(await prefs(page), { theme: "dark", sound: true, volume: 40, askBeforeLeaving: true });
+  assert.deepEqual(await prefs(page), { theme: "dark", sound: true, volume: 40, askBeforeLeaving: true, muteReactions: false });
   await page.tap("#settings-close");
   await page.locator("#settings").waitFor({ state: "detached" });
   assert.equal(await focused(page), "settings-open", "focus goes back to the gear");

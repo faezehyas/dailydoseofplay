@@ -2,7 +2,7 @@
 // waiting room, and hand-off of a Session to the game. How players get
 // connected lives in room.js; this file is only the UI around it.
 //
-//   startGameShell({ slug, title, tagline, createRobot, onSession, minPlayers, maxPlayers, robots, layout, settings, howToPlay, tutorial })
+//   startGameShell({ slug, title, tagline, createRobot, onSession, minPlayers, maxPlayers, robots, layout, settings, howToPlay, tutorial, banter })
 //
 // onSession(session, root, shell) mounts the game in `root` and returns { destroy }.
 // shell.leave() goes back to the lobby; while the game says a friend match is
@@ -23,10 +23,13 @@
 // tutorial loads the game's tutorial.js (() => import("./tutorial.js")): a
 // Learn button in the lobby, a link at the top of "How to play" and
 // /<slug>/?learn open it (see tutorial.js).
+// banter is optional: how robots react during a game ({ score, strong, lines },
+// see robotBanter() in reactions.js). Without it robots say "Good game!" at the end.
 import { initShell, el, $, toast, copyText, getNickname, setNickname, nicknameField, setTabAlert, askBeforeLeaving } from "./shell.js";
 import { confirmDialog } from "./confirm.js";
 import { HostRoom, GuestRoom, RoomError, localRoom } from "./room.js";
 import { howToPlayPanel } from "./how-to-play.js";
+import { robotBanter, setGameLines } from "./reactions.js";
 
 const ERRORS = {
   no_such_room: "That room doesn't exist any more. Ask your friend for a fresh invite link.",
@@ -61,7 +64,7 @@ const LAYOUTS = ["narrow", "medium", "wide"];
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 4;
 
-export function startGameShell({ slug, title, tagline = "", createRobot, onSession, minPlayers = 2, maxPlayers = 2, robots = 1, layout = "wide", settings, howToPlay, tutorial }) {
+export function startGameShell({ slug, title, tagline = "", createRobot, onSession, minPlayers = 2, maxPlayers = 2, robots = 1, layout = "wide", settings, howToPlay, tutorial, banter = {} }) {
   initShell({ title, settings });
   const lobbyRoot = $("#lobby");
   const gameRoot = $("#game");
@@ -69,6 +72,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     tutorial &&
     el("p", { class: "learn-link" }, el("a", { href: "?learn", id: "learn-link", onclick: (e) => (e.preventDefault(), learn()) }, "Learn by playing: a short interactive tutorial"));
   if (howToPlay) gameRoot.after(howToPlayPanel(howToPlay, learnLink));
+  setGameLines(banter.lines);
   // The lobby, game and "How to play" share one column (theme.css).
   const page = lobbyRoot.closest(".page");
   const showView = (name) => {
@@ -461,7 +465,9 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     const [session, ...robotSessions] = localRoom({ game: slug, names, mode: "robot" });
     state.robots = robotSessions.map((robotSession) => {
       robotSession.on("rematch", (votes) => votes.them && !votes.me && robotSession.requestRematch());
-      return createRobot(robotSession);
+      const robot = createRobot(robotSession);
+      robotBanter(robotSession, robot, banter);
+      return robot;
     });
     state.robot = state.robots[0];
     startSession(session);

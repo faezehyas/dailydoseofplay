@@ -3,10 +3,10 @@
 // (names, rematch votes, goodbye). It is DOM-free so games and robots can be
 // tested headless.
 //
-// Engine messages use a "$" prefix: $bye and $rematch during the game, and
-// the handshake below before it. Everything else is a game message and is
-// handed to session.onMessage handlers as (msg, fromSeat), buffered until the
-// game registers one.
+// Engine messages use a "$" prefix: $bye, $rematch and $react (a reaction,
+// see reactions.js) during the game, and the handshake below before it.
+// Everything else is a game message and is handed to session.onMessage
+// handlers as (msg, fromSeat), buffered until the game registers one.
 import { Emitter, MESSAGE_TOO_BIG } from "./channel.js";
 import { HubGroup, SpokeGroup } from "./group.js";
 import { cleanName, defaultName } from "./names.js";
@@ -48,6 +48,8 @@ export class Session extends Emitter {
         this.votes.add(from);
         this.#emitVotes();
         return this.#maybeRematch();
+      case "$react":
+        return this.emit("react", from, msg.i);
       default:
         if (msg.t.startsWith("$")) return;
         if (this.handlers.length === 0) this.buffer.push([msg, from]);

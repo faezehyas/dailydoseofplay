@@ -269,7 +269,8 @@ function openSettings(game) {
 }
 
 // The General tab: the nickname, the theme as a segmented control with
-// icons, and switches for sound (with its volume) and asking before leaving.
+// icons, and switches for sound (with its volume), asking before leaving and
+// muting reactions.
 function generalSettings() {
   const prefs = getPrefs();
   const theme = el(
@@ -305,6 +306,7 @@ function generalSettings() {
       "div",
       { class: "pref-list" },
       toggle("settings-ask", "Ask before leaving", "When you leave a game with friends", prefs.askBeforeLeaving, (on) => setPrefs({ askBeforeLeaving: on })),
+      toggle("settings-reactions", "Mute reactions", "Hide other players' emoji and phrases", prefs.muteReactions, (on) => setPrefs({ muteReactions: on })),
     ),
   ];
 }
