@@ -1,6 +1,7 @@
 // Headless-browser tests: while a ready game's home tile is hovered or has
 // keyboard focus, it loops a short preview of the game in place of its icon,
-// without changing size, and shows the icon again after; on a touch screen it
+// without changing size, and shows the icon again after (also when a click
+// left focus in the tile); on a touch screen it
 // loops while the tile is in view; with reduced motion, or without a preview,
 // the icon stays. Skips if Playwright is missing.
 //
@@ -136,6 +137,16 @@ test("a tile loops its game's preview while hovered or focused, then shows its i
   await page.locator(`.game-card[data-slug="${second}"] svg.tile-preview`).waitFor();
   await page.locator(`.game-card[data-slug="${first}"] .game-icon img`).waitFor();
   assert.equal(await preview(page, first), null, "the first tile shows its icon again");
+
+  // Mouse: pressing a tile's link focuses it, but the preview still stops once the pointer leaves.
+  await page.locator(`.game-card[data-slug="${first}"] h2 a`).hover();
+  await page.mouse.down();
+  await page.locator(`.game-card[data-slug="${first}"] svg.tile-preview`).waitFor();
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
+  assert.equal(await focusedTile(), first, "the pressed link keeps focus");
+  await page.locator(`.game-card[data-slug="${first}"] .game-icon img`).waitFor();
+  assert.equal(await preview(page, first), null, "the icon is back once the pointer leaves");
   await page.close();
   assert.deepEqual(errors, []);
 });

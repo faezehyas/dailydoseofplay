@@ -34,9 +34,11 @@ function card(game) {
   return el("li", {}, tile);
 }
 
-// While a ready tile is hovered or focused, or on a touch screen while it is
-// mostly in view, it loops a short preview of its game, then shows its icon
-// again. preview.svg is inlined so its animations, which start paused, can
+// While a ready tile is hovered or has keyboard focus, or on a touch screen
+// while it is mostly in view, it loops a short preview of its game, then
+// shows its icon again. A click focuses a link too, but that focus stays
+// after the pointer leaves (and on a page restored by Back), so it doesn't
+// count. preview.svg is inlined so its animations, which start paused, can
 // run; without it the icon stays.
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const canHover = matchMedia("(hover: hover)").matches;
@@ -91,7 +93,7 @@ function watchPreview(tile, img, slug) {
   }
   tile.addEventListener("mouseenter", () => set("hover", true));
   tile.addEventListener("mouseleave", () => set("hover", false));
-  tile.addEventListener("focusin", () => set("focus", true));
+  tile.addEventListener("focusin", (e) => set("focus", e.target.matches(":focus-visible")));
   tile.addEventListener("focusout", (e) => tile.contains(e.relatedTarget) || set("focus", false));
   if (canHover) return;
   new IntersectionObserver(([entry]) => set("view", entry.intersectionRatio >= 0.6), { threshold: [0, 0.6] }).observe(tile);
