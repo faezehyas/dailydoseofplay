@@ -6,7 +6,8 @@
       "status": "ready",
       "players": "2 players",
       "maxPlayers": 2,
-      "description": "Hide your fleet, hunt theirs. Grab gifts for big missiles, missile rain and the nuke."
+      "description": "Hide your fleet, hunt theirs. Grab gifts for big missiles, missile rain and the nuke.",
+      "credits": [{ "github": "Faezehyas" }]
     },
     {
       "slug": "tic-tac-toe",
@@ -14,7 +15,8 @@
       "status": "ready",
       "players": "2 players",
       "maxPlayers": 2,
-      "description": "Line them up before your friend does. Quick to learn, sneaky to master."
+      "description": "Line them up before your friend does. Quick to learn, sneaky to master.",
+      "credits": [{ "github": "Faezehyas" }]
     },
     {
       "slug": "connect-4",
@@ -22,7 +24,8 @@
       "status": "ready",
       "players": "2 players",
       "maxPlayers": 2,
-      "description": "Drop, stack and line up four before your rival does."
+      "description": "Drop, stack and line up four before your rival does.",
+      "credits": [{ "github": "Faezehyas" }]
     },
     {
       "slug": "gomoku",
@@ -30,7 +33,8 @@
       "status": "ready",
       "players": "2 players",
       "maxPlayers": 2,
-      "description": "Fifteen lines each way, five stones to win. Build two threats, block every one of theirs."
+      "description": "Fifteen lines each way, five stones to win. Build two threats, block every one of theirs.",
+      "credits": [{ "github": "Faezehyas" }]
     },
     {
       "slug": "chess",
@@ -38,7 +42,8 @@
       "status": "ready",
       "players": "2 players",
       "maxPlayers": 2,
-      "description": "Sixty-four squares, two armies, one king to trap. Your move."
+      "description": "Sixty-four squares, two armies, one king to trap. Your move.",
+      "credits": [{ "github": "Faezehyas" }]
     },
     {
       "slug": "checkers",
@@ -46,7 +51,8 @@
       "status": "ready",
       "players": "2 players",
       "maxPlayers": 2,
-      "description": "Hop, capture, crown a king. Leave your friend without a piece to move."
+      "description": "Hop, capture, crown a king. Leave your friend without a piece to move.",
+      "credits": [{ "github": "Faezehyas" }]
     },
     {
       "slug": "backgammon",
@@ -54,7 +60,8 @@
       "status": "ready",
       "players": "2 players",
       "maxPlayers": 2,
-      "description": "Roll, run and hit. Bring all fifteen checkers home and off the board first."
+      "description": "Roll, run and hit. Bring all fifteen checkers home and off the board first.",
+      "credits": [{ "github": "Faezehyas" }]
     },
     {
       "slug": "chutes-and-ladders",
@@ -62,7 +69,8 @@
       "status": "ready",
       "players": "2–4 players",
       "maxPlayers": 4,
-      "description": "Spin, climb the ladders, slide down the chutes. First to square 100 wins."
+      "description": "Spin, climb the ladders, slide down the chutes. First to square 100 wins.",
+      "credits": [{ "github": "maminrayej" }]
     },
     {
       "slug": "dots-and-boxes",
@@ -70,7 +78,8 @@
       "status": "ready",
       "players": "2 players",
       "maxPlayers": 2,
-      "description": "Join the dots, close a box and go again. Most boxes wins."
+      "description": "Join the dots, close a box and go again. Most boxes wins.",
+      "credits": [{ "github": "maminrayej" }]
     },
     {
       "slug": "ludo",
@@ -78,7 +87,8 @@
       "status": "ready",
       "players": "2–4 players",
       "maxPlayers": 4,
-      "description": "Roll a 6 to come out, knock rivals back to their yard, and race all four tokens home."
+      "description": "Roll a 6 to come out, knock rivals back to their yard, and race all four tokens home.",
+      "credits": [{ "github": "maminrayej" }]
     },
     {
       "slug": "crazy-eights",
@@ -86,7 +96,8 @@
       "status": "ready",
       "players": "2–4 players",
       "maxPlayers": 4,
-      "description": "Match the suit or the rank, play an 8 to change it, and empty your hand first. Nobody deals, nobody peeks."
+      "description": "Match the suit or the rank, play an 8 to change it, and empty your hand first. Nobody deals, nobody peeks.",
+      "credits": [{ "github": "maminrayej" }]
     },
     {
       "slug": "go-fish",
@@ -94,7 +105,8 @@
       "status": "ready",
       "players": "2–4 players",
       "maxPlayers": 4,
-      "description": "Got any 7s? Ask, catch, and lay down the most books of four. Nobody deals, nobody peeks."
+      "description": "Got any 7s? Ask, catch, and lay down the most books of four. Nobody deals, nobody peeks.",
+      "credits": [{ "github": "maminrayej" }]
     },
     {
       "slug": "gin-rummy",
@@ -102,7 +114,8 @@
       "status": "ready",
       "players": "2 players",
       "maxPlayers": 2,
-      "description": "Build sets and runs, then knock or go gin. First to 100 wins. Nobody deals, nobody peeks."
+      "description": "Build sets and runs, then knock or go gin. First to 100 wins. Nobody deals, nobody peeks.",
+      "credits": [{ "github": "maminrayej" }]
     }
   ]
 }

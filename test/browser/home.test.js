@@ -1,5 +1,5 @@
 // Headless-browser tests: every game tile on the home page is the same size,
-// whatever its description's length, and a phone screen doesn't scroll
+// whatever its description's length or its makers' handles, and a phone screen doesn't scroll
 // sideways or hide the first tile below the hero; placeholders hold the
 // tiles' places while the list loads, and a failed load offers Retry; the
 // hero's scene loops, pauses off screen and in a hidden tab, and holds still
@@ -16,6 +16,9 @@ import { startServer } from "../helpers.js";
 
 const ARTIFACTS = path.resolve("test-artifacts");
 const { games } = JSON.parse(readFileSync("public/games.json", "utf8"));
+// The longest GitHub handle, on the first tile, beside its real maker.
+const credited = games.map((g, i) => (i === 0 ? { ...g, credits: [{ github: "a".repeat(39) }, ...g.credits] } : g));
+const madeBy = (game) => `Made by ${game.credits.map((c) => `@${c.github}`).join(", ")}`;
 
 async function loadPlaywright() {
   const require = createRequire(import.meta.url);
@@ -46,13 +49,17 @@ test("home page tiles are all the same size", { skip: !pw && "Playwright not ins
   for (const width of [1280, 768, 360]) {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     page.on("pageerror", (e) => errors.push(`${width}: ${e.message}`));
+    await page.route("**/games.json", (route) => route.fulfill({ json: { games: credited } }));
     await page.goto(`${srv.base}/`);
     await page.locator(".game-card[data-slug]").nth(games.length - 1).waitFor();
     const cards = await page.locator(".game-card[data-slug]").evaluateAll((els) =>
       els.map((card) => {
         const box = card.getBoundingClientRect();
         const p = card.querySelector("p");
+        const credit = card.querySelector(".made-by");
         return {
+          credit: credit.textContent,
+          creditRight: credit.getBoundingClientRect().right,
           height: box.height,
           right: box.right,
           metaGap: box.bottom - card.querySelector(".game-meta").getBoundingClientRect().bottom,
@@ -69,6 +76,8 @@ test("home page tiles are all the same size", { skip: !pw && "Playwright not ins
       assert.ok(card.lines <= 2, `${name}: description shows ${card.lines} lines`);
       assert.equal(card.text, games[i].description, `${name}: the full description stays in the DOM`);
       assert.ok(card.right <= width, `${name}: card ends inside the screen`);
+      assert.equal(card.credit, madeBy(credited[i]), `${name}: the full credits stay in the DOM`);
+      assert.ok(card.creditRight <= card.right, `${name}: credits end inside the card`);
     }
     if (width === 360) {
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, "no horizontal scroll at 360 px");

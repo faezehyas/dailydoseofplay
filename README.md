@@ -221,7 +221,7 @@ public/
 test/              integration and browser tests
 docs/              deploying
 vendor/            the mental-poker library behind card decks (git submodule), our patches and lock file
-scripts/           build-mental-poker.sh builds it into public/engine/vendor/mental-poker/ (committed); install-wasm-tools.sh gets the pinned tools for CI
+scripts/           build-mental-poker.sh builds it into public/engine/vendor/mental-poker/ (committed); install-wasm-tools.sh gets the pinned tools for CI; credits.js writes the Contributors list
 app.yaml           Wasmer Edge app config (name dailydoseofplay, owner faezeh_yass)
 ```
 
@@ -231,6 +231,16 @@ app.yaml           Wasmer Edge app config (name dailydoseofplay, owner faezeh_ya
 - **Rooms live in server memory.** The app is pinned to one region to keep rooms on one set of instances. A friend's join could still in theory land on a different instance.
 - **Fair play is checked after the game, not refereed live.** A modified client could lie during play; the lie is detected at the end, and stalling or leaving is not prevented.
 - **A modified host browser can read a hand in card games with three or more players.** Every message passes through the room creator's browser, which could hold back a player's moves, forge a game-ending move in their name and so get their key for the audit while the real game goes on. With two players the host is your only opponent, so this gives them nothing. See "A modified host" in [ARCHITECTURE.md](ARCHITECTURE.md#card-games-cardmatch).
+
+## Contributors
+
+Who made each game, from the `credits` in `public/games.json`
+(`node scripts/credits.js` writes this list):
+
+<!-- credits:start -->
+- [@Faezehyas](https://github.com/Faezehyas): Sea Battle, Tic Tac Toe, Connect 4, Gomoku, Chess, Checkers, Backgammon
+- [@maminrayej](https://github.com/maminrayej): Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy
+<!-- credits:end -->
 
 ## Credits and license
 

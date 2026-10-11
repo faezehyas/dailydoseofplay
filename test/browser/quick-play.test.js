@@ -88,7 +88,7 @@ test("quick play links on the home page start a game straight away", { skip: !pw
     // The rest of the tile still opens the lobby.
     await home(page, srv.base);
     // force: the name's stretched link covers the description, as intended.
-    await page.locator('.game-card[data-slug="ludo"] p').click({ force: true });
+    await page.locator('.game-card[data-slug="ludo"] p').first().click({ force: true });
     await page.locator("#play-friend").waitFor();
     assert.equal(new URL(page.url()).pathname, "/ludo/");
     await ctx.close();
