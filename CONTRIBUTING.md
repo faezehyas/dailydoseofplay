@@ -80,7 +80,7 @@ your protocol:
 
 ```
 public/<slug>/
-├── index.html       page shell: copy public/sea-battle/index.html, change title and meta
+├── index.html       page shell: copy public/sea-battle/index.html, change title and description; keep the icon, manifest and theme-color tags
 ├── style.css        game-specific styles; only var(--…) tokens from /engine/theme.css, light and dark
 ├── main.js          startGameShell(...) and the view
 ├── rules.js         pure rules

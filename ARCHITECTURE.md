@@ -50,6 +50,14 @@ fails when a `"ddp-…"` key in `public/` is missing from it. Change the page
 with the facts it states (a log line, an ICE server, a new kind of data); the
 accounts work (F1) must rewrite it before it ships.
 
+**Installing.** Every page links `/manifest.webmanifest` and two `theme-color`
+tags, light and dark, set to `--bg`. The manifest's icons are `favicon.svg`
+and PNGs in `public/icons/` (192 and 512 px, plus a 512 px maskable one with
+the dots on a full-bleed square), committed as files. Chrome offers to
+install from the manifest alone; there is no service worker, so caching stays
+as described under **Server**. `test/server.test.js` checks the manifest's
+content type and that every icon it lists is served at its stated size.
+
 ## Layers
 
 | Layer | Files | Knows about games? |
