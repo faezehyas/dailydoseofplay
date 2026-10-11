@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sounds, chime, MELODY, OFFSET, GAP, TIMBRES } from "./chimes.js";
+import { sounds, chime, MELODY, OFFSET, GAP, TIMBRES, RIGHT } from "./chimes.js";
 import { pentatonic } from "./synth.js";
 
 const OUTCOMES = ["win", "loss", "draw", "over"];
@@ -42,7 +42,20 @@ test("every outcome in every flavour has a chime of its own, at the fanfare leve
   }
   assert.equal(names.size, OUTCOMES.length * FLAVOURS.length);
   assert.deepEqual(Object.keys(TIMBRES).sort(), [...FLAVOURS].sort());
-  assert.equal(sounds.names.length, names.size, "no other sounds");
+  assert.equal(sounds.names.length, names.size + FLAVOURS.length, "no other sounds but the tutorial's right move");
+});
+
+test("a tutorial's right move is the win's last two notes, quick, at the ui level", () => {
+  assert.deepEqual(RIGHT, MELODY.win.slice(-2));
+  for (const flavour of FLAVOURS) {
+    const name = chime("right", flavour);
+    assert.equal(sounds.defs[name].role, "ui", name);
+    const heard = listen(name);
+    RIGHT.forEach((step, k) => {
+      const at = heard.filter((h) => h.t >= (k * GAP) / 2 && h.t < ((k + 1) * GAP) / 2);
+      assert.ok(at.some((h) => Math.abs(h.f - note(step)) < 0.01), `${name}: note ${k + 1} is ${note(step).toFixed(0)} Hz`);
+    });
+  }
 });
 
 test("a win rises over three notes, a loss falls over two, a draw stays, and 'over' is a softer win", () => {

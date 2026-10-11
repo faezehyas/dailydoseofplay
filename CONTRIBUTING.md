@@ -81,6 +81,7 @@ public/<slug>/
 ├── sounds.js        optional: the game's sounds, played through the engine (step 5b)
 ├── icon.svg         original 16:10 card art (viewBox 0 0 320 200), no external refs
 ├── preview.svg      optional: the home tile's animated preview (step 5c)
+├── tutorial.js      optional: the tutorial's adapter to your board, and lessons.js its lessons (step 5d)
 ├── rules.test.js    rules unit tests
 ├── robot.test.js    robot unit tests (+ a full robot-vs-robot game)
 └── match.test.js    protocol test: two peers play a full game (optional file; may live in robot.test.js)
@@ -374,6 +375,59 @@ is the shortest to copy). Without one the tile keeps its icon.
 - Moves: give a piece `.pop`, `.fade`, `.gone`, `.draw`, `.slide` (from `--x`, `--y`) or `.fall` (from `--y`) and its start time `--d`, or your own keyframes. Animate only transform and opacity, and put a moving piece in a `<g transform="…">` rather than giving it a `transform` of its own.
 - Check it: hover the tile in light and dark, and run `npm test` (it checks the file) and `node --test test/browser/home-previews.test.js` (it checks the length).
 
+### 5d. Tutorial (optional)
+
+A tutorial teaches the rules on your real board: 3 to 6 short lessons of 1 to
+4 steps, each one or two sentences that light up squares, maybe draw an arrow,
+and wait for one move, which your `rules.js` checks (see **Tutorials** in
+`ARCHITECTURE.md`). The engine does the rest: the lesson list and its ticks,
+hints, the check mark and its chime, the end screen, a Learn button in the
+lobby, a link at the top of "How to play" and `/<slug>/?learn`. Tic Tac Toe's
+is the shortest to copy, and Chess shows a promotion picker.
+
+`lessons.js` is data, in your game's own move format:
+
+```js
+export const lessons = [
+  {
+    title: "Three in a row",
+    steps: [
+      {
+        text: "Line up three of your marks to win. Finish the top row.",
+        position: "XX. OO. ...", // whatever your load() reads; left out, the step goes on from the last one
+        highlight: [0, 1], // cells lit up
+        arrows: [[0, 2]], // optional [from, to] cells
+        expect: { cell: 2 }, // a move, or a list of accepted ones; a move matches if it has every field
+        reply: { cell: 5 }, // optional: a move played back before the next step
+      },
+    ],
+  },
+];
+```
+
+`tutorial.js` connects the lessons to your board. Reuse your view's markup,
+classes and art (move shared art to `art.js`), so the tutorial looks like the
+game:
+
+```js
+export { lessons } from "./lessons.js";
+export const flavour = "paper"; // the chime's timbre, as for celebrate()
+export const load = (position) => /* a rules state whose side to move is the learner */;
+export const play = (state, move) => applyMove(state, state.turn, move); // throws RuleError when illegal
+export const cells = (move) => [move.cell]; // the cells a move uses, lit up by the hint
+export function board() {
+  // render(state) draws it, onMove(fn) reports the learner's moves (legal or not),
+  // cell(c) is a cell's element, reject(move) springs a wrong move back (nothing with reduced motion).
+  return { node, render, onMove, cell, reject };
+}
+```
+
+A dice game fixes a step's roll with a field of its own on the step: `play`
+gets the step as its third argument and can hand `applyMove` an `rng` that
+rolls it. Pass `tutorial: () => import("./tutorial.js")` to
+`startGameShell()`, so the page loads it only when someone opens it. Test it
+with `lessons.test.js` (step 7).
+
 ### 6. Register it
 
 Games aren't listed ahead of time, so add your game's entry to the end of
@@ -400,6 +454,7 @@ no change.
   - it blocks an immediate loss;
   - robot vs robot over 20 seeded games always finishes with legal moves.
 - **Protocol** (in `match.test.js` or `robot.test.js`): pair two `TurnMatch`es over `localPair()` + `openSession()` + `matchRouter()` (see `public/engine/turn-match.test.js`), play a full game, and assert both states are equal. For more than two players, seat them with `localRoom()` from `engine/room.js` and pass `players` to each `TurnMatch` (see the three-player test in `turn-match.test.js`). For a card game, run `startCardRobot()` in every seat of a `localRoom()` and also assert every `match.verdict` is `{ ok: true }` (see `public/engine/card-match.test.js`).
+- **`lessons.test.js`** (with a tutorial): every step's expected moves and reply are legal in its position according to `rules.js`, a step without a position follows a reply, and there are 3 to 6 lessons of 1 to 4 steps (see Chess's).
 - **Sounds:** nothing to add. `test/browser/sound-levels.test.js` finds every `sounds.js` and checks each sound's loudness.
 - **Message size:** add the game to `GAMES` in `test/message-size.test.js` (its biggest board and most players). It plays a full match and fails if a message is over 4 K characters; a browser cuts off a player whose message is over 64 K (see **Message size** in `ARCHITECTURE.md`). Send moves, not whole states.
 - **Browser (recommended):** add `test/browser/<slug>.test.js` modelled on `test/browser/friend-match.test.js`. Host clicks `#play-friend`, the guest opens `#invite-link`, both play through `window.ddp.match`, then a rematch.
@@ -478,6 +533,7 @@ windows (one private).
 | `public/engine/prefs.js` | The general settings (theme, sound, volume, asking before leaving) in `ddp-settings` |
 | `public/engine/settings.js` | `gameSettings()`: a game's settings, shown in the lobby card and the settings panel |
 | `public/engine/how-to-play.js` | `howToPlayPanel()`: the "How to play" panel, the same sections in every game |
+| `public/engine/tutorial.js` | `startTutorial()`: a game's lessons on its own board, from its `tutorial.js` |
 | `public/engine/players.js` | `playerBar()`: names, whose turn it is, the score, React and Leave, above every game |
 | `public/engine/reactions.js` | Quick reactions: the React tray, bubbles, mute, and the robots' banter |
 | `public/engine/result.js` | `resultPanel()`: the game-over panel with the result, Rematch and Leave, in every game |

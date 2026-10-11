@@ -1330,6 +1330,272 @@ input::placeholder {
   }
 }
 
+/* ---------- tutorial (engine/tutorial.js) ---------- */
+.lobby-actions .learn {
+  grid-column: 1 / -1;
+}
+
+.rules .learn-link {
+  margin: 12px 0 0;
+  font-weight: 700;
+}
+
+/* Nothing to open while a game or the tutorial is on show. */
+.page[data-view="game"] .learn-link {
+  display: none;
+}
+
+.tutorial {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.tutorial h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.tutorial .tagline {
+  margin: 0;
+}
+
+.tut-lessons {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tut-lesson {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 14px;
+  border: 1px solid var(--control-border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .tut-lesson:hover {
+    background: var(--surface-2);
+  }
+}
+
+.tut-num {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.tut-lesson[data-done="true"] .tut-num {
+  background: var(--accent-2);
+  color: var(--accent-ink);
+}
+
+/* A finished lesson's tick. */
+.tut-lesson[data-done="true"] .tut-tick::before {
+  content: "";
+  display: block;
+  width: 7px;
+  height: 14px;
+  margin: 0 auto 4px;
+  border: solid var(--ok);
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+
+.tut-summary,
+.tut-count,
+.tut-progress {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.tut-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tut-top .btn {
+  margin-left: -12px;
+}
+
+.tut-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tut-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.tut-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--control-border);
+  background: var(--surface-2);
+}
+
+.tut-dots .now {
+  border-color: var(--accent-text);
+  background: var(--accent);
+}
+
+.tut-dots .done {
+  border-color: var(--accent-2-text);
+  background: var(--accent-2);
+}
+
+.tut-text {
+  margin: 0;
+  min-height: 3em;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.tut-stage {
+  position: relative;
+}
+
+/* Lit squares show what the step is about; the hint shows the move. */
+.tut-lit {
+  box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 6px var(--accent-2);
+}
+
+.tut-hint {
+  box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 6px var(--accent);
+}
+
+/* Over the pieces, under a game's own overlays (Chess's promotion picker). */
+.tut-arrows {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.tut-arrow {
+  fill: var(--accent-2);
+  stroke: var(--accent-2);
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
+.tut-check {
+  position: absolute;
+  z-index: 5;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.tut-check svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.tut-check circle {
+  fill: var(--ok);
+}
+
+.tut-check path {
+  fill: none;
+  stroke: var(--surface);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tut-feedback {
+  margin: 0;
+  min-height: 1.5em;
+  font-weight: 700;
+}
+
+.tut-feedback.right {
+  color: var(--accent-2-text);
+}
+
+.tut-feedback.wrong {
+  color: var(--accent-text);
+}
+
+.tut-next,
+.tut-end-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.tut-end {
+  text-align: center;
+}
+
+.tut-end p {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tut-arrow {
+    animation: tut-arrow var(--dur-slow) var(--ease-out) both;
+  }
+  .tut-check {
+    animation: tut-check var(--dur-med) var(--ease-spring) both;
+  }
+  .tut-hint {
+    animation: tut-hint var(--dur-slow) var(--ease-out) 2;
+  }
+}
+
+/* Arrows grow from their start (tutorial.js draws them along +x). */
+@keyframes tut-arrow {
+  from {
+    opacity: 0;
+    transform: scaleX(0.2);
+  }
+}
+
+@keyframes tut-check {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+}
+
+@keyframes tut-hint {
+  50% {
+    transform: scale(0.9);
+  }
+}
+
 /* ---------- home ---------- */
 .hero {
   text-align: center;

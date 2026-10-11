@@ -60,7 +60,7 @@ accounts work (F1) must rewrite it before it ships.
 
 **Import graph.** An arrow is an `import`. The game box stands for every
 `public/<slug>/` folder, so its arrows are those of all the games together;
-`art.js` and `sounds.js` are optional and `match.js` is Sea Battle's alone. The `cards/`
+`art.js`, `sounds.js`, `tutorial.js` and `lessons.js` are optional and `match.js` is Sea Battle's alone. The `cards/`
 modules are the card games' shared table (see **Card games**).
 Dotted arrows are reads of `games.json`, not imports. Every module in
 `public/` and `server/` has a box: `test/architecture.test.js` fails when one
@@ -79,6 +79,8 @@ flowchart TB
     g_sounds["sounds.js"]
     g_how_to_play["how-to-play.js"]
     g_art["art.js"]
+    g_tutorial["tutorial.js<br>loaded when opened"]
+    g_lessons["lessons.js"]
     g_match["match.js<br>Sea Battle only"]
   end
   subgraph engine ["Engine: public/engine/"]
@@ -109,6 +111,7 @@ flowchart TB
     e_settings["settings.js"]
     e_prefs["prefs.js"]
     e_how_to_play["how-to-play.js"]
+    e_tutorial["tutorial.js<br>loaded when opened"]
     e_names["names.js"]
     e_robot_pace["robot-pace.js"]
     e_sound["sound.js"]
@@ -155,7 +158,14 @@ flowchart TB
   p_main --> g_settings
   p_main --> g_sounds
   p_main --> g_how_to_play
+  p_main --> g_tutorial
+  g_art --> e_shell
   g_art --> g_rules
+  g_lessons --> g_rules
+  g_tutorial --> e_shell
+  g_tutorial --> g_art
+  g_tutorial --> g_lessons
+  g_tutorial --> g_rules
   g_match --> e_channel
   g_match --> e_fair
   g_match --> g_rules
@@ -213,6 +223,7 @@ flowchart TB
   e_lobby --> e_reactions
   e_lobby --> e_room
   e_lobby --> e_shell
+  e_lobby --> e_tutorial
   e_peer --> e_channel
   e_players --> e_reactions
   e_players --> e_shell
@@ -232,6 +243,10 @@ flowchart TB
   e_session --> e_names
   e_settings --> e_shell
   e_how_to_play --> e_shell
+  e_tutorial --> e_celebrate
+  e_tutorial --> e_chimes
+  e_tutorial --> e_shell
+  e_tutorial --> e_turn_match
   e_shell --> e_names
   e_shell --> e_prefs
   e_signaling --> e_channel
@@ -444,7 +459,7 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `shell.js` | Header with the home link in a `nav` landmark, a "Skip to content" link to the page's `<main>` (shown on focus), and light/dark and sound toggles (each keeps one label, "Dark mode" or "Mute sounds", and gives its state through `aria-pressed`) next to the gear that opens the settings panel (see **Settings**), the footer every page ends with (how games run, then links to this file, the repository and the privacy page; more links join `FOOTER_LINKS`), nickname in `localStorage` (`getNickname()` picks and saves a default when there is none) and the nickname field (`nicknameField()`, in the lobby and the panel), `segGroup()` (a group of segmented options), the theme on `<html data-theme>`, toasts (just below the header; a repeated one is announced again), a tab-title alert ("Your turn"), `el()` DOM helper, and `askBeforeLeaving()`, the panel's "Ask before leaving" switch |
 | `prefs.js` | The general settings (see **Settings**): `getPrefs()`, `setPrefs(patch)`, `onPrefsChange(fn)`, and `normalizePrefs()` and `loadPrefs(storage)`, which moves the old `ddp-theme` and `ddp-sound` into `ddp-settings`. No DOM; runs in node too. |
 | `names.js` | `checkName()` and `cleanName()`: the nickname rules (see **Nicknames**), shared with the server; `defaultName()`, a friendly default name |
-| `theme.css` | Design tokens for light and dark, fonts and motion (see **Type and motion**), chips and `.mono`, buttons, cards, lobby, the home hero with its steps and its game-table scene, the home grid (tiles whose name links to the lobby, with Play friends and Play the robot links), the moves the tiles' previews use (see **Tile previews**) and its loading tiles (see **Colours and contrast**), the game page column (see **Page column**), the player bar with the reactions' tray and bubbles, the result panel, the result moment, the confirm dialog, the settings panel and `.text-page` (the privacy page's reading column) |
+| `theme.css` | Design tokens for light and dark, fonts and motion (see **Type and motion**), chips and `.mono`, buttons, cards, lobby, the home hero with its steps and its game-table scene, the home grid (tiles whose name links to the lobby, with Play friends and Play the robot links), the moves the tiles' previews use (see **Tile previews**) and its loading tiles (see **Colours and contrast**), the game page column (see **Page column**), the player bar with the reactions' tray and bubbles, the result panel, the result moment, the tutorial (see **Tutorials**), the confirm dialog, the settings panel and `.text-page` (the privacy page's reading column) |
 | `signaling.js` | `RoomClient`: create, join (with or without the invite key), admit, decline, signal, leave. It uses the global `WebSocket`, so it also runs in Node 22 for the integration test. |
 | `peer.js` | `PeerChannel`: one ordered, reliable DataChannel to one other browser, pre-negotiated (`negotiated: true, id: 0`) on both sides; buffers early ICE candidates; detects ICE failure, a 20 s timeout and a 10 s disconnect grace. Refuses a message over `MAX_MESSAGE_LENGTH` before parsing it and closes with `message_too_big` (see **Message size**). |
 | `channel.js` | `Emitter` and `localPair()`, an in-memory two-ended channel with the same interface as `PeerChannel` (used for robots and tests). `MAX_MESSAGE_LENGTH` (64 K characters of JSON) and `MESSAGE_TOO_BIG`: the local pair refuses an oversized message the same way, so robot games and tests behave like WebRTC. |
@@ -460,15 +475,16 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `deck-crypto.js` | A synchronous layer over the vendored mental-poker WebAssembly (`vendor/mental-poker/`): keys, shuffles and their proofs, shares, opening, the audit. Bytes in, bytes out. |
 | `base64.js` | Bytes to base64 and back, strict about its input, for binary data in JSON messages |
 | `vendor/mental-poker/` | The built library, committed (see **Card games**): `cards_play_bg.wasm`, its loader `cards_play.js`, `LICENSE`, and `SOURCE` (the commit it was built from) |
-| `lobby.js` | `startGameShell()`: the game's `description` from `games.json` under its name (the lobby shows at once and the text fills in when the file arrives), a "How to play" link under it that opens the game's `howToPlay` panel (see `how-to-play.js`, put under `#game`) and moves focus to its summary, the "Play with a friend" / "Play vs robot" / join-by-code UI with a quiet line under the Play buttons that games connect browsers directly, invite link with copy and share, the waiting room (a player list and a Start button when a game allows more than two; Accept / Decline for anyone knocking), `?room=CODE&key=KEY` auto-join, `?robot=1` (a robot game) and `?friend=1` (a new room at once, as if "Play with a friend" was pressed; dropped from the address bar so a reload doesn't make another), connection-failure and player-left screens. It hands the game a `shell` with `leave()` and `setInProgress(on)` (see **Leaving**). With a game's `settings` it shows them inside the home screen's card, between the nickname and the Play buttons, and their summary on the host's waiting screen, so friends see the rules before the game starts; it passes them to the settings panel and locks them while a game is on. Each new screen moves focus to its heading (not on page load); progress such as "Creating a room…" or "Bo joined" is read out from one `role="status"` line, and the connection-problem screen uses `role="alert"`. The code field takes only the server's code letters (uppercased, spaces and dashes dropped, anything else refused with a hint) and joins by itself at four; a join that fails returns to it with the code still in, the error under the field and read out from the status line. It also sets which view is on show for the page column. |
+| `lobby.js` | `startGameShell()`: the game's `description` from `games.json` under its name (the lobby shows at once and the text fills in when the file arrives), a "How to play" link under it that opens the game's `howToPlay` panel (see `how-to-play.js`, put under `#game`) and moves focus to its summary, the "Play with a friend" / "Play vs robot" / join-by-code UI with a quiet line under the Play buttons that games connect browsers directly, invite link with copy and share, the waiting room (a player list and a Start button when a game allows more than two; Accept / Decline for anyone knocking), `?room=CODE&key=KEY` auto-join, `?robot=1` (a robot game), `?friend=1` (a new room at once, as if "Play with a friend" was pressed; dropped from the address bar so a reload doesn't make another) and `?learn` (the game's tutorial, also opened by a Learn button under the Play buttons and a link at the top of "How to play"; see **Tutorials**), connection-failure and player-left screens. It hands the game a `shell` with `leave()` and `setInProgress(on)` (see **Leaving**). With a game's `settings` it shows them inside the home screen's card, between the nickname and the Play buttons, and their summary on the host's waiting screen, so friends see the rules before the game starts; it passes them to the settings panel and locks them while a game is on. Each new screen moves focus to its heading (not on page load); progress such as "Creating a room…" or "Bo joined" is read out from one `role="status"` line, and the connection-problem screen uses `role="alert"`. The code field takes only the server's code letters (uppercased, spaces and dashes dropped, anything else refused with a hint) and joins by itself at four; a join that fails returns to it with the code still in, the error under the field and read out from the status line. It also sets which view is on show for the page column. |
 | `fair.js` | `commit` and `verifyCommit` (SHA-256 commitments), `HashChain` and `SharedRandom` (random draws all peers agree on). SHA-256 uses WebCrypto where the page has it, else a plain-JS copy (see below). |
 | `players.js` | `playerBar(session, { onLeave, classes })`: the bar above every game (see **Player bar**). |
 | `reactions.js` | Quick reactions in the player bar (see **Reactions**): the React tray, the bubbles with their pop, the checks on `$react`, and `robotBanter()`, which the lobby starts for every robot seat. |
 | `result.js` | `resultPanel(session, { onLeave, onShow, classes })`: the game-over panel of every game, with Rematch and Leave (see **Result panel**). |
 | `celebrate.js` | `celebrate({ outcome, flavour, highlight, anchor, board })`: the result moment a game plays from the panel's `onShow`, and `calm()`, which the panel calls when it hides (see **Result moment**). |
-| `chimes.js` | The result chimes: the site's jingle for each outcome in each game's timbre, through `sound.js` (see **Result moment**). No DOM. |
+| `chimes.js` | The result chimes: the site's jingle for each outcome in each game's timbre, through `sound.js` (see **Result moment**), and a tutorial's right move (`right-<flavour>`, see **Tutorials**). No DOM. |
 | `confirm.js` | `confirmDialog({ title, text, yes, no })`: a yes-or-no question in a modal `<dialog>` styled like the site. Focus moves to Cancel, Esc or Cancel says no, and focus returns to where it was (Leave). Resolves to `true` for yes. |
-| `how-to-play.js` | `howToPlayPanel(sections)`: the "How to play" panel (`details.rules#how-to-play`) with the same `<h3>` sections in every game, in one order: Goal, Players, Setup, On your turn, Winning, Settings and clocks, Fair play, Keyboard. A game leaves out what doesn't apply; a section is a paragraph or a list, and an unknown one throws. `startGameShell()` puts it under `#game`. |
+| `how-to-play.js` | `howToPlayPanel(sections, top)`: the "How to play" panel (`details.rules#how-to-play`) with the same `<h3>` sections in every game, in one order: Goal, Players, Setup, On your turn, Winning, Settings and clocks, Fair play, Keyboard. A game leaves out what doesn't apply; a section is a paragraph or a list, and an unknown one throws. `top` goes first (the lobby's link to the tutorial). `startGameShell()` puts it under `#game`. |
+| `tutorial.js` | `startTutorial()`: a game's lessons on its own board, with the lesson list and its ticks, the step runner, the highlight layer (lit squares and arrows), the hint, progress and the end screen (see **Tutorials**). The lobby imports it only when a tutorial opens. |
 | `settings.js` | `gameSettings()`: a game's settings (groups of segmented options such as clocks or board size), remembered per device under the game's key. The lobby shows them folded to a summary ("Game settings" over chips such as "No clocks", "Coin toss", "Easy robot", and Change) that opens to the options; a "device" group (`scope: "device"`, or `robot: true`) is tagged "vs robot only", its chip has a teal dot, and it is left out of the waiting screen's summary, like a "view" group. `form()` is the options themselves, shown in the lobby card and in the settings panel's "This game" tab, and each copy follows changes made in the other; `lock(on)`, from the lobby, disables all but the "view" options while a game is on. `get()` is the current config, which the game sends to its guests (`setup`). |
 | `sound.js` | Every game's sounds play through it (see **Sound levels**): `defineSounds()` takes a game's list of sounds, each with a role, and returns `play(name, opts, at)`. One audio context and one output for the site, the per-device mute and volume (a master gain after the output) from `prefs.js`, and preloading of short CC0 recordings (Sea Battle, Chess, Backgammon, Ludo and the card games, see each `sounds/LICENSE.txt`) |
 | `synth.js` | Building blocks for synthesized sounds: `tone()`, `noise()` (white or brown), `decay()` and a `pentatonic()` scale |
@@ -875,6 +891,69 @@ colours change: the pieces glow, the board dims, the pills take their seat
 colour, and nothing moves. The colours stay while the panel is up; it calls
 `calm()` when it hides, for a rematch.
 
+**Tutorials.** A game can teach its rules with a short interactive
+tutorial, learnt by making moves on the real board rather than by reading.
+`startTutorial()` in `tutorial.js` runs it in the page: no server, no timer
+and no score. It is a lesson list, 3 to 6 lessons of 1 to 4 steps, and each
+step shows a sentence or two, lights up squares (`.tut-lit`), may draw arrows
+and waits for one move.
+
+```mermaid
+flowchart LR
+  lessons["lessons.js<br>data: text, position,<br>highlight, arrows,<br>expect, reply"] --> runner
+  subgraph engine ["engine/tutorial.js"]
+    runner["step runner"] --> layer["highlight layer:<br>lit squares, arrows,<br>hint, check mark"]
+  end
+  runner -- "load(position)<br>play(state, move)" --> adapter
+  adapter["the game's tutorial.js<br>(adapter)"] -- "applyMove()" --> rules["rules.js"]
+  adapter -- "board(): render, onMove,<br>cell, reject" --> view["the game's own board<br>markup, art.js, style.css"]
+```
+
+- **Lessons are data** (`public/<slug>/lessons.js`): `[{ title, steps: [{ text,
+  position, highlight, arrows, expect, reply }] }]`, in the game's own
+  position and move format. `expect` is one move or a list of accepted
+  moves, and a move matches when it has every field of one of them; `reply`
+  is a move the teacher plays back. A step without a `position` goes on from
+  the last one. A dice game can put its roll on the step: the adapter's
+  `play` gets the step and can hand `applyMove` an `rng` that rolls it.
+- **The adapter** (`public/<slug>/tutorial.js`) exports the lessons, the
+  chime's `flavour`, `load(position)` (a rules state whose side to move is
+  the learner), `play(state, move, step)` (`applyMove` for the side to move),
+  `cells(move)` and `board()`: the game's own markup, classes and art, with
+  `render(state)`, `onMove(fn)`, `cell(c)` and `reject(move)`. The board
+  only hands over cells, so the engine draws the lit squares, arrows and
+  hint the same way in every game. It reports any move the learner makes,
+  legal or not.
+- **Every move is checked by the game's `rules.js`**, so a lesson can't teach
+  a wrong rule, and `lessons.test.js` plays every step's expected moves and
+  replies through it. A move the rules refuse, or a legal move that isn't
+  the step's, springs back (`reject`), and the line under the board says why
+  in the rules' own words ("That piece can't move there."). After the second
+  wrong try the squares of the right move light up (`.tut-hint`). A right
+  move gets a check mark on its square and `right-<flavour>`, the win
+  chime's last two notes at the `ui` level; then the reply, then the next
+  step.
+- **Entry points:** a Learn button in the lobby under the Play buttons, a
+  link at the top of "How to play" (hidden while a game or the tutorial is on
+  show), and `/<slug>/?learn`, which can be shared. Opening it from the page
+  adds a history entry, so Back returns to the lobby. The page imports
+  `engine/tutorial.js` and the game's `tutorial.js` only then. The last
+  lesson ends on a screen with "Play the robot now", which plays the result
+  moment's win (`celebrate()`).
+- **Progress** stays on the device: `ddp-lessons` in `localStorage` holds
+  each game's finished lessons, which get a tick in the list.
+- **Access:** the step's text is in a `role="status"` line, so it is read
+  out, and why a move was wrong in a polite live line. Opening a lesson moves
+  focus to its title, and a finished lesson to Next lesson. The boards take
+  taps and the keyboard as in the games (arrow keys, Enter or Space). With
+  `prefers-reduced-motion` the arrows, the check mark and the hint don't
+  move and wrong moves don't spring back.
+
+Tic Tac Toe (placing a mark, three in a row, blocking) and Chess (the
+pieces, capture, check and checkmate, castling, en passant and promotion)
+have tutorials; `test/browser/tutorial.test.js` plays the first Chess lesson
+by keyboard.
+
 **Player colours.** A player has the same colour on every screen, so "I'm the
 coral one" is true for everyone at the table. In a two-player game whoever
 moves first this match is coral and the other teal (in Chess, White is coral),
@@ -932,7 +1011,7 @@ checks that no game opens its own audio context or output.
 |---|---|
 | `index.html` | Page with `#lobby` and `#game` sections |
 | `how-to-play.js` | The "How to play" text, `export const howToPlay = { goal, players, setup, turn, winning, settings, fairPlay, keyboard }`, passed to `startGameShell()` |
-| `main.js` | `startGameShell({ slug, title, layout, settings, createRobot, onSession, minPlayers, maxPlayers, robots })` and the view. The player counts default to 2 and `maxPlayers` must match `games.json`; the lobby's tagline is the game's `description` there (a `tagline` option still overrides it); `layout` picks the page column (see **Page column**). |
+| `main.js` | `startGameShell({ slug, title, layout, settings, howToPlay, tutorial, createRobot, onSession, minPlayers, maxPlayers, robots })` and the view. The player counts default to 2 and `maxPlayers` must match `games.json`; the lobby's tagline is the game's `description` there (a `tagline` option still overrides it); `layout` picks the page column (see **Page column**). |
 | `settings.js` | Optional: the game's settings, `export const settings = gameSettings({ key, prefix, groups, normalize, hint })`, passed to `startGameShell()` and read with `settings.get()`. Each group has a `scope`: `"room"` (the default), `"device"` or `"view"` (see **Settings**). |
 | `rules.js` | Pure rules: no DOM, timers, network or `Math.random`. Randomness is passed in. |
 | `match.js` | Only for games with hidden information that isn't a deck of cards (Sea Battle's fleet): one player's protocol state machine. Card games use `engine/card-match.js`, the others `engine/turn-match.js`. |
@@ -941,6 +1020,8 @@ checks that no game opens its own audio context or output.
 | `*.test.js` | `node --test` unit tests, next to the code |
 | `icon.svg` | Card art for the home page (16:10) |
 | `preview.svg` | Optional: the tile's short animated preview (see **Tile previews**) |
+| `tutorial.js`, `lessons.js` | Optional: the tutorial (see **Tutorials**). `lessons.js` is its lessons as data; `tutorial.js` exports them with the adapter the engine plays them through, and `main.js` passes `tutorial: () => import("./tutorial.js")`. |
+| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo, Chutes and Ladders), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces) |
 
 ## Card games (`CardMatch`)
 
