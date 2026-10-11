@@ -1,10 +1,11 @@
-// The README lists every ready game, and the docs' relative links point at
-// files that exist.
+// The README lists every ready game and who made it, and the docs' relative
+// links point at files that exist.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { withContributors } from "../scripts/credits.js";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const read = (file) => readFileSync(path.join(ROOT, file), "utf8");
@@ -20,6 +21,11 @@ test("readme: lists every ready game in games.json", () => {
   const ready = JSON.parse(read("public/games.json")).games.filter((g) => g.status === "ready");
   assert.ok(ready.length >= 10, "found the ready games");
   for (const game of ready) assert.ok(readme.includes(game.name), `README lists ${game.name}`);
+});
+
+test("readme: the Contributors list matches the credits in games.json (node scripts/credits.js)", () => {
+  const readme = read("README.md");
+  assert.equal(readme, withContributors(readme, JSON.parse(read("public/games.json")).games));
 });
 
 test("readme: relative links in README, CONTRIBUTING and docs/ point at existing files", () => {

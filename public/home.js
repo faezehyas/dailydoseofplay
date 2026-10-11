@@ -18,6 +18,7 @@ function card(game) {
     // Links can't nest, so the name's link stretches over the tile (theme.css).
     el("h2", {}, ready ? el("a", { href: lobby }, game.name) : game.name),
     el("p", {}, game.description),
+    game.credits && el("p", { class: "made-by" }, `Made by ${game.credits.map((c) => `@${c.github}`).join(", ")}`),
     // The tile is the link, so only a game that isn't ready gets a badge.
     el("div", { class: "game-meta" }, el("span", { class: "chip mono" }, game.players), !ready && el("span", { class: "badge soon" }, "Coming soon")),
     ready &&

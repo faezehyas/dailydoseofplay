@@ -131,6 +131,12 @@ test("registry: every entry is well formed and every ready game has a folder", a
     slugs.add(g.slug);
     assert.ok(g.name && g.description && g.players, g.slug);
     assert.ok(["ready", "soon"].includes(g.status), g.slug);
+    // Optional: who made the game, by GitHub handle.
+    if (g.credits !== undefined) {
+      assert.ok(Array.isArray(g.credits) && g.credits.length > 0, `${g.slug} credits`);
+      for (const c of g.credits) assert.match(c.github, /^[a-zA-Z0-9-]{1,39}$/, `${g.slug} credits`);
+      assert.equal(new Set(g.credits.map((c) => c.github)).size, g.credits.length, `${g.slug} credits a handle twice`);
+    }
     if (g.status === "ready") {
       assert.ok(fs.existsSync(new URL(`../public/${g.slug}/index.html`, import.meta.url)), `${g.slug}/index.html`);
       assert.ok(fs.existsSync(new URL(`../public/${g.slug}/icon.svg`, import.meta.url)), `${g.slug}/icon.svg`);

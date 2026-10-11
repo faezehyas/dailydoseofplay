@@ -446,7 +446,11 @@ it loads. An entry with `"status": "soon"` still works: its home tile is greyed
 out with a "Coming soon" badge and no links, while the server treats the game
 like any other. Use it only if a maintainer asks. Fields: `slug`, `name`, `status`, `players`,
 `maxPlayers` (2, or the same `maxPlayers` you pass to `startGameShell()` for a game with more players), and a one-sentence original `description`. The home tile and
-the lobby both show it. The server reads `games.json` once at startup, so
+the lobby both show it. Add yourself to `credits` by GitHub handle, such as
+`"credits": [{ "github": "your-handle" }]` (one entry per person who built the
+game): the home tile and the end of "How to play" show "Made by @your-handle".
+Then run `node scripts/credits.js` to add you to the README's Contributors list.
+The server reads `games.json` once at startup, so
 restart `npm start` after editing it, or creating a room will fail with `bad_game`.
 The browser test reads the "Coming soon" count from the registry, so it needs
 no change.
@@ -519,7 +523,7 @@ The [PR template](.github/pull_request_template.md) repeats these lines, shorten
 - [ ] A new `localStorage` key (such as the settings panel's `key`) is listed on `public/privacy/index.html`
 - [ ] Sounds, if any, are in `sounds.js` with a role each, and `test/browser/sound-levels.test.js` passes
 - [ ] Original name, text and art; nothing copied from papergames
-- [ ] `games.json` entry added as `ready`; the game moved to "Shipped" in `GAMES.md`; README updated
+- [ ] `games.json` entry added as `ready`, with you in `credits`, and `node scripts/credits.js` run; the game moved to "Shipped" in `GAMES.md`; README updated
 - [ ] `npm test` passes; `npm run test:browser` passes or is reported as skipped
 - [ ] No new dependencies, no build step, nothing changed under `server/`, no secrets
 - [ ] Every commit message follows Conventional Commits

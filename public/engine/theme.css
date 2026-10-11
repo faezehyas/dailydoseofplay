@@ -788,6 +788,12 @@ input::placeholder {
   margin: 6px 0;
 }
 
+.rules .made-by {
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .rematch-status {
   margin: 10px 0 0;
   color: var(--muted);
@@ -2227,6 +2233,14 @@ input::placeholder {
   font-size: 0.95rem;
 }
 
+/* One line, so a long handle can't make one tile taller than the rest. */
+.game-card .made-by {
+  display: block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.85rem;
+}
+
 .game-icon {
   width: 100%;
   aspect-ratio: 16 / 10;
@@ -2455,6 +2469,10 @@ input::placeholder {
 
 .game-card.placeholder h2 {
   width: 60%;
+}
+
+.game-card.placeholder .made-by {
+  width: 45%;
 }
 
 .game-card.placeholder .game-meta span:first-child {
