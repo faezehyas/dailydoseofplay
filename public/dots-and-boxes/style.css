@@ -316,6 +316,21 @@
   cursor: pointer;
 }
 
+/* The tutorial's lit lines and hint: a soft band under the line. */
+.db-board .band {
+  fill: transparent;
+}
+
+.db-board .band.tut-lit {
+  fill: color-mix(in srgb, var(--accent-2) 30%, transparent);
+}
+
+.db-board .band.tut-hint {
+  fill: color-mix(in srgb, var(--accent) 35%, transparent);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
 /* Claimed boxes: a tint, a pencil hatch and the owner's initial. */
 .db-board .box .tint {
   fill: color-mix(in srgb, var(--mine) var(--db-tint), transparent);

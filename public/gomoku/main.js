@@ -11,17 +11,17 @@ import { makeRules, normalizeConfig, stoneOf, isTimed, timeLeft, EMPTY, DRAW, SI
 import { chooseMove } from "./robot.js";
 import { settings } from "./settings.js";
 import { howToPlay } from "./how-to-play.js";
+import { pointName, gridSvg } from "./art.js";
 
 const ROBOT_DELAY = 600;
 const CLAIM_GRACE_MS = 5000; // past the opponent's limit before we stop waiting for their forfeit
-const COLUMNS = "ABCDEFGHJKLMNOP"; // board coordinates skip I, as on Go boards
-const STARS = [[3, 3], [3, 11], [7, 7], [11, 3], [11, 11]];
 const COUNT_WORD = { 5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine" };
 
 startGameShell({
   slug: "gomoku",
   title: "Gomoku",
   howToPlay,
+  tutorial: () => import("./tutorial.js"),
   layout: "medium",
   settings,
   createRobot: (session) =>
@@ -43,17 +43,6 @@ function describeConfig(c) {
   parts.push(c.moveSeconds ? `${c.moveSeconds} s a move` : "no move limit");
   parts.push(c.gameSeconds ? `${c.gameSeconds / 60} min each` : "no game clock");
   return parts.join(" · ");
-}
-
-const pointName = (i) => `${COLUMNS[i % SIZE]}${SIZE - Math.floor(i / SIZE)}`;
-
-function gridSvg() {
-  const lines = [];
-  for (let k = 0; k < SIZE; k++) {
-    lines.push(`<line x1="0.5" y1="${k + 0.5}" x2="${SIZE - 0.5}" y2="${k + 0.5}"/>`, `<line x1="${k + 0.5}" y1="0.5" x2="${k + 0.5}" y2="${SIZE - 0.5}"/>`);
-  }
-  const stars = STARS.map(([r, c]) => `<circle cx="${c + 0.5}" cy="${r + 0.5}" r="0.12"/>`).join("");
-  return `<svg class="gmk-grid" viewBox="0 0 ${SIZE} ${SIZE}" aria-hidden="true">${lines.join("")}${stars}</svg>`;
 }
 
 function mountGomoku(session, root, shell) {

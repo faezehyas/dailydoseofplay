@@ -20,6 +20,7 @@ startGameShell({
   slug: "connect-4",
   title: "Connect 4",
   howToPlay,
+  tutorial: () => import("./tutorial.js"),
   layout: "narrow",
   settings,
   createRobot: (session) => {

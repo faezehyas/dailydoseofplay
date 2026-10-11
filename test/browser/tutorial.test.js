@@ -1,8 +1,10 @@
 // Headless-browser test for the tutorials (engine/tutorial.js): the first
 // Chess lesson played by keyboard on a 360 px phone, with a wrong move that
 // springs back, a second one that brings the hint, and a tick saved for the
-// finished lesson; the Learn button and Back; and Tic Tac Toe's last lesson,
-// whose end screen starts a robot game. Skips if Playwright is missing.
+// finished lesson; the Learn button and Back; Tic Tac Toe's last lesson,
+// whose end screen starts a robot game; and the first lesson of Connect 4
+// (by keyboard), Gomoku, Checkers and Dots and Boxes. Skips if Playwright is
+// missing.
 //
 //   npm run test:browser
 import test from "node:test";
@@ -146,3 +148,75 @@ test("Tic Tac Toe's last lesson ends with Play the robot now, which starts a rob
   assert.equal(new URL(page.url()).search, "", "?learn is dropped");
   assert.deepEqual(errors, []);
 });
+
+// Opens a game's first lesson on a 360 px phone, plays it with `moves`, and
+// checks the lesson is saved as done with no errors and no sideways scroll.
+async function firstLesson(t, slug, moves) {
+  const srv = await startServer();
+  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
+  t.after(async () => {
+    await browser.close();
+    await srv.close();
+  });
+  const page = await browser.newPage({ viewport: { width: 360, height: 740 } });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  await page.goto(`${srv.base}/${slug}/`);
+  await page.click("#learn");
+  await page.locator(".tut-lesson").first().click();
+  await step(page, `Step 1 of ${moves.length}`);
+  assert.ok(await noHorizontalScroll(page), "no sideways scroll at 360 px");
+  for (const [k, move] of moves.entries()) {
+    if (k) await step(page, `Step ${k + 1} of ${moves.length}`);
+    await move(page);
+  }
+  await page.waitForSelector("#tut-next");
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("ddp-lessons"))), { [slug]: [0] });
+  assert.deepEqual(errors, []);
+}
+
+const skip = !pw && "Playwright not installed";
+
+test("Connect 4's first lesson by keyboard: the disc drops, teal stacks on it", { skip, timeout: 60_000 }, (t) =>
+  firstLesson(t, "connect-4", [
+    async (page) => {
+      await page.locator('.tut-stage .c4-col[data-col="0"]').focus();
+      for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("Enter");
+      await page.waitForSelector('.tut-stage .c4-cell[data-i="31"][data-v="teal"]');
+      assert.equal(await page.locator('.tut-stage .c4-cell[data-i="38"]').getAttribute("data-v"), "coral", "the disc fell to the bottom");
+    },
+    (page) => page.keyboard.press("Enter"),
+  ]));
+
+test("Gomoku's first lesson: a stone on the centre point, then one beside it", { skip, timeout: 60_000 }, (t) =>
+  firstLesson(t, "gomoku", [
+    (page) => page.click('.tut-stage .gmk-cell[data-i="112"]'),
+    async (page) => {
+      assert.equal(await page.locator('.tut-stage .gmk-cell[data-i="98"]').getAttribute("data-v"), "second", "the teacher played back");
+      await page.click('.tut-stage .gmk-cell[data-i="111"]');
+    },
+  ]));
+
+test("Checkers' first lesson: a man steps forward twice", { skip, timeout: 60_000 }, (t) =>
+  firstLesson(t, "checkers", [
+    async (page) => {
+      await page.click('.tut-stage .ck-sq[data-sq="42"]');
+      await page.click('.tut-stage .ck-sq[data-sq="35"]');
+    },
+    async (page) => {
+      assert.equal(await page.locator('.tut-stage .ck-sq[data-sq="14"] .piece.b').count(), 1, "the teacher played back");
+      await page.click('.tut-stage .ck-sq[data-sq="35"]');
+      await page.click('.tut-stage .ck-sq[data-sq="28"]');
+    },
+  ]));
+
+test("Dots and Boxes' first lesson: the lit line, then any free one", { skip, timeout: 60_000 }, (t) =>
+  firstLesson(t, "dots-and-boxes", [
+    (page) => page.click('.tut-stage .hit[data-line="0"]'),
+    async (page) => {
+      assert.equal(await page.locator('.tut-stage .line.p1[data-l="11"]').count(), 1, "the teacher played back");
+      await page.click('.tut-stage .hit[data-line="1"]');
+    },
+  ]));

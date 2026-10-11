@@ -271,6 +271,12 @@
   --disc-fill: color-mix(in srgb, var(--disc) 65%, var(--sunk));
 }
 
+/* The tutorial's lit squares and hint ring the hole. */
+.c4-cell.tut-lit,
+.c4-cell.tut-hint {
+  border-radius: 50%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .c4-disc {
     animation: none;

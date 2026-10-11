@@ -241,3 +241,13 @@
 .gmk-board.done.lined .gmk-cell:not(.win)::after {
   opacity: 0.45;
 }
+
+/* The tutorial's lit points and hint are round, and a lit stone gets a ring. */
+.gmk-cell.tut-lit,
+.gmk-cell.tut-hint {
+  border-radius: 50%;
+}
+
+.gmk-cell.tut-lit::after {
+  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px var(--accent-2);
+}

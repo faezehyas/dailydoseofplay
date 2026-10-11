@@ -12,9 +12,8 @@ import { chooseMove } from "./robot.js";
 import { settings, normalizeLevel } from "./settings.js";
 import { playMove } from "./sounds.js";
 import { howToPlay } from "./how-to-play.js";
+import { CROWN_SVG } from "./art.js";
 
-const CROWN_SVG =
-  '<svg viewBox="0 0 24 24" class="crown" aria-hidden="true"><path d="M4 17.5h16l1.2-9.3-5.1 3.7L12 5.5l-4.1 6.4-5.1-3.7z"/></svg>';
 const ROBOT_DELAY = 600;
 const CLAIM_GRACE_MS = 5000; // past the opponent's limit before we stop waiting for their forfeit
 const LEVEL_NAMES = { easy: "Easy", medium: "Medium", hard: "Hard" };
@@ -23,6 +22,7 @@ startGameShell({
   slug: "checkers",
   title: "Checkers",
   howToPlay,
+  tutorial: () => import("./tutorial.js"),
   layout: "narrow",
   settings,
   createRobot: (session) => {
