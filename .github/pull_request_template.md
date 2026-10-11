@@ -25,22 +25,30 @@
 
 ## Tests run
 
-- [ ] `npm test`
-- [ ] `npm run test:browser` (passed, or skipped because Playwright is missing)
-- [ ] By hand: friend match in two windows with rematch and leave, and a game against the robot
+<!-- The tests you ran and their results, and what you checked by hand (step 8 of the recipe in CONTRIBUTING.md). -->
 
 ## Checklist
 
-See [Checklist before opening the PR](https://github.com/Faezehyas/dailydoseofplay/blob/main/CONTRIBUTING.md#checklist-before-opening-the-pr) for the details behind each line.
+<!-- For a new game. On other PRs, tick what applies and delete the rest. Each line is explained in CONTRIBUTING.md. -->
 
-- [ ] Pure, unit-tested `rules.js`; illegal moves throw `RuleError`
-- [ ] The robot plays legal moves, and robot-vs-robot games always finish
-- [ ] No hidden information over the wire; all randomness from `SharedRandom`
-- [ ] `playerBar()`, `resultPanel()` and `celebrate()` from the engine, not the game's own
+- [ ] `public/<slug>/` has `index.html`, `style.css`, `main.js`, `rules.js`, `robot.js`, `how-to-play.js`, `icon.svg` and tests
+- [ ] `rules.js` is pure and unit-tested; illegal moves throw `RuleError`
+- [ ] The robot plays legal, decent moves, and robot-vs-robot games always finish
+- [ ] Friend match in two windows: invite link, auto-join, full game, rematch, leave
+- [ ] No hidden information on the wire: `CardMatch` for hidden cards, commitments like Sea Battle for the rest
+- [ ] All randomness comes from `SharedRandom`
+- [ ] `layout` passed to `startGameShell()`; no `max-width` on the view's top-level box
+- [ ] Names, turn, score and Leave come from `playerBar()`
+- [ ] The result, Rematch and Leave come from `resultPanel()`
+- [ ] The panel's `onShow` plays `celebrate()`; no win or lose sounds of the game's own
 - [ ] 360 px with no sideways scroll, also with two 20-letter names; light and dark; touch and keyboard
-- [ ] Theme tokens only: colours, fonts and timings; each player keeps one colour
+- [ ] Coral or teal text uses `--accent-text` or `--accent-2-text`; controls are outlined in `--control-border`
+- [ ] No fonts or timings of its own: timers carry `mono`, transitions use `--dur-*` and `--ease-*`
+- [ ] Each player keeps one colour: `.mine` and `.theirs` use `--mine` and `--theirs`, and the root has `data-you`
 - [ ] A new `localStorage` key is listed on the privacy page
-- [ ] Original name, text, art and sounds; nothing copied from papergames
-- [ ] `games.json`, `GAMES.md` and the README updated
-- [ ] No new dependencies, no build step, nothing under `server/`, no secrets
-- [ ] Commits follow Conventional Commits
+- [ ] Sounds, if any, are in `sounds.js` with a role each, and `sound-levels.test.js` passes
+- [ ] Original name, text and art; nothing copied from papergames
+- [ ] `games.json` entry added as `ready`; the game moved to "Shipped" in `GAMES.md`; README updated
+- [ ] `npm test` passes; `npm run test:browser` passes or is reported as skipped
+- [ ] No new dependencies, no build step, nothing changed under `server/`, no secrets
+- [ ] Every commit message follows Conventional Commits

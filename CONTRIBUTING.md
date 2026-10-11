@@ -499,7 +499,7 @@ windows (one private).
 
 ## Checklist before opening the PR
 
-The PR template repeats these lines in short as checkboxes.
+The [PR template](.github/pull_request_template.md) repeats these lines, shortened.
 
 - [ ] `public/<slug>/` contains `index.html`, `style.css`, `main.js`, `rules.js`, `robot.js`, `how-to-play.js`, `icon.svg` and tests
 - [ ] `rules.js` is pure and fully unit-tested; illegal moves throw `RuleError`
