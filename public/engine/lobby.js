@@ -520,7 +520,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     gameRoot.replaceChildren();
     // The game has a history entry of its own, so Back leaves it as Leave does.
     history.pushState({ game: slug }, "");
-    settings?.lock(true);
+    settings?.lock(true, session.mode);
     let inProgress = false;
     state.mustAsk = () => inProgress && session.mode === "friend" && askBeforeLeaving();
     state.leave = async () => {

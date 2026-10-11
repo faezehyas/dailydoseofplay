@@ -485,7 +485,7 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `confirm.js` | `confirmDialog({ title, text, yes, no })`: a yes-or-no question in a modal `<dialog>` styled like the site. Focus moves to Cancel, Esc or Cancel says no, and focus returns to where it was (Leave). Resolves to `true` for yes. |
 | `how-to-play.js` | `howToPlayPanel(sections, top)`: the "How to play" panel (`details.rules#how-to-play`) with the same `<h3>` sections in every game, in one order: Goal, Players, Setup, On your turn, Winning, Settings and clocks, Fair play, Keyboard. A game leaves out what doesn't apply; a section is a paragraph or a list, and an unknown one throws. `top` goes first (the lobby's link to the tutorial). `startGameShell()` puts it under `#game`. |
 | `tutorial.js` | `startTutorial()`: a game's lessons on its own board, with the lesson list and its ticks, the step runner, the highlight layer (lit squares and arrows), the hint, progress and the end screen (see **Tutorials**). The lobby imports it only when a tutorial opens. |
-| `settings.js` | `gameSettings()`: a game's settings (groups of segmented options such as clocks or board size), remembered per device under the game's key. The lobby shows them folded to a summary ("Game settings" over chips such as "No clocks", "Coin toss", "Easy robot", and Change) that opens to the options; a "device" group (`scope: "device"`, or `robot: true`) is tagged "vs robot only", its chip has a teal dot, and it is left out of the waiting screen's summary, like a "view" group. `form()` is the options themselves, shown in the lobby card and in the settings panel's "This game" tab, and each copy follows changes made in the other; `lock(on)`, from the lobby, disables all but the "view" options while a game is on. `get()` is the current config, which the game sends to its guests (`setup`). |
+| `settings.js` | `gameSettings()`: a game's settings (groups of segmented options such as clocks or board size), remembered per device under the game's key. The lobby shows them folded to a summary ("Game settings" over chips such as "No clocks", "Coin toss", "Easy robot", and Change) that opens to the options; a "device" group (`scope: "device"`, or `robot: true`) is tagged "vs robot only", its chip has a teal dot, and it is left out of the waiting screen's summary, like a "view" group. `form()` is the options themselves, shown in the lobby card and in the settings panel's "This game" tab, and each copy follows changes made in the other; `lock(on, mode)`, from the lobby, disables all but the "view" options while a game is on and shows that game's config. `get()` is the current config, which the game sends to its guests (`setup`); `get("robot")` is a robot game's, from the game's `robot(config, picked)` (see **Clocks against the robot**). It remembers which groups the player picked an option in (`picked`, kept with the config under the same key). |
 | `sound.js` | Every game's sounds play through it (see **Sound levels**): `defineSounds()` takes a game's list of sounds, each with a role, and returns `play(name, opts, at)`. One audio context and one output for the site, the per-device mute and volume (a master gain after the output) from `prefs.js`, and preloading of short CC0 recordings (Sea Battle, Chess, Backgammon, Ludo and the card games, see each `sounds/LICENSE.txt`) |
 | `synth.js` | Building blocks for synthesized sounds: `tone()`, `noise()` (white or brown), `decay()` and a `pentatonic()` scale |
 | `loudness.js` | `loudness(samples, sampleRate)`: how loud a sound is to the ear, in LUFS (K-weighted, loudest 100 ms). No DOM; runs in node too. |
@@ -696,6 +696,18 @@ End move between its two tabs:
   rematches included, so a change applies from the next game started in the
   lobby. View options stay open and apply at once: the game reads them with
   `get()` when it needs them.
+
+**Clocks against the robot.** A robot game has no clocks unless the player
+picks one; friend games keep each game's defaults. `gameSettings()` remembers
+which groups the player picked an option in, choosing the one already shown
+included, and keeps the list in the config's stored object as `picked` (never
+sent in `setup`). Settings saved before that count a value other than the
+default as picked. A game whose clocks are on by default (Sea Battle, Tic Tac
+Toe, Connect 4, Gomoku) has a pure `robotConfig(config, picked)` in `rules.js`
+that turns off each clock not picked, passes it to `gameSettings()` as `robot`,
+and reads `settings.get("robot")` in a robot game. While a robot game is on,
+the locked options show its clocks. Each "How to play" says so under
+"Settings and clocks".
 
 The header keeps its quick theme and sound toggles beside the gear: at 360 px
 the brand and three buttons still fit (6 px to spare), and muting mid-game
@@ -1015,7 +1027,7 @@ checks that no game opens its own audio context or output.
 | `index.html` | Page with `#lobby` and `#game` sections |
 | `how-to-play.js` | The "How to play" text, `export const howToPlay = { goal, players, setup, turn, winning, settings, fairPlay, keyboard }`, passed to `startGameShell()` |
 | `main.js` | `startGameShell({ slug, title, layout, settings, howToPlay, tutorial, createRobot, onSession, minPlayers, maxPlayers, robots })` and the view. The player counts default to 2 and `maxPlayers` must match `games.json`; the lobby's tagline is the game's `description` there (a `tagline` option still overrides it); `layout` picks the page column (see **Page column**). |
-| `settings.js` | Optional: the game's settings, `export const settings = gameSettings({ key, prefix, groups, normalize, hint })`, passed to `startGameShell()` and read with `settings.get()`. Each group has a `scope`: `"room"` (the default), `"device"` or `"view"` (see **Settings**). |
+| `settings.js` | Optional: the game's settings, `export const settings = gameSettings({ key, prefix, groups, normalize, hint, robot })`, passed to `startGameShell()` and read with `settings.get()` (`settings.get("robot")` in a robot game). Each group has a `scope`: `"room"` (the default), `"device"` or `"view"` (see **Settings**). `robot` is for clocks on by default (see **Clocks against the robot**). |
 | `rules.js` | Pure rules: no DOM, timers, network or `Math.random`. Randomness is passed in. |
 | `match.js` | Only for games with hidden information that isn't a deck of cards (Sea Battle's fleet): one player's protocol state machine. Card games use `engine/card-match.js`, the others `engine/turn-match.js`. |
 | `sounds.js` | Optional: the game's sounds, `export const sounds = defineSounds({...})` with a role for each (see **Sound levels**), and the `play` helpers `main.js` calls. The only file that imports `engine/sound.js`. |
@@ -1173,7 +1185,7 @@ shuffled in about 2.6 s, and finish 30 turns and the audit in about 4 s.
 - **Turns:** a hit lets you fire again; a miss, or a hit that sinks a ship, passes the turn.
 - **Sinking:** a sunk ship is revealed, and the squares beside it are marked as clear water.
 - **Gifts:** after every 6 moves (one fire action is one move), a mystery gift ("?") appears on an unexplored square of each board, at most 2 waiting per board. Only a shot aimed at a gift's own square picks it up (the aimed square of a big missile, nuclear missile or carpet bomb counts); the weapon inside is shown only then. A gift hit by a splash or missile rain aimed elsewhere is destroyed with its square, since nobody can aim at it any more. Each player sees only the gifts on the board they fire at, never the opponent's gifts or pickups. A gift whose square becomes cleared water after a sinking disappears too.
-- **Time limits (room settings):** like papergames, games are timed. Under **Game settings** the player picks a time per shot (10, 20, 30 or 40 s, or none) and a time for each player (3, 5 or 10 min, or none); the default is 30 s a shot and 10 min each. When the time for a shot runs out, that player's browser fires a random shot; when a player's own clock runs out, they lose. In a friend game the room creator's settings apply (the host sends `setup {config}` before the first match, as in Tic Tac Toe). Against the robot only the human's clock runs: the robot reports no time spent. Fleet placement isn't timed.
+- **Time limits (room settings):** like papergames, games are timed. Under **Game settings** the player picks a time per shot (10, 20, 30 or 40 s, or none) and a time for each player (3, 5 or 10 min, or none); the default is 30 s a shot and 10 min each, and none against the robot unless the player picks one (see **Clocks against the robot**). When the time for a shot runs out, that player's browser fires a random shot; when a player's own clock runs out, they lose. In a friend game the room creator's settings apply (the host sends `setup {config}` before the first match, as in Tic Tac Toe). Against the robot only the human's clock runs: the robot reports no time spent. Fleet placement isn't timed.
 
 **Weapons:**
 

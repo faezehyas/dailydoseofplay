@@ -50,6 +50,13 @@ export function normalizeConfig(raw) {
   };
 }
 
+// Against the robot there are no clocks unless the player picked one (picked:
+// the names of the settings they chose themselves).
+export function robotConfig(config, picked) {
+  const c = normalizeConfig(config);
+  return { ...c, shotSeconds: picked.includes("shotSeconds") ? c.shotSeconds : 0, gameSeconds: picked.includes("gameSeconds") ? c.gameSeconds : 0 };
+}
+
 // Splash patterns as [dRow, dCol] around the aimed square.
 export const PATTERNS = {
   shot: [[0, 0]],

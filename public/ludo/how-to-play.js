@@ -21,6 +21,7 @@ export const howToPlay = {
     "Time to move: when it runs out, a move is made for you.",
     "Play vs robot: 1, 2 or 3 robots, Easy, Medium or Hard.",
     "With friends, the settings of whoever creates the room apply to everyone.",
+    "Against robots there are no clocks unless you pick one.",
   ],
   fairPlay: "Every roll is drawn by all the players' browsers together, so nobody can choose or predict it, and every browser checks every move with the same rules.",
   keyboard: "Tab to the Roll button and press Enter. Then Tab or the arrow keys pick a token, and Enter or Space moves it. Keys 1 to 4 pick your tokens too.",

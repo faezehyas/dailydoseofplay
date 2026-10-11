@@ -23,6 +23,7 @@ export const howToPlay = {
     "First move: a coin toss drawn by both browsers, you, or your opponent.",
     "Robot level: Easy, Medium or Hard.",
     "In a friend game, the settings of whoever creates the room apply to both players.",
+    "Against the robot there are no clocks unless you pick one.",
   ],
   fairPlay: "Both browsers check every move with the same rules, and the dice are drawn by both browsers together, so neither can load them.",
   keyboard: "Move around the board with the arrow keys and press Enter or Space to pick a checker or a point. Escape lets go of a checker.",

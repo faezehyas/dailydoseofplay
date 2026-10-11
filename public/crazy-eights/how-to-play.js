@@ -26,6 +26,7 @@ export const howToPlay = {
     "Time to move: when it runs out, a move is made for you.",
     "**Four colours** shows diamonds blue and clubs green, on this device only.",
     "With friends, the settings of whoever creates the room apply to everyone, except card colours.",
+    "Against robots there are no clocks unless you pick one.",
   ],
   fairPlay: "There's no dealer: every browser shuffles the deck in turn and proves it did so honestly, and a card can only be read with every player's key, so nobody can peek at another hand or stack the deck. (The one gap: with three or more players, a room creator running a tampered browser could read a hand.) When the game ends, everyone reveals their key and each browser replays the whole game with every card known: you see \"Fair play verified\" or what didn't add up.",
   keyboard: "Tab to your hand, use the arrow keys and press Enter to play. D draws and P passes. After an 8, pick a suit with the arrow keys and Enter.",

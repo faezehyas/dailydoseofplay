@@ -308,11 +308,14 @@ test("home page, theme toggle, drag-to-move and a robot game on a phone", { skip
   await page.fill("#nickname", "Cleo");
   assert.ok(await page.locator("#sb-settings").isVisible(), "game settings on the home screen");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, "settings fit on a phone");
+  // No clocks against the robot unless picked: pick the game clock shown.
+  await page.click("#sb-settings > summary");
+  await page.click('#sb-settings label:has(input[name="sb-gameSeconds"][value="600"])');
   await page.click("#play-robot");
   await page.locator("#ready").waitFor();
   assert.ok(await page.locator("#sb-settings").isHidden(), "settings only on the home screen");
   assert.match(await page.locator(".pb-players").innerText(), /Cleo[\s\S]*Robot/);
-  assert.equal(await page.locator("#sb-config").innerText(), "30 s a shot · 10 min each", "default settings");
+  assert.equal(await page.locator("#sb-config").innerText(), "no shot limit · 10 min each", "only the picked clock");
 
   // Drag the destroyer to the first free legal spot, in its current orientation.
   const target = await page.evaluate(() => {

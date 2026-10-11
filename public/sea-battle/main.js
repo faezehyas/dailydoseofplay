@@ -86,7 +86,7 @@ startGameShell({
   howToPlay,
   layout: "wide",
   settings,
-  createRobot: (session) => startRobot(session, { delay: AI_DELAY, config: settings.get() }),
+  createRobot: (session) => startRobot(session, { delay: AI_DELAY, config: settings.get("robot") }),
   // A seat's score: the ships it has sunk.
   banter: { score: (st, p) => st.boards[R.other(p)].sunk.length, lines: { strongMove: ["Direct hit!"], lead: ["Splash!"] } },
   onSession: (session, root, shell) => mountSeaBattle(session, root, shell),
@@ -867,7 +867,7 @@ function mountSeaBattle(session, root, shell) {
   function onSetup(msg) {
     if (me === 1) begin(msg.config);
   }
-  if (session.mode === "robot") begin(settings.get());
+  if (session.mode === "robot") begin(settings.get("robot"));
   else if (me === 0) {
     const c = settings.get();
     session.send({ t: "setup", config: c });

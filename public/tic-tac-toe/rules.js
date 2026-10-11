@@ -23,6 +23,13 @@ export function normalizeConfig(raw) {
   };
 }
 
+// Against the robot there are no clocks unless the player picked one (picked:
+// the names of the settings they chose themselves).
+export function robotConfig(config, picked) {
+  const c = normalizeConfig(config);
+  return { ...c, moveSeconds: picked.includes("moveSeconds") ? c.moveSeconds : 0, gameSeconds: picked.includes("gameSeconds") ? c.gameSeconds : 0 };
+}
+
 const lineCache = new Map();
 
 // Every run of k squares across, down or diagonal on a size×size board.

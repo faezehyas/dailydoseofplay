@@ -26,7 +26,7 @@ startGameShell({
   settings,
   createRobot: (session) =>
     startTurnRobot(session, {
-      rules: makeRules(settings.get()),
+      rules: makeRules(settings.get("robot")),
       choose: (state, me, rng) => ({ ...chooseMove(state, me, rng), ms: ROBOT_DELAY }),
       delay: ROBOT_DELAY,
     }),
@@ -301,7 +301,7 @@ function mountTicTacToe(session, root, shell) {
     offMsg,
     session.on("rematch-start", () => config && newMatch()),
   ];
-  if (session.mode === "robot") begin(settings.get());
+  if (session.mode === "robot") begin(settings.get("robot"));
   else if (me === 0) {
     const c = settings.get();
     session.send({ t: "setup", config: c });

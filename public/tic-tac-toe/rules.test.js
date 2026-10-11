@@ -10,6 +10,7 @@ import {
   emptyCells,
   linesFor,
   normalizeConfig,
+  robotConfig,
   timeLeft,
   DEFAULT_CONFIG,
   EMPTY,
@@ -183,6 +184,15 @@ test("settings default to papergames-style values and reject unknown ones", () =
   assert.deepEqual(normalizeConfig({ size: 4, moveSeconds: 7, gameSeconds: "120", first: "me" }), DEFAULT_CONFIG);
   const custom = { size: 5, moveSeconds: 0, gameSeconds: 300, first: "guest" };
   assert.deepEqual(normalizeConfig({ ...custom, extra: 1 }), custom);
+});
+
+test("robot games have no clocks unless the player picked one", () => {
+  assert.deepEqual(robotConfig(DEFAULT_CONFIG, []), { ...DEFAULT_CONFIG, moveSeconds: 0, gameSeconds: 0 });
+  const custom = { size: 5, moveSeconds: 10, gameSeconds: 300, first: "guest" };
+  assert.deepEqual(robotConfig(custom, ["first"]), { ...custom, moveSeconds: 0, gameSeconds: 0 });
+  assert.deepEqual(robotConfig(custom, ["moveSeconds"]), { ...custom, gameSeconds: 0 });
+  assert.deepEqual(robotConfig(custom, ["gameSeconds"]), { ...custom, moveSeconds: 0 });
+  assert.deepEqual(robotConfig(DEFAULT_CONFIG, ["moveSeconds", "gameSeconds"]), DEFAULT_CONFIG, "a picked default still counts");
 });
 
 test("who moves first: the coin toss, or the room's fixed choice", () => {

@@ -28,6 +28,7 @@ export const howToPlay = {
     "Robot level: Easy, Medium or Hard.",
     "**Four colours** shows diamonds blue and clubs green, on this device only.",
     "In a friend game, the settings of whoever creates the room apply to both players, except card colours.",
+    "Against the robot there are no clocks unless you pick one.",
   ],
   fairPlay: "There's no dealer: both browsers shuffle the deck in turn, before every hand, and prove they did so honestly, and a card can only be read with both players' keys, so nobody can peek at the other hand or stack the deck. A knock shows the whole hand, so every meld and score is checked as it happens. When the game ends, both keys are revealed and each browser replays the whole game with every card known: you see \"Fair play verified\" or what didn't add up.",
   keyboard: "D draws from the stock, T takes the pile, P passes, K knocks and N starts the next hand. In your hand, the arrow keys move and Enter picks; Shift with an arrow moves a card.",

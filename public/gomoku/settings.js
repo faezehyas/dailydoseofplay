@@ -1,6 +1,6 @@
 // Gomoku's settings: clocks and who moves first.
 import { gameSettings } from "../engine/settings.js";
-import { normalizeConfig } from "./rules.js";
+import { normalizeConfig, robotConfig } from "./rules.js";
 
 const GROUPS = [
   { name: "moveSeconds", legend: "Time per move", options: [[10, "10 s"], [20, "20 s"], [30, "30 s"], [40, "40 s"], [0, "No limit"]], summary: (v, l, c) => (v ? `${l} a move` : c.gameSeconds ? "No move limit" : "") },
@@ -13,5 +13,6 @@ export const settings = gameSettings({
   prefix: "gmk",
   groups: GROUPS,
   normalize: normalizeConfig,
-  hint: "15 × 15 board, five in a row wins. In a friend game, the settings of whoever creates the room apply to both players.",
+  robot: robotConfig,
+  hint: "15 × 15 board, five in a row wins. In a friend game, the settings of whoever creates the room apply to both players. Against the robot there are no clocks unless you pick one.",
 });

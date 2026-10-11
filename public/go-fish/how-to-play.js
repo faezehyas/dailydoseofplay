@@ -24,6 +24,7 @@ export const howToPlay = {
     "Time to ask: when it runs out, an ask is made for you.",
     "**Four colours** shows diamonds blue and clubs green, on this device only.",
     "With friends, the settings of whoever creates the room apply to everyone, except card colours.",
+    "Against robots there are no clocks unless you pick one.",
   ],
   fairPlay: "There's no dealer: every browser shuffles the deck in turn and proves it did so honestly, and a card can only be read with every player's key, so nobody can peek at another hand or stack the deck. Cards change hands only face up. (The one gap: with three or more players, a room creator running a tampered browser could read a hand.) When the game ends, everyone reveals their key and each browser replays the whole game with every card known, so a player who asked for a rank they didn't hold, said \"Go fish\" while holding it, kept some back or hid a book or a lucky fish is caught: you see \"Fair play verified\" or what didn't add up.",
   keyboard: "Tab to your hand, use the arrow keys and Enter to pick a card, Tab to the players, and press A or Enter on Ask. Esc clears.",

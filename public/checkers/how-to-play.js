@@ -20,6 +20,7 @@ export const howToPlay = {
     "Clocks (optional): a limit for each move, and a total for each player's whole game. Whoever runs out of time loses the round.",
     "Robot level: Easy, Medium or Hard.",
     "In a friend game, the settings of whoever creates the room apply to both players.",
+    "Against the robot there are no clocks unless you pick one.",
   ],
   fairPlay: "Both browsers check every move with the same rules, so a move that breaks them stops the match. Each browser keeps its own player's clock.",
   keyboard: "Move between dark squares with the arrow keys, press Enter or Space to pick a piece or a square, and Escape to put the piece back.",
