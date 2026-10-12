@@ -1,9 +1,10 @@
 // The card table's pieces, shared by the card games: cards, the other
 // players' seats, the stock and its riffle, the deck's work, your hand, flying
-// cards and the animation queue (see "The shared table" in ARCHITECTURE.md).
+// cards and the animation queue, and for trick games the trick, won tricks
+// and the pass (see "The shared table" in ARCHITECTURE.md).
 // Each part has the class pc-<part> (cards.css) and <prefix>-<part> (the game's).
 import { el } from "../shell.js";
-import { suitOf, rankOf, RANK_NAMES } from "./faces.js";
+import { suitOf, rankOf, RANK_NAMES, SUIT_NAMES } from "./faces.js";
 import { symbols, faceSvg, BACK_SVG, suitSvg } from "./art.js";
 
 // What the deck is doing, while the match is busy: the status line, then the table's chip.
@@ -255,11 +256,17 @@ export function cardTable({ prefix, play, animate, done }) {
     const TIGHT = 0.72;
     const units = slots.reduce((u, _, i) => u + (i ? (inGroup[i] ? TIGHT : 1) : 0), 0);
     let gap = groups.length ? Math.max(10, cw * 0.45) : 0;
-    let step = n > 1 ? Math.min(cw * 0.72, (W - cw - 12 - gap * gaps) / units) : 0;
+    // The arc tilts the outer cards' top corners past the row's ends: flatten it as far as needed.
+    const reach = (deg) => 2 * Math.sin((deg * ((n - 1) / 2) * Math.PI) / 180) * cw * 1.4 * 1.6;
+    const full = flat ? 0 : Math.min(3.2, 26 / Math.max(n, 1));
+    const spare = W - cw - 12 - gap * gaps - min * units;
+    const arc = full && reach(full) > spare ? (full * Math.max(0, spare - 1)) / reach(full) : full;
+    const room = W - cw - 12 - reach(arc);
+    let step = n > 1 ? Math.min(cw * 0.72, (room - gap * gaps) / units) : 0;
     // Tight: narrow the gaps before the row has to scroll.
     if (n > 1 && step < min && gaps) {
-      gap = Math.max(6, (W - cw - 12 - min * units) / gaps);
-      step = Math.min(cw * 0.72, (W - cw - 12 - gap * gaps) / units);
+      gap = Math.max(6, (room - min * units) / gaps);
+      step = Math.min(cw * 0.72, (room - gap * gaps) / units);
     }
     const scroll = n > 1 && step < min;
     if (scroll) step = min;
@@ -267,7 +274,7 @@ export function cardTable({ prefix, play, animate, done }) {
     handIn.style.width = scroll ? `${Math.ceil(total + 16)}px` : "100%";
     hand.classList.toggle("scrolls", scroll);
     const x0 = scroll ? 8 : (W - total) / 2;
-    const angle = scroll || flat ? 0 : Math.min(3.2, 26 / Math.max(n, 1));
+    const angle = scroll ? 0 : arc;
     const xs = [];
     let x = x0;
     slots.forEach((slot, i) => {
@@ -452,6 +459,95 @@ export function cardTable({ prefix, play, animate, done }) {
     return { node, render, rect, clear, cards };
   }
 
+  // ---------- a trick game: the trick, the tricks each seat won, the pass ----------
+  // The trick: each seat's card lands in front of it (pos: "bottom", "left", "top" or "right").
+  function makeTrick(positions) {
+    const node = el("div", { class: cls("trick"), id: `${prefix}-trick`, role: "img" });
+    const spots = new Map();
+    for (const [p, pos] of positions) {
+      const spot = el("div", { class: `pc-trick-spot pos-${pos} p-${p}`, dataset: { seat: p } });
+      spots.set(p, spot);
+      node.append(spot);
+    }
+    const followSuit = el("span", { class: "pc-suit-sign" });
+    const follow = el("span", { class: "pc-follow", hidden: true }, "Follow ", followSuit);
+    const info = el("div", { class: cls("trick-info") }, follow);
+    const cards = new Map(); // seat -> card
+    // plays: [{ p, slot }] in order; face(slot); arriving: slots still in the air;
+    // suit: the suit to follow (null: none yet); wins: the seat taking it, once known.
+    function render(plays, { face, arriving = new Set(), suit = null, wins = -1, label = "" }) {
+      for (const [p, spot] of spots) {
+        const play = plays.find((x) => x.p === p);
+        let card = cards.get(p);
+        if (!play) {
+          card?.remove();
+          cards.delete(p);
+          spot.classList.remove("lead", "wins");
+          continue;
+        }
+        if (!card || card.dataset.slot !== String(play.slot)) {
+          card?.remove();
+          card = cardEl(face(play.slot));
+          card.dataset.slot = play.slot;
+          cards.set(p, card);
+          spot.append(card);
+        }
+        const f = face(play.slot);
+        setFace(card, f);
+        card.classList.toggle("down", f === null);
+        card.style.opacity = arriving.has(play.slot) ? "0" : "";
+        card.style.transform = `rotate(${((play.slot * 37) % 9) - 4}deg)`;
+        spot.classList.toggle("lead", plays[0].p === p);
+        spot.classList.toggle("wins", wins === p);
+      }
+      follow.hidden = suit === null;
+      if (suit !== null) {
+        followSuit.innerHTML = suitSvg(suit);
+        followSuit.className = `pc-suit-sign s-${suit}`;
+        follow.setAttribute("aria-label", `Follow ${SUIT_NAMES[suit].toLowerCase()}`);
+      }
+      node.setAttribute("aria-label", label || (plays.length ? "The trick" : "The trick is empty"));
+    }
+    // Where seat p's card lands.
+    const rect = (p) => rectIn(cards.get(p) ?? spots.get(p));
+    // The trick goes to `to` (a rect): every card slides onto the winning one, and they fly there face down.
+    async function gather(plays, wins, to, { face, ms, g }) {
+      const at = rect(wins);
+      const from = plays.map((x) => ({ ...x, r: rect(x.p) }));
+      for (const card of cards.values()) card.style.opacity = "0";
+      await Promise.all(from.filter((x) => x.p !== wins).map((x) => fly(face(x.slot), x.r, at, { ms: ms * 0.45, g })));
+      const top = from.find((x) => x.p === wins);
+      await Promise.all(from.map((x, i) => wait(i * 30, g).then(() => fly(x === top ? face(x.slot) : null, at, to, { ms, turn: x === top ? "down" : null, g }))));
+    }
+    function clear() {
+      cards.forEach((c) => c.remove());
+      cards.clear();
+      for (const spot of spots.values()) spot.classList.remove("lead", "wins");
+      follow.hidden = true;
+    }
+    return { node, info, render, rect, gather, clear, spots };
+  }
+
+  // The tricks a seat has won: a small stack of backs and the count.
+  function makeWon(p) {
+    const backs = [cardEl(null), cardEl(null), cardEl(null)];
+    const count = el("span", { class: "n mono" }, "0");
+    const node = el("span", { class: `${cls("won")} p-${p}`, dataset: { seat: p } }, el("span", { class: "stack", "aria-hidden": "true" }, backs), count);
+    function render(n, label) {
+      node.classList.toggle("none", !n);
+      backs.forEach((c, i) => (c.hidden = n <= i));
+      count.textContent = String(n);
+      node.setAttribute("aria-label", label ?? `${n} ${n === 1 ? "trick" : "tricks"} won`);
+    }
+    render(0);
+    return { node, render, rect: () => rectIn(backs[0]) };
+  }
+
+  // The pass: cards leave face down toward a seat (from: [{ face, rect }]), a little apart.
+  async function sendCards(from, to, { ms, g, gap = 80 }) {
+    await Promise.all(from.map((x, i) => wait(i * gap * pace(), g).then(() => fly(x.face, x.rect, to, { ms, turn: x.face === null ? null : "down", g }))));
+  }
+
   // ---------- motion ----------
   const flyLayer = el("div", { class: cls("fly"), "aria-hidden": "true" });
   const live = (g) => g === gen && !destroyed;
@@ -592,6 +688,9 @@ export function cardTable({ prefix, play, animate, done }) {
       hand.classList.toggle("movable", !!fn);
     },
     makeSpread,
+    makeTrick,
+    makeWon,
+    sendCards,
     flyLayer,
     rectIn,
     fly,
