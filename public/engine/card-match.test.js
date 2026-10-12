@@ -499,8 +499,8 @@ test("a move may show at most 16 hidden cards", async () => {
   for (const m of matches) assert.deepEqual(m.verdict, { ok: true });
 });
 
-test("a hidden card can't change hands: refused in my browser, and stops the match if sent anyway", async () => {
-  // Passing would let a third player read it: everyone else's shares of it went out when it was dealt.
+test("a hidden card in a hand can't be dealt to another: refused in my browser, and stops the match if sent anyway", async () => {
+  // Dealing it again would let a third player read it: everyone else's shares of it went out when it was dealt. deck.pass() seals it instead.
   const rules = {
     deckSize: 8,
     newState: (first, players, deck) => ({ turn: first, winner: -1, hands: [0, 1, 2].map((p) => [deck.cards[p]].map((slot) => (deck.deal(slot, p), slot))) }),
@@ -515,13 +515,13 @@ test("a hidden card can't change hands: refused in my browser, and stops the mat
   const invalid = [];
   mover.on("invalid", (why) => invalid.push(why));
   await mover.play({ pass: true });
-  assert.deepEqual(invalid, ["a hidden card can't change hands"]);
+  assert.deepEqual(invalid, ["a hidden card in a hand changes hands with deck.pass()"]);
   sessions[mover.me].send({ t: "move", m: 1, move: { pass: true }, sh: [] });
   const others = matches.filter((m) => m !== mover);
   await until(() => others.every((m) => m.phase === "aborted"));
   for (const m of others) {
     assert.ok(m.abortSeat === mover.me || m.abortAbout === mover.me);
-    assert.match(m.abortReason, /broke the rules: a hidden card can't change hands/);
+    assert.match(m.abortReason, /broke the rules: a hidden card in a hand changes hands with deck\.pass\(\)/);
   }
 });
 

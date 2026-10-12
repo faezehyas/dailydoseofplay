@@ -11,7 +11,7 @@ import { Emitter, MESSAGE_TOO_BIG } from "./channel.js";
 import { HubGroup, SpokeGroup } from "./group.js";
 import { cleanName, defaultName } from "./names.js";
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 const HELLO_TIMEOUT_MS = 10_000;
 
 export class Session extends Emitter {

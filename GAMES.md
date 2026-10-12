@@ -46,7 +46,8 @@ Reversi, Pass the Piece, Bulls and Cows and Pairs instead.
 What the engine has today: `TurnMatch` runs any game where everyone sees the
 whole board and one seat moves at a time, with dice or other luck drawn by all
 peers through `needsRandom`. `CardMatch` does the same for card games, with a
-shared deck nobody deals and nobody can peek at. Rooms seat 2 to 4 players: the
+shared deck nobody deals and nobody can peek at, and a hidden card can pass
+from one hand to another in secret (`deck.pass()`, sealed to its receiver). Rooms seat 2 to 4 players: the
 server allows up to 8, but the seat colours stop at four. Other hidden
 information, or moves made at the same time, need a match of their own, like
 Sea Battle's `match.js`.

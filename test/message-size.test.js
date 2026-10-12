@@ -178,6 +178,64 @@ test("the engine's own handshake, with four players at the longest names, is far
   assert.ok(largest.size * HEADROOM <= MAX_MESSAGE_LENGTH);
 });
 
+// Four players are dealt 13 cards, each picks three to pass left (sealed all at
+// once by the last pick), then each plays a card it was passed with the share sealed to it.
+const passing = {
+  deckSize: 52,
+  newState: (first, players, deck) => ({
+    turn: 0,
+    winner: -1,
+    players,
+    hands: Array.from({ length: players }, (_, p) => deck.cards.slice(p * 13, p * 13 + 13).map((slot) => (deck.deal(slot, p), slot))),
+    picks: [],
+    got: [],
+  }),
+  reveals: (state, player, move) => (Number.isInteger(move.play) ? [move.play] : []),
+  applyMove(state, player, move, deck) {
+    const n = state.players;
+    if (Number.isInteger(move.play)) {
+      state.hands[player] = state.hands[player].filter((s) => s !== move.play);
+      if (player === n - 1) state.winner = 0;
+    } else {
+      state.picks[player] = move.pass;
+      if (player === n - 1) {
+        state.picks.forEach((slots, p) => {
+          state.hands[p] = state.hands[p].filter((s) => !slots.includes(s));
+          for (const s of slots) deck.pass(s, (p + 1) % n);
+          state.hands[(p + 1) % n].push(...slots);
+          state.got[(p + 1) % n] = slots;
+        });
+      }
+    }
+    state.turn = (player + 1) % n;
+    return [];
+  },
+};
+const passOrPlay = (state, me) => (state.got[me] ? { play: state.got[me][0] } : { pass: state.hands[me].slice(0, 3) });
+
+test("a pass round of the card engine, with four players passing three cards each, is far below the cap", { timeout: 120_000 }, async (t) => {
+  const sessions = localRoom({ game: "cards", names: names(4), mode: "friend" });
+  const largest = { size: 0, t: null };
+  const links = [...sessions[0].group.links.values(), ...sessions.slice(1).map((s) => s.group.link)];
+  measure(links, largest);
+  let sealed = 0; // the largest seal message
+  for (const link of links) {
+    const send = link.send.bind(link);
+    link.send = (frame) => {
+      if ((frame.msg ?? frame).t === "seal") sealed = Math.max(sealed, JSON.stringify(frame).length);
+      return send(frame);
+    };
+  }
+  const robots = sessions.map((s) => startCardRobot(s, { rules: passing, choose: passOrPlay, delay: 0 }));
+  await until(() => robots.every((r) => r.match.verdict || r.match.phase === "aborted"));
+  for (const r of robots) r.destroy();
+  assert.deepEqual(robots.map((r) => r.match.verdict?.ok), [true, true, true, true]);
+  assert.equal(robots[0].match.sealed.length, 12);
+  t.diagnostic(`card engine with a pass: ${largest.size} characters (${largest.t}); seal ${sealed}`);
+  assert.ok(sealed > 0, "the sealed cards were measured");
+  assert.ok(largest.size * HEADROOM <= MAX_MESSAGE_LENGTH, `${largest.size} is too close to ${MAX_MESSAGE_LENGTH}`);
+});
+
 test("the card engine's largest message is far below the cap, with four players and a 108-card deck", { timeout: 300_000 }, async (t) => {
   // Shuffles and share rounds grow with the deck, so CardMatch sends them in parts.
   const rules = toyCards({ deckSize: 108, hand: 7, maxTurns: 40 });

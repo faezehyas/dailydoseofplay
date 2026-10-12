@@ -104,6 +104,7 @@ flowchart TB
     e_deck_service["deck-service.js"]
     e_deck_worker["deck-worker.js<br>Web Worker"]
     e_deck_crypto["deck-crypto.js"]
+    e_seal["seal.js<br>WebCrypto"]
     e_vendor_mental_poker_cards_play["vendor/mental-poker/cards_play.js"]
     e_base64["base64.js"]
     e_fair["fair.js"]
@@ -203,6 +204,7 @@ flowchart TB
   e_card_match --> e_deck_service
   e_card_match --> e_fair
   e_card_match --> e_robot_pace
+  e_card_match --> e_seal
   e_card_match --> e_session
   e_card_match --> e_turn_match
   e_cards_art --> e_cards_faces
@@ -478,7 +480,8 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `session.js` → `matchRouter()` | Routes game messages to the current match by match number `m`, with the sender's seat, and holds messages for a rematch that hasn't started yet |
 | `robot-pace.js` | `robotPause(ms)`: every robot's pause before it moves goes through it, so browser tests can speed robots up by setting `globalThis.ddpRobotPace` (1 for players) |
 | `turn-match.js` | `TurnMatch` and `startTurnRobot()`: a generic protocol for open-information turn games, for two or more players. Agreed coin toss for who starts, every peer validates every move with the same rules (only the seat on turn may move), and luck moves (dice) use `SharedRandom`. A rules object may set `draws`, the most shared draws one match needs (default 256). This is the default for future games. Card games use `card-match.js`; Sea Battle hides a fleet, not cards, so it has its own `match.js`. |
-| `card-match.js` | `CardMatch` and `startCardRobot()`: turn games with hidden cards and no dealer (mental poker, see **Card games**). Like `TurnMatch`, plus a deck the rules deal from (`deck.deal`, `deck.open`, `deck.shuffle`, `deck.face`), every shuffle and share checked as it arrives, and an audit when the match ends. |
+| `card-match.js` | `CardMatch` and `startCardRobot()`: turn games with hidden cards and no dealer (mental poker, see **Card games**). Like `TurnMatch`, plus a deck the rules deal from (`deck.deal`, `deck.pass`, `deck.open`, `deck.shuffle`, `deck.face`), every shuffle and share checked as it arrives, a hidden card passed in secret, and an audit when the match ends. |
+| `seal.js` | Sealing a hidden card's shares to one player, through WebCrypto (ECDH P-256, HKDF-SHA256, AES-GCM): each player's seal key, `seal()` and `unseal()` (either side's private key opens an envelope), and `revealedKey()`, which accepts a key revealed for the audit only if it belongs to the published one. |
 | `deck-service.js` | `deckService()`: the deck cryptography as async calls, in one Web Worker per tab (`deck-worker.js`) or in-process in Node. Replaces the worker if the WebAssembly crashes. Also `DeckError` and the byte sizes. |
 | `deck-worker.js` | The worker: runs `deck-crypto.js` off the main thread |
 | `deck-crypto.js` | A synchronous layer over the vendored mental-poker WebAssembly (`vendor/mental-poker/`): keys, shuffles and their proofs, shares, opening, the audit. Bytes in, bytes out. |
@@ -655,6 +658,8 @@ its largest message, with four players and a 108-card deck, is 3063 (a part
 of a `shuffle`); Crazy Eights' (four players, 52 cards) is about the same,
 3063 to 3065 as reshuffles add digits to the round number, Go Fish's
 3063 and Gin Rummy's 3064 to 3065 (two players, the deck shuffled again every hand).
+A pass's sealed cards go in a `seal` message of about 704 characters (three
+cards, four players).
 
 **Why a pre-negotiated channel.** With the default in-band handshake, the
 guest's channel opens when the host's open request arrives, and Chrome
@@ -666,7 +671,8 @@ side's first message can arrive before the other side has the channel.
 Engine messages start with `$`. Everything else belongs to the game. The
 game receives messages through `session.onMessage((msg, fromSeat) => …)`,
 which buffers until a handler is attached. The handshake's protocol version is
-2; a page from before groups gets "a different version of this page".
+3; a page from before the card engine's secret pass (2), or before groups,
+gets "a different version of this page" when it connects, before any game.
 
 | Engine message, during a game | Meaning |
 |---|---|
@@ -1064,12 +1070,14 @@ at the top of that file; Crazy Eights, Go Fish and Gin Rummy use it (see
 
 **How a match runs.** Every message carries `m`, as in `TurnMatch`.
 
-1. **Keys.** Each browser makes a key and sends `hello {tip, key}`: its
-   `SharedRandom` chain tip, and its public key with a proof that it holds
-   the secret. The proof covers the match number, the seat and the tip, so a
-   key can't be reused by another seat or in another match. Everyone checks
-   every proof and adds the keys into one joint key. One shared draw picks
-   who starts.
+1. **Keys.** Each browser makes a key and sends `hello {tip, key, seal}`:
+   its `SharedRandom` chain tip, its public key with a proof that it holds
+   the secret, and the public half of a second key, its seal key (see
+   **Passing a hidden card** below). The proof covers the match number, the
+   seat, the tip and the seal key, so a key can't be reused by another seat
+   or in another match, and the two keys can't be swapped apart. Everyone
+   checks every proof and adds the keys into one joint key. One shared draw
+   picks who starts.
 2. **The shuffle.** The deck starts as the cards 0 to `deckSize` − 1 in
    order. Seat 0 re-encrypts every card under the joint key, permutes them,
    and sends the result with a proof that it is still the same cards
@@ -1086,11 +1094,14 @@ at the top of that file; Crazy Eights, Go Fish and Gin Rummy use it (see
 4. **Reshuffles.** `deck.shuffle(slots)` sends those cards, say a discard
    pile, through another round of shuffles by every seat, into new slots.
    Faces that were open are hidden again.
-5. **The audit.** When `state.winner` is set, everyone sends their secret key
-   (`audit {key}`). Each browser checks every key against the one that player
-   used, reads every card it couldn't see, and replays the game from the deal
-   with every face known. The result is `match.verdict`: `{ ok: true }`, or
-   what went wrong and, when it was a move, whose. Once the audit has
+5. **Passing.** `deck.pass(slot, seat)` moves a card in someone's hand to
+   another seat in secret (below).
+6. **The audit.** When `state.winner` is set, everyone sends their secret
+   keys (`audit {key, seal}`). Each browser checks every key against the one
+   that player used, opens and checks every sealed card, reads every card it
+   couldn't see, and replays the game from the deal with every face known.
+   The result is `match.verdict`: `{ ok: true }`, or what went wrong and,
+   when it was a move, whose. Once the audit has
    passed, `match.face()` returns every card, so a game can show the hands
    left at the end (Crazy Eights counts their penalty points). During play
    it returns only the open cards and your own, as before, and after a
@@ -1102,18 +1113,63 @@ at the top of that file; Crazy Eights, Go Fish and Gin Rummy use it (see
 | A shuffle that swaps, copies or drops a card, or one passed off as another seat's | At once: the proof fails, and the match stops naming the shuffler. |
 | A wrong share, or a share for another card | At once: its proof fails. |
 | Showing a card that isn't in your hand, or moving out of turn | At once, like any illegal move. |
+| Passing a card with a bad sealed share, or a share for another card | At once, by its receiver, who stops the match naming the giver; then the two of them settle it (below). If the receiver kept quiet, in the audit. |
+| Saying a good sealed card is bad | When the giver and the receiver reveal their seal keys after the match stops: everyone opens the envelope and names the receiver. |
 | Breaking a rule that depends on a hidden card ("draw only if nothing plays") | In the audit, where `deck.face()` returns every face, so the rule throws. The result stands; the audit only reports. |
-| Revealing a different key at the end | In the audit. |
+| Revealing a different key (card or seal) at the end | In the audit. |
 
 The audit needs every player's key. A player who leaves after the last move,
 or never sends their key, leaves the match unverified (`verdict` stays null):
 the view should say so. Nothing stops stalling either: a player who never
 sends their shares holds the game up until someone leaves. A seat that sends
 more than `MAX_AHEAD` shuffle or share parts ahead of the match is flooding,
-and is blamed for it. A hidden card can't pass from one player to another
-(Hearts' pass): that needs a private message, and every message here goes
-to everyone. A card that is already open can, so Go Fish shows the cards an
-answer hands over before dealing them to the asker.
+and is blamed for it.
+
+**Passing a hidden card.** A dealt card can be read only by its holder,
+because every other player's share of it went out to everyone, and the
+holder's own share never did. Every message goes to everyone, so giving that
+share away in the open would let anyone read the card. Instead the holder's
+browser seals it to the receiver: an ECDH key on P-256 between the giver's
+and the receiver's seal keys, HKDF-SHA256 bound to the match, the deck step,
+the slot and the two seats, and AES-GCM (`engine/seal.js`, WebCrypto, no
+library). Either side's private key opens it, nobody else's.
+
+- The rules call `deck.pass(slot, seat)`, from any move: Hearts passes the
+  mover's own cards, and Old Maid would take one from someone else's hand.
+  The card's holder's browser seals by itself as the round runs, like a
+  share round (`seal {k, i, n, d}`, the envelopes in parts). The room
+  creator relays envelopes it can't open.
+- A pass carries every share that hasn't gone to everyone, except the
+  receiver's own: the first holder's share, which the next holder forwards
+  if it passes the card on. The receiver opens the envelope, checks each
+  share's Chaum–Pedersen proof against its player's key and the card, and
+  reads the card. Everyone else records that the card changed hands and
+  keeps the envelope for the audit. The giver still knows the card it gave.
+- When the holder later shows the card, its move carries every share still
+  missing with its proof (`move {move, sh}`), so everyone opens and checks
+  it at once. A move may carry at most 16 shares.
+- A card dealt and passed in one call goes straight to its last seat, and a
+  card opened in the same call needs no envelope.
+- A receiver that finds a bad envelope stops the match, naming the giver
+  (`abort {reason, about, dispute}`, `about` the giver, `dispute` the deck
+  step). Only the receiver could check it, so the giver and the receiver
+  then reveal their seal keys (`unseal {key}`); a browser that was behind
+  catches up to that step first, and an abort that arrives meanwhile
+  doesn't stop it short. A dispute about a step where nothing was sealed to
+  the accuser names the accuser. Everyone accepts the first key that
+  belongs to its published key, opens the envelope, and names whoever
+  lied: the giver, or a receiver who accused falsely (`match.verdict`, with
+  the match stopped; `match.disputing` while it waits). The card keys stay
+  secret, so the hands stay hidden, but the two seal keys also open the
+  other cards those two passed or were passed in that game.
+- At the end the audit reveals every seal key, accepts only those that
+  agree with the published ones (an ECDH with the auditor's own key must
+  match), and opens every envelope with its giver's key. A bad one names
+  the giver, even if its receiver kept quiet.
+
+A card that is already open changes hands with `deck.deal()`, which Go Fish
+uses to hand over cards an answer shows; `deck.deal()` refuses a hidden card
+in a hand.
 
 **A modified host, with three or more players.** Every message goes through
 the host's browser (see **Groups**), and messages aren't signed. A modified
@@ -1123,8 +1179,11 @@ real game goes on, and the host can read your hand and play your seat.
 Signing moves wouldn't close this, because the host also relays the keys a
 signature would be checked against, and could swap in its own. It would
 take direct links between every pair of players (a mesh, see **Groups**).
-With two players the host is your only opponent, so this gives them nothing
-the game doesn't already.
+Seal keys are no different: the host could swap in its own at the hello
+(both keys at once, with a proof of its own) and read the cards passed to
+that player, or relay a different envelope to each player so their verdicts
+differ. With two players the host is your only opponent, so this gives them
+nothing the game doesn't already.
 
 **Writing rules.** The rules see slots, never ciphertexts, and `deck.face()`
 only returns faces every player can see, so the state is the same in every
@@ -1186,7 +1245,10 @@ game's own styles and tests.
 card plus its proof (7.7 KB for 52 cards, 13 KB for 108), so `CardMatch` sends
 it in parts of 3000 base64 characters (`shuffle {k, i, n, d}`), and shares 16
 to a message (`shares {k, i, n, d}`), and a move may show at most 16 hidden
-cards. Every message stays under 4 K characters (see **Message size**). In the
+cards. A seal key is 65 bytes; a sealed card is 28 bytes plus its shares
+(159 bytes, 212 characters, for a card's usual one share), and `seal` sends as
+many envelopes to a part as fit 3000 characters with every share a pass
+could need. Every message stays under 4 K characters (see **Message size**). In the
 browser test, four robots with 52 cards and seven-card hands have the deck
 shuffled in about 2.6 s, and finish 30 turns and the audit in about 4 s.
 
@@ -2036,8 +2098,9 @@ is shown and goes again, or with **Turn passes** the turn always ends. A
 lucky card laid straight into its book is shown all the same, so it goes
 again too.
 
-**Cards change hands face up.** A hidden card can't be dealt to another
-player, so a give names its cards in `reveals()`: they open, every browser
+**Cards change hands face up.** An answer shows its cards anyway (the asker
+must see they are the rank asked for), so rather than pass them sealed, a give
+names its cards in `reveals()`: they open, every browser
 checks they are the rank asked for, and the rules then deal those open cards
 to the asker. Books and lucky fish are reveals too (at most four hidden
 cards, under the 16-per-move limit). Every card ends the game face up in a
