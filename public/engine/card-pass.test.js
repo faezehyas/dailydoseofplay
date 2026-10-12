@@ -452,6 +452,28 @@ test("a sealed round with an envelope missing stops the match", async () => {
   assert.match(matches[1].abortReason, /sent 1 sealed cards where 2 were due/);
 });
 
+test("a match sends its audit keys as soon as it ends, so a rematch vote can't overtake them", async () => {
+  // The router drops an old match's messages once a rematch starts, so the keys must go first.
+  const { sessions, matches } = seated(2, passRules([{ seat: 0, move: { pass: true } }, { seat: 1, move: { play: true } }]));
+  const sent = [];
+  tap(sessions[1], (msg) => void sent.push(msg.t));
+  const before = new Promise((resolve) => matches[1].on("over", () => setTimeout(() => resolve(sent.includes("audit")), 0)));
+  await until(() => matches.every((m) => m.phase === "playing"));
+  // A slow device: WebCrypto takes a while from here on.
+  const subtle = globalThis.crypto.subtle;
+  const exportKey = subtle.exportKey;
+  subtle.exportKey = async (...args) => (await new Promise((r) => setTimeout(r, 50)), exportKey.apply(subtle, args));
+  try {
+    await matches[0].play({ pass: true });
+    await until(() => matches[1].canMove());
+    await matches[1].play({ play: true });
+    assert.equal(await before, true, "the audit went out before the next task, where a click would land");
+    await until(() => matches.every((m) => m.verdict));
+  } finally {
+    subtle.exportKey = exportKey;
+  }
+});
+
 test("a page from before the secret pass is told to reload when it connects, before any game", async () => {
   const [host, guest] = localPair();
   const admitted = admitGuest(host, { game: "hearts" });

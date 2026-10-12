@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sealKeys, sealSecret, sealPublic, revealedKey, seal, unseal, sealedBytes, SealError, SEAL_PUBLIC_BYTES } from "./seal.js";
+import { sealKeys, sealPublic, revealedKey, seal, unseal, sealedBytes, SealError, SEAL_PUBLIC_BYTES } from "./seal.js";
 
 const [giver, receiver, stranger] = await Promise.all([sealKeys(), sealKeys(), sealKeys()]);
 const plain = Uint8Array.from({ length: 131 }, (_, i) => i);
@@ -38,10 +38,10 @@ test("public keys: 65 bytes, and a point off the curve is refused", async () => 
 });
 
 test("a revealed key is accepted only if it belongs to the published one", async () => {
-  const key = await revealedKey(await sealSecret(giver), giver.publicKey, receiver);
+  const key = await revealedKey(giver.secret, giver.publicKey, receiver);
   assert.ok(key);
   assert.deepEqual(await unseal(key, receiver.publicKey, "m1/k3/slot7/0-1", env), plain, "the audit opens it with the revealed key");
-  assert.equal(await revealedKey(await sealSecret(stranger), giver.publicKey, receiver), null);
+  assert.equal(await revealedKey(stranger.secret, giver.publicKey, receiver), null);
   assert.equal(await revealedKey(new Uint8Array(32).fill(3), giver.publicKey, receiver), null);
   assert.equal(await revealedKey(new Uint8Array(31), giver.publicKey, receiver), null);
 });

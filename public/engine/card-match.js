@@ -33,7 +33,7 @@ import { robotPause } from "./robot-pace.js";
 import { RuleError } from "./turn-match.js";
 import { deckService, DeckError, MAX_DECK, HELLO_BYTES, SECRET_BYTES, SHARE_BYTES } from "./deck-service.js";
 import { toBase64, fromBase64 } from "./base64.js";
-import { sealKeys, sealSecret, sealPublic, revealedKey, seal, unseal, sealedBytes, SealError, SEAL_PUBLIC_BYTES, SEAL_SECRET_BYTES } from "./seal.js";
+import { sealKeys, sealPublic, revealedKey, seal, unseal, sealedBytes, SealError, SEAL_PUBLIC_BYTES, SEAL_SECRET_BYTES } from "./seal.js";
 
 // Shuffles and share rounds go out in parts, so no message passes 4K characters.
 const PART_CHARS = 3000;
@@ -573,7 +573,7 @@ export class CardMatch extends Emitter {
     const parties = [giver, receiver];
     let key, other;
     if (parties.includes(this.me)) {
-      this.send({ t: "unseal", key: toBase64(await sealSecret(this.sealKey)) });
+      this.send({ t: "unseal", key: toBase64(this.sealKey.secret) });
       key = this.sealKey.privateKey;
       other = this.sealPks[this.me === giver ? receiver : giver];
     } else {
@@ -699,7 +699,8 @@ export class CardMatch extends Emitter {
 
   async #audit() {
     this.#busy("auditing");
-    this.send({ t: "audit", key: toBase64(this.key.secret), seal: toBase64(await sealSecret(this.sealKey)) });
+    // At once: a rematch vote sent after this must not overtake it (the router drops an old match's messages).
+    this.send({ t: "audit", key: toBase64(this.key.secret), seal: toBase64(this.sealKey.secret) });
     const secrets = [];
     for (let s = 0; s < this.players; s++) secrets[s] = s === this.me ? { key: this.key.secret } : await this.#wait(`audit:${s}`);
     const faces = [];

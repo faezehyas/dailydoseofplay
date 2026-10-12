@@ -21,15 +21,12 @@ export class SealError extends Error {
 const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const fromB64url = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
 
-// A fresh key pair: { privateKey, publicKey, public: its 65 bytes }.
+// A fresh key pair: { privateKey, publicKey, public: its 65 bytes, secret: the 32 revealed for the audit }.
+// The secret is exported now, so revealing it later needs no wait.
 export async function sealKeys() {
   const pair = await subtle().generateKey(ECDH, true, ["deriveBits"]);
-  return { ...pair, public: new Uint8Array(await subtle().exportKey("raw", pair.publicKey)) };
-}
-
-// The 32 secret bytes, revealed for the audit.
-export async function sealSecret(pair) {
-  return fromB64url((await subtle().exportKey("jwk", pair.privateKey)).d);
+  const pub = new Uint8Array(await subtle().exportKey("raw", pair.publicKey));
+  return { ...pair, public: pub, secret: fromB64url((await subtle().exportKey("jwk", pair.privateKey)).d) };
 }
 
 // Another player's public key; refuses a point that isn't on the curve.
