@@ -120,6 +120,14 @@ const GAMES = {
     const choose = (st, me, rng, face) => chooseMove(st, me, rng, face, { level: "hard" });
     return { config, players: 2, robot: (s) => startRobot(s, { rules: makeRules(config), choose, delay: () => 0 }) };
   },
+  hearts: async () => {
+    const { makeRules, DEFAULT_CONFIG } = await import("../public/hearts/rules.js");
+    const { chooseMove, startRobot } = await import("../public/hearts/robot.js");
+    // Four players and a game to 50: many hands, each shuffled again, with twelve sealed cards a pass.
+    const config = { ...DEFAULT_CONFIG, target: 50, jack: true, moveSeconds: 60 };
+    const choose = (st, me, rng, face) => chooseMove(st, me, rng, face, { level: "hard" });
+    return { config, players: 4, robot: (s) => startRobot(s, { rules: makeRules(config, 4), choose, delay: () => 0 }) };
+  },
   "dots-and-boxes": async () => {
     const { makeRules, DEFAULT_CONFIG } = await import("../public/dots-and-boxes/rules.js");
     const { startRobot } = await import("../public/dots-and-boxes/robot.js");

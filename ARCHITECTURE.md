@@ -1,7 +1,7 @@
 # Architecture
 
 Daily Dose of Play is a free, no-login site of browser games for two or more
-players (Chutes and Ladders, Ludo, Crazy Eights and Go Fish seat up to four). One small Node server
+players (Chutes and Ladders, Ludo, Crazy Eights, Go Fish and Hearts seat up to four). One small Node server
 on Wasmer Edge serves the pages and introduces players to each other. The games
 themselves run browser to browser over WebRTC DataChannels: with more than
 two players, every guest connects to the room creator's browser, which
@@ -657,9 +657,9 @@ grow with the deck, so `CardMatch` sends them in parts (see **Card games**);
 its largest message, with four players and a 108-card deck, is 3063 (a part
 of a `shuffle`); Crazy Eights' (four players, 52 cards) is about the same,
 3063 to 3065 as reshuffles add digits to the round number, Go Fish's
-3063 and Gin Rummy's 3064 to 3065 (two players, the deck shuffled again every hand).
-A pass's sealed cards go in a `seal` message of about 704 characters (three
-cards, four players).
+3063, Gin Rummy's 3064 to 3065 (two players, the deck shuffled again every
+hand) and Hearts' 3064 (four players, a game to 50). A pass's sealed cards go
+in a `seal` message of about 704 characters (three cards, four players).
 
 **Why a pre-negotiated channel.** With the default in-band handshake, the
 guest's channel opens when the host's open request arrives, and Chrome
@@ -798,7 +798,7 @@ the lobby cards:
 | Lobby, invite, waiting room | 520 px | all |
 | Game, `layout: "narrow"` | 520 px | Tic Tac Toe, Connect 4, Chess, Checkers |
 | Game, `layout: "medium"` | 640 px | Gomoku, Backgammon |
-| Game, `layout: "wide"` (the default) | 980 px | Sea Battle, Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy |
+| Game, `layout: "wide"` (the default) | 980 px | Sea Battle, Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts |
 
 Below that width the column is the page's width less its 16 px gutters. A
 game's own top-level box has no `max-width`, so it fills `#game`. The default
@@ -822,7 +822,7 @@ most two to a row; under 600 px they sit in a 2×2 grid beside Leave (React
 under it) over a slimmer score, so four fit a 360 px phone. A pill and its score read
 `--seat` and `--seat-text`, which are `--mine` and `--theirs` unless the game
 gives each seat a class of its own that sets them (Chutes and Ladders `p0`
-to `p3`, Ludo its board colours, Crazy Eights, Go Fish and Gin Rummy `p-0` to `p-3`).
+to `p3`, Ludo its board colours, the card games `p-0` to `p-3`).
 
 **Reactions.** Players can't type to each other: there would be nothing to
 stop a stranger's words reaching a child. Instead the player bar's React
@@ -910,11 +910,12 @@ Toe, Connect 4 and Gomoku, the mated king in Chess, the last capture in
 Checkers, the last checker borne off in Backgammon, the last ship sunk in
 Sea Battle (once its shell lands), the pawn on 100 in Chutes and Ladders,
 the last box in Dots and Boxes, the winner's tokens home in Ludo, the
-winners' books in Go Fish, and the winner's melds on the table in Gin Rummy. The
+winners' books in Go Fish, the winner's melds on the table in Gin Rummy, and the
+winner's pill and tricks in Hearts. The
 chimes (`chimes.js`) are one melody, a C-major pentatonic jingle, in a
 timbre that fits the game's pieces (`flavour`): `wood` for Chess, Checkers,
 Backgammon and Ludo; `paper` for Tic Tac Toe, Gomoku, Dots and Boxes and Gin Rummy;
-`plastic` for Connect 4; `bell` for Chutes and Ladders; `water` (a bubble
+`plastic` for Connect 4; `bell` for Chutes and Ladders and Hearts; `water` (a bubble
 under the bell) for Sea Battle and Go Fish. They are synthesized, at the `fanfare`
 level, and follow the mute toggle. With `prefers-reduced-motion` only the
 colours change: the pieces glow, the board dims, the pills take their seat
@@ -1065,8 +1066,9 @@ that started the room, and has no dealer. `engine/card-match.js` does it with
 mental poker: every player holds a share of the deck's key, and a card can
 only be read with every share. With three or more players, a modified host
 can still read a hand (see **A modified host** below). The rules contract is
-at the top of that file; Crazy Eights, Go Fish and Gin Rummy use it (see
-**Crazy Eights in depth**, **Go Fish in depth** and **Gin Rummy in depth**).
+at the top of that file; Crazy Eights, Go Fish, Gin Rummy and Hearts use it
+(see **Crazy Eights in depth**, **Go Fish in depth**, **Gin Rummy in depth**
+and **Hearts in depth**).
 
 **How a match runs.** Every message carries `m`, as in `TurnMatch`.
 
@@ -1238,7 +1240,7 @@ table's pieces and motion, the robots' pacing and the leaving notice. A game
 builds its own layout from those pieces, keeps its own rules, robot and
 special moments, and links `cards/cards.css` after `theme.css`. Each part
 carries the class `pc-<part>` for the shared styles and `<prefix>-<part>`
-(`ce-` for Crazy Eights, `gf-` for Go Fish, `gr-` for Gin Rummy) for the
+(`ce-` for Crazy Eights, `gf-` for Go Fish, `gr-` for Gin Rummy, `hr-` for Hearts) for the
 game's own styles and tests.
 
 **Sizes.** A card is 66 bytes, a share 131. A shuffle message is 66 bytes a
@@ -2314,6 +2316,131 @@ their `paper` timbre.
 
 **Leaving.** The shared notice (`engine/cards/leave-notice.js`): whether the
 game was checked before they left.
+
+## Hearts in depth
+
+Hearts is the fourth game on `CardMatch` (see **Card games**) and the first
+whose cards change hands in secret: the pass goes through `deck.pass()`
+(see **Passing a hidden card**). Four players with 13 cards each, or three
+with 17. It draws its table with the shared pieces, the trick ones included
+(see **The shared table**).
+
+**Three players.** Friend rooms are never filled with robots (see
+**Groups**), so three friends could only play if the game took three. With
+three, the 2 of diamonds is left out: the rules get a 51-card deck whose
+faces skip it (`cardFace()` in `rules.js` maps them back to the standard
+deck for the view and the robots), everyone gets 17 cards, and the pass
+goes left, then right. Two players can't start a game (`minPlayers` 3).
+
+**One match is a whole game**, as in Gin Rummy: between hands
+`deck.shuffle()` sends all the cards through another round of shuffles by
+every browser, into new slots (about 2.6 s with four seats, shown by the
+shared riffle and the deck's chip), and the next hand is dealt from them.
+With **One hand** a game, a match is a single hand and the view adds the
+scores up across rematches.
+
+**A hand as moves.** `CardMatch` only takes a move from `state.turn`, so each
+step is a move by whoever makes it, and `state.phase` says which:
+
+| Phase | Whose move | Moves |
+|---|---|---|
+| `pass` | each seat in turn from the hand's opener | `{ pass: [three slots] }`: recorded, not given; the last pick calls `deck.pass()` for all of them at once, so everyone picks before anyone receives |
+| `find` | each seat in turn from the opener | `{ play: slot }` if it's the 2 of clubs (shown, checked live), else `{ none: true }` |
+| `play` | the seat on turn, then the trick's winner | `{ play: slot }` |
+| `result` | the last trick's winner | `{ next: true }`: shuffles and deals the next hand |
+
+The opener moves on a seat each hand and passes first. The pass cycles left,
+right, across, none (left and right with three), or never with passing off.
+
+**Finding the 2 of clubs.** Nobody can see who holds it, so the seats say in
+turn whether they have it, as a forced move: the holder plays it and the
+others say "no 2♣". A "no" from the holder is a lie only the audit sees; if
+every seat says no, the game stops at once (`winner` -2, no winners) so the
+audit can name the liar instead of looping.
+
+**What's checked when.** A played card is shown (`reveals()`), so its face,
+the 2 of clubs lead, the suit to follow, the trick's winner (the highest of
+the suit led, aces high), hearts breaking (a heart or the queen of spades),
+the points and the moon are all checked live. The rest of your hand is
+hidden, so these throw only in the audit, which names the player: not
+following suit while holding it, leading a heart before hearts are broken
+while holding something else, a heart or the queen on the first trick while
+holding something else, and saying you haven't got the 2 of clubs when you
+have. The state never depends on a hidden face. Your own browser never
+offers an illegal card: only legal ones light up and can be tapped.
+
+**Scoring.** A heart is 1 point and the queen of spades 13. Taking all 26
+(shooting the moon) gives everyone else 26 (classic), or takes 26 off the
+shooter (a room setting). With the jack of diamonds on, whoever takes it
+gets −10 (the moon too). The game ends when someone reaches the target (100,
+or 50) and the lowest score wins; **if two or more are level at the bottom,
+another hand is played** until one is lowest alone. In a one-hand game,
+players level at the bottom share the win (the result says "Draw" and names
+them).
+
+**Robot** (`robot.js`). A robot uses only the public state (every card
+played this hand, the voids they show, who took which points), its own
+`face()` and the cards it passed or was passed. The 2 of clubs, an only
+legal card and the next hand are `forcedMove()`. `robot.test.js` checks a
+robot asks for no other face, and that dealing the cards hidden from it
+differently changes none of its choices.
+
+| Level | Pass | Play |
+|---|---|---|
+| Easy | three at random | a random legal card |
+| Medium | its most dangerous cards: the queen (unless it has five spades), the ace and king of spades, then high hearts | ducks under the trick when it can (the highest card that loses); can't duck: the highest if it plays last, else the lowest; void: the queen, then its highest heart, then its highest card |
+| Hard | the same danger, plus emptying a short club or diamond suit to make a void, keeping low spades to guard a queen it keeps; with a moon hand (five hearts or more with the ace and the king or queen, five queens, kings and aces in all, and the queen of spades guarded), its low cards | counts every card and void: leads low in suits where many higher cards are out and nobody is void, flushes the queen with low spades and never leads the ace or king of spades while she's out; spots an opponent taking every point (7 or more) and takes a heart off them; goes for the moon with a moon hand, or once it holds every point so far (10 or more) and nothing out beats its cards but one |
+
+Hard wins about 95% of games against three Easy robots and about 40% against
+three Medium (a fair share would be 25%); `robot.test.js` checks over 75%
+and 28% on 80 games. A choice takes under 2 ms. Robots pause like a person
+(`startPacedRobot()`): a blink for "no 2♣", a beat for a forced card, 0.6
+to 2 s for a choice and about 1.5 s for the pass, waiting while your screen
+replays.
+
+**Your turn.** To pass, tap three cards (they stand up in your colour) and
+**Pass left** (right, across); you may pick and press it before your turn,
+and your three go when it comes. The cards passed to you are marked with a
+heart-pink dot until you play them. To play, tap a lit card. On a keyboard
+the hand is one tab stop (arrow keys, Enter plays or picks); P passes, Esc
+puts the picks back. The move timer (15, 30 or 60 s, off by default) times
+your real choices and plays Hard's choice for you, or your three picks if
+you made them.
+
+**Table.** A rose velvet table in a rosewood rim with a coral inlay. The
+others sit on your left, across and on your right (with three, left and
+right), each with a fan of backs, a pill, the tricks they have won and their
+points this hand; on a wide table the side seats sit beside the trick, on a
+phone all three above it. In the middle each card lands in front of its
+seat, the lead marked by a tab in its colour, with chips under the trick for
+the suit to follow, hearts broken and, while passing, where your three go.
+At the end of a hand a tally card counts each seat's points into the totals
+(the lowest in its colour). The player bar's score is each player's total
+and its note their cards in hand. The result panel holds the score sheet, a
+row a hand and a column a player with the totals at the foot (the rows
+scroll inside it, so the panel fits a phone), and the fair-play verdict.
+
+**Motion.** The shared riffle and deal (13 each). The pass: your three slide
+face down toward their seat, everyone's leave at once, and the three passed
+to you land face down and turn over. A card flies to the trick from its seat,
+turning face up from a hidden hand; the winning card lights, the trick slides
+together and flies face down to the winner's tricks. The queen of spades
+drops onto the trick with weight: the table jolts and a shadow spreads.
+Hearts breaking cracks the chip's heart in two with a heartbeat and a ring of
+small hearts. The hand's points count up, a moon rises over the table with
+confetti in the shooter's colour, and between hands the cards gather back to
+the deck. The game's end is the result moment, the winner's pill and tricks
+lighting up.
+
+**Sound** (`sounds.js`). The shared card sounds (shuffle, deal, a card
+played, gathering the cards) and your turn, a refusal and the timer;
+synthesized: the pass's whoosh, a trick swept in, a heartbeat for hearts
+breaking, an ominous low note for the queen of spades, the points ticking up
+and a fanfare for the moon. A win or a loss plays the result chimes in their
+`bell` timbre.
+
+**Leaving.** The shared notice (`engine/cards/leave-notice.js`), with each
+player's points.
 
 ## Differences from the reference (wasmerio/edge-multiplayer-games)
 

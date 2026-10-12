@@ -1,0 +1,637 @@
+/* Hearts view. Shared tokens come from /engine/theme.css, and the card
+   table's pieces (cards, seats, hand, the trick, won tricks, seat colours)
+   from /engine/cards/cards.css. Here: a rose velvet table in a rosewood rim
+   with a coral inlay, the seats round the trick, the pass, the chips under
+   the trick, a hand's tally, the moments for the queen, broken hearts and
+   the moon, and the score sheet. */
+.hearts {
+  --pc-felt: #8a2f47;
+  --pc-felt-2: #561629;
+  --pc-felt-muted: #f6d9e0;
+  --pc-rim: #5a2a24;
+  --pc-rim-2: #2e1410;
+  --hr-inlay: #ff8a6b;
+  --hr-inlay-2: #b8452c;
+  --hr-panel: rgb(36 8 18 / 78%);
+  --hr-heart: #ff5d73;
+  --hr-moon: #ffe7a3;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .hearts {
+    --pc-felt: #6a2238;
+    --pc-felt-2: #3a0d1b;
+    --pc-felt-muted: #ecc9d2;
+    --pc-rim: #3f1d18;
+    --pc-rim-2: #1e0b08;
+    --hr-inlay: #d9694e;
+    --hr-inlay-2: #8a321f;
+    --hr-panel: rgb(22 4 10 / 82%);
+  }
+}
+
+:root[data-theme="dark"] .hearts {
+  --pc-felt: #6a2238;
+  --pc-felt-2: #3a0d1b;
+  --pc-felt-muted: #ecc9d2;
+  --pc-rim: #3f1d18;
+  --pc-rim-2: #1e0b08;
+  --hr-inlay: #d9694e;
+  --hr-inlay-2: #8a321f;
+  --hr-panel: rgb(22 4 10 / 82%);
+}
+
+/* ---------- the table: rose velvet in a rosewood rim with a coral inlay ---------- */
+.hr-table {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 6px;
+  min-height: min(600px, max(440px, calc(100svh - 250px)));
+  background:
+    radial-gradient(120% 90% at 50% 42%, transparent 52%, rgb(0 0 0 / 26%)),
+    radial-gradient(circle at 50% 46%, rgb(255 255 255 / 7%), transparent 34%),
+    repeating-linear-gradient(115deg, rgb(255 255 255 / 2%) 0 2px, transparent 2px 9px),
+    radial-gradient(circle at 50% 45%, var(--pc-felt), var(--pc-felt-2));
+  box-shadow: inset 0 0 0 2px var(--pc-rim-2), inset 0 0 0 4px var(--hr-inlay-2), inset 0 0 0 5px var(--hr-inlay), inset 0 8px 22px rgb(0 0 0 / 36%), var(--shadow);
+}
+
+.hr-table .pc-opps .pc-seat {
+  flex: 1 1 0;
+}
+
+.hr-table .pc-seat .pc-fan {
+  max-width: 190px;
+}
+
+/* Under each seat: the tricks it has won and its points this hand. */
+.hr-seat-row,
+.hr-me-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.hr-points {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--hr-panel);
+  color: var(--pc-felt-ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.hr-points[hidden] {
+  display: none;
+}
+
+/* A seat that has picked its three to pass. */
+.hr-picked {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--c);
+  color: #17201d;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.hr-picked[hidden] {
+  display: none;
+}
+
+.hr-table .pc-seat > .pc-bubble {
+  top: calc(100% - 6px);
+}
+
+/* ---------- the middle: the trick, the deck while it's dealt, the chips, a hand's tally ---------- */
+.hr-centre {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  row-gap: 8px;
+  min-width: 0;
+}
+
+.hr-trick-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  max-width: 100%;
+}
+
+.hr-deck {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+}
+
+.hr-deck.away {
+  visibility: hidden;
+}
+
+.hr-centre .pc-busy.float {
+  top: auto;
+  bottom: -4px;
+}
+
+.hr-broken .hr-heart,
+.hr-tally .dot {
+  flex: none;
+}
+
+.hr-broken .hr-heart svg {
+  display: block;
+  width: 15px;
+  height: 14px;
+  overflow: visible;
+  color: var(--hr-heart);
+}
+
+.hr-broken .hr-heart path {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.hr-broken .hr-heart .l { transform: translate(-1px, 0) rotate(-5deg); }
+.hr-broken .hr-heart .r { transform: translate(1px, 0) rotate(5deg); }
+
+.hr-pass-chip {
+  background: var(--hr-panel) !important;
+  border: 1.5px solid var(--hr-inlay);
+}
+
+/* A hand's points: each seat's hearts and queen, counting into the totals. */
+.hr-tally {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 4;
+  display: grid;
+  gap: 6px;
+  width: max-content;
+  min-width: min(250px, 92cqi);
+  max-width: 94cqi;
+  padding: 10px 14px 12px;
+  border-radius: 16px;
+  background: var(--hr-panel);
+  border: 2px solid var(--hr-inlay);
+  color: var(--pc-felt-ink);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 35%);
+  transform: translate(-50%, -50%);
+}
+
+.hr-tally[hidden] {
+  display: none;
+}
+
+.hr-tally.moon {
+  border-color: var(--hr-moon);
+}
+
+.hr-tally-title {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.hr-tally.moon .hr-tally-title {
+  color: var(--hr-moon);
+}
+
+.hr-tally-rows {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.hr-tally-row {
+  display: contents;
+}
+
+.hr-tally-row .who {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 700;
+}
+
+.hr-tally-row .add,
+.hr-tally-row .total {
+  justify-self: end;
+  font-weight: 800;
+}
+
+.hr-tally-row .add {
+  color: var(--pc-felt-muted);
+}
+
+.hr-tally-row .total {
+  min-width: 2.4em;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 12%);
+  text-align: right;
+}
+
+.hr-tally-row.low .total {
+  background: var(--c);
+  color: #17201d;
+}
+
+/* ---------- your corner: the pass, the clock, your hand ---------- */
+.hr-table .pc-me {
+  position: relative;
+}
+
+.hr-bar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px 8px;
+  min-height: 40px;
+}
+
+.hr-pass {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.hr-pass[hidden] {
+  display: none;
+}
+
+.hr-pass small {
+  font-weight: 600;
+}
+
+.hr-pass:disabled {
+  background: rgb(0 0 0 / 30%);
+  border-color: transparent;
+  color: var(--pc-felt-ink);
+  opacity: 1;
+}
+
+/* Room under the fan for its outer cards' dip, and above it for a picked card's lift. */
+.hr-hand {
+  height: calc(var(--ch) + 46px);
+}
+
+.hr-hand .hr-hcard {
+  bottom: 26px;
+}
+
+.hr-hcard.pickable,
+.hr-hcard.playable {
+  cursor: pointer;
+}
+
+.hr-me-row .pill {
+  min-width: 0;
+}
+
+.hr-me-row .pill .name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hr-table .pc-me .pill .count {
+  flex: none;
+  min-width: 1.6em;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--pc-felt-ink);
+  color: #17201d;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+/* Cards passed to you: a heart-pink dot. */
+.hr-table {
+  --received: var(--hr-heart);
+}
+
+.hr-timer {
+  display: grid;
+  grid-template-columns: 90px auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--pc-felt-ink);
+}
+
+.hr-timer[hidden] {
+  display: none;
+}
+
+.hr-timer .bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 30%);
+  overflow: hidden;
+}
+
+.hr-timer .bar span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--c, var(--accent-2));
+  transform-origin: left;
+}
+
+.hr-timer.low {
+  color: #ffd2c8;
+}
+
+/* ---------- moments: the moon, the queen's shadow, hearts breaking ---------- */
+.hr-moment {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  z-index: 6;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: max-content;
+  max-width: 92cqi;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.hr-moment .art svg {
+  display: block;
+  width: clamp(70px, 22cqi, 130px);
+  height: auto;
+  color: var(--hr-moon);
+  filter: drop-shadow(0 0 18px rgb(255 231 163 / 55%));
+}
+
+.hr-moment .words {
+  display: inline-block;
+  padding: 6px 22px 8px;
+  border-radius: 18px;
+  background: var(--hr-panel);
+  border: 3px solid var(--c);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 8cqi, 3rem);
+  font-weight: 600;
+  line-height: 1.1;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 35%);
+}
+
+.hr-shade {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 140px;
+  height: 140px;
+  margin: -70px 0 0 -70px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(10 0 6 / 70%), rgb(10 0 6 / 0%) 70%);
+  pointer-events: none;
+}
+
+.hr-mini-heart {
+  width: 18px;
+  height: 17px;
+  margin: -8px 0 0 -9px;
+  color: var(--hr-heart);
+  pointer-events: none;
+}
+
+.hr-mini-heart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hr-minis {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+}
+
+.hr-log li.queen,
+.hr-log li.moon {
+  font-weight: 700;
+}
+
+/* ---------- game over: the places in seat colours, the score sheet and the verdict ---------- */
+.hearts .result-places li {
+  --seat: var(--c);
+  --seat-text: var(--c-ink);
+}
+
+.hr-sheet-box {
+  max-height: min(34svh, 260px);
+  overflow: auto;
+  margin: 0 0 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.hr-sheet {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.hr-sheet th:first-child {
+  width: 4.2em;
+}
+
+.hr-sheet th,
+.hr-sheet td {
+  padding: 3px 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.hr-sheet thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  font-size: 0.78rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.hr-sheet thead th:first-child,
+.hr-sheet tbody th,
+.hr-sheet tfoot th {
+  text-align: left;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.hr-sheet .who {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  max-width: 100%;
+  color: var(--c-ink);
+}
+
+.hr-sheet .who .dot {
+  width: 10px;
+  height: 10px;
+}
+
+.hr-sheet .nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hr-sheet tbody tr:nth-child(even) {
+  background: var(--surface-2);
+}
+
+.hr-sheet td.moon {
+  font-weight: 800;
+}
+
+.hr-sheet tfoot td,
+.hr-sheet tfoot th {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  font-weight: 800;
+  color: var(--text);
+}
+
+.hr-sheet tfoot td.best {
+  color: var(--ok);
+}
+
+.hr-carried {
+  display: block;
+  margin: -4px 0 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.hr-over .verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: 8px;
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.hr-over .verdict.ok {
+  color: var(--ok);
+}
+
+.hr-over .verdict small {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.hr-over .verdict.bad {
+  color: var(--danger);
+}
+
+/* ---------- a wide table: the side seats sit beside the trick ---------- */
+@container (min-width: 620px) {
+  .hr-table.seats-4 .pc-opps,
+  .hr-table.seats-3 .pc-opps {
+    min-height: calc(var(--ow) * 1.4 + 52px);
+  }
+
+  .hr-table .pc-seat.pos-left,
+  .hr-table .pc-seat.pos-right {
+    top: 34%;
+  }
+}
+
+/* ---------- phones ---------- */
+@media (max-width: 600px) {
+  /* Thirteen cards fit a phone's row without scrolling. */
+  .hr-table {
+    --cw: clamp(44px, 12.5cqi, 82px);
+    min-height: 0;
+  }
+
+  .hr-table .pc-seat .pc-fan {
+    max-width: 110px;
+  }
+
+  .hr-tally {
+    padding: 8px 10px 10px;
+  }
+
+  .hr-tally-title {
+    font-size: 1.05rem;
+  }
+
+  .hr-over .verdict small {
+    display: none;
+  }
+
+  .hr-sheet {
+    font-size: 0.8rem;
+  }
+
+  .hr-sheet th,
+  .hr-sheet td {
+    padding: 2px 5px;
+  }
+
+  .hr-sheet th:first-child {
+    width: 3em;
+  }
+
+  .hr-sheet .who .dot {
+    display: none;
+  }
+
+  .hr-sheet-box {
+    max-height: min(26svh, 200px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hr-broken .hr-heart path {
+    transition: none;
+  }
+}

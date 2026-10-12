@@ -116,6 +116,15 @@
       "maxPlayers": 2,
       "description": "Build sets and runs, then knock or go gin. First to 100 wins. Nobody deals, nobody peeks.",
       "credits": [{ "github": "maminrayej" }]
+    },
+    {
+      "slug": "hearts",
+      "name": "Hearts",
+      "status": "ready",
+      "players": "3–4 players",
+      "maxPlayers": 4,
+      "description": "Pass three, duck the queen of spades, or shoot the moon. Lowest score wins. Nobody deals, nobody peeks.",
+      "credits": [{ "github": "maminrayej" }]
     }
   ]
 }

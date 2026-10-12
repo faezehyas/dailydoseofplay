@@ -111,6 +111,9 @@ Ask for a rank, catch a lucky fish, and lay down the most books of four. Hidden 
 Classic two-player gin: draw, discard, build sets and runs, then knock with 10 or less or go gin; lay-offs, undercuts, and a game to 100 with its bonuses. Your hand groups itself into its melds, and you can drag it into any order. No dealer and no peeking, as in the other card games; a knock shows the hand, so every score is checked as it happens. Room settings for one hand a game, Oklahoma knocking, Big Gin, who deals first and a move timer; a robot at three levels; a four-colour deck.
 </td>
 <td width="50%" valign="top">
+<a href="https://www.dailydoseofplay.com/hearts/"><img src="public/hearts/icon.svg" width="320" alt=""></a><br>
+<b><a href="https://www.dailydoseofplay.com/hearts/">Hearts</a></b> · 3–4 players<br>
+Pass three cards, follow suit, duck the queen of spades, or take every heart and shoot the moon; the lowest score at 100 wins. The pass is sealed to its new holder, so nobody else can read it, not even the room creator's browser (short of a tampered one, the card games' one gap), and the audit catches anyone who didn't follow suit or led hearts too soon. Room settings for the game's length, passing, the moon, the jack of diamonds and a move timer; with three players the 2 of diamonds is left out; 2–3 robots at three levels; a four-colour deck.
 </td>
 </tr>
 </table>
@@ -239,7 +242,7 @@ Who made each game, from the `credits` in `public/games.json`
 
 <!-- credits:start -->
 - [@Faezehyas](https://github.com/Faezehyas): Sea Battle, Tic Tac Toe, Connect 4, Gomoku, Chess, Checkers, Backgammon
-- [@maminrayej](https://github.com/maminrayej): Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy
+- [@maminrayej](https://github.com/maminrayej): Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts
 <!-- credits:end -->
 
 ## Credits and license
