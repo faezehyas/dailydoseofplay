@@ -131,7 +131,10 @@ test("two friends play Checkers on the host's settings through the invite link, 
   assert.match(await host.locator("#ck-status").innerText(), /^Your turn\.$/);
   assert.match(await guest.locator("#ck-status").innerText(), /Ada is thinking/);
   assert.ok(await host.locator("#ck-clocks").isVisible());
-  assert.match(await host.locator("#ck-clocks").innerText(), /5:00[\s\S]*\d+ s[\s\S]*5:00/);
+  // Ada's clock has run since the game began, as long as the move clock has; Bo's waits at 5:00.
+  const [ada, move, bo] = (await host.locator("#ck-clocks").innerText()).split("\n");
+  assert.match(`${ada} ${move} ${bo}`, /^[45]:\d\d \d+ s 5:00$/);
+  assert.equal(Number(ada[0]) * 60 + Number(ada.slice(2)) - parseInt(move), 240, "Ada's two clocks count the same time");
 
   // Game 1: the host plays strong moves (the first by keyboard), the friend the
   // first legal move each time, by touch. Once, the friend tries a piece that
@@ -311,8 +314,10 @@ test("Checkers vs the robot on a 360 px phone: a full game by touch, then a rema
   const n = await moveCount(page);
   await page.tap(square(28)); // the last landing square plays the whole jump
   await wait(page, (k) => window.ddp.match.state.moves.length > k, n);
-  assert.deepEqual(await page.evaluate(() => window.ddp.match.state.moves.at(-1)), [56, 42, 28]);
-  await wait(page, (k) => window.ddp.robot.match.state.moves.length > k, n);
+  // The quick robot may have answered already: read the jump by its place.
+  assert.deepEqual(await page.evaluate((k) => window.ddp.match.state.moves[k], n), [56, 42, 28]);
+  // Its answer reaches both boards before they're compared.
+  await wait(page, (k) => [window.ddp.match, window.ddp.robot.match].every((m) => m.state.moves.length === k + 2), n);
   assert.deepEqual(await page.evaluate(() => window.ddp.match.state.board), await page.evaluate(() => window.ddp.robot.match.state.board));
   await page.click("#leave");
   await page.locator("#play-friend").waitFor();
