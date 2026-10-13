@@ -326,6 +326,21 @@ Hearts' `{ 3: "17 cards each" }`. In `onSession`, use `session.players`
 moves to the next seat. `newState(first, players)` receives the player count.
 Don't use `winner: 2` for a draw there, since 2 is a seat.
 
+Friend rooms of such a game mix people and robots (see **Mixed rooms** in
+`ARCHITECTURE.md`): the host fills empty seats with robots, and a robot takes
+over a guest who leaves. What the game must do for that:
+
+- Use `TurnMatch` or `CardMatch`, routed by `matchRouter()`, and route
+  every message other than your own `setup` to it: a takeover arrives as
+  `{ t: "$takeover", seat }` and the router hands it to the match.
+- Start the robot's first match from `session.resume`:
+  `newMatch(session.resume?.m ?? 1, session.resume)` passing `from` to the
+  match. `startTurnRobot()`, `startCardRobot()` and `startPacedRobot()` do.
+- Build `createRobot` from the device's settings (`settings.get()`), as the
+  host's robots use the host's robot level.
+- Say in "How to play" that empty seats can go to robots and what happens
+  when a friend leaves.
+
 The view must provide:
 
 - The player bar from `engine/players.js` (see **Player bar** in `ARCHITECTURE.md`), first in the view: names, whose turn it is, the score and **Leave**. Don't build your own. Pass `badges` (a node per seat: a mark, disc or colour) and `notes` (a short line per seat, such as pips) to `update()` if the game has them, and `classes` to `playerBar()` if seats have colours of their own.

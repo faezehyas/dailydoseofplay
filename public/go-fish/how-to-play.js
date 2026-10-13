@@ -3,7 +3,7 @@ export const howToPlay = {
   goal: "Collect the most **books**: four cards of one rank.",
   players: [
     "Two to four, with a standard 52-card deck.",
-    "To play friends, create a room and send the invite link to up to three of them, then press **Start game**.",
+    "To play friends, create a room and send the invite link to up to three of them, then press **Start game**. Empty seats can go to robots (**Add robot**), at the host's robot level. If a friend leaves mid-game, the hand stops, since every card needs their key, and a robot takes their seat from the next game.",
     "Against robots, pick how many play (**Players**, 2, 3 or 4, above **Play vs robot**) and the robots' level in the settings: Easy, Medium or Hard.",
   ],
   setup: "With two or three players everyone gets 7 cards; with four, 5 each. The rest of the deck is the pond. Books you were dealt go down before the first ask.",
