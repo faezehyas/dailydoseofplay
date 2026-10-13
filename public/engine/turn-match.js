@@ -14,6 +14,8 @@
 //
 // Messages (all carry m = match number): chain {tip}, draw {k, v}, move {move}, abort {reason}.
 // receive(msg, from) takes the sender's seat; only the seat on turn may move.
+// takeover(seat): a robot plays on for a player who left (see "Leaving" in
+// ARCHITECTURE.md); the robot's own match starts from the host's (from).
 import { Emitter } from "./channel.js";
 import { SharedRandom, FairPlayError } from "./fair.js";
 import { matchRouter } from "./session.js";
@@ -28,7 +30,7 @@ const noRandom = () => {
 };
 
 export class TurnMatch extends Emitter {
-  constructor({ send, me, rules, m = 1, players = 2 }) {
+  constructor({ send, me, rules, m = 1, players = 2, from = null }) {
     super();
     this.send = (msg) => send({ ...msg, m });
     this.me = me; // my seat; 0 = host
@@ -39,11 +41,35 @@ export class TurnMatch extends Emitter {
     this.state = null;
     this.tips = []; // chain tips by seat
     this.working = false;
+    if (from) {
+      this.srReady = from.handover(me).then((copy) => {
+        Object.assign(this, copy);
+        return copy.sr;
+      });
+      this.queue = this.srReady.then(() => this.emit("update"));
+      return;
+    }
     this.srReady = SharedRandom.create(rules.draws);
     this.queue = this.srReady.then((sr) => {
       this.sr = sr;
       this.send({ t: "chain", tip: sr.tip });
     });
+  }
+
+  // A robot took over `seat`, whose player left. Their chain left with them,
+  // so the seat adds nothing more to draws; before the first move, with
+  // every chain not yet in, the match stops instead.
+  takeover(seat) {
+    this.srReady.then((sr) => sr.drop(seat));
+    this.#enqueue(() => this.phase === "starting" && this.abort("A player left before the first move."));
+  }
+
+  // On the host: this match as the robot taking over `seat` sees it, once
+  // every message before the takeover is played.
+  handover(seat) {
+    let copy = { phase: "aborted", sr: new SharedRandom(null) };
+    const step = () => (copy = { phase: this.phase, state: structuredClone(this.state), sr: this.sr.forSeat(seat) });
+    return this.#enqueue(step).then(() => copy);
   }
 
   canMove() {
@@ -153,6 +179,7 @@ export class TurnMatch extends Emitter {
 
 // Drive a robot over a session for a TurnMatch game.
 // choose(state, me, rng) returns a legal move.
+// A robot taking a seat over mid-game starts from session.resume.
 export function startTurnRobot(session, { rules, choose, delay = 600, rng = Math.random }) {
   const router = matchRouter(session);
   let match = null;
@@ -165,13 +192,13 @@ export function startTurnRobot(session, { rules, choose, delay = 600, rng = Math
       if (!destroyed && match.canMove()) match.play(choose(match.state, match.me, rng));
     }, robotPause(delay));
   }
-  function newMatch(m) {
-    match = new TurnMatch({ send: (msg) => session.send(msg), me: session.index, players: session.players.length, rules, m });
+  function newMatch(m, from) {
+    match = new TurnMatch({ send: (msg) => session.send(msg), me: session.index, players: session.players.length, rules, m, from });
     match.on("update", schedule);
     router.start(match);
   }
   session.on("rematch-start", () => newMatch(match.m + 1));
-  newMatch(1);
+  newMatch(session.resume?.m ?? 1, session.resume);
   return {
     get match() {
       return match;

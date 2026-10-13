@@ -169,13 +169,13 @@ export function startRobot(session, { rules, choose, delay, rng = Math.random })
       else match.play(choose(match.state, match.me, rng));
     }, robotPause(ms < 0 ? 50 : ms));
   }
-  function newMatch(m) {
-    match = new TurnMatch({ send: (msg) => session.send(msg), me: session.index, players: session.players.length, rules, m });
+  function newMatch(m, from) {
+    match = new TurnMatch({ send: (msg) => session.send(msg), me: session.index, players: session.players.length, rules, m, from });
     match.on("update", schedule);
     router.start(match);
   }
   session.on("rematch-start", () => newMatch(match.m + 1));
-  newMatch(1);
+  newMatch(session.resume?.m ?? 1, session.resume);
   return {
     get match() {
       return match;

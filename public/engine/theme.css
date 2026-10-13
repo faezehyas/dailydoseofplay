@@ -726,6 +726,7 @@ input::placeholder {
 .roster li {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 10px;
   padding: 8px 12px;
   border-radius: 10px;
@@ -750,8 +751,10 @@ input::placeholder {
   color: var(--text);
 }
 
-.knock-actions {
+.knock-actions,
+.seat-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
 }
 

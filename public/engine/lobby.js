@@ -8,7 +8,10 @@
 // shell.leave() goes back to the lobby; while the game says a friend match is
 // on (shell.setInProgress(true)), it asks first. The browser's Back does the same,
 // and closing or reloading the tab gets the browser's own prompt.
-// createRobot(session) drives one robot seat over an in-memory group.
+// createRobot(session) drives one robot seat over an in-memory group. With
+// more than two seats, friend rooms use it too: the host can fill empty seats
+// with robots, and a robot takes over the seat of a guest who leaves
+// (session.resume: the match it joins mid-game).
 // maxPlayers must match the game's entry in games.json (the server enforces it).
 // A game that seats more than two lets the player pick how many sit at a robot
 // game's table, from max(2, minPlayers) to maxPlayers, just above "Play vs
@@ -298,7 +301,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
         {},
         duel
           ? "Send this link to a friend. The game starts as soon as they open it."
-          : `Send this link to up to ${maxPlayers - 1} friends. Start when everyone is in; a full room starts by itself.`,
+          : `Send this link to up to ${maxPlayers - 1} friends, or fill seats with robots. Start when everyone is in; a room full of friends starts by itself.`,
         " Someone who types the code instead has to be let in by you.",
       ),
       // Screen readers get the code from the label, spaced so each letter is
@@ -327,7 +330,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     showRoster(room);
   }
 
-  // Players so far (4-seat games), then anyone with only the code asking to join.
+  // Players so far (4-seat games), robots and empty seats each with a
+  // button to add or remove a robot, then anyone with only the code asking to join.
   function showRoster(room) {
     const list = $("#roster");
     if (!list) return;
@@ -335,11 +339,38 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     const knocks = room.knocking;
     list.hidden = duel && knocks.length === 0;
     setTabAlert(knocks.length ? `${knocks[0].name} wants to join` : null);
-    // Accept and Decline go with their row, so focus moves back to the heading.
+    // Accept and Decline go with their row, so focus moves back to the heading;
+    // after adding or removing a robot it stays on the seats.
     const hadFocus = list.contains(document.activeElement);
+    const onSeat = hadFocus && !!document.activeElement.closest(".robot, .empty");
+    const setRobots = (n, text) => {
+      room.setRobots(n);
+      progress.textContent = text;
+    };
+    const empty = duel ? 0 : maxPlayers - players.length;
     list.replaceChildren(
       ...(duel ? [] : players).map((p, i) =>
-        el("li", { class: p.ready ? "ready" : "" }, el("span", {}, p.name), el("small", {}, i === 0 ? "host" : p.ready ? "in" : "connecting…")),
+        p.robot
+          ? el(
+              "li",
+              { class: "ready robot" },
+              el("span", {}, p.name),
+              el(
+                "span",
+                { class: "seat-actions" },
+                el("small", {}, "robot"),
+                el("button", { class: "btn small", type: "button", "aria-label": `Remove ${p.name}`, onclick: () => setRobots(room.robots - 1, `${p.name} removed`) }, "Remove"),
+              ),
+            )
+          : el("li", { class: p.ready ? "ready" : "" }, el("span", {}, p.name), el("small", {}, i === 0 ? "host" : p.ready ? "in" : "connecting…")),
+      ),
+      ...Array.from({ length: empty }, (_, i) =>
+        el(
+          "li",
+          { class: "empty" },
+          el("span", {}, "Empty seat"),
+          el("button", { class: "btn small", type: "button", id: i === 0 ? "add-robot" : undefined, onclick: () => setRobots(room.robots + 1, "Robot added") }, "Add robot"),
+        ),
       ),
       ...knocks.map(({ id, name }) =>
         el(
@@ -355,12 +386,14 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
         ),
       ),
     );
-    if (hadFocus) focusHeading();
+    if (onSeat) ($("#add-robot") || $("#roster .robot button") || $("h1", lobbyRoot)).focus();
+    else if (hadFocus) focusHeading();
     if (duel) return;
     const ready = players.filter((p) => p.ready).length;
+    const friends = players.filter((p, i) => i > 0 && p.ready && !p.robot).length;
     const start = $("#start-game");
-    start.disabled = ready < minPlayers;
-    start.textContent = ready < minPlayers ? `Start game (needs ${minPlayers} players)` : `Start game (${ready} players)`;
+    start.disabled = ready < minPlayers || friends === 0;
+    start.textContent = ready < minPlayers ? `Start game (needs ${minPlayers} players)` : friends === 0 ? "Start game (needs a friend)" : `Start game (${ready} players)`;
   }
 
   function showBusy(text) {
@@ -420,7 +453,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     const attempt = state.attempt;
     const current = () => attempt === state.attempt;
     showBusy("Creating a room…");
-    const room = new HostRoom({ game: slug, name });
+    const room = new HostRoom({ game: slug, name, maxPlayers });
     state.room = room;
     try {
       await room.open();
@@ -441,10 +474,10 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     let seated = [name]; // who is in, in join order, to say who just joined
     room.on("players", (players) => {
       if (!current()) return;
-      const ready = players.filter((p) => p.ready).length;
-      if (ready >= maxPlayers) return begin(room);
+      const people = players.filter((p) => p.ready && !p.robot);
+      if (people.length >= maxPlayers) return begin(room);
       if (!duel) {
-        const inRoom = players.filter((p) => p.ready).map((p) => p.name);
+        const inRoom = people.map((p) => p.name);
         if (inRoom.length > seated.length) progress.textContent = `${inRoom.find((n, i) => n !== seated[i])} joined`;
         seated = inRoom;
         return showRoster(room);
@@ -468,7 +501,9 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     if (room !== state.room) return;
     state.room = null;
     setTabAlert(null);
-    startSession(room.start());
+    const [session, ...robotSessions] = room.start();
+    robotSessions.forEach(seatRobot);
+    startSession(session);
   }
 
   // key comes only from an invite link; a typed code asks the host to let us in.
@@ -484,7 +519,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     const room = new GuestRoom({ game: slug, code, key, name });
     state.room = room;
     let host = "your friend";
-    room.on("status", ({ step, host: hostName, players }) => {
+    room.on("status", ({ step, host: hostName, players, robots }) => {
       if (!current()) return;
       if (step === "knocking") {
         setStatus("Waiting for the host to let you in…");
@@ -494,7 +529,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
       } else if (duel) {
         setStatus("Connected! Starting the game…");
       } else {
-        const count = players ? [" (", el("span", { class: "mono" }, `${players.length} players in`), ")"] : [];
+        const people = players && (robots ? `${players.length - robots} players and ${robots} ${robots === 1 ? "robot" : "robots"} in` : `${players.length} players in`);
+        const count = players ? [" (", el("span", { class: "mono" }, people), ")"] : [];
         setStatus(`Connected! Waiting for ${host} to start`, ...count, "…");
       }
     });
@@ -517,14 +553,19 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     const count = typeof robots === "function" ? robots() : (robots ?? (choosePlayers ? settings.players() : maxPlayers) - 1);
     const names = [name, ...Array.from({ length: count }, (_, i) => (count === 1 ? "Robot" : `Robot ${i + 1}`))];
     const [session, ...robotSessions] = localRoom({ game: slug, names, mode: "robot" });
-    state.robots = robotSessions.map((robotSession) => {
-      robotSession.on("rematch", (votes) => votes.them && !votes.me && robotSession.requestRematch());
-      const robot = createRobot(robotSession);
-      robotBanter(robotSession, robot, banter);
-      return robot;
-    });
+    robotSessions.forEach(seatRobot);
     state.robot = state.robots[0];
     startSession(session);
+  }
+
+  // A robot plays a seat: in a robot game, or in a friend room on the host.
+  // It votes for a rematch once someone else has, and may join after votes are in.
+  function seatRobot(robotSession) {
+    robotSession.on("rematch", (votes) => votes.them && !votes.me && robotSession.requestRematch());
+    const robot = createRobot(robotSession);
+    robotBanter(robotSession, robot, banter);
+    state.robots.push(robot);
+    if (robotSession.votes.size && !robotSession.votes.has(robotSession.index)) robotSession.requestRematch();
   }
 
   // ---------- tutorial ----------
@@ -582,6 +623,12 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
       leaveGame();
     };
     state.game = onSession(session, gameRoot, { leave: state.leave, setInProgress: (on) => (inProgress = on) });
+    // A guest left a friend room: on the host a robot takes their seat over.
+    session.on("takeover", (seat, why, robot) => {
+      if (robot) seatRobot(robot);
+      const who = session.players[seat].name;
+      toast(why === "left" ? `${who} left, so a robot plays their seat.` : `The connection to ${who} was lost, so a robot plays their seat.`);
+    });
     session.on("end", (reason, seat) => {
       inProgress = false;
       if (reason === "self") return;
@@ -592,7 +639,12 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   }
 
   function confirmLeave(session) {
-    const text = session.players.length === 2 ? `${session.opponent.name} will be told you left.` : "It ends for everyone.";
+    const text =
+      session.takeover && session.index !== 0
+        ? "A robot takes your seat and the game goes on."
+        : session.players.length === 2
+          ? `${session.opponent.name} will be told you left.`
+          : "It ends for everyone.";
     return confirmDialog({ title: "Leave the game?", text, yes: "Leave" });
   }
 

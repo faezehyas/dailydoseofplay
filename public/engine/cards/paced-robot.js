@@ -43,8 +43,8 @@ export function startPacedRobot(session, { rules, choose, delay, key, fallback, 
       match.play(move);
     }, robotPause(waiting ? 40 : ms));
   }
-  function newMatch(m) {
-    match = new CardMatch({ send: (msg) => session.send(msg), me: session.index, players: session.players.length, rules, m });
+  function newMatch(m, from) {
+    match = new CardMatch({ send: (msg) => session.send(msg), me: session.index, players: session.players.length, rules, m, from });
     match.on("update", schedule);
     match.on("invalid", () => {
       refused = keyOf();
@@ -53,7 +53,7 @@ export function startPacedRobot(session, { rules, choose, delay, key, fallback, 
     router.start(match);
   }
   session.on("rematch-start", () => newMatch(match.m + 1));
-  newMatch(1);
+  newMatch(session.resume?.m ?? 1, session.resume);
   return {
     get match() {
       return match;

@@ -10,7 +10,9 @@
 //    H(x(N-k)) equals the previous value. The draw seed is
 //    H(k, seat0Value, seat1Value, ...). Values are fixed by the published
 //    tips, so the last revealer cannot bias the result, and nobody can
-//    predict a draw before every reveal arrives.
+//    predict a draw before every reveal arrives. A seat whose player left
+//    mid-match (a robot plays it on) adds nothing after its last reveal: its
+//    chain left with the player (drop()).
 import { rngFromBytes } from "./rng.js";
 
 const enc = new TextEncoder();
@@ -138,12 +140,14 @@ export class SharedRandom {
   static async create(length = 256) {
     return new SharedRandom(await HashChain.create(length));
   }
+  // chain: null for a robot that took a seat over (forSeat()): it reveals nothing.
   constructor(chain) {
     this.chain = chain;
     this.k = 0;
     this.inbox = new Map(); // "k:seat" -> value
     this.waiters = new Map(); // "k:seat" -> { resolve, reject }
     this.verifiers = null; // seat -> ChainVerifier, mine excluded
+    this.dropped = new Map(); // seat -> its last reveal, for a seat whose player left
     this.failed = null;
   }
   get tip() {
@@ -176,6 +180,34 @@ export class SharedRandom {
   #onlyPeer() {
     return this.verifiers?.size === 1 ? [...this.verifiers.keys()][0] : 1 - this.index;
   }
+  // The player of `seat` left. Every peer calls this at the same point in the
+  // stream, after the same reveals from that seat, so all agree on its last
+  // one; from the next draw on, its value is empty.
+  drop(seat) {
+    const from = (key) => key.split(":").map(Number);
+    let last = this.verifiers?.get(seat)?.k ?? 0;
+    for (const key of this.inbox.keys()) if (from(key)[1] === seat) last = Math.max(last, from(key)[0]);
+    this.dropped.set(seat, last);
+    for (const [key, waiter] of this.waiters) {
+      const [k, s] = from(key);
+      if (s !== seat || k <= last) continue;
+      this.waiters.delete(key);
+      waiter.resolve("");
+    }
+  }
+  // A copy for the robot that takes over dropped `seat`, from where this peer
+  // is: it checks every other seat's reveals, mine included, and reveals none.
+  forSeat(seat) {
+    const copy = new SharedRandom(null);
+    const verifier = (last, k) => Object.assign(new ChainVerifier(last), { k });
+    copy.k = this.k;
+    copy.index = seat;
+    copy.inbox = new Map(this.inbox);
+    copy.dropped = new Map(this.dropped);
+    copy.verifiers = new Map([...this.verifiers].map(([s, v]) => [s, verifier(v.last, v.k)]));
+    copy.verifiers.set(this.index, verifier(this.chain.links[this.chain.length - this.k], this.k));
+    return copy;
+  }
   abort(err) {
     this.failed = err;
     for (const w of this.waiters.values()) w.reject(err);
@@ -183,6 +215,7 @@ export class SharedRandom {
   }
   #wait(k, seat) {
     if (this.failed) return Promise.reject(this.failed);
+    if (k > this.dropped.get(seat)) return Promise.resolve("");
     const key = `${k}:${seat}`;
     if (this.inbox.has(key)) {
       const v = this.inbox.get(key);
@@ -197,11 +230,14 @@ export class SharedRandom {
     if (!this.verifiers) throw new FairPlayError("peer chain not set");
     const k = ++this.k;
     const values = [];
-    values[this.index] = this.chain.reveal(k);
-    send(k, values[this.index]);
+    if (this.chain) {
+      values[this.index] = this.chain.reveal(k);
+      send(k, values[this.index]);
+    }
     const seats = [...this.verifiers.keys()];
     const theirs = await Promise.all(seats.map((seat) => this.#wait(k, seat)));
     for (const [i, seat] of seats.entries()) {
+      if (k > this.dropped.get(seat)) continue;
       await this.verifiers.get(seat).accept(k, theirs[i]);
       values[seat] = theirs[i];
     }

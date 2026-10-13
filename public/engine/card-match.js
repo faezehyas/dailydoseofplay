@@ -26,6 +26,9 @@
 // Messages (all carry m): hello {tip, key, seal}, draw {k, v}, shuffle {k, i, n, d},
 // shares {k, i, n, d}, seal {k, i, n, d}, move {move, sh}, audit {key, seal},
 // abort {reason, about, dispute}, unseal {key}.
+// takeover(seat): a robot takes the seat of a player who left (see "Leaving"
+// in ARCHITECTURE.md). Every card needs that player's key, which left with
+// them, so the match stops and the robot plays from the next one.
 import { Emitter } from "./channel.js";
 import { SharedRandom, FairPlayError } from "./fair.js";
 import { matchRouter } from "./session.js";
@@ -145,7 +148,8 @@ function bytes(v, { exact, max }) {
 }
 
 export class CardMatch extends Emitter {
-  constructor({ send, me, rules, m = 1, players = 2 }) {
+  // from: the match a robot takes over; it sits this one out.
+  constructor({ send, me, rules, m = 1, players = 2, from = null }) {
     super();
     if (!(rules.deckSize >= 1 && rules.deckSize <= MAX_DECK)) throw new Error(`deckSize must be 1 to ${MAX_DECK}`);
     this.send = (msg) => send({ ...msg, m });
@@ -174,7 +178,20 @@ export class CardMatch extends Emitter {
     this.seen = new Set();
     this.srReady = SharedRandom.create(1); // one draw: who starts
     this.queue = Promise.resolve();
-    this.#enqueue(() => this.#setup());
+    if (from) this.phase = "aborted";
+    else this.#enqueue(() => this.#setup());
+  }
+
+  takeover(seat) {
+    if (this.phase === "starting" || this.phase === "playing") {
+      return this.abort("left. Every card needs every player's key, so this game stops here; a robot takes their seat from the next one.", seat);
+    }
+    // Over, but their audit key never came: this game can't be checked.
+    if (this.phase !== "over" || this.verdict || this.seen.has(`audit:${seat}`)) return;
+    this.verdict = { ok: false, reason: "left before the audit finished, so this game couldn't be checked", seat };
+    this.busy = null;
+    this.emit("verified", this.verdict);
+    this.emit("update");
   }
 
   canMove() {
@@ -771,7 +788,8 @@ export class CardMatch extends Emitter {
 }
 
 // Drive a robot over a session for a CardMatch game. choose(state, me, rng,
-// face) returns a legal move; face(slot) is what this seat knows.
+// face) returns a legal move; face(slot) is what this seat knows. A robot
+// taking a seat over mid-game (session.resume) plays from the next match.
 export function startCardRobot(session, { rules, choose, delay = 600, rng = Math.random }) {
   const router = matchRouter(session);
   let match = null;
@@ -784,13 +802,13 @@ export function startCardRobot(session, { rules, choose, delay = 600, rng = Math
       if (!destroyed && match.canMove()) match.play(choose(match.state, match.me, rng, (slot) => match.face(slot)));
     }, robotPause(delay));
   }
-  function newMatch(m) {
-    match = new CardMatch({ send: (msg) => session.send(msg), me: session.index, players: session.players.length, rules, m });
+  function newMatch(m, from) {
+    match = new CardMatch({ send: (msg) => session.send(msg), me: session.index, players: session.players.length, rules, m, from });
     match.on("update", schedule);
     router.start(match);
   }
   session.on("rematch-start", () => newMatch(match.m + 1));
-  newMatch(1);
+  newMatch(session.resume?.m ?? 1, session.resume);
   return {
     get match() {
       return match;
