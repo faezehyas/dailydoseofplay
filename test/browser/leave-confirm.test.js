@@ -143,7 +143,7 @@ test("a finished friend match and a robot game leave at once, by Leave or Back",
   assert.deepEqual(errors, []);
 });
 
-test("with three players, the question says the game ends for everyone", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
+test("with three players, a guest hears a robot takes their seat, and the host that the game ends for everyone", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
   const { open, room, errors } = await setup(t);
   const host = await open("Ada");
   const friends = [await open("Bo"), await open("Cy")];
@@ -153,8 +153,12 @@ test("with three players, the question says the game ends for everyone", { skip:
   for (const p of [host, ...friends]) await wait(p, () => window.ddp.match?.phase === "playing");
 
   await friends[0].click("#leave");
-  assert.equal(await friends[0].locator("dialog#confirm p").innerText(), "It ends for everyone.");
+  assert.equal(await friends[0].locator("dialog#confirm p").innerText(), "A robot takes your seat and the game goes on.");
   await friends[0].click("#confirm-yes");
-  for (const p of [host, friends[1]]) await p.locator("#ended", { hasText: "Bo left the game." }).waitFor({ timeout: 20_000 });
+  for (const p of [host, friends[1]]) await p.locator(".pb-name", { hasText: "Bo (robot)" }).waitFor({ timeout: 20_000 });
+  await host.click("#leave");
+  assert.equal(await host.locator("dialog#confirm p").innerText(), "It ends for everyone.");
+  await host.click("#confirm-yes");
+  await friends[1].locator("#ended", { hasText: "Ada left the game." }).waitFor({ timeout: 20_000 });
   assert.deepEqual(errors, []);
 });

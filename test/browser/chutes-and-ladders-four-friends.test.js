@@ -80,11 +80,13 @@ test("four friends fill a Chutes and Ladders room and play a full game, then a r
   for (const p of pages) await wait(p, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing");
   await playOut();
 
-  // One player leaves: the game ends for the others.
+  // One player leaves: a robot plays on for them. The host leaves: the game ends for the others.
   await friends[1].close();
-  for (const p of [host, friends[0], friends[2]]) {
+  for (const p of [host, friends[0], friends[2]]) await p.locator(".pb-name", { hasText: "Cy (robot)" }).waitFor({ timeout: 20_000 });
+  await host.close();
+  for (const p of [friends[0], friends[2]]) {
     await p.locator("#ended").waitFor({ timeout: 20_000 });
-    assert.match(await p.locator("#ended").innerText(), /Cy (left the game|.*lost)/);
+    assert.match(await p.locator("#ended").innerText(), /Ada (left the game|.*lost)/);
   }
   assert.deepEqual(errors, []);
 });

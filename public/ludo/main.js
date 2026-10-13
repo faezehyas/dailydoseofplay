@@ -608,7 +608,7 @@ function mountGame(session, root, shell) {
             {},
             over
               ? `With ${session.players[seat].name} gone, there's no rematch for this table. Final standings:`
-              : `Ludo needs every player's moves and dice, so the game is over for all ${count} of you. Where everyone stood:`,
+              : `Every move goes through ${session.players[seat].name}'s browser, so the game is over for all ${count} of you. Where everyone stood:`,
           ),
           el(
             "ul",
