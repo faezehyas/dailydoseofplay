@@ -549,6 +549,27 @@ input::placeholder {
   grid-template-columns: 1fr;
 }
 
+/* How many play a robot game (settings.js): a row of its own under the Play buttons. */
+.lobby-actions .players-choice {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.players-choice legend {
+  float: left;
+  margin: 0;
+}
+
+.players-choice .seg-opt span {
+  min-width: 44px;
+  min-height: 44px;
+  justify-items: center;
+}
+
 .lobby-note {
   color: var(--muted);
   font-size: 0.85rem;

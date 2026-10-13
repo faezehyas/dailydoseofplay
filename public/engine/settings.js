@@ -8,8 +8,8 @@ import { el, segGroup } from "./shell.js";
 
 // groups: [{ name, legend, options: [[value, label, hint?], …], scope?, summary? }]
 // scope: "room" (the default) is the game's rules, sent to the other players;
-// "device" only applies to robot games (the robots' level and number; `robot:
-// true` says the same); "view" is this player's own view of the game and
+// "device" only applies to robot games (the robots' level; `robot: true` says
+// the same); "view" is this player's own view of the game and
 // can change during a game, which the game reads with get() when it needs it.
 // summary(value, label, config) is the text of the group's chip in the
 // summary (default: the label; "" leaves it out).
@@ -17,8 +17,11 @@ import { el, segGroup } from "./shell.js";
 // robot(config, picked), optional, is the config for a robot game, given the
 // names of the groups the player picked an option in: a game whose clocks are
 // on by default turns off the ones not picked.
-export function gameSettings({ key, prefix, groups, normalize, hint, robot }) {
-  let { config, picked } = load();
+// playerNotes, optional, are hints for some of the lobby's player counts
+// ({ 3: "17 cards each" }; see offerPlayers()).
+export function gameSettings({ key, prefix, groups, normalize, hint, robot, playerNotes = {} }) {
+  let { config, picked, players } = load();
+  let counts = []; // the player counts the lobby offers for a robot game
   let locked = false;
   let mode = "friend"; // the game that's on while locked
   const shown = new Map(); // what is on screen (summaries, options) → how to bring it up to date
@@ -33,11 +36,11 @@ export function gameSettings({ key, prefix, groups, normalize, hint, robot }) {
     const config = normalize(raw);
     const defaults = normalize(null);
     const picked = Array.isArray(raw?.picked) ? raw.picked : groups.map((g) => g.name).filter((name) => config[name] !== defaults[name]);
-    return { config, picked: new Set(picked) };
+    return { config, picked: new Set(picked), players: savedPlayers(raw) };
   }
   function save() {
     try {
-      localStorage.setItem(key, JSON.stringify({ ...config, picked: [...picked] }));
+      localStorage.setItem(key, JSON.stringify({ ...config, picked: [...picked], players }));
     } catch {}
   }
   function pick(name) {
@@ -66,6 +69,7 @@ export function gameSettings({ key, prefix, groups, normalize, hint, robot }) {
         const label = g.options.find(([value]) => value === config[g.name])?.[1] ?? "";
         return { text: g.summary ? g.summary(config[g.name], label, config) : label, robot: scopeOf(g) === "device" };
       })
+      .concat(withRobot && counts.length ? [{ text: `${seats()} players`, robot: true }] : [])
       .filter((p) => p.text);
     return parts.flatMap(({ text, robot }, i) => [i ? el("span", { class: "sr-only" }, ", ") : "", el("span", { class: robot ? "chip robot" : "chip" }, text)]);
   }
@@ -109,6 +113,20 @@ export function gameSettings({ key, prefix, groups, normalize, hint, robot }) {
     details.addEventListener("toggle", () => (change.textContent = details.open ? "Done" : "Change"));
     return details;
   }
+  // A robot game's player count, for a game that seats more than two: the
+  // lobby offers `counts` once (offerPlayers()), shows playersForm() by its
+  // "Play vs robot" button and starts with players() seats. The summary
+  // mentions it; the default is a full table.
+  function offerPlayers(list) {
+    counts = list;
+  }
+  const seats = () => (counts.includes(players) ? players : counts.at(-1));
+  function playersForm() {
+    const options = counts.map((n) => [n, String(n), playerNotes[n]]);
+    const fieldset = segGroup({ name: `${prefix}-players`, legend: "Players", options, value: seats(), onChange: (n) => ((players = n), save(), refresh()) });
+    fieldset.classList.add("players-choice");
+    return fieldset;
+  }
   // lock(true, mode) while a game is on; the lobby calls it.
   function lock(on, gameMode = "friend") {
     locked = on;
@@ -116,5 +134,12 @@ export function gameSettings({ key, prefix, groups, normalize, hint, robot }) {
     refresh();
   }
   // get("robot") is the config for a robot game.
-  return { get: (gameMode) => ({ ...current(gameMode) }), summary, panel, form, lock };
+  return { get: (gameMode) => ({ ...current(gameMode) }), summary, panel, form, lock, offerPlayers, players: seats, playersForm };
+}
+
+// The player count saved with a game's settings, if any. Settings saved
+// before the lobby offered it kept the number of robots instead.
+export function savedPlayers(raw) {
+  if (Number.isInteger(raw?.players)) return raw.players;
+  if (Number.isInteger(raw?.robots)) return raw.robots + 1;
 }

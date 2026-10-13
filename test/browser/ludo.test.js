@@ -31,14 +31,14 @@ test("two friends play Ludo on the host's house rules through the invite link, t
   // Host (laptop, light) turns on blocks and the capture bonus, and starts.
   const host = await open("host", "Ada", { colorScheme: "light" });
   await host.goto(`${srv.base}/ludo/`);
-  for (const [name, value] of [["threeSixes", "true"], ["blocks", "false"], ["captureBonus", "false"], ["places", "true"], ["moveSeconds", "0"], ["level", "easy"], ["robots", "3"]]) {
+  for (const [name, value] of [["threeSixes", "true"], ["blocks", "false"], ["captureBonus", "false"], ["places", "true"], ["moveSeconds", "0"], ["level", "easy"]]) {
     assert.equal(await host.locator(`#ld-settings input[name="ld-${name}"]:checked`).getAttribute("value"), value, `classic default for ${name}`);
   }
   await pick(host, "blocks", true);
   await pick(host, "captureBonus", true);
   await pick(host, "first", "host");
-  assert.equal(await host.locator("#ld-settings legend .robot-only").count(), 2, "robot level and count are marked as robot-only");
-  assert.deepEqual(await host.locator("#ld-settings .settings-line .chip.robot").allInnerTexts(), ["Easy robot", "3 robots"], "robot-only choices are marked in the summary");
+  assert.equal(await host.locator("#ld-settings legend .robot-only").count(), 1, "the robot level is marked as robot-only");
+  assert.deepEqual(await host.locator("#ld-settings .settings-line .chip.robot").allInnerTexts(), ["Easy robot", "4 players"], "robot-only choices are marked in the summary");
   await host.click("#play-friend");
   await host.locator("#room-code").waitFor();
   assert.deepEqual(

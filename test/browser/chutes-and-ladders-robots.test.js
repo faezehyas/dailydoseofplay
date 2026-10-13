@@ -29,6 +29,7 @@ test("Chutes and Ladders vs the robot on a 360 px phone: spinner, hops, sounds, 
   await page.click('.game-card[data-slug="chutes-and-ladders"]');
   await page.fill("#nickname", "Cleopatra Philopator"); // 20 characters, the longest allowed
   await pick(page, "first", "host");
+  await page.click('label:has(input[name="cl-players"][value="2"])');
   assert.ok(await noHorizontalScroll(page), "settings fit at 360 px");
   await page.screenshot({ path: `${ARTIFACTS}/cl-3-settings-mobile-light.png`, fullPage: true });
   await page.click("#play-robot");
@@ -104,7 +105,7 @@ test("Chutes and Ladders against three robots", { skip: !pw && "Playwright not i
   page.on("pageerror", (e) => errors.push(e.message));
   await page.addInitScript(() => (globalThis.ddpRobotPace = 0.1));
   await page.goto(`${srv.base}/chutes-and-ladders/`);
-  await pick(page, "robots", 3);
+  await page.click('label:has(input[name="cl-players"][value="4"])');
   await page.click("#play-robot");
   await wait(page, () => window.ddp.match?.phase === "playing");
   assert.match(await page.locator(".pb-players").innerText(), /Robot 1[\s\S]*Robot 2[\s\S]*Robot 3/);

@@ -16,8 +16,7 @@ export const BOOKS = [4, 2];
 export const FIRST = ["random", "host", "guest"];
 export const MOVE_SECONDS = [0, 15, 30, 60];
 export const LEVELS = ["easy", "medium", "hard"];
-export const ROBOTS = [1, 2, 3];
-// level, robots and fourColor are per device; the rules ignore them.
+// level and fourColor are per device; the rules ignore them.
 export const DEFAULT_CONFIG = {
   hand: "classic",
   lucky: "again",
@@ -26,7 +25,6 @@ export const DEFAULT_CONFIG = {
   first: "random",
   moveSeconds: 0,
   level: "easy",
-  robots: 3,
   fourColor: false,
 };
 
@@ -41,7 +39,6 @@ export function normalizeConfig(raw) {
     first: pick(c.first, FIRST, DEFAULT_CONFIG.first),
     moveSeconds: pick(c.moveSeconds, MOVE_SECONDS, DEFAULT_CONFIG.moveSeconds),
     level: pick(c.level, LEVELS, DEFAULT_CONFIG.level),
-    robots: pick(c.robots, ROBOTS, DEFAULT_CONFIG.robots),
     fourColor: pick(c.fourColor, [true, false], DEFAULT_CONFIG.fourColor),
   };
 }

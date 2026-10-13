@@ -237,12 +237,11 @@ test("illegal moves throw RuleError", () => {
 
 test("config: unknown values fall back to the classic defaults, and the room picks who rolls first", () => {
   assert.deepEqual(normalizeConfig(null), DEFAULT_CONFIG);
-  assert.deepEqual(DEFAULT_CONFIG, { threeSixes: true, blocks: false, captureBonus: false, places: true, first: "random", moveSeconds: 0, level: "easy", robots: 3 });
-  const c = normalizeConfig({ blocks: "yes", moveSeconds: 17, level: "insane", robots: 9, first: "host", captureBonus: true });
+  assert.deepEqual(DEFAULT_CONFIG, { threeSixes: true, blocks: false, captureBonus: false, places: true, first: "random", moveSeconds: 0, level: "easy" });
+  const c = normalizeConfig({ blocks: "yes", moveSeconds: 17, level: "insane", first: "host", captureBonus: true });
   assert.equal(c.blocks, false);
   assert.equal(c.moveSeconds, 0);
   assert.equal(c.level, "easy");
-  assert.equal(c.robots, 3);
   assert.equal(c.captureBonus, true);
   assert.equal(makeRules({ first: "host" }).newState(1, 4).turn, 0);
   assert.equal(makeRules({ first: "guest" }).newState(0, 4).turn, 1);

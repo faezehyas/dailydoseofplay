@@ -4,7 +4,7 @@ export const howToPlay = {
   players: [
     "Two to four, each with a pawn.",
     "To play friends, create a room and send the invite link to up to three of them. Press **Start game** when everyone is in; a full room of four starts by itself.",
-    "Against the robot, pick 1, 2 or 3 robots in the settings.",
+    "Against robots, pick how many play (**Players**, 2, 3 or 4, by **Play vs robot**).",
   ],
   setup: "Every pawn starts on the lawn below square 1. The track runs along the rows: left to right, up a row, right to left, and so on up to 100 at the top left.",
   turn: [
@@ -18,7 +18,6 @@ export const howToPlay = {
     "Spin a 6: your turn ends, or you spin again.",
     "First spin: a coin toss, you, or the next player.",
     "Your spinner: tap to spin, or pick **Spins by itself** to sit back and watch. Each player picks their own.",
-    "Play vs robot: 1, 2 or 3 robots.",
     "With friends, the settings of whoever creates the room apply to everyone, except the spinner.",
   ],
   fairPlay: "Every spin is drawn by all the players' browsers together, so nobody can choose or predict it, and every browser checks every move with the same rules.",

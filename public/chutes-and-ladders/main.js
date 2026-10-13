@@ -41,7 +41,6 @@ startGameShell({
   settings,
   minPlayers: 2,
   maxPlayers: MAX_PLAYERS,
-  robots: () => settings.get().robots,
   createRobot: (session) => startTurnRobot(session, { rules: makeRules(settings.get()), choose: chooseMove, delay: ROBOT_DELAY }),
   // A ladder usually gains you 10 squares or more; a spin alone at most 6.
   banter: { score: (st, p) => st.pos[p], strong: 10, lines: { strongMove: ["What a ladder!"], lead: ["Up I go!"] } },
