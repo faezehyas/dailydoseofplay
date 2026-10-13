@@ -138,6 +138,7 @@ flowchart TB
     e_cards_paced_robot["cards/paced-robot.js"]
     e_cards_leave_notice["cards/leave-notice.js"]
     e_cards_card_sounds["cards/card-sounds.js"]
+    e_cards_lesson_deck["cards/lesson-deck.js"]
     e_cards_css["cards/cards.css<br>linked by card games"]
   end
   subgraph server ["Server: server/"]
@@ -178,8 +179,12 @@ flowchart TB
   p_main --> g_tutorial
   g_art --> e_shell
   g_art --> g_rules
+  g_art --> e_cards_art
+  g_art --> e_cards_faces
+  g_art --> e_cards_table
   g_lessons --> g_art
   g_lessons --> g_rules
+  g_lessons --> e_cards_lesson_deck
   g_tutorial --> e_shell
   g_tutorial --> e_turn_match
   g_tutorial --> g_art
@@ -189,6 +194,9 @@ flowchart TB
   g_tutorial --> g_pick
   g_tutorial --> g_board_view
   g_tutorial --> g_sounds
+  g_tutorial --> e_cards_faces
+  g_tutorial --> e_cards_lesson_deck
+  g_tutorial --> e_cards_table
   g_art --> g_sounds
   g_motion --> e_shell
   g_motion --> g_art
@@ -232,6 +240,8 @@ flowchart TB
   e_cards_card_sounds --> e_synth
   e_cards_melds --> e_cards_faces
   e_cards_leave_notice --> e_shell
+  e_cards_lesson_deck --> e_cards_faces
+  e_cards_lesson_deck --> e_turn_match
   e_cards_paced_robot --> e_card_match
   e_cards_paced_robot --> e_robot_pace
   e_cards_paced_robot --> e_session
