@@ -443,7 +443,11 @@ export function board() {
 
 A dice game fixes a step's roll with a field of its own on the step: `play`
 gets the step as its third argument and can hand `applyMove` an `rng` that
-rolls it. Pass `tutorial: () => import("./tutorial.js")` to
+rolls it (Chutes and Ladders' `spin`). When the dice come before a choice,
+put the roll in the position instead and roll it in `load`, so the board
+shows the dice before the move (Backgammon, Ludo). The engine lights a cell
+with a box shadow; on a board drawn in SVG, make `cell(c)` return a shape of
+your own with the class `tut-ring` (Ludo, Chutes and Ladders). Pass `tutorial: () => import("./tutorial.js")` to
 `startGameShell()`, so the page loads it only when someone opens it. Test it
 with `lessons.test.js` (step 7).
 

@@ -38,6 +38,7 @@ startGameShell({
   slug: "ludo",
   title: "Ludo",
   howToPlay,
+  tutorial: () => import("./tutorial.js"),
   layout: "wide",
   settings,
   minPlayers: 2,

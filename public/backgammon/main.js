@@ -11,6 +11,7 @@ import { makeRules, normalizeConfig, isTimed, timeLeft, legalSteps, legalPlays, 
 import { chooseMove, inContact, startRobot } from "./robot.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
+import { STACK, dieFace, checkerStack, trayStack, boardCells, arrowTarget } from "./art.js";
 import { howToPlay } from "./how-to-play.js";
 
 const ROBOT_DELAY = 800;
@@ -25,12 +26,7 @@ const MY_PACE = 0.7; // your own checkers fly faster than the replayed ones
 const AUTO_DELAY = 450; // between the steps the game plays for you in a race
 const FORCED_DELAY = 550; // before a move you have no choice about is played for you
 const CLAIM_GRACE_MS = 5000; // past the opponent's limit before we stop waiting for their forfeit
-const STACK = 5; // checkers drawn on a point; a taller stack shows its count
 const LEVEL_NAME = { easy: "Easy", medium: "Medium", hard: "Hard" };
-// The board from your side: your home board is bottom right, and you move
-// from 24 at the top right, along the top, down and along the bottom to 1.
-const TOP = [13, 14, 15, 16, 17, 18, "bar-top", 19, 20, 21, 22, 23, 24, "off-top"];
-const BOTTOM = [12, 11, 10, 9, 8, 7, BAR, 6, 5, 4, 3, 2, 1, OFF];
 
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -48,6 +44,7 @@ startGameShell({
   slug: "backgammon",
   title: "Backgammon",
   howToPlay,
+  tutorial: () => import("./tutorial.js"),
   layout: "medium",
   settings,
   createRobot: (session) => {
@@ -72,11 +69,6 @@ function describeConfig(c, robot) {
 }
 
 const rollText = (roll) => (roll[0] === roll[1] ? `double ${roll[0]}s` : `${roll[0]} and ${roll[1]}`);
-
-function dieFace(value, cls) {
-  const spots = { 1: [5], 2: [3, 7], 3: [3, 5, 7], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] }[value];
-  return el("span", { class: `die ${cls}`, role: "img", "aria-label": `${value}${cls.includes("used") ? ", played" : ""}` }, spots.map((s) => el("i", { style: `grid-area: s${s}` })));
-}
 
 function mountBackgammon(session, root, shell) {
   const me = session.index;
@@ -146,19 +138,7 @@ function mountBackgammon(session, root, shell) {
     onShow: ({ winner, outcome }) => outcome && celebrate({ outcome, flavour: "wood", highlight: match.state.reason === "off" ? [...cells.get(winner === me ? OFF : "off-top").querySelectorAll(".slab")].slice(-1) : [], board }),
   });
 
-  // Every cell of the board, keyed by your point number (BAR, OFF) or "bar-top"/"off-top" for the opponent's.
-  const cells = new Map();
-  for (const [row, keys] of [TOP, BOTTOM].entries()) {
-    for (const [col, key] of keys.entries()) {
-      const kind = key === BAR || key === "bar-top" ? "bar" : key === OFF || key === "off-top" ? "tray" : "point";
-      const mine = typeof key === "number";
-      const attrs = { class: `bg-cell ${kind} ${row ? "bottom" : "top"}`, style: `grid-area: ${row ? 3 : 1} / ${col + 1}` };
-      if (kind === "point") attrs.class += ` ${key % 2 ? "odd" : "even"}`;
-      const cell = mine ? el("button", { ...attrs, type: "button", dataset: { n: key, row, col } }) : el("div", { ...attrs, "aria-hidden": "true" });
-      cells.set(key, cell);
-      board.append(cell);
-    }
-  }
+  const cells = boardCells(board);
 
   root.append(
     el(
@@ -347,18 +327,10 @@ function mountBackgammon(session, root, shell) {
       selected = null;
       return render();
     }
-    const step = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] }[e.key];
-    if (!step) return;
+    const next = arrowTarget(cells, cell, e.key);
+    if (next === undefined) return;
     e.preventDefault();
-    let row = Number(cell.dataset.row);
-    let col = Number(cell.dataset.col);
-    for (let k = 0; k < 14; k++) {
-      if (step[0]) row = 1 - row;
-      else col = (col + step[1] + 14) % 14;
-      const next = cells.get((row ? BOTTOM : TOP)[col]);
-      if (next?.tagName === "BUTTON") return next.focus();
-      if (step[0]) return;
-    }
+    next?.focus();
   });
 
   // ---------- racing home: the game can move for you ----------
@@ -605,13 +577,6 @@ function mountBackgammon(session, root, shell) {
     return match?.state?.pos;
   }
 
-  function checkerStack(count, whose, cls = "") {
-    const out = [];
-    for (let i = 0; i < Math.min(count, STACK); i++) out.push(el("span", { class: `checker ${whose} ${cls}` }));
-    if (count > STACK) out[STACK - 1].append(el("b", {}, String(count)));
-    return out;
-  }
-
   function renderBoard(pos) {
     const legal = auto ? [] : steps();
     const sources = new Set(legal.map((s) => s.from));
@@ -672,13 +637,6 @@ function mountBackgammon(session, root, shell) {
       }
     }
     board.classList.toggle("armed", sources.size > 0);
-  }
-
-  function trayStack(count, whose) {
-    const out = [];
-    for (let i = 0; i < count; i++) out.push(el("span", { class: `slab ${whose}` }));
-    if (count) out.push(el("b", { class: "tray-count" }, String(count)));
-    return out;
   }
 
   function renderDice() {
