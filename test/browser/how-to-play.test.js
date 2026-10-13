@@ -1,7 +1,7 @@
 // Headless-browser test: every ready game's "How to play" uses the same
 // sections in the same order (a game may leave some out), and the lobby's
-// "How to play" link opens the panel and moves focus to it. The panel ends
-// with "Made by" from the game's credits. Skips if Playwright is missing.
+// "How to play" link opens the panel and moves focus to it. The panel shows
+// no "Made by" line. Skips if Playwright is missing.
 //
 //   npm run test:browser
 import test from "node:test";
@@ -29,10 +29,9 @@ test("every game's How to play has the same sections, and the lobby link opens i
     const order = headings.map((h) => SECTIONS.indexOf(h));
     assert.ok(order.every((i, k) => i >= 0 && (k === 0 || i > order[k - 1])), `${game.name}: ${headings.join(", ")}`);
     assert.ok(headings.includes("Goal") && headings.includes("Winning"), `${game.name}: has a Goal and a Winning section`);
-    const madeBy = page.locator("details.rules > .made-by:last-child");
-    await madeBy.waitFor({ state: "attached" });
-    assert.equal(await madeBy.textContent(), `Made by ${game.credits.map((c) => `@${c.github}`).join(", ")}`, `${game.name}: credits`);
-    assert.equal(await madeBy.locator("a").first().getAttribute("href"), `https://github.com/${game.credits[0].github}`, `${game.name}: links the profile`);
+    // Wait for games.json, which has the credits, to fill in the description.
+    await page.locator(".lobby-card .tagline:not([hidden])").waitFor();
+    assert.ok(!(await page.locator("details.rules").textContent()).includes("Made by"), `${game.name}: no "Made by" line`);
 
     const panel = page.locator("details.rules");
     assert.equal(await panel.evaluate((d) => d.open), false, `${game.name}: closed on load`);

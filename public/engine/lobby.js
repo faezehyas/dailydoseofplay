@@ -24,8 +24,7 @@
 // them inside the lobby card and the host's waiting screen their summary; the
 // settings panel shows them again in its "This game" tab, locked during a game.
 // howToPlay is the game's "How to play" text (how-to-play.js), shown under the
-// game and linked from the lobby card. It ends with "Made by" from the game's
-// credits in games.json.
+// game and linked from the lobby card.
 // tutorial loads the game's tutorial.js (() => import("./tutorial.js")): a
 // Learn button in the lobby, a link at the top of "How to play" and
 // /<slug>/?learn open it (see tutorial.js).
@@ -34,7 +33,7 @@
 import { initShell, el, $, toast, copyText, getNickname, setNickname, nicknameField, setTabAlert, askBeforeLeaving } from "./shell.js";
 import { confirmDialog } from "./confirm.js";
 import { HostRoom, GuestRoom, RoomError, localRoom } from "./room.js";
-import { howToPlayPanel, madeBy } from "./how-to-play.js";
+import { howToPlayPanel } from "./how-to-play.js";
 import { robotBanter, setGameLines } from "./reactions.js";
 import { robotRecord, resetRobotRecord } from "./robot-record.js";
 
@@ -78,8 +77,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   const learnLink =
     tutorial &&
     el("p", { class: "learn-link" }, el("a", { href: "?learn", id: "learn-link", onclick: (e) => (e.preventDefault(), learn()) }, "Learn by playing: a short interactive tutorial"));
-  const rules = howToPlay && howToPlayPanel(howToPlay, learnLink);
-  if (rules) gameRoot.after(rules);
+  if (howToPlay) gameRoot.after(howToPlayPanel(howToPlay, learnLink));
   setGameLines(banter.lines);
   // The lobby, game and "How to play" share one column (theme.css).
   const page = lobbyRoot.closest(".page");
@@ -105,20 +103,17 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   lobbyRoot.append(progress);
   let firstView = true;
 
-  // The lobby shows at once; the description and the credits under "How to
-  // play" fill in when games.json arrives.
+  // The lobby shows at once; the description fills in when games.json arrives.
   const taglineEl = el("p", { class: "tagline", hidden: !tagline }, tagline);
-  fetch("/games.json", { cache: "no-cache" })
-    .then((res) => res.json())
-    .then(({ games }) => {
-      const game = games.find((g) => g.slug === slug);
-      if (!tagline) {
-        taglineEl.textContent = game?.description ?? "";
+  if (!tagline) {
+    fetch("/games.json", { cache: "no-cache" })
+      .then((res) => res.json())
+      .then(({ games }) => {
+        taglineEl.textContent = games.find((g) => g.slug === slug)?.description ?? "";
         taglineEl.hidden = !taglineEl.textContent;
-      }
-      if (rules && game?.credits) rules.append(madeBy(game.credits));
-    })
-    .catch(() => {});
+      })
+      .catch(() => {});
+  }
 
   // A new view takes focus to its heading, except on page load. The first
   // replaces the page's loading placeholder (index.html).
