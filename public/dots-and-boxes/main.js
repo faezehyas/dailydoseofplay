@@ -1,8 +1,8 @@
 // Dots and Boxes page: mounts the engine shell and renders a TurnMatch.
-// The rules live in rules.js and the paper and pencil in art.js; this file
-// is the input, the motion and the sounds. The match state never waits for
-// the screen: every line is queued and played out in order, the opponent's
-// at a pace you can follow.
+// The rules live in rules.js, the paper and pencil in art.js and their
+// motion in motion.js; this file is the input, the pacing and the sounds.
+// The match state never waits for the screen: every line is queued and
+// played out in order, the opponent's at a pace you can follow.
 import { startGameShell } from "../engine/lobby.js";
 import { matchRouter } from "../engine/session.js";
 import { TurnMatch } from "../engine/turn-match.js";
@@ -15,13 +15,11 @@ import { startRobot } from "./robot.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
 import { howToPlay } from "./how-to-play.js";
-import { U, s, r1, wobble, stroke, buildBoard, stepCursor, lineName, lineArt, boxArt } from "./art.js";
+import { U, stroke, buildBoard, stepCursor, lineName, lineArt, boxArt } from "./art.js";
+import { PACE, motion } from "./motion.js";
 
 const CLAIM_GRACE_MS = 5000; // past the opponent's limit before we stop waiting for their forfeit
 const REPLAY_LINE_MAX = 1300; // the longest the other browser takes to replay one of your lines
-// Milliseconds: your stroke, theirs, the pause before their first line and
-// between their lines, a box's pop, and between two boxes closed at once.
-const PACE = { mine: 170, theirs: 330, first: 300, gap: 200, after: 240, pop: 420, stagger: 110 };
 const LEVEL_NAME = { easy: "Easy", medium: "Medium", hard: "Hard" };
 
 // Read live, so a browser test can switch it mid-game.
@@ -41,10 +39,6 @@ startGameShell({
   banter: { score: (st, p) => st.score[p], strong: 2, lines: { strongMove: ["What a chain!"], lead: ["Mine now!"] } },
   onSession: (session, root, shell) => mountGame(session, root, shell),
 });
-
-const clamp01 = (t) => Math.min(1, Math.max(0, t));
-const easeOut = (t) => 1 - (1 - t) ** 3;
-const easeBack = (t) => 1 + 2.7 * (t - 1) ** 3 + 1.7 * (t - 1) ** 2;
 
 const clockText = (ms) => {
   const sec = Math.max(0, Math.ceil(ms / 1000));
@@ -73,6 +67,7 @@ function mountGame(session, root, shell) {
   let rules = null;
   let geo = null;
   let board = null;
+  let anim = null; // the board's motion (motion.js)
   let match = null;
   let m = 0;
   let gen = 0; // bumps on every new match, so the old match's animations stop
@@ -147,36 +142,6 @@ function mountGame(session, root, shell) {
   // ---------- motion helpers ----------
   const live = (g) => g === gen && !destroyed;
   const fast = () => still() || document.hidden;
-  const wait = (ms, g) => new Promise((r) => (fast() || !live(g) ? r() : setTimeout(r, ms)));
-
-  function tween(ms, step, g) {
-    return new Promise((resolve) => {
-      if (fast() || !live(g)) {
-        step(1);
-        return resolve();
-      }
-      const t0 = performance.now();
-      let done = false;
-      const finish = () => {
-        if (done) return;
-        done = true;
-        if (live(g)) step(1);
-        resolve();
-      };
-      const frame = (now) => {
-        if (done) return;
-        if (!live(g)) return finish();
-        // A frame's timestamp can be a little before t0.
-        const t = clamp01((now - t0) / ms);
-        step(t);
-        if (t < 1) requestAnimationFrame(frame);
-        else finish();
-      };
-      requestAnimationFrame(frame);
-      // Frames stop in a hidden tab; the queue must not.
-      setTimeout(finish, ms + 150);
-    });
-  }
 
   // ---------- drawing ----------
   function lineNode(l, player) {
@@ -186,84 +151,10 @@ function mountGame(session, root, shell) {
     return g;
   }
 
-  // The pencil draws the line from one dot to the other, a graphite tip leading.
-  async function penStroke(l, player, ms, g) {
-    const node = lineNode(l, player);
-    const paths = node.querySelectorAll("path");
-    const { at } = stroke(config.size, l);
-    const tip = fast() ? null : s("circle", { class: `tip ${cls(player)}`, r: 6.5 });
-    if (tip) board.fx.append(tip);
-    const set = (t) => {
-      for (const p of paths) p.style.strokeDashoffset = String(1 - t);
-      if (tip) {
-        const p = at(t);
-        tip.setAttribute("cx", r1(p.x));
-        tip.setAttribute("cy", r1(p.y));
-      }
-    };
-    set(0);
-    await tween(ms, (t) => set(easeOut(t)), g);
-    tip?.remove();
-    for (const p of paths) p.style.strokeDashoffset = "";
-  }
-
   function boxNode(b, player) {
     const box = boxArt(config.size, b, cls(player), initials[player]);
     board.boxes.append(box.node);
     return box;
-  }
-
-  // A claimed box pops in: the tint springs out, the hatch scribbles itself
-  // in, the initial lands, and a few flecks fly off.
-  function popBox(b, player, g) {
-    const { inner, cx, cy } = boxNode(b, player);
-    if (fast() || !live(g)) return;
-    const hatchPath = inner.querySelector(".hatch");
-    const letter = inner.querySelector(".initial");
-    const ring = s("circle", { class: `ring ${cls(player)}`, cx, cy, r: 20 });
-    board.fx.append(ring);
-    const flecks = [];
-    for (let i = 0; i < 7; i++) {
-      const node = s("circle", { class: `fleck ${cls(player)}`, r: 2.5 + (i % 3), style: "opacity: 0" });
-      board.fx.append(node);
-      flecks.push({ node, angle: (i / 7) * Math.PI * 2 + Math.random() * 0.5, dist: 46 + Math.random() * 22 });
-    }
-    tween(PACE.pop, (t) => {
-      inner.setAttribute("transform", `scale(${(0.25 + 0.75 * easeBack(t)).toFixed(3)})`);
-      hatchPath.style.strokeDashoffset = String(1 - clamp01(t * 1.6));
-      const lt = clamp01((t - 0.25) / 0.75);
-      letter.style.opacity = String(lt > 0 ? 1 : 0);
-      letter.setAttribute("transform", `rotate(${r1(wobble(b, 11) * 6)}) scale(${(0.4 + 0.6 * easeBack(lt)).toFixed(3)})`);
-      ring.setAttribute("r", r1(20 + 46 * easeOut(t)));
-      ring.style.opacity = String(0.6 * (1 - t));
-      for (const f of flecks) {
-        // From the ring's edge outwards, fading in, then out as they fall.
-        const d = 22 + f.dist * easeOut(t);
-        f.node.setAttribute("cx", r1(cx + Math.cos(f.angle) * d));
-        f.node.setAttribute("cy", r1(cy + Math.sin(f.angle) * d + 18 * t * t));
-        f.node.style.opacity = String(t < 0.1 ? t / 0.1 : t < 0.5 ? 1 : 1 - (t - 0.5) / 0.5);
-      }
-    }, g).then(() => {
-      ring.remove();
-      for (const f of flecks) f.node.remove();
-      inner.removeAttribute("transform");
-      hatchPath.style.strokeDashoffset = "";
-      letter.style.opacity = "";
-      letter.setAttribute("transform", `rotate(${r1(wobble(b, 11) * 6)})`);
-    });
-  }
-
-  // A wave through boxes taken together: each one swells in turn.
-  function ripple(boxes, g, gap = 70) {
-    if (fast() || !live(g)) return;
-    boxes.forEach((b, i) => {
-      const inner = board.boxes.querySelector(`[data-box="${b}"] .box-in`);
-      if (!inner) return;
-      setTimeout(() => {
-        if (!live(g)) return;
-        tween(300, (t) => inner.setAttribute("transform", `scale(${(1 + 0.13 * Math.sin(Math.PI * t)).toFixed(3)})`), g).then(() => inner.removeAttribute("transform"));
-      }, i * gap);
-    });
   }
 
   // ---------- the queue ----------
@@ -274,7 +165,7 @@ function mountGame(session, root, shell) {
     if (theirs) {
       current = { player: ev.player };
       render();
-      await wait((lastShown === ev.player ? PACE.gap : PACE.first) * pace, g);
+      await anim.wait((lastShown === ev.player ? PACE.gap : PACE.first) * pace, g);
       if (!live(g)) return;
     }
     shownLines[ev.line] = ev.player;
@@ -283,28 +174,28 @@ function mountGame(session, root, shell) {
     render();
     const ms = (theirs ? PACE.theirs : PACE.mine) * pace;
     play("line", { dur: ms / 1000, mine: !theirs });
-    await penStroke(ev.line, ev.player, ms, g);
+    await anim.penStroke(lineNode(ev.line, ev.player), ev.line, cls(ev.player), ms, g);
     if (!live(g)) return;
     lastShown = ev.player;
     for (const [i, b] of ev.boxes.entries()) {
-      if (i) await wait(PACE.stagger * pace, g);
+      if (i) await anim.wait(PACE.stagger * pace, g);
       if (!live(g)) return;
       shownBoxes[b] = ev.player;
       play("box", { k: run.boxes.length, mine: !theirs });
       run.boxes.push(b);
-      popBox(b, ev.player, g);
+      anim.popBox(boxNode(b, ev.player), b, cls(ev.player), g);
       render();
     }
     if (!ev.again) {
       // The turn is over: a long run gets a wave and a flourish.
       if (run.boxes.length >= 3) {
-        await wait(160 * pace, g);
-        ripple(run.boxes, g);
+        await anim.wait(160 * pace, g);
+        anim.ripple(run.boxes, g);
         play("chain", { n: run.boxes.length, mine: !theirs });
       }
       run = { player: -1, boxes: [] };
     }
-    if (theirs) await wait((ev.boxes.length ? PACE.after : PACE.after / 2) * pace, g);
+    if (theirs) await anim.wait((ev.boxes.length ? PACE.after : PACE.after / 2) * pace, g);
     current = null;
   }
 
@@ -340,7 +231,7 @@ function mountGame(session, root, shell) {
       if (w !== DRAW) {
         const mine = [];
         match.state.boxes.forEach((owner, b) => owner === w && mine.push(b));
-        ripple(mine, g, 40);
+        anim.ripple(mine, g, 40);
       }
     }
   }
@@ -675,6 +566,7 @@ function mountGame(session, root, shell) {
     rules = makeRules(config);
     geo = geometry(config.size);
     board = buildBoard(config.size);
+    anim = motion(board, config.size, { fast, live });
     boardWrap.replaceChildren(board.svg);
     board.svg.addEventListener("pointermove", onPointer);
     board.svg.addEventListener("pointerdown", onPointer);

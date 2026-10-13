@@ -432,14 +432,20 @@ game:
 export { lessons } from "./lessons.js";
 export const flavour = "paper"; // the chime's timbre, as for celebrate()
 export const load = (position) => /* a rules state whose side to move is the learner */;
-export const play = (state, move) => applyMove(state, state.turn, move); // throws RuleError when illegal
+export const play = (state, move) => applyMove(state, state.turn, move); // returns its events; throws RuleError when illegal
 export const cells = (move) => [move.cell]; // the cells a move uses, lit up by the hint
 export function board() {
-  // render(state) draws it, onMove(fn) reports the learner's moves (legal or not),
-  // cell(c) is a cell's element, reject(move) springs a wrong move back (nothing with reduced motion).
+  // render(state, played) draws it; with played (the events play returned) it shows that move
+  // as the game does and returns a promise that settles once it has landed.
+  // onMove(fn) reports the learner's moves (legal or not), cell(c) is a cell's element,
+  // reject(move) springs a wrong move back (nothing with reduced motion).
   return { node, render, onMove, cell, reject };
 }
 ```
+
+The tutorial should feel like the game: the same gestures, motion and
+sounds. Share them with `main.js` (move them to `art.js` or another module
+in your folder) rather than writing them twice.
 
 A dice game fixes a step's roll with a field of its own on the step: `play`
 gets the step as its third argument and can hand `applyMove` an `rng` that

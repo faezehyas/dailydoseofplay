@@ -11,7 +11,8 @@ import { makeRules, normalizeConfig, isTimed, timeLeft, legalSteps, legalPlays, 
 import { chooseMove, inContact, startRobot } from "./robot.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
-import { STACK, dieFace, checkerStack, trayStack, boardCells, arrowTarget } from "./art.js";
+import { boardCells, arrowTarget, drawBoard, rollDice, rollText, theirKey } from "./art.js";
+import { motion, MY_PACE, DROP_PACE } from "./motion.js";
 import { howToPlay } from "./how-to-play.js";
 
 const ROBOT_DELAY = 800;
@@ -21,8 +22,6 @@ const PASS_DELAY = 1600; // after a passed turn, so the notice can be read
 const SETTLE_DELAY = 400; // after the opponent's checkers land, before your dice roll
 const BEFORE_MOVE = 250; // the opponent's dice show a moment before their checkers move
 const BETWEEN_STEPS = 140;
-const FLY = { min: 240, perPx: 0.9, max: 620 }; // a checker's flight time, by distance
-const MY_PACE = 0.7; // your own checkers fly faster than the replayed ones
 const AUTO_DELAY = 450; // between the steps the game plays for you in a race
 const FORCED_DELAY = 550; // before a move you have no choice about is played for you
 const CLAIM_GRACE_MS = 5000; // past the opponent's limit before we stop waiting for their forfeit
@@ -68,8 +67,6 @@ function describeConfig(c, robot) {
   return parts.join(" · ");
 }
 
-const rollText = (roll) => (roll[0] === roll[1] ? `double ${roll[0]}s` : `${roll[0]} and ${roll[1]}`);
-
 function mountBackgammon(session, root, shell) {
   const me = session.index;
   const opp = 1 - me;
@@ -87,8 +84,6 @@ function mountBackgammon(session, root, shell) {
   let selected = null; // the point whose checker you picked
   let anim = null; // the opponent's play being replayed: { pos, dice }
   let settledAt = 0; // when the last replay ended
-  let hidden = new Map(); // cell key -> checkers still in the air, hidden at the top of that cell
-  let flying = 0;
   let rollId = 0; // bumps on every roll, so new dice tumble once
   let diceSig = "";
   let marks = null; // the opponent's last play: { left, came } as cell key -> checkers
@@ -139,6 +134,8 @@ function mountBackgammon(session, root, shell) {
   });
 
   const cells = boardCells(board);
+  const motions = motion(board, cells, { still, render, gone: () => destroyed });
+  const { hidden, moveOnScreen } = motions;
 
   root.append(
     el(
@@ -175,14 +172,14 @@ function mountBackgammon(session, root, shell) {
   }
 
   function stageStep(step, drop, forced = !!forcedNext()) {
-    moveOnScreen(me, step.from, step.to, () => {
+    moveOnScreen("mine", step.from, step.to, () => {
       const done = applyStaged(step, forced);
       // Keep the moved checker picked when it can go on.
       const next = steps();
       selected = done.to !== OFF && next.some((s) => s.from === done.to) ? done.to : null;
       if (next.length && next.every((s) => s.from === next[0].from)) selected = next[0].from;
       return done;
-    }, drop ? 0.45 : MY_PACE, drop);
+    }, drop ? DROP_PACE : MY_PACE, drop);
   }
 
   // Takes back the last step you chose (forced steps after it go too, or they
@@ -193,25 +190,16 @@ function mountBackgammon(session, root, shell) {
     const last = stage.steps[chosen];
     const keep = stage.steps.slice(0, chosen);
     const after = stage.steps.length - 1 - chosen;
-    const start = topRect(last.to);
-    const blot = last.hit ? topRect("bar-top") : null;
-    resetStage();
-    for (const s of keep) applyStaged(s, s.forced);
+    const restage = () => {
+      resetStage();
+      for (const s of keep) applyStaged(s, s.forced);
+    };
     if (after) {
+      restage();
       render();
       return play("bar");
     }
-    hide(last.from, 1);
-    if (last.hit) hide(last.to, 1);
-    render();
-    const back = (whose, from, key) =>
-      fly(whose, from, topRect(key), MY_PACE).then(() => {
-        hide(key, -1);
-        render();
-        play("bar");
-      });
-    back("mine", start, last.from);
-    if (last.hit) back("theirs", blot, last.to);
+    motions.takeBack(last, restage);
   }
 
   function confirm() {
@@ -247,78 +235,16 @@ function mountBackgammon(session, root, shell) {
   }
 
   // ---------- input ----------
-  board.addEventListener("click", (e) => {
-    const cell = e.target.closest("button[data-n]");
-    if (cell && !dragged) pick(Number(cell.dataset.n));
-    dragged = false;
-  });
-
-  // Drag a checker with a mouse or finger; a press that doesn't move is a tap.
-  let drag = null;
-  let dragged = false;
-  const cellAt = (x, y) => {
-    const cell = document.elementFromPoint(x, y)?.closest("button[data-n]");
-    return cell && board.contains(cell) ? Number(cell.dataset.n) : null;
-  };
-  board.addEventListener("pointerdown", (e) => {
-    dragged = false;
-    const cell = e.target.closest("button[data-n]");
-    if (!cell || e.button !== 0 || drag || auto) return;
-    const from = Number(cell.dataset.n);
-    if (steps().some((s) => s.from === from)) drag = { from, id: e.pointerId, x: e.clientX, y: e.clientY, node: null, over: null };
-  });
-  function onPointerMove(e) {
-    if (!drag || e.pointerId !== drag.id) return;
-    if (!drag.node) {
-      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return;
-      const at = topRect(drag.from);
-      if (!at || !steps().some((s) => s.from === drag.from)) return (drag = null);
-      drag.size = at;
-      drag.node = ghost("mine", at);
-      drag.node.classList.add("held");
-      hide(drag.from, 1);
-      selected = drag.from;
+  const drag = motions.drags({
+    steps,
+    ready: () => !auto,
+    tap: pick,
+    lift: (from) => {
+      selected = from;
       render();
-    }
-    const b = board.getBoundingClientRect();
-    const x = e.clientX - b.left - board.clientLeft - drag.size.w / 2;
-    const y = e.clientY - b.top - board.clientTop - drag.size.h / 2;
-    Object.assign(drag.node.style, { left: `${x}px`, top: `${y}px` });
-    const over = cellAt(e.clientX, e.clientY);
-    if (over !== drag.over) {
-      cells.get(drag.over)?.classList.remove("over");
-      drag.over = over;
-      if (steps().some((s) => s.from === drag.from && s.to === over)) cells.get(over).classList.add("over");
-    }
-  }
-  function endDrag(e) {
-    if (!drag || e.pointerId !== drag.id) return;
-    const { from, node, over } = drag;
-    drag = null;
-    if (!node) return;
-    dragged = true;
-    cells.get(over)?.classList.remove("over");
-    const to = e.type === "pointerup" ? cellAt(e.clientX, e.clientY) : null;
-    const there = steps()
-      .filter((s) => s.from === from && s.to === to)
-      .sort((a, b) => a.die - b.die);
-    const b = board.getBoundingClientRect();
-    const r = node.getBoundingClientRect();
-    const at = { x: r.left - b.left - board.clientLeft, y: r.top - b.top - board.clientTop, w: r.width, h: r.height };
-    node.classList.remove("held");
-    if (there.length) {
-      hide(from, -1);
-      return stageStep(there[0], { start: at, node });
-    }
-    // Not a legal point: back where it came from, still picked.
-    fly("mine", at, topRect(from), 0.6, node).then(() => {
-      hide(from, -1);
-      render();
-    });
-  }
-  addEventListener("pointermove", onPointerMove);
-  addEventListener("pointerup", endDrag);
-  addEventListener("pointercancel", endDrag);
+    },
+    drop: (step, at) => stageStep(step, at),
+  });
   // Arrow keys move around the board; Enter or Space picks (native button); Escape lets go.
   board.addEventListener("keydown", (e) => {
     const cell = e.target.closest("button[data-n]");
@@ -366,12 +292,12 @@ function mountBackgammon(session, root, shell) {
   // have no choice about, and the end of a turn that was forced all the way.
   // In a race with auto-play on, every step: the robot's best play from where you stand.
   function scheduleAuto() {
-    if (autoTimer || !stage || !myTurn() || match.working || flying || drag) return;
+    if (autoTimer || !stage || !myTurn() || match.working || motions.flying || drag.active()) return;
     if (!auto && !forcedNext() && !(forcedTurn() && !steps().length)) return;
     autoTimer = setTimeout(() => {
       autoTimer = null;
       // Busy or landing: the next render schedules it again.
-      if (destroyed || !stage || !myTurn() || match.working || flying || drag) return;
+      if (destroyed || !stage || !myTurn() || match.working || motions.flying || drag.active()) return;
       const legal = steps();
       if (!legal.length) {
         if (auto) return confirm();
@@ -446,89 +372,7 @@ function mountBackgammon(session, root, shell) {
   }
 
   // ---------- motion ----------
-  // Checkers in the air are copies ("ghosts") that fly over the board; the
-  // real checker waits hidden where it lands. The game's state never waits.
-  const theirKey = (n) => (n === BAR ? "bar-top" : n === OFF ? "off-top" : 25 - n);
   const pause = (ms) => new Promise((r) => setTimeout(r, still ? 0 : ms));
-
-  function hide(key, by) {
-    const n = (hidden.get(key) || 0) + by;
-    if (n > 0) hidden.set(key, n);
-    else hidden.delete(key);
-  }
-
-  // Where the top checker (or slab) of a cell is drawn, relative to the board.
-  function topRect(key) {
-    const items = cells.get(key).querySelectorAll(".checker, .slab");
-    const node = items[items.length - 1];
-    if (!node) return null;
-    const r = node.getBoundingClientRect();
-    const b = board.getBoundingClientRect();
-    return { x: r.left - b.left - board.clientLeft, y: r.top - b.top - board.clientTop, w: r.width, h: r.height };
-  }
-
-  function ghost(whose, at) {
-    const node = el("span", { class: `checker ${whose} ghost`, "aria-hidden": "true" });
-    Object.assign(node.style, { left: `${at.x}px`, top: `${at.y}px`, width: `${at.w}px`, height: `${at.h}px` });
-    board.append(node);
-    return node;
-  }
-
-  // Lifts a checker, carries it along a low arc and sets it down (squashed
-  // into a slab when it lands in a tray). Resolves once it has landed.
-  function fly(whose, from, to, pace = 1, node = null) {
-    if (!from || !to || still || destroyed) {
-      node?.remove();
-      return Promise.resolve();
-    }
-    node ??= ghost(whose, from);
-    flying++;
-    const dx = to.x + to.w / 2 - (from.x + from.w / 2);
-    const dy = to.y + to.h / 2 - (from.y + from.h / 2);
-    const dist = Math.hypot(dx, dy);
-    const lift = Math.min(22, 6 + dist * 0.06);
-    const frames = [];
-    for (let i = 0; i <= 12; i++) {
-      const t = i / 12;
-      const grow = 1 + 0.16 * Math.sin(Math.PI * t);
-      const sx = grow * (1 + t * (to.w / from.w - 1));
-      const sy = grow * (1 + t * (to.h / from.h - 1));
-      frames.push({ transform: `translate(${dx * t}px, ${dy * t - 4 * lift * t * (1 - t)}px) scale(${sx}, ${sy})` });
-    }
-    const ms = Math.min(FLY.max, FLY.min + dist * FLY.perPx) * pace;
-    return node
-      .animate(frames, { duration: ms, easing: "cubic-bezier(.45, 0, .25, 1)", fill: "forwards" })
-      .finished.catch(() => {})
-      .finally(() => {
-        node.remove();
-        flying--;
-      });
-  }
-
-  // Plays one step on the board shown. `apply()` moves the checker in the
-  // position being drawn and returns { hit }; a copy flies to where it lands,
-  // then a checker it hit flies to the bar.
-  async function moveOnScreen(player, from, to, apply, pace, drop = {}) {
-    const key = (n) => (player === me ? n : theirKey(n));
-    const whose = player === me ? "mine" : "theirs";
-    const barKey = player === me ? "bar-top" : BAR;
-    const start = drop.start ?? topRect(key(from));
-    const under = topRect(key(to));
-    const done = apply();
-    hide(key(to), 1);
-    if (done.hit) hide(barKey, 1);
-    render();
-    const knocked = done.hit && under && !still ? ghost(whose === "mine" ? "theirs" : "mine", under) : null;
-    await fly(whose, start, topRect(key(to)), pace, drop.node);
-    hide(key(to), -1);
-    render();
-    play(to === OFF ? "off" : done.hit ? "hit" : "place");
-    if (!done.hit) return;
-    await fly(null, under, topRect(barKey), pace, knocked);
-    hide(barKey, -1);
-    render();
-    play("bar");
-  }
 
   // The opponent's play, one checker at a time, after a short pause.
   // Net change per cell of the opponent's play, for the last-move marks.
@@ -557,7 +401,7 @@ function mountBackgammon(session, root, shell) {
     for (const s of played) {
       if (anim !== run || destroyed) return;
       const quick = auto && racing();
-      await moveOnScreen(opp, s.from, s.to, () => {
+      await moveOnScreen("theirs", s.from, s.to, () => {
         run.dice.splice(run.dice.indexOf(s.die), 1);
         return applyStep(run.pos, opp, s.from, s.die);
       }, quick ? MY_PACE : 1);
@@ -581,62 +425,7 @@ function mountBackgammon(session, root, shell) {
     const legal = auto ? [] : steps();
     const sources = new Set(legal.map((s) => s.from));
     const dests = new Set(legal.filter((s) => s.from === selected).map((s) => s.to));
-    const shownMarks = anim ? null : marks;
-    for (const [key, cell] of cells) {
-      let label;
-      if (!pos) {
-        cell.replaceChildren();
-        continue;
-      }
-      if (key === "bar-top" || key === "off-top") {
-        const n = pos[opp][key === "bar-top" ? BAR : OFF];
-        cell.replaceChildren(...(key === "bar-top" ? checkerStack(n, "theirs") : trayStack(n, "theirs")));
-      } else if (key === BAR) {
-        const n = pos[me][BAR];
-        cell.replaceChildren(...checkerStack(n, "mine"));
-        label = n ? `Your bar: ${n} checker${n > 1 ? "s" : ""}` : "Your bar: empty";
-      } else if (key === OFF) {
-        const n = pos[me][OFF];
-        cell.replaceChildren(...trayStack(n, "mine"));
-        label = `Borne off: ${n} of yours`;
-      } else {
-        const mine = pos[me][key];
-        const theirs = pos[opp][25 - key];
-        cell.replaceChildren(...(mine ? checkerStack(mine, "mine") : checkerStack(theirs, "theirs")));
-        label = `Point ${key}: ${mine ? `${mine} of yours` : theirs ? `${theirs} of ${oppName}'s` : "empty"}`;
-      }
-      const items = cell.querySelectorAll(".checker, .slab");
-      const pending = hidden.get(key) || 0;
-      for (let i = Math.max(0, items.length - pending); i < items.length; i++) items[i].classList.add("pending");
-      const shown = items.length - pending;
-      const top = items[shown - 1];
-      top?.classList.add("top");
-      // Where a picked checker would land: the next free spot, or around a
-      // full stack's top checker, or around the blot it would hit.
-      if (dests.has(key) && cell.classList.contains("point")) {
-        if (top?.classList.contains("theirs")) top.classList.add("target");
-        else if (shown >= STACK) top.classList.add("target");
-        else cell.append(el("span", { class: "slot", "aria-hidden": "true" }));
-      }
-      // The opponent's last play: an outline where each checker left, a ring on each that arrived.
-      if (shownMarks && cell.classList.contains("point")) {
-        const came = Math.min(shownMarks.came.get(key) || 0, shown);
-        for (let i = shown - came; i < shown; i++) if (items[i].classList.contains("theirs")) items[i].classList.add("arrived");
-        const gone = Math.min(shownMarks.left.get(key) || 0, STACK - shown);
-        for (let i = 0; i < gone; i++) cell.append(el("span", { class: "vacated", "aria-hidden": "true" }));
-      }
-      cell.classList.toggle("src", sources.has(key));
-      cell.classList.toggle("selected", selected === key && !(drag?.node && drag.from === key));
-      cell.classList.toggle("dest", dests.has(key));
-      if (cell.tagName === "BUTTON") {
-        if (dests.has(key)) label += key === OFF ? ", bear off here" : ", move here";
-        else if (selected === key) label += ", picked";
-        else if (sources.has(key)) label += ", can move";
-        cell.setAttribute("aria-label", label);
-        cell.setAttribute("aria-disabled", String(!sources.has(key) && !dests.has(key)));
-      }
-    }
-    board.classList.toggle("armed", sources.size > 0);
+    drawBoard(board, cells, pos, me, { hidden, sources, dests, selected, held: drag.held(), marks: anim ? null : marks, oppName });
   }
 
   function renderDice() {
@@ -666,13 +455,7 @@ function mountBackgammon(session, root, shell) {
     if (sig === diceSig) return;
     const tumble = current && !still && !diceSig.startsWith(`${rollId}|`);
     diceSig = sig;
-    diceBox.replaceChildren(
-      ...faces.map((v, k) => {
-        const die = dieFace(v, classes[k] + (tumble ? " tumble" : ""));
-        if (tumble) die.style.setProperty("--spin", `${(Math.random() < 0.5 ? -1 : 1) * (200 + Math.random() * 160)}deg`);
-        return die;
-      }),
-    );
+    diceBox.replaceChildren(...rollDice(faces, classes, tumble));
     diceBox.setAttribute("aria-label", `${owner === me ? "Your" : `${oppName}'s`} ${fresh ? "" : "last "}roll: ${rollText(roll)}`);
   }
 
@@ -744,7 +527,7 @@ function mountBackgammon(session, root, shell) {
   function renderOver() {
     const phase = match?.phase;
     // Let the winning checkers finish moving first.
-    if ((phase !== "over" && phase !== "aborted") || (phase === "over" && (anim || flying))) return result.hide();
+    if ((phase !== "over" && phase !== "aborted") || (phase === "over" && (anim || motions.flying))) return result.hide();
     const st = match.state;
     const winner = phase === "over" ? st.winner : -1;
     let reason;
@@ -768,7 +551,7 @@ function mountBackgammon(session, root, shell) {
     stage = null;
     selected = null;
     anim = null;
-    hidden = new Map();
+    hidden.clear();
     marks = null;
     auto = null;
     clearTimeout(autoTimer);
@@ -844,9 +627,7 @@ function mountBackgammon(session, root, shell) {
       clearInterval(ticker);
       clearTimeout(rollTimer);
       clearTimeout(autoTimer);
-      removeEventListener("pointermove", onPointerMove);
-      removeEventListener("pointerup", endDrag);
-      removeEventListener("pointercancel", endDrag);
+      drag.stop();
       for (const off of offs) off();
     },
   };

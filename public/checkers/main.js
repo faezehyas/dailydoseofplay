@@ -13,6 +13,7 @@ import { settings, normalizeLevel } from "./settings.js";
 import { playMove } from "./sounds.js";
 import { howToPlay } from "./how-to-play.js";
 import { CROWN_SVG } from "./art.js";
+import { startsWith, jumpEnds } from "./pick.js";
 
 const ROBOT_DELAY = 600;
 const CLAIM_GRACE_MS = 5000; // past the opponent's limit before we stop waiting for their forfeit
@@ -50,8 +51,6 @@ function describeConfig(c, level) {
   if (level) parts.push(`${LEVEL_NAMES[level]} robot`);
   return parts.join(" · ");
 }
-
-const startsWith = (path, prefix) => path.length >= prefix.length && prefix.every((sq, k) => path[k] === sq);
 
 function mountCheckers(session, root, shell) {
   const me = session.index;
@@ -151,8 +150,8 @@ function mountCheckers(session, root, shell) {
         return done ? send(done) : render();
       }
       // A tap on the final square of exactly one way plays the whole jump.
-      const ends = ways.filter((m) => m[m.length - 1] === sq);
-      if (ends.length === 1 && sq !== picked[0]) return send(ends[0]);
+      const end = jumpEnds(legal, picked).get(sq);
+      if (end) return send(end);
       if (picked.length > 1) {
         if (sq === picked[0]) {
           picked = null;
@@ -307,8 +306,7 @@ function mountCheckers(session, root, shell) {
     const ways = picked ? legal.filter((m) => startsWith(m, picked) && m.length > picked.length) : [];
     const targets = new Set(ways.map((m) => m[picked.length]));
     // Where a multi-jump would end: tapping there plays it all at once.
-    const lastSquares = ways.map((m) => m[m.length - 1]);
-    const ends = new Set(lastSquares.filter((sq) => !targets.has(sq) && sq !== picked[0] && lastSquares.indexOf(sq) === lastSquares.lastIndexOf(sq)));
+    const ends = picked ? jumpEnds(legal, picked) : new Map();
     const taking = new Set(picked ? capturedBy(picked) : []);
     const last = st?.moves.at(-1);
     const lastCaptured = new Set(last ? capturedBy(last) : []);

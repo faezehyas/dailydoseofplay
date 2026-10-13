@@ -16,10 +16,15 @@
 //                            the same items in order, lists in it too). reply is a move played back.
 //   flavour                  the timbre of its chimes (chimes.js)
 //   load(position)           a rules state for a position; its side to move is the learner
-//   play(state, move, step)  applies a move for the side to move with rules.js, or throws RuleError
+//   play(state, move, step)  applies a move for the side to move with rules.js, or throws RuleError;
+//                            what it returns (the rules' events) goes to render
 //   cells(move)              the cells a move uses, lit up by the hint
-//   board()                  the game's board view: { node, render(state), onMove(fn), cell(c), reject(move) }
-//                            cell(c) is the element of cell c; reject(move) springs a wrong move back.
+//   board()                  the game's board view: { node, render(state, played), onMove(fn), cell(c), reject(move) }
+//                            render gets `played`, what play returned, for the move that just
+//                            landed (the learner's or the reply), and may animate it as the game
+//                            does, returning a promise that settles once it has landed; the check
+//                            mark, the chime and the next step wait for it. cell(c) is the element
+//                            of cell c; reject(move) springs a wrong move back.
 // highlight is a list of cells, arrows a list of [from, to] cells.
 import { el } from "./shell.js";
 import { RuleError } from "./turn-match.js";
@@ -65,6 +70,7 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
   let state = null;
   let tries = 0;
   let busy = false;
+  let run = 0; // bumps whenever the lesson moves on
 
   const later = (fn, ms) => {
     const t = setTimeout(() => (timers.delete(t), fn()), ms);
@@ -73,6 +79,13 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
   const clearTimers = () => {
     for (const t of timers) clearTimeout(t);
     timers.clear();
+    run += 1;
+  };
+  // Runs fn once the board has shown a move (render's promise, if any),
+  // unless the lesson has moved on meanwhile.
+  const landed = (shown, fn) => {
+    const at = run;
+    Promise.resolve(shown).then(() => at === run && fn());
   };
 
   // ---------- the lesson's pieces ----------
@@ -184,14 +197,15 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
     if (lesson < 0 || busy) return;
     const step = lessons[lesson].steps[stepIndex];
     const after = structuredClone(state);
+    let played;
     try {
-      tutorial.play(after, move, step);
+      played = tutorial.play(after, move, step);
     } catch (err) {
       if (!(err instanceof RuleError)) throw err;
       return wrong(move, `${err.message}.`);
     }
     if (!expected(step).some((want) => matches(move, want))) return wrong(move, "That move is allowed, but it isn't the one this step asks for.");
-    right(move, after, step);
+    right(move, after, step, played);
   }
 
   function wrong(move, why) {
@@ -204,23 +218,23 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
     feedback.className = "tut-feedback wrong";
   }
 
-  function right(move, after, step) {
+  function right(move, after, step, played) {
     busy = true;
     state = after;
-    view.render(state);
     light([], "tut-lit");
     arrows.replaceChildren();
-    showCheck(tutorial.cells(move).at(-1));
-    sounds.play(chime("right", flavour));
     feedback.textContent = "Right!";
     feedback.className = "tut-feedback right";
-    later(() => {
-      check.hidden = true;
-      if (!step.reply) return advance();
-      tutorial.play(state, step.reply, step);
-      view.render(state);
-      later(advance, REPLY_MS);
-    }, RIGHT_MS);
+    landed(view.render(state, played), () => {
+      showCheck(tutorial.cells(move).at(-1));
+      sounds.play(chime("right", flavour));
+      later(() => {
+        check.hidden = true;
+        if (!step.reply) return advance();
+        const replied = tutorial.play(state, step.reply, step);
+        landed(view.render(state, replied), () => later(advance, REPLY_MS));
+      }, RIGHT_MS);
+    });
   }
 
   function advance() {

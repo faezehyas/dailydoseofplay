@@ -68,7 +68,7 @@ content type and that every icon it lists is served at its stated size.
 
 **Import graph.** An arrow is an `import`. The game box stands for every
 `public/<slug>/` folder, so its arrows are those of all the games together;
-`art.js`, `sounds.js`, `tutorial.js` and `lessons.js` are optional and `match.js` is Sea Battle's alone. The `cards/`
+`art.js`, `motion.js`, `sounds.js`, `tutorial.js` and `lessons.js` are optional, `match.js` is Sea Battle's alone, `pick.js` Checkers' and `board-view.js` Ludo's. The `cards/`
 modules are the card games' shared table (see **Card games**).
 Dotted arrows are reads of `games.json`, not imports. Every module in
 `public/` and `server/` has a box: `test/architecture.test.js` fails when one
@@ -90,6 +90,9 @@ flowchart TB
     g_tutorial["tutorial.js<br>loaded when opened"]
     g_lessons["lessons.js"]
     g_match["match.js<br>Sea Battle only"]
+    g_motion["motion.js"]
+    g_pick["pick.js<br>Checkers only"]
+    g_board_view["board-view.js<br>Ludo only"]
   end
   subgraph engine ["Engine: public/engine/"]
     e_boot["boot.js<br>static pages"]
@@ -162,6 +165,9 @@ flowchart TB
   p_main --> e_cards_paced_robot
   p_main --> e_cards_table
   p_main --> g_match
+  p_main --> g_motion
+  p_main --> g_pick
+  p_main --> g_board_view
   p_main --> g_robot
   p_main --> g_rules
   p_main --> g_settings
@@ -177,6 +183,18 @@ flowchart TB
   g_tutorial --> g_art
   g_tutorial --> g_lessons
   g_tutorial --> g_rules
+  g_tutorial --> g_motion
+  g_tutorial --> g_pick
+  g_tutorial --> g_board_view
+  g_tutorial --> g_sounds
+  g_art --> g_sounds
+  g_motion --> e_shell
+  g_motion --> g_art
+  g_motion --> g_rules
+  g_motion --> g_sounds
+  g_board_view --> g_art
+  g_board_view --> g_rules
+  g_board_view --> g_sounds
   g_match --> e_channel
   g_match --> e_fair
   g_match --> g_rules
@@ -957,12 +975,20 @@ flowchart LR
   moving.
 - **The adapter** (`public/<slug>/tutorial.js`) exports the lessons, the
   chime's `flavour`, `load(position)` (a rules state whose side to move is
-  the learner), `play(state, move, step)` (`applyMove` for the side to move),
-  `cells(move)` and `board()`: the game's own markup, classes and art, with
-  `render(state)`, `onMove(fn)`, `cell(c)` and `reject(move)`. The board
-  only hands over cells, so the engine draws the lit squares, arrows and
-  hint the same way in every game. It reports any move the learner makes,
-  legal or not.
+  the learner), `play(state, move, step)` (`applyMove` for the side to move,
+  returning its events), `cells(move)` and `board()`: the game's own markup,
+  classes and art, with `render(state, played)`, `onMove(fn)`, `cell(c)` and
+  `reject(move)`. The board only hands over cells, so the engine draws the
+  lit squares, arrows and hint the same way in every game. It reports any
+  move the learner makes, legal or not.
+- **It plays like the game.** The board takes moves the way the game does
+  (taps, drags, keys and buttons) and shows them with the game's own motion
+  and sounds, from the same code in the game's folder (`art.js`, `sounds.js`).
+  `render` gets `played`, the events of the move that just landed (the
+  learner's or the reply), animates them as the game would and returns a
+  promise that settles once they have landed; the check mark, the chime and
+  the next step wait for it. Without `played` it draws the position as it
+  stands.
 - **Every move is checked by the game's `rules.js`**, so a lesson can't teach
   a wrong rule, and `lessons.test.js` plays every step's expected moves and
   replies through it. A move the rules refuse, or a legal move that isn't
@@ -1071,7 +1097,9 @@ checks that no game opens its own audio context or output.
 | `icon.svg` | Card art for the home page (16:10) |
 | `preview.svg` | Optional: the tile's short animated preview (see **Tile previews**) |
 | `tutorial.js`, `lessons.js` | Optional: the tutorial (see **Tutorials**). `lessons.js` is its lessons as data; `tutorial.js` exports them with the adapter the engine plays them through, and `main.js` passes `tutorial: () => import("./tutorial.js")`. |
-| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo; Chutes and Ladders, with its spinner), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces, Gomoku's grid and point names, Checkers' crown, Dots and Boxes' paper, lines and boxes, Backgammon's cells, checkers and dice, Sea Battle's boards, ships and marks) |
+| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo; Chutes and Ladders, with its spinner and its pawns' hops, climbs and slides), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces, Gomoku's grid and point names, Checkers' crown, Dots and Boxes' paper, lines and boxes, Backgammon's cells, checkers and dice, Sea Battle's boards, ships, ship dragging and the shells' flight and landing) |
+| `motion.js` | Optional: the move motion the view shares with the tutorial, with its sounds (Chess's slide and capture and its drag, Backgammon's checker flights and drag, Dots and Boxes' pencil strokes and boxes) |
+| `pick.js`, `board-view.js` | Checkers' picking of a move square by square (and one tap for a whole multi-jump); Ludo's token motion, rolling die and move choices. Both shared by the view and the tutorial. |
 
 ## Card games (`CardMatch`)
 

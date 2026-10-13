@@ -723,3 +723,8 @@ button.cell {
     justify-self: center;
   }
 }
+
+/* The tutorial's lit squares show over your ships while you place them. */
+.tut-stage .placing .layer.cells {
+  z-index: 4;
+}

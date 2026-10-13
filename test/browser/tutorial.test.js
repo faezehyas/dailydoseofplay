@@ -29,7 +29,8 @@ async function press(page, name) {
 }
 const move = async (page, from, to) => (await press(page, from), await press(page, to));
 const feedback = (page) => page.locator("#tut-feedback").textContent();
-const step = (page, text) => page.waitForSelector(`.tut-step:text-is("${text}")`, { timeout: 5000 });
+// A step waits for the last move to play out, as long as a ladder or a spin of 6 takes in the game.
+const step = (page, text) => page.waitForSelector(`.tut-step:text-is("${text}")`, { timeout: 15_000 });
 
 test("the first Chess lesson by keyboard: a wrong move springs back, the second brings the hint, and the tick is saved", { skip: !pw && "Playwright not installed", timeout: 90_000 }, async (t) => {
   const srv = await startServer();
@@ -96,7 +97,7 @@ test("the first Chess lesson by keyboard: a wrong move springs back, the second 
   // The right moves: a check mark, then the next step.
   await move(page, "d4", "a4");
   assert.equal(await feedback(page), "Right!");
-  assert.equal(await page.locator(".tut-check:not([hidden])").count(), 1, "a check mark");
+  await page.waitForSelector(".tut-check:not([hidden])", { timeout: 2000 }); // a check mark once the rook lands
   assert.equal(await square(page, "a4").getAttribute("data-p"), ROOK);
   await step(page, "Step 2 of 3");
   await move(page, "c1", "h6");
@@ -228,23 +229,34 @@ test("Backgammon's first lesson: a 3 and a 1 make a point, then one checker take
       for (const n of [8, 5, 6]) await tap(page, n);
       assert.equal(await page.locator(".tut-stage .die.used").count(), 1, "the 3 is played");
       await tap(page, 5);
+      await page.click(".tut-stage button:text-is('Confirm')");
     },
     async (page) => {
       assert.equal(await page.locator(".tut-stage .die:not(.used)").count(), 2, "a fresh roll");
       for (const n of [24, 18, 13]) await tap(page, n);
+      await page.click(".tut-stage button:text-is('Confirm')");
     },
   ]);
 });
 
-test("Sea Battle's first lesson: the Destroyer moves to the lit squares, then turns upright", { skip, timeout: 60_000 }, (t) => {
-  const tap = (page, i) => page.click(`.tut-stage .own .cell[data-i="${i}"]`);
+test("Sea Battle's first lesson: the Destroyer is dragged to the lit squares, then turns upright", { skip, timeout: 60_000 }, (t) => {
+  const centre = async (page, i) => {
+    const b = await page.locator(`.tut-stage .own .cell[data-i="${i}"]`).boundingBox();
+    return [b.x + b.width / 2, b.y + b.height / 2];
+  };
   return firstLesson(t, "sea-battle", [
     async (page) => {
-      await tap(page, 54);
-      assert.equal(await page.locator(".tut-stage .ship.selected").count(), 1, "the Destroyer is picked");
-      await tap(page, 23);
+      const [x0, y0] = await centre(page, 54);
+      const [x1, y1] = await centre(page, 23);
+      await page.mouse.move(x0, y0);
+      await page.mouse.down();
+      await page.mouse.move(x1, y1, { steps: 8 });
+      await page.mouse.up();
     },
-    (page) => tap(page, 23),
+    async (page) => {
+      assert.equal(await page.locator(".tut-stage .ship.selected").count(), 1, "the moved Destroyer stays picked");
+      await page.locator('.tut-stage .own .ship[data-k="4"]').click();
+    },
   ]);
 });
 
@@ -257,11 +269,16 @@ test("Chutes and Ladders' first lesson: two spins with the fixed numbers", { ski
     },
   ]));
 
-test("Ludo's first lesson: a 6 brings a token out, then a 4 moves it on", { skip, timeout: 60_000 }, (t) => {
+test("Ludo's first lesson: roll a 6 to bring a token out, then roll a 4 to move it on", { skip, timeout: 60_000 }, (t) => {
   const tap = (page, token) => page.click(`.tut-stage .hit-token[data-token="${token}"]`);
   return firstLesson(t, "ludo", [
-    (page) => tap(page, 0),
     async (page) => {
+      await page.click(".tut-stage .ld-roll");
+      await tap(page, 0);
+    },
+    async (page) => {
+      await page.click(".tut-stage .ld-roll");
+      await page.waitForSelector(".tut-stage .hit-token");
       assert.equal(await page.locator(".tut-stage .ld-die .face").getAttribute("data-value"), "4", "the lesson's 4");
       await tap(page, 0);
     },
