@@ -39,6 +39,7 @@ import { HostRoom, GuestRoom, RoomError, localRoom } from "./room.js";
 import { howToPlayPanel } from "./how-to-play.js";
 import { robotBanter, setGameLines } from "./reactions.js";
 import { robotRecord, resetRobotRecord } from "./robot-record.js";
+import { isApp, share } from "./native.js";
 
 const ERRORS = {
   no_such_room: "That room doesn't exist any more. Ask your friend for a fresh invite link.",
@@ -283,12 +284,14 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
       onclick: async () => toast((await copyText(link)) ? "Invite link copied" : "Copy failed: select the link and copy it"),
     }, "Copy link");
     const shareBtn =
-      navigator.share &&
+      (isApp || navigator.share) &&
       el("button", {
         class: "btn",
         type: "button",
-        // A cancelled share sheet needs nothing; any other failure copies the link instead.
+        // The app opens the phone's share sheet itself (native.js). On the web a
+        // cancelled share sheet needs nothing; any other failure copies the link instead.
         onclick: () =>
+          share(`Play ${title} with me!`, link) ||
           navigator.share({ title: `${title} on Daily Dose of Play`, text: "Play with me!", url: link }).catch(async (e) => {
             if (e.name === "AbortError") return;
             toast((await copyText(link)) ? "Sharing didn't work, so the invite link was copied" : "Sharing failed: select the link and copy it");
@@ -427,6 +430,25 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     );
   }
 
+  // The lobby server can't be reached: no connection, or the app's offline
+  // copy, which has no server. The robot and the tutorial need none.
+  function showOffline(retry) {
+    cleanupConnection();
+    view(
+      el("h1", {}, "You're offline"),
+      el("p", { class: "notice", id: "offline-note" }, "Play the robot or learn a game. Playing with friends needs an internet connection."),
+      el(
+        "div",
+        { class: "lobby-actions" },
+        el("button", { class: "btn primary", type: "button", id: "play-robot", onclick: playRobot }, "Play vs robot"),
+        el("button", { class: "btn", type: "button", id: "retry", onclick: () => retry() }, "Try again"),
+        tutorial && el("button", { class: "btn learn", id: "learn", type: "button", onclick: learn }, "Learn"),
+      ),
+      el("button", { class: "btn ghost", type: "button", onclick: () => showHome() }, "Back"),
+    );
+    progress.textContent = "You're offline. Play the robot or learn a game.";
+  }
+
   // ---------- connection plumbing ----------
   // Every user action bumps `attempt`; async steps from an older attempt
   // (e.g. a create that resolves after Cancel) must not touch the UI.
@@ -458,7 +480,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     try {
       await room.open();
     } catch (err) {
-      if (current()) showFailure(ERRORS[err.code] || ERRORS.connect_failed);
+      if (current()) err.code === "connect_failed" ? showOffline(host) : showFailure(ERRORS[err.code] || ERRORS.connect_failed);
       return;
     }
     if (!current()) return;
@@ -539,6 +561,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
       session = await room.join();
     } catch (err) {
       if (!current()) return;
+      if (err.code === "connect_failed") return showOffline(() => join(code, key));
       if (!(err instanceof RoomError)) return showHome(ERRORS[err.code] || ERRORS.connect_failed, code);
       return showFailure(ERRORS[err.code] || NO_TURN_HELP, () => join(code, key));
     }

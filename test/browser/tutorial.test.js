@@ -4,7 +4,8 @@
 // finished lesson; the Learn button and Back; Tic Tac Toe's last lesson,
 // whose end screen starts a robot game; and the first lesson of Connect 4
 // (by keyboard), Gomoku, Checkers, Dots and Boxes, Backgammon, Sea Battle,
-// Chutes and Ladders and Ludo. Skips if Playwright is missing.
+// Chutes and Ladders, Ludo, Crazy Eights, Go Fish, Gin Rummy and Hearts.
+// Skips if Playwright is missing.
 //
 //   npm run test:browser
 import test from "node:test";
@@ -284,3 +285,55 @@ test("Ludo's first lesson: roll a 6 to bring a token out, then roll a 4 to move 
     },
   ]);
 });
+
+// A card in the tutorial's hand: a slot is its face in the lesson deck ("10H" -> the ten of hearts).
+const hcard = (page, name) => {
+  const face = "SHDC".indexOf(name.at(-1)) * 13 + ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"].indexOf(name.slice(0, -1));
+  return page.locator(`.tut-stage .pc-hcard[data-slot="${face}"]`);
+};
+
+test("Crazy Eights' first lesson: a heart on the 9♥, then a king on teal's king", { skip, timeout: 60_000 }, (t) =>
+  firstLesson(t, "crazy-eights", [
+    (page) => hcard(page, "4H").click(),
+    async (page) => {
+      assert.match(await page.locator(".tut-stage #ce-pile").getAttribute("aria-label"), /K♥ on top/, "teal played back");
+      await hcard(page, "KS").click();
+    },
+  ]));
+
+test("Go Fish's first lesson: ask for 7s, teal hands one over, then ask for Kings", { skip, timeout: 60_000 }, (t) => {
+  const ask = async (page, name) => {
+    await hcard(page, name).click();
+    await page.click(".tut-stage #gf-ask");
+  };
+  return firstLesson(t, "go-fish", [
+    (page) => ask(page, "7S"),
+    async (page) => {
+      assert.equal(await hcard(page, "7D").count(), 1, "teal handed over the 7♦");
+      await ask(page, "KC");
+    },
+  ]);
+});
+
+test("Gin Rummy's first lesson: the 7♦ from the pile makes a set, then two taps throw the K♦", { skip, timeout: 60_000 }, (t) => {
+  // Cards in the hand overlap: tap each on its uncovered left edge.
+  const tap = (page, name) => hcard(page, name).click({ position: { x: 7, y: 24 } });
+  return firstLesson(t, "gin-rummy", [
+    (page) => page.click(".tut-stage #gr-pile"),
+    async (page) => {
+      assert.equal(await page.locator(".tut-stage .gr-hcard.taken.inmeld").count(), 1, "the 7♦ joined a meld, marked as just taken");
+      await tap(page, "KD");
+      await page.waitForSelector('.tut-stage #gr-discard:text-is("Discard the K♦")');
+      await tap(page, "KD");
+    },
+  ]);
+});
+
+test("Hearts' first lesson: the A♦ takes violet's diamond trick, then you lead a club", { skip, timeout: 60_000 }, (t) =>
+  firstLesson(t, "hearts", [
+    (page) => hcard(page, "AD").click(),
+    async (page) => {
+      assert.equal(await page.locator(".tut-stage .hr-me-row .pc-won .n").textContent(), "3", "you took the trick");
+      await hcard(page, "9C").click();
+    },
+  ]));

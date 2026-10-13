@@ -13,29 +13,20 @@ import { el, toast, setTabAlert } from "../engine/shell.js";
 import { playerBar } from "../engine/players.js";
 import { resultPanel } from "../engine/result.js";
 import { celebrate } from "../engine/celebrate.js";
-import { cardTable, DECK_WORK, tokenMs, easing } from "../engine/cards/table.js";
+import { cardTable, DECK_WORK } from "../engine/cards/table.js";
 import { humanPause } from "../engine/cards/paced-robot.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { cardWords } from "../engine/cards/faces.js";
 import { makeRules, normalizeConfig, forcedMove, askable, ranksIn, rankOf, rankWords, rankName, totalBooks, MAX_PLAYERS } from "./rules.js";
+import { ROBOT_PACE, AUTO, PACE, cardsOf, giveWords, fishWords, askSeat, drawSeat, drawBooks, drawHand, drawAsk, tableMotion } from "./art.js";
 import { chooseMove, startRobot, timeoutMove } from "./robot.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
 import { howToPlay } from "./how-to-play.js";
 
-// How long robots take before each move (robotPause() scales these in tests).
-const ROBOT_PACE = { answer: 480, book: 380, done: 220, ask: 650, option: 80, max: 1800 };
-// Your browser's own answers, books and lucky fish, after a short beat.
-const AUTO = { answer: 550, book: 400, show: 400, done: 250 };
-const PACE = { deal: 70, dealFly: 300, give: 440, draw: 360, book: 460, bubble: 820, between: 180, take: 60 };
 const CLAIM_GRACE_MS = 6000; // past a player's time before we say their browser is quiet
 const LEVEL_NAME = { easy: "Easy", medium: "Medium", hard: "Hard" };
 const PLACE = ["1st", "2nd", "3rd", "4th"];
-const NUMBER = ["no", "one", "two", "three", "four"];
-// "a 7", "an 8", "two Jacks"
-const cardsOf = (n, r) => (n === 1 ? `${r === 0 || r === 7 ? "an" : "a"} ${rankWords(r).replace(/s$/, "")}` : `${NUMBER[n] ?? n} ${rankWords(r)}`);
-const FISH_SVG =
-  '<svg viewBox="0 0 40 24" aria-hidden="true" focusable="false"><path d="M3 12C9 3 21 2 29 9L37 3V21L29 15C21 22 9 21 3 12Z" fill="currentColor"/><circle cx="11" cy="10.5" r="2" fill="#fff"/><circle cx="11.4" cy="10.7" r="1" fill="#1d2129"/><path d="M17 8Q20 12 17 16" fill="none" stroke="rgb(0 0 0 / 22%)" stroke-width="1.4" stroke-linecap="round"/></svg>';
 
 // Robot games: robots wait for the screen to finish replaying, and hurry once you're out. The view sets these.
 let screenBusy = () => false;
@@ -60,6 +51,7 @@ startGameShell({
   slug: "go-fish",
   title: "Go Fish",
   howToPlay,
+  tutorial: () => import("./tutorial.js"),
   layout: "wide",
   settings,
   minPlayers: 2,
@@ -113,7 +105,7 @@ function mountGame(session, root, shell) {
   const unit = () => (config?.books === 2 ? "pair" : "book");
   // The shared table: cards, seats, stock, hand and motion (engine/cards/table.js).
   const table = cardTable({ prefix: "gf", play, animate: (ev, g) => animate(ev, g), done: (idle) => replayed(idle) });
-  const { cardEl, miniCard, fly, live, fast, wait, rectIn, flyLayer, hand, handCards } = table;
+  const { miniCard, live, fast, wait, rectIn, flyLayer, hand, handCards } = table;
 
   // One session handler: "setup" is for this view (and only from the room's creator), the rest goes to the matches.
   let route = () => {};
@@ -127,14 +119,7 @@ function mountGame(session, root, shell) {
 
   // The other players round the table: the next player on your left, then across, then on your right.
   const POS = { 2: ["top"], 3: ["top", "top"], 4: ["left", "top", "right"] }[count];
-  const opps = around.slice(1).map((p, i) => {
-    const seat = table.makeSeat({ p, name: session.players[p].name, pos: POS[i] });
-    seat.books = el("div", { class: "gf-books", "aria-hidden": "true" });
-    seat.pick = el("button", { class: "gf-pick", type: "button", dataset: { seat: p }, disabled: true, onclick: () => pickSeat(p) });
-    seat.node.append(seat.books);
-    seat.node.prepend(seat.pick);
-    return seat;
-  });
+  const opps = around.slice(1).map((p, i) => askSeat(table, { p, name: session.players[p].name, pos: POS[i], onPick: pickSeat }));
   const seatOf = (p) => opps.find((o) => o.p === p);
 
   const pondCount = el("span", { class: "gf-pond-label" }, "The pond");
@@ -194,11 +179,6 @@ function mountGame(session, root, shell) {
     return { hands: st.hands.map((h) => h.slice()), stock: st.stock.length, books: st.books.map((b) => b.map((x) => ({ rank: x.rank, slots: x.slots.slice() }))), arriving: new Set() };
   }
   const faceOf = (slot) => match?.face(slot) ?? null;
-  // Your hand, by rank (so a rank's cards sit together), then suit.
-  const sortKey = (slot) => {
-    const f = faceOf(slot);
-    return f === null ? 1000 + slot : rankOf(f) * 4 + Math.floor(f / 13);
-  };
 
   // ---------- whose decision it is ----------
   // The player who must act now, on this screen (after the replay catches up).
@@ -218,23 +198,8 @@ function mountGame(session, root, shell) {
 
   // ---------- rendering pieces ----------
   function renderHand() {
-    const slots = view.hands[me].slice().sort((a, b) => sortKey(a) - sortKey(b));
-    const asking = myAsk();
-    const chosen = slots.filter((slot) => faceOf(slot) !== null && rankOf(faceOf(slot)) === selRank);
-    table.renderHand(slots, {
-      face: faceOf,
-      arriving: view.arriving,
-      first: chosen[0],
-      look: (slot, face) => {
-        const on = face !== null && rankOf(face) === selRank && asking;
-        return {
-          lift: on,
-          classes: { chosen: on, askable: asking },
-          label: face === null ? "A card, still being dealt" : `${cardWords(face)}${on ? ", chosen to ask for" : ""}`,
-        };
-      },
-    });
-    myCount.textContent = String(slots.length);
+    drawHand(table, view.hands[me], { face: faceOf, arriving: view.arriving, rank: selRank, asking: myAsk() });
+    myCount.textContent = String(view.hands[me].length);
     myBooksCount.textContent = view.books[me].length ? `· ${plural(view.books[me].length, unit())}` : "";
   }
 
@@ -243,39 +208,11 @@ function mountGame(session, root, shell) {
     const asking = myAsk();
     const options = asking ? askable(st, me) : [];
     for (const o of opps) {
-      const n = view.hands[o.p].length;
-      const out = st && n === 0 && st.out[o.p];
-      o.render(view.hands[o.p], view.arriving, `${session.players[o.p].name}: ${out ? "out of cards" : plural(n, "card")}, ${plural(view.books[o.p].length, unit())}`);
-      renderBooks(o.books, view.books[o.p]);
-      const can = options.includes(o.p);
-      o.pick.disabled = !can;
-      o.pick.setAttribute("aria-label", can ? `Ask ${session.players[o.p].name}${selRank !== null ? ` for ${rankWords(selRank)}` : ""} (${plural(n, "card")})` : `${session.players[o.p].name}, ${plural(n, "card")}`);
-      o.pick.setAttribute("aria-pressed", String(can && selSeat === o.p));
-      o.node.classList.toggle("askable", can);
-      o.node.classList.toggle("chosen", can && selSeat === o.p);
-      o.node.classList.toggle("asked", shownAsk?.to === o.p);
-      o.node.classList.toggle("out", !!out);
+      const out = st && view.hands[o.p].length === 0 && st.out[o.p];
+      drawSeat(table, o, { name: session.players[o.p].name, hand: view.hands[o.p], books: view.books[o.p], face: faceOf, arriving: view.arriving, out, can: options.includes(o.p), chosen: selSeat === o.p, asked: shownAsk?.to === o.p, rank: selRank, unit: unit() });
     }
-    renderBooks(myBooks, view.books[me]);
+    drawBooks(table, myBooks, view.books[me], { face: faceOf, arriving: view.arriving });
     meArea.classList.toggle("asked", shownAsk?.to === me);
-  }
-
-  // Each book a small fan of its cards, face up; a long row overlaps more.
-  function renderBooks(box, books) {
-    const want = books.map((b) => String(b.slots[0]));
-    const have = [...box.children].map((c) => c.dataset.book);
-    if (have.join() !== want.join()) {
-      for (const node of [...box.children]) if (!want.includes(node.dataset.book)) node.remove();
-      books.forEach((b, i) => {
-        let node = box.querySelector(`[data-book="${b.slots[0]}"]`);
-        if (!node) {
-          node = el("div", { class: "gf-book", dataset: { book: b.slots[0], rank: b.rank } }, b.slots.map((slot) => cardEl(faceOf(slot))));
-        }
-        if (box.children[i] !== node) box.insertBefore(node, box.children[i] ?? null);
-      });
-    }
-    box.style.setProperty("--n", String(books.length));
-    for (const node of box.children) node.style.opacity = view.arriving.has(Number(node.dataset.book)) ? "0" : "";
   }
 
   function renderCentre() {
@@ -294,182 +231,8 @@ function mountGame(session, root, shell) {
     return seatOf(p).rect(slot);
   }
   const booksBox = (p) => (p === me ? myBooks : seatOf(p).books);
-
-  // A speech bubble at a seat: "Got any 7s?", "Go fish!".
-  function say(p, content, g, kind = "") {
-    if (!live(g)) return;
-    const host = p === me ? askBar : seatOf(p).node;
-    host.querySelector(":scope > .gf-say")?.remove();
-    const node = el("div", { class: `gf-say p-${p} ${kind}`, role: "presentation" }, content);
-    host.append(node);
-    // Kept inside the table; its tail still points at the seat.
-    const b = node.getBoundingClientRect();
-    const t = tableBox.getBoundingClientRect();
-    const shift = Math.max(0, t.left + 8 - b.left) + Math.min(0, t.right - 8 - b.right);
-    if (shift) {
-      node.style.marginLeft = `${shift}px`;
-      node.style.setProperty("--shift", `${shift}px`);
-    }
-    const end = () => node.remove();
-    const ms = PACE.bubble * 1.7;
-    if (fast()) return setTimeout(end, 900);
-    node
-      .animate(
-        [
-          { transform: "translate(-50%, 8px) scale(.7)", opacity: 0 },
-          { transform: "translate(-50%, 0) scale(1)", opacity: 1, offset: 0.14 },
-          { transform: "translate(-50%, 0) scale(1)", opacity: 1, offset: 0.85 },
-          { transform: "translate(-50%, -6px) scale(.96)", opacity: 0 },
-        ],
-        { duration: ms, easing: easing("out") },
-      )
-      .finished.then(end, end);
-  }
-
-  // "Go fish!": rings spread on the pond beside the stock, and a fish leaps out and dives back.
-  function splash(g) {
-    if (fast() || !live(g)) return;
-    const st = rectIn(stock);
-    const w = st.w;
-    const cx = st.x + w * 1.55;
-    const cy = st.y + st.h * 0.7;
-    for (const [i, d] of [0, 160].entries()) {
-      const ring = el("span", { class: "gf-fx ring" });
-      flyLayer.append(ring);
-      ring
-        .animate([{ transform: `translate(${cx}px, ${cy}px) scale(.3, .15)`, opacity: 0.9 }, { transform: `translate(${cx}px, ${cy}px) scale(${1.8 - i * 0.4}, ${0.9 - i * 0.2})`, opacity: 0 }], { duration: tokenMs("slow") * 3, delay: d, easing: easing("out"), fill: "backwards" })
-        .finished.then(() => ring.remove(), () => ring.remove());
-    }
-    const fish = el("span", { class: "gf-fx fish" });
-    fish.innerHTML = FISH_SVG;
-    fish.style.setProperty("--fw", `${Math.round(w * 0.75)}px`);
-    flyLayer.append(fish);
-    const span = w * 0.55;
-    const up = Math.min(90, st.h * 0.75);
-    const at = (dx, dy, rot, s = 1) => `translate(${cx + dx}px, ${cy + dy}px) rotate(${rot}deg) scale(${s})`;
-    fish
-      .animate(
-        [
-          { transform: at(span, 6, 50, 0.5), opacity: 0 },
-          { transform: at(span * 0.6, -up * 0.7, 30), opacity: 1, offset: 0.25 },
-          { transform: at(0, -up, 0), opacity: 1, offset: 0.5 },
-          { transform: at(-span * 0.6, -up * 0.7, -30), opacity: 1, offset: 0.75 },
-          { transform: at(-span, 6, -50, 0.5), opacity: 0 },
-        ],
-        { duration: tokenMs("slow") * 3.2, easing: "cubic-bezier(.3,.1,.4,1)" },
-      )
-      .finished.then(() => fish.remove(), () => fish.remove());
-    for (let i = 0; i < 5; i++) {
-      const drop = el("span", { class: "gf-fx drop" });
-      flyLayer.append(drop);
-      const a = -Math.PI / 2 + (i - 2) * 0.45;
-      drop
-        .animate([{ transform: `translate(${cx + span}px, ${cy}px) scale(.6)`, opacity: 0.9 }, { transform: `translate(${cx + span + Math.cos(a) * 34}px, ${cy + Math.sin(a) * 30}px) scale(1)`, opacity: 0 }], { duration: tokenMs("slow") * 2, delay: 60, easing: easing("out"), fill: "backwards" })
-        .finished.then(() => drop.remove(), () => drop.remove());
-    }
-  }
-
-  // Sparkles round a rect: a lucky catch, a book.
-  function sparkle(r, p, g, n = 8) {
-    if (fast() || !live(g)) return;
-    const cx = r.x + r.w / 2;
-    const cy = r.y + r.h / 2;
-    for (let i = 0; i < n; i++) {
-      const node = el("span", { class: `gf-fx spark p-${p}` });
-      flyLayer.append(node);
-      const a = (i / n) * Math.PI * 2;
-      const d = Math.max(r.w, r.h) * 0.6 + 14;
-      node
-        .animate([{ transform: `translate(${cx}px, ${cy}px) scale(.2)`, opacity: 1 }, { transform: `translate(${cx + Math.cos(a) * d}px, ${cy + Math.sin(a) * d}px) scale(1)`, opacity: 0 }], { duration: tokenMs("slow") * 2.4, easing: easing("out") })
-        .finished.then(() => node.remove(), () => node.remove());
-    }
-  }
-
-  // Moves `slot` from the pond to player p's hand.
-  async function dealTo(p, slot, g, ms, sound = "deal") {
-    const from = table.stockRect();
-    view.stock = Math.max(0, view.stock - 1);
-    view.hands[p].push(slot);
-    view.arriving.add(slot);
-    render();
-    if (sound) play(sound);
-    await fly(p === me ? faceOf(slot) : null, from, seatRect(p, slot), { ms, turn: p === me && faceOf(slot) !== null ? "up" : null, g });
-    view.arriving.delete(slot);
-    if (live(g)) render();
-  }
-
-  // Cards handed over, face up: from the answerer's hand to the asker's.
-  async function handOver(ev, g, k) {
-    const from = new Map(ev.slots.map((slot) => [slot, seatRect(ev.p, slot)]));
-    view.hands[ev.p] = view.hands[ev.p].filter((s) => !ev.slots.includes(s));
-    for (const slot of ev.slots) {
-      view.hands[ev.to].push(slot);
-      view.arriving.add(slot);
-    }
-    render();
-    // At once (reduced motion, a hidden tab): one slide, not a burst.
-    if (fast()) play("draw");
-    await Promise.all(
-      ev.slots.map((slot, i) =>
-        wait(i * 110 * k, g).then(async () => {
-          if (!fast()) play("draw");
-          await fly(faceOf(slot), from.get(slot), seatRect(ev.to, slot), { ms: PACE.give * k, turn: ev.to === me ? null : "down", g });
-          view.arriving.delete(slot);
-          if (live(g)) render();
-        }),
-      ),
-    );
-  }
-
-  // A book: its cards gather from the hand and fan down in front of their owner.
-  async function layBook(ev, g, k) {
-    const from = new Map(ev.slots.map((slot) => [slot, seatRect(ev.p, slot)]));
-    view.hands[ev.p] = view.hands[ev.p].filter((s) => !ev.slots.includes(s));
-    view.books[ev.p].push({ rank: ev.rank, slots: ev.slots.slice() });
-    view.arriving.add(ev.slots[0]);
-    render();
-    const node = booksBox(ev.p).querySelector(`[data-book="${ev.slots[0]}"]`);
-    const targets = node ? [...node.children].map((c) => rectIn(c)) : [];
-    await Promise.all(ev.slots.map((slot, i) => wait(i * 70 * k, g).then(() => fly(faceOf(slot), from.get(slot), targets[i] ?? rectIn(booksBox(ev.p)), { ms: PACE.book * k, turn: ev.p === me ? null : "up", spin: (i - 1.5) * 6, g }))));
-    view.arriving.delete(ev.slots[0]);
-    if (!live(g)) return;
-    render();
-    play("book");
-    if (node && !fast()) node.animate([{ transform: "scale(1.25)" }, { transform: "scale(1)" }], { duration: tokenMs("slow") * 1.4, easing: easing("spring") });
-    if (node) sparkle(rectIn(node), ev.p, g, 10);
-    // The last book of the game: confetti from where it landed.
-    if (view.books.flat().length === totalBooks(match.state) && node) table.confetti(rectIn(node), ev.p, seats, g);
-  }
-
-  // A lucky fish is shown: your card hops; another player's flips up over their seat.
-  async function showLucky(ev, g, k) {
-    if (ev.p === me) {
-      const btn = handCards.get(ev.slot);
-      if (btn && !fast() && live(g)) btn.firstChild.animate([{ transform: "translateY(0)" }, { transform: "translateY(-22px) rotate(-4deg)", offset: 0.4 }, { transform: "translateY(0)" }], { duration: tokenMs("slow") * 2.4, easing: easing("spring") });
-      if (btn) sparkle(rectIn(btn.firstChild), me, g);
-      await wait(PACE.bubble * 0.7 * k, g);
-      return;
-    }
-    const from = seatRect(ev.p, ev.slot);
-    const r = rectIn(pond);
-    const to = { x: from.x + (r.x + r.w / 2 - from.x) * 0.35, y: from.y + 30, w: r.w * 0.55, h: r.w * 0.55 * 1.4 };
-    if (fast() || !live(g)) return;
-    const card = cardEl(faceOf(ev.slot), { down: true });
-    card.classList.add("gf-shown");
-    card.style.width = `${to.w}px`;
-    card.style.height = `${to.h}px`;
-    flyLayer.append(card);
-    card.animate([{ transform: `translate(${from.x}px, ${from.y}px) scale(${from.w / to.w})`, opacity: 0.6 }, { transform: `translate(${to.x}px, ${to.y}px) scale(1)`, opacity: 1, offset: 0.35 }, { transform: `translate(${to.x}px, ${to.y}px) scale(1)`, opacity: 1, offset: 0.8 }, { transform: `translate(${from.x}px, ${from.y}px) scale(${from.w / to.w})`, opacity: 0 }], {
-      duration: PACE.bubble * 1.8 * k,
-      easing: easing("out"),
-      fill: "forwards",
-    });
-    const inner = card.querySelector(".in");
-    inner.animate([{ transform: "rotateY(180deg)" }, { transform: "rotateY(0deg)" }], { duration: PACE.bubble * 0.5 * k, delay: PACE.bubble * 0.3 * k, easing: easing("out"), fill: "forwards" });
-    setTimeout(() => sparkle(to, ev.p, g), PACE.bubble * 0.6 * k);
-    await wait(PACE.bubble * 1.8 * k, g);
-    card.remove();
-  }
+  const sayHost = (p) => (p === me ? askBar : seatOf(p).node);
+  const { say, splash, dealTo, handOver, layBook, showLucky } = tableMotion({ table, view: () => view, render, face: faceOf, me, seats, seatRect, booksBox, sayHost, tableBox, pond, stock, total: () => totalBooks(match.state) });
 
   async function animate(ev, g) {
     const k = table.pace();
@@ -487,16 +250,14 @@ function mountGame(session, root, shell) {
       addLog({ player: ev.p, rank: ev.rank, text: `${nameOf(ev.p)} asked ${ev.to === me ? "you" : nameOf(ev.to)} for ${rankWords(ev.rank)}` });
       await wait(PACE.bubble * k, g);
     } else if (ev.type === "give") {
-      say(ev.p, ev.slots.length === 1 ? "Here you go!" : ev.slots.length === 2 ? "Here, both!" : `Here, all ${NUMBER[ev.slots.length] ?? ev.slots.length}!`, g, "give");
+      say(ev.p, giveWords(ev.slots.length), g, "give");
       shownAsk = null;
       await handOver(ev, g, k);
       if (!live(g)) return;
       addLog({ player: ev.p, faces: ev.slots.map(faceOf), text: `${nameOf(ev.p)} handed ${ev.to === me ? "you" : nameOf(ev.to)} ${cardsOf(ev.slots.length, ev.rank)}` });
       await wait(PACE.between * k, g);
     } else if (ev.type === "fish") {
-      const fishIcon = el("span", { class: "gf-say-fish", "aria-hidden": "true" });
-      fishIcon.innerHTML = FISH_SVG;
-      say(ev.p, [fishIcon, "Go fish!"], g, "fish");
+      say(ev.p, fishWords(), g, "fish");
       shownAsk = null;
       render();
       play("fish");
@@ -727,21 +488,8 @@ function mountGame(session, root, shell) {
   }
 
   function renderAsk(asking) {
-    askBtn.hidden = !asking;
-    tableBox.classList.toggle("my-ask", asking);
-    if (!asking) {
-      handHint.textContent = "";
-      hint.textContent = !match || match.phase !== "playing" ? "" : "Ask for a rank you hold. Got them all? You go again. Go fish? You draw from the pond.";
-      hint.parentNode.hidden = !hint.textContent;
-      return;
-    }
-    hint.parentNode.hidden = false;
-    const options = askable(match.state, me);
-    const to = options.length === 1 ? options[0] : selSeat;
-    askBtn.disabled = selRank === null || to === null;
-    askBtn.textContent = selRank === null && to === null ? "Pick a card and a player" : selRank === null ? `Ask ${nameOf(to)} for…` : to === null ? `Ask … for ${rankWords(selRank)}` : `Ask ${nameOf(to)} for ${rankWords(selRank)}`;
-    handHint.textContent = selRank === null ? "Tap a card to ask for its rank" : options.length > 1 && to === null ? "Now tap a player" : "";
-    hint.textContent = "Tap a card, then a player, then Ask. Keys: arrows and Enter in your hand, Tab to the players, A asks, Esc clears.";
+    const options = asking ? askable(match.state, me) : [];
+    drawAsk({ askBtn, handHint, hint, tableBox }, { asking, playing: match?.phase === "playing", rank: selRank, to: options.length === 1 ? options[0] : selSeat, many: options.length > 1, nameOf });
   }
 
   // Answers, books, lucky fish and the end of a turn: made for you, truthfully, after a short beat.

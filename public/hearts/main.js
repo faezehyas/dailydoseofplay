@@ -2,7 +2,8 @@
 // in rules.js; the card table's shared pieces (art, seats, hand, the trick,
 // won tricks, the pass and motion) in engine/cards/. This file is the view:
 // four (or three) seats round the trick, the pass, the queen's weight, hearts
-// breaking, each hand's points tallying up and the moon. Leading the 2 of
+// breaking, each hand's points tallying up and the moon (drawn and moved by
+// art.js, which the tutorial shares). Leading the 2 of
 // clubs, an only legal card and the next hand are played for you after a
 // short beat. The match state never waits for the screen: every event is
 // queued and played out in order, faster when they pile up, and at once with
@@ -14,11 +15,12 @@ import { el, toast, setTabAlert } from "../engine/shell.js";
 import { playerBar } from "../engine/players.js";
 import { resultPanel } from "../engine/result.js";
 import { celebrate } from "../engine/celebrate.js";
-import { cardTable, DECK_WORK, tokenMs, easing } from "../engine/cards/table.js";
+import { cardTable, DECK_WORK } from "../engine/cards/table.js";
 import { humanPause } from "../engine/cards/paced-robot.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { cardWords, cardName, suitOf, SUIT_NAMES } from "../engine/cards/faces.js";
-import { makeRules, normalizeConfig, forcedMove, legalPlays, passTo, cardFace, handSize, isPoint, HEARTS, QUEEN_SPADES, MIN_PLAYERS, MAX_PLAYERS, PASS_COUNT } from "./rules.js";
+import { makeRules, normalizeConfig, forcedMove, legalPlays, passTo, cardFace, handSize, isPoint, QUEEN_SPADES, MIN_PLAYERS, MAX_PLAYERS, PASS_COUNT } from "./rules.js";
+import { PACE, DIR_WORD, plural, signed, handOrder, tableView, whyNot, heartsTable } from "./art.js";
 import { chooseMove, startRobot, timeoutMove } from "./robot.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
@@ -28,17 +30,8 @@ import { howToPlay } from "./how-to-play.js";
 const ROBOT_PACE = { pass: 1500, play: 620, option: 60, forced: 360, find: 140, next: 1700, max: 2100 };
 // Your browser's own moves nobody chooses, after a short beat.
 const AUTO = { find: 260, play: 420, next: 1700 };
-const PACE = { deal: 26, dealFly: 260, pass: 520, between: 140, play: 360, look: 520, gather: 440, tally: 45, bubble: 820, moment: 900 };
 const CLAIM_GRACE_MS = 6000; // past a player's time before we say their browser is quiet
 const LEVEL_NAME = { easy: "Easy", medium: "Medium", hard: "Hard" };
-const DIR_WORD = { left: "left", right: "right", across: "across" };
-const DIR_ARROW = { left: "←", right: "→", across: "↑" };
-const MOON_SVG =
-  '<svg viewBox="0 0 120 120" aria-hidden="true" focusable="false"><circle cx="60" cy="60" r="44" fill="currentColor" opacity=".18"/><path d="M78 20a44 44 0 1 0 22 62A36 36 0 1 1 78 20Z" fill="currentColor"/><circle cx="52" cy="52" r="5" fill="#000" opacity=".12"/><circle cx="44" cy="76" r="7" fill="#000" opacity=".1"/><circle cx="66" cy="88" r="4" fill="#000" opacity=".12"/></svg>';
-const HEART_SVG = '<svg viewBox="0 0 24 22" aria-hidden="true" focusable="false"><path d="M12 21 2.6 11.7A5.6 5.6 0 0 1 12 4a5.6 5.6 0 0 1 9.4 7.7Z" fill="currentColor"/></svg>';
-const BROKEN_SVG =
-  '<svg viewBox="0 0 24 22" aria-hidden="true" focusable="false"><path class="l" d="M12 21 2.6 11.7A5.6 5.6 0 0 1 12 4l-1.6 4.4 2.6 3-2.2 3.4Z" fill="currentColor"/><path class="r" d="M12 21l1.2-6.2 2.2-3.4-2.6-3L12 4a5.6 5.6 0 0 1 9.4 7.7Z" fill="currentColor"/></svg>';
-
 // Robot games: robots wait for the screen to finish replaying. The view sets this.
 let screenBusy = () => false;
 
@@ -59,6 +52,7 @@ startGameShell({
   slug: "hearts",
   title: "Hearts",
   howToPlay,
+  tutorial: () => import("./tutorial.js"),
   layout: "wide",
   settings,
   minPlayers: MIN_PLAYERS,
@@ -74,15 +68,12 @@ startGameShell({
   onSession: (session, root, shell) => mountGame(session, root, shell),
 });
 
-const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const listOf = (names) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
-const signed = (n) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0");
 
 function mountGame(session, root, shell) {
   const me = session.index;
   const count = session.players.length;
   const seats = session.players.map((p) => p.seat);
-  const around = Array.from({ length: count }, (_, i) => (me + i) % count); // me, then clockwise (to my left)
   const myName = session.me.name === "You" ? "You" : `${session.me.name} (you)`;
   const nameOf = (p) => (p === me ? "You" : session.players[p].name);
   // "You pass", "Bo passes"
@@ -112,7 +103,7 @@ function mountGame(session, root, shell) {
   const four = () => settings.get().fourColor;
   // The shared table (engine/cards/table.js).
   const table = cardTable({ prefix: "hr", play, animate: (ev, g) => animate(ev, g), done: (idle) => replayed(idle) });
-  const { miniCard, fly, live, fast, wait, rectIn, flyLayer, hand, handCards } = table;
+  const { miniCard, fly, live, fast, wait } = table;
   const faceOf = (slot) => cardFace(count, match?.face(slot) ?? null);
 
   // "setup" is for this view (only from the room's creator); the rest goes to the matches.
@@ -125,50 +116,10 @@ function mountGame(session, root, shell) {
   bar.update({ badges: seats.map(() => el("span", { class: "dot", "aria-hidden": "true" })) });
   const status = el("p", { class: table.cls("status"), id: "hr-status", role: "status", "aria-live": "polite", tabindex: "-1" });
 
-  // The others round the table: the next on your left, then across, then on your right.
-  const POS = count === 4 ? ["left", "top", "right"] : ["left", "right"];
-  const posOf = (p) => (p === me ? "bottom" : POS[around.indexOf(p) - 1]);
-  const opps = around.slice(1).map((p, i) => {
-    const seat = table.makeSeat({ p, name: session.players[p].name, pos: POS[i] });
-    seat.won = table.makeWon(p);
-    seat.points = el("span", { class: "hr-points mono", hidden: true });
-    seat.mark = el("span", { class: "hr-picked", hidden: true, "aria-hidden": "true" }, "✓");
-    seat.node.append(el("span", { class: "hr-seat-row" }, seat.won.node, seat.points));
-    seat.pill.append(seat.mark);
-    return seat;
-  });
-  const seatOf = (p) => opps.find((o) => o.p === p);
-
-  // The middle: the trick, the deck while it's shuffled and dealt, the chips under it, a hand's tally.
-  const trick = table.makeTrick(around.map((p) => [p, posOf(p)]));
-  const stockEl = table.makeStock({ label: (left) => (left ? `The deck: ${plural(left, "card")} to deal` : "The deck") });
-  // Out of sight between deals, but still laid out: the hand is sized from the deck's card width.
-  const deckBox = el("div", { class: "hr-deck away", "aria-hidden": "true" }, el("div", { class: table.cls("stack") }, stockEl, table.riffle));
-  const brokenChip = el("span", { class: "hr-broken", id: "hr-broken", hidden: true }, el("span", { class: "hr-heart" }), "Hearts broken");
-  brokenChip.firstChild.innerHTML = BROKEN_SVG;
-  const passChip = el("span", { class: "hr-pass-chip", id: "hr-pass-chip", hidden: true });
-  trick.info.append(passChip, brokenChip);
-  const tallyRows = el("div", { class: "hr-tally-rows" });
-  const tallyTitle = el("strong", { class: "hr-tally-title" });
-  const tally = el("div", { class: "hr-tally", id: "hr-tally", hidden: true }, tallyTitle, tallyRows);
-  const centre = el("div", { class: "hr-centre" }, el("div", { class: "hr-trick-wrap" }, trick.node, deckBox, tally), trick.info, table.busyChip);
-
-  // Your corner: the pass button and timer, your hand, your pill, tricks and points.
-  const passLabel = el("span", {});
-  const passNote = el("small", {});
-  const passBtn = el("button", { class: "btn primary hr-pass", type: "button", id: "hr-pass", hidden: true, onclick: () => passNow() }, passLabel, passNote);
-  const timerFill = el("span");
-  const timerText = el("span", { class: "mono" });
-  const timer = el("div", { class: "hr-timer", id: "hr-timer", hidden: true, role: "timer", "aria-label": "Time for your move" }, el("span", { class: "bar" }, timerFill), timerText);
-  const actionBar = el("div", { class: "hr-bar", id: "hr-bar" }, passBtn, timer);
-  const myCount = el("span", { class: "count mono" }, "0");
-  const myWon = table.makeWon(me);
-  const myPoints = el("span", { class: "hr-points mono", id: "hr-points", hidden: true });
-  const myPill = el("span", { class: "pill" }, el("span", { class: "dot", "aria-hidden": "true" }), el("span", { class: "name" }, myName), myCount);
-  const handHint = el("p", { class: table.cls("hand-hint"), id: "hr-hand-hint" });
-  const meArea = el("div", { class: table.cls("me", `p-${me}`) }, actionBar, hand, el("div", { class: "hr-me-row" }, myPill, myWon.node, myPoints), handHint);
-  const tableBox = el("div", { class: table.cls("table", `four-seats seats-${count}`), id: "hr-table" }, el("div", { class: table.cls("opps") }, opps.map((o) => o.node)), centre, meArea);
-  const tableWrap = el("div", { class: table.cls("table-wrap") }, tableBox, flyLayer);
+  // The table's pieces and motion (art.js).
+  const parts = heartsTable(table, { me, names: session.players.map((p) => p.name), myName, onPass: () => passNow() });
+  const { around, opps, seatOf, trick, deckBox, tally, timer, timerFill, timerText, actionBar, meArea, myWon, myPill, tableBox, tableWrap } = parts;
+  const { drawHand, drawSeats, drawCentre, drawActions, seatRect, wonRect, say, heartsBreak, cardToTrick, takeTrick, passCards, tallyUp } = parts;
 
   const hint = el("p", { class: table.cls("hint"), id: "hr-hint" });
   const logList = el("ol", { class: table.cls("log"), id: "hr-log", "aria-label": "Recent moves" });
@@ -197,26 +148,7 @@ function mountGame(session, root, shell) {
 
   // ---------- the table as drawn ----------
   const emptyView = (scores = seats.map(() => 0)) => ({ hands: seats.map(() => []), trick: [], won: seats.map(() => 0), points: seats.map(() => 0), scores: scores.slice(), broken: false, dir: "none", picks: seats.map(() => false), received: [], stock: 0, wins: -1, arriving: new Set(), flipping: new Set() });
-  function viewFromState() {
-    const st = match.state;
-    return {
-      hands: st.hands.map((h) => h.slice()),
-      trick: st.trick.map((x) => ({ p: x.p, slot: x.slot })),
-      won: st.won.map((w) => w.length / count),
-      points: rawPoints(st),
-      scores: st.scores.slice(),
-      broken: st.broken,
-      dir: st.dir,
-      picks: st.picks.map(Boolean),
-      received: st.phase === "pass" ? [] : st.received[me].slice(),
-      stock: 0,
-      wins: -1,
-      arriving: new Set(),
-      flipping: new Set(),
-    };
-  }
-  // Hearts and the queen each seat has taken this hand.
-  const rawPoints = (st) => st.won.map((slots) => slots.reduce((n, s) => n + (suitOf(faceOf(s)) === HEARTS ? 1 : faceOf(s) === QUEEN_SPADES ? 13 : 0), 0));
+  const viewFromState = () => tableView(match.state, me, faceOf);
   const known = (slot) => (view.arriving.has(slot) || view.flipping.has(slot) ? null : faceOf(slot));
   const scoreOf = (p) => carried[p] + view.scores[p];
 
@@ -240,71 +172,21 @@ function mountGame(session, root, shell) {
   const canPick = () => picking() && current?.type !== "deal" && view.hands[me].length > 0 && view.hands[me].every((s) => known(s) !== null);
 
   // ---------- rendering pieces ----------
-  // Your hand by suit (clubs, diamonds, spades, hearts, alternating colours), low to high.
-  const SUIT_ORDER = [3, 2, 0, 1];
-  const sortKey = (slot) => {
-    const f = known(slot);
-    return f === null ? 1000 + slot : SUIT_ORDER.indexOf(suitOf(f)) * 20 + (f % 13 === 0 ? 14 : f % 13);
-  };
+  const sortKey = (slot) => handOrder(slot, known(slot));
 
   function renderHand() {
     const slots = view.hands[me].slice().sort((a, b) => sortKey(a) - sortKey(b));
     const choice = myChoice();
     const legal = new Set(choice === "play" ? legalPlays(match.state, me, faceOf) : []);
-    const pass = canPick();
     const sent = new Set(match?.state?.picks?.[me] ?? []);
     picked = picked.filter((s) => slots.includes(s));
-    const received = new Set(view.received);
-    table.renderHand(slots, {
-      face: known,
-      arriving: view.arriving,
-      first: legal.size ? slots.find((s) => legal.has(s)) : picked[0],
-      look: (slot, face) => {
-        const isPicked = picked.includes(slot) || sent.has(slot);
-        const playable = legal.has(slot);
-        return {
-          lift: isPicked,
-          classes: { playable, dim: choice === "play" && !playable, picked: isPicked, pickable: pass && !sent.size, received: received.has(slot) },
-          label:
-            face === null
-              ? "A card, still being dealt"
-              : `${cardWords(face)}${received.has(slot) ? ", passed to you" : ""}${playable ? ", play it" : choice === "play" ? ", can't be played now" : ""}${isPicked ? ", picked to pass" : ""}`,
-        };
-      },
-    });
-    myCount.textContent = String(view.hands[me].length);
-  }
-
-  function renderSeats() {
-    for (const o of opps) {
-      const n = view.hands[o.p].length;
-      const pts = view.points[o.p];
-      o.render(view.hands[o.p], view.arriving, `${session.players[o.p].name}: ${plural(n, "card")}, ${plural(view.won[o.p], "trick")} won${pts ? `, ${plural(pts, "point")} this hand` : ""}`);
-      o.won.render(view.won[o.p]);
-      o.points.hidden = !pts && !o.points.dataset.counting;
-      if (!o.points.dataset.counting) o.points.textContent = `♥ ${pts}`;
-      o.mark.hidden = !(view.dir !== "none" && view.picks[o.p] && match?.state?.phase === "pass");
-    }
-    myWon.render(view.won[me]);
-    myPoints.hidden = !view.points[me];
-    myPoints.textContent = `♥ ${view.points[me]}`;
+    drawHand(slots, { face: known, arriving: view.arriving, choice, legal, pass: canPick(), sent, picked, received: new Set(view.received) });
   }
 
   function renderCentre() {
     const st = match?.state;
-    const lead = view.trick.length ? known(view.trick[0].slot) : null;
-    const plays = view.trick.filter((x) => !view.arriving.has(x.slot));
-    trick.render(view.trick, {
-      face: known,
-      arriving: view.arriving,
-      suit: lead === null ? null : suitOf(lead),
-      wins: view.wins,
-      label: plays.length ? `The trick: ${plays.map((x) => `${nameOf(x.p)} ${cardName(known(x.slot) ?? 0)}`).join(", ")}${lead !== null ? `. Follow ${SUIT_NAMES[suitOf(lead)].toLowerCase()}` : ""}` : "The trick is empty",
-    });
-    brokenChip.hidden = !view.broken;
     const passing = st && st.phase === "pass" && view.dir !== "none" && match.phase === "playing";
-    passChip.hidden = !passing;
-    if (passing) passChip.textContent = `Pass ${DIR_WORD[view.dir]} ${DIR_ARROW[view.dir]} ${nameOf(passTo(st, me))}`;
+    drawCentre(view, { face: known, nameOf, to: passing ? passTo(st, me) : null });
     const dealing = view.stock > 0 || match?.busy === "shuffling";
     deckBox.classList.toggle("away", !dealing);
     if (dealing) table.renderStock(view.stock || count * handSize(count));
@@ -313,15 +195,6 @@ function mountGame(session, root, shell) {
   }
 
   // ---------- motion ----------
-  function seatRect(p, slot) {
-    if (p === me) {
-      const btn = slot !== undefined && handCards.get(slot);
-      return btn ? rectIn(btn.firstChild) : rectIn(hand);
-    }
-    return seatOf(p).rect(slot);
-  }
-  const wonRect = (p) => (p === me ? myWon.rect() : seatOf(p).won.rect());
-
   // Moves `slot` from the deck to player p's hand.
   async function dealTo(p, slot, g, ms, sound = "deal") {
     const from = table.stockRect();
@@ -334,92 +207,6 @@ function mountGame(session, root, shell) {
     await fly(face, from, seatRect(p, slot), { ms, turn: face !== null ? "up" : null, g });
     view.arriving.delete(slot);
     if (live(g)) render();
-  }
-
-  // A word over a seat: "No 2♣", "Picked".
-  function say(p, text, g) {
-    table.bubble(p === me ? actionBar : seatOf(p).node, p, text, g, PACE.bubble);
-  }
-
-  // A moment over the table, in the player's colour: "Shot the moon!".
-  function moment(text, p, kind, g, art = "") {
-    if (!live(g) || fast()) return;
-    const node = el("div", { class: `hr-moment p-${p} ${kind}`, role: "presentation" }, el("span", { class: "art" }), el("span", { class: "words" }, text));
-    node.firstChild.innerHTML = art;
-    flyLayer.append(node);
-    const end = () => node.remove();
-    node.animate(
-      [
-        { transform: "translate(-50%, -40%) scale(.5)", opacity: 0 },
-        { transform: "translate(-50%, -50%) scale(1.06)", opacity: 1, offset: 0.2 },
-        { transform: "translate(-50%, -50%) scale(1)", opacity: 1, offset: 0.32 },
-        { transform: "translate(-50%, -52%) scale(1)", opacity: 1, offset: 0.82 },
-        { transform: "translate(-50%, -62%) scale(.96)", opacity: 0 },
-      ],
-      { duration: PACE.moment * 2.6, easing: easing("out") },
-    ).finished.then(end, end);
-  }
-
-  // The felt takes a weight: the table nudges down and back.
-  function thump(g, px = 4) {
-    if (fast() || !live(g)) return;
-    tableBox.animate([{ transform: "translateY(0)" }, { transform: `translateY(${px}px)`, offset: 0.22 }, { transform: "translateY(-1px)", offset: 0.6 }, { transform: "translateY(0)" }], { duration: tokenMs("slow") * 1.4, easing: easing("out") });
-  }
-
-  // The queen of spades lands with weight: she drops onto the trick, a shadow spreads over the felt.
-  function queenLands(p, g) {
-    play("queen");
-    if (fast() || !live(g)) return;
-    thump(g, 6);
-    const card = trick.node.querySelector(`.pc-trick-spot[data-seat="${p}"] .pc-card`);
-    const tilt = card?.style.transform ?? "";
-    card?.animate([{ transform: `${tilt} translateY(-18px) scale(1.28)` }, { transform: `${tilt} translateY(2px) scale(.94)`, offset: 0.45 }, { transform: `${tilt} translateY(0) scale(1)` }], { duration: tokenMs("slow") * 2, easing: easing("out") });
-    const shade = el("div", { class: "hr-shade", "aria-hidden": "true" });
-    const r = rectIn(card ?? trick.node);
-    shade.style.transform = `translate(${r.x + r.w / 2}px, ${r.y + r.h / 2}px)`;
-    flyLayer.append(shade);
-    shade
-      .animate([{ transform: `translate(${r.x + r.w / 2}px, ${r.y + r.h / 2}px) scale(.2)`, opacity: 0.85 }, { transform: `translate(${r.x + r.w / 2}px, ${r.y + r.h / 2}px) scale(3.2)`, opacity: 0 }], { duration: tokenMs("slow") * 4, easing: easing("out") })
-      .finished.then(() => shade.remove(), () => shade.remove());
-  }
-
-  // Hearts break: the chip's heart cracks in two with a heartbeat.
-  function heartsBreak(g) {
-    play("broken");
-    if (fast() || !live(g)) return;
-    const [l, r] = brokenChip.querySelectorAll("path");
-    const ms = tokenMs("slow") * 2.4;
-    brokenChip.animate([{ transform: "scale(.6)", opacity: 0 }, { transform: "scale(1.18)", opacity: 1, offset: 0.25 }, { transform: "scale(1)", offset: 0.4 }, { transform: "scale(1.1)", offset: 0.6 }, { transform: "scale(1)" }], { duration: ms, easing: easing("out") });
-    l?.animate([{ transform: "translate(1px, 0) rotate(0)" }, { transform: "translate(-1.5px, 0) rotate(-8deg)", offset: 0.6 }, { transform: "translate(-1px, 0) rotate(-5deg)" }], { duration: ms, easing: easing("out"), fill: "forwards" });
-    r?.animate([{ transform: "translate(-1px, 0) rotate(0)" }, { transform: "translate(1.5px, 0) rotate(8deg)", offset: 0.6 }, { transform: "translate(1px, 0) rotate(5deg)" }], { duration: ms, easing: easing("out"), fill: "forwards" });
-    const host = rectIn(trick.node);
-    for (let i = 0; i < 7; i++) {
-      const node = el("span", { class: "pc-fx hr-mini-heart" });
-      node.innerHTML = HEART_SVG;
-      flyLayer.append(node);
-      const a = (i / 7) * Math.PI * 2;
-      const cx = host.x + host.w / 2;
-      const cy = host.y + host.h / 2;
-      const d = Math.min(host.w, host.h) * 0.55;
-      node
-        .animate([{ transform: `translate(${cx}px, ${cy}px) scale(.3)`, opacity: 0 }, { transform: `translate(${cx + Math.cos(a) * d * 0.5}px, ${cy + Math.sin(a) * d * 0.5}px) scale(1)`, opacity: 1, offset: 0.3 }, { transform: `translate(${cx + Math.cos(a) * d}px, ${cy + Math.sin(a) * d - 20}px) scale(.6)`, opacity: 0 }], { duration: ms * 1.4, easing: easing("out") })
-        .finished.then(() => node.remove(), () => node.remove());
-    }
-  }
-
-  // A number counting up, a tick for each step (it lands at once with reduced motion).
-  async function countUp(node, from, to, g, text) {
-    node.dataset.counting = "1";
-    const steps = fast() ? 0 : Math.min(Math.abs(to - from), 26);
-    for (let i = 1; i <= steps && live(g); i++) {
-      node.textContent = text(Math.round(from + (to - from) * Math.min(1, i / steps)));
-      play("tally", { n: i });
-      await wait(PACE.tally * table.pace(), g);
-    }
-    delete node.dataset.counting;
-    if (!live(g)) return;
-    if (!steps && to !== from) play("tally");
-    node.textContent = text(to);
   }
 
   async function animate(ev, g) {
@@ -445,7 +232,8 @@ function mountGame(session, root, shell) {
     } else if (ev.type === "passed") {
       const to = (q) => passTo({ dir: ev.dir, players: count }, q);
       const from = around.find((q) => to(q) === me);
-      await passCards(ev, to, from, g, k);
+      picked = [];
+      await passCards(view, ev, { to, from, face: faceOf, g, k, render });
       if (!live(g)) return;
       addLog({ player: me, faces: ev.picks[me].map(faceOf), text: `You passed ${ev.picks[me].map((s) => cardName(faceOf(s))).join(" ")} to ${nameOf(to(me))}` });
       // Named once their envelopes are open (see renderLog).
@@ -454,18 +242,8 @@ function mountGame(session, root, shell) {
       say(ev.p, "No 2♣", g);
       await wait(PACE.bubble * 0.35 * k, g);
     } else if (ev.type === "play") {
-      const from = seatRect(ev.p, ev.slot);
-      view.hands[ev.p] = view.hands[ev.p].filter((s) => s !== ev.slot);
-      view.received = view.received.filter((s) => s !== ev.slot);
-      view.trick.push({ p: ev.p, slot: ev.slot });
-      view.arriving.add(ev.slot);
-      render();
-      play("play");
-      await fly(ev.face, from, trick.rect(ev.p), { ms: PACE.play * k, turn: ev.p === me ? null : "up", spin: ((ev.slot * 37) % 9) - 4, g });
-      view.arriving.delete(ev.slot);
+      await cardToTrick(view, ev, { g, k, render });
       if (!live(g)) return;
-      render();
-      if (ev.face === QUEEN_SPADES) queenLands(ev.p, g);
       addLog({ player: ev.p, face: ev.face, kind: ev.face === QUEEN_SPADES ? "queen" : "", text: `${nameOf(ev.p)} ${ev.lead ? verb(ev.p, "leads") : verb(ev.p, "plays")} ${cardWords(ev.face)}` });
       if (ev.face === QUEEN_SPADES) await wait(PACE.look * k, g);
     } else if (ev.type === "broken") {
@@ -474,21 +252,8 @@ function mountGame(session, root, shell) {
       heartsBreak(g);
       addLog({ player: ev.p, kind: "broken", text: "Hearts are broken" });
     } else if (ev.type === "trick") {
-      await wait(PACE.look * k, g);
+      const raw = await takeTrick(view, ev, { face: faceOf, g, k, render });
       if (!live(g)) return;
-      view.wins = ev.winner;
-      render();
-      await wait(PACE.look * 0.6 * k, g);
-      if (!live(g)) return;
-      play("sweep");
-      await trick.gather(ev.plays, ev.winner, wonRect(ev.winner), { face: faceOf, ms: PACE.gather * k, g });
-      if (!live(g)) return;
-      view.trick = [];
-      view.wins = -1;
-      view.won[ev.winner]++;
-      const raw = ev.plays.reduce((n, x) => n + (suitOf(x.face) === HEARTS ? 1 : x.face === QUEEN_SPADES ? 13 : 0), 0);
-      view.points[ev.winner] += raw;
-      render();
       addLog({ player: ev.winner, faces: ev.plays.filter((x) => isPoint(x.face)).map((x) => x.face), text: raw ? `${nameOf(ev.winner)} ${verb(ev.winner, "takes")} the trick: ${plural(raw, "point")}` : `${nameOf(ev.winner)} ${verb(ev.winner, "takes")} the trick` });
     } else if (ev.type === "score") {
       await showTally(ev, g, k);
@@ -501,67 +266,10 @@ function mountGame(session, root, shell) {
     await wait(PACE.between * k, g);
   }
 
-  // The pass: each seat's three cards leave face down toward their seat; yours arrive and turn up in your hand.
-  async function passCards(ev, to, from, g, k) {
-    play("pass");
-    const flights = [];
-    for (let q = 0; q < count; q++) {
-      const cards = ev.picks[q].map((s) => ({ face: q === me ? faceOf(s) : null, rect: seatRect(q, s) }));
-      flights.push(table.sendCards(cards, seatRect(to(q)), { ms: PACE.pass * k, g }));
-    }
-    for (let q = 0; q < count; q++) view.hands[q] = view.hands[q].filter((s) => !ev.picks[q].includes(s));
-    picked = [];
-    // The cards coming to you land face down, then turn up.
-    const mine = ev.picks[from];
-    for (const s of mine) view.flipping.add(s);
-    render();
-    await Promise.all(flights);
-    if (!live(g)) return;
-    for (let q = 0; q < count; q++) view.hands[to(q)].push(...ev.picks[q]);
-    view.received = mine.slice();
-    view.picks = seats.map(() => false);
-    render();
-    await wait(tokenMs("med"), g);
-    for (const s of mine) view.flipping.delete(s);
-    render();
-    await wait(tokenMs("slow"), g);
-  }
-
   // The hand's points tally up: each seat's hearts and queen, the moon, then the totals.
   async function showTally(ev, g, k) {
-    const rows = around.map((p) => {
-      const add = el("span", { class: "add mono" }, "0");
-      const total = el("span", { class: "total mono" }, String(scoreOf(p)));
-      const row = el("div", { class: `hr-tally-row p-${p} ${p === me ? "mine" : ""}` }, el("span", { class: "dot", "aria-hidden": "true" }), el("span", { class: "who" }, p === me ? "You" : session.players[p].name), add, total);
-      return { p, add, total, row };
-    });
-    tallyTitle.textContent = ev.moon >= 0 ? `${nameOf(ev.moon)} shot the moon!` : `Hand ${ev.hand}`;
-    tallyRows.replaceChildren(...rows.map((r) => r.row));
-    // The moon rises first, then the points.
-    if (ev.moon >= 0) {
-      play("moon");
-      moment(ev.moon === me ? "You shot the moon!" : `${session.players[ev.moon].name} shot the moon!`, ev.moon, "moon", g, MOON_SVG);
-      table.confetti(rectIn(trick.node), ev.moon, seats, g);
-      await wait(PACE.moment * 2.4 * k, g);
-      if (!live(g)) return;
-    }
-    tally.hidden = false;
-    tally.className = `hr-tally ${ev.moon >= 0 ? `moon p-${ev.moon}` : ""}`;
-    render();
-    if (!fast()) tally.animate([{ transform: "translate(-50%, -50%) scale(.85)", opacity: 0 }, { transform: "translate(-50%, -50%) scale(1)", opacity: 1 }], { duration: tokenMs("slow"), easing: easing("spring") });
-    for (const r of rows) {
-      if (!live(g)) return;
-      const add = ev.add[r.p];
-      r.row.classList.add("on");
-      await countUp(r.add, 0, add, g, signed);
-      if (add) await countUp(r.total, scoreOf(r.p), scoreOf(r.p) + add, g, String);
-      else r.total.textContent = String(scoreOf(r.p));
-    }
+    await tallyUp(view, ev, { nameOf, scoreOf, seats, g, k, render });
     if (!live(g)) return;
-    view.scores = ev.scores.slice();
-    render();
-    const best = Math.min(...ev.scores.map((s, p) => carried[p] + s));
-    for (const r of rows) r.row.classList.toggle("low", scoreOf(r.p) === best);
     addLog({ player: ev.moon >= 0 ? ev.moon : undefined, kind: ev.moon >= 0 ? "moon" : "", text: ev.moon >= 0 ? `${nameOf(ev.moon)} shot the moon: ${config.moon === "others" ? "26 to everyone else" : "26 off"}` : `Hand ${ev.hand}: ${around.map((p) => `${nameOf(p)} ${signed(ev.add[p])}`).join(", ")}` });
     await wait(PACE.bubble * k, g);
   }
@@ -620,25 +328,10 @@ function mountGame(session, root, shell) {
     if (myChoice() !== "play") return;
     if (!legalPlays(match.state, me, faceOf).includes(slot)) {
       play("nope");
-      return toast(whyNot(slot));
+      return toast(whyNot(match.state, me, slot, faceOf));
     }
     match.play({ play: slot });
   });
-
-  // Why a card can't be played now, in words.
-  function whyNot(slot) {
-    const st = match.state;
-    const f = faceOf(slot);
-    if (st.trick.length) {
-      const lead = suitOf(st.trick[0].face);
-      const can = match.state.hands[me].some((s) => suitOf(faceOf(s)) === lead);
-      if (suitOf(f) !== lead && can) return `Follow suit: play a ${SUIT_NAMES[lead].toLowerCase().replace(/s$/, "")}`;
-      if (st.tricks === 0 && isPoint(f)) return "No points on the first trick";
-      return "You can't play that one now";
-    }
-    if (st.tricks === 0) return "The 2 of clubs leads";
-    return suitOf(f) === HEARTS ? "Hearts aren't broken yet: lead another suit" : "You can't lead that one now";
-  }
 
   function togglePick(slot) {
     if (wantPass) return;
@@ -740,7 +433,7 @@ function mountGame(session, root, shell) {
     const mine = myDecision() || picking();
     status.className = `${table.cls("status")} ${mine ? `mine p-${me}` : d ? `p-${d.player}` : ""}`;
     if (view) {
-      renderSeats();
+      drawSeats(view, match?.state?.phase === "pass");
       renderCentre();
       renderHand();
     }
@@ -769,16 +462,9 @@ function mountGame(session, root, shell) {
     const st = match?.state;
     const pass = picking() && view?.hands[me].length;
     const hadFocus = actionBar.contains(document.activeElement) ? document.activeElement : null;
-    passBtn.hidden = !pass;
-    if (pass) {
-      passLabel.textContent = `Pass ${DIR_WORD[st.dir]} ${DIR_ARROW[st.dir]}`;
-      passNote.textContent = wantPass ? "when it's your turn" : picked.length === PASS_COUNT ? `to ${nameOf(passTo(st, me))}` : `${picked.length} of 3 picked`;
-      passBtn.disabled = picked.length !== PASS_COUNT || !!wantPass;
-    }
+    const note = !pass ? "" : wantPass ? "when it's your turn" : picked.length === PASS_COUNT ? `to ${nameOf(passTo(st, me))}` : `${picked.length} of 3 picked`;
+    drawActions({ dir: pass ? st.dir : null, note, ready: picked.length === PASS_COUNT && !wantPass, choice: myChoice(), wantPass, received: view?.received.length });
     if (hadFocus?.hidden || hadFocus?.disabled) status.focus({ preventScroll: true });
-    const choice = myChoice();
-    tableBox.classList.toggle("my-turn", !!choice || !!pass);
-    handHint.textContent = pass ? (wantPass ? "Esc puts them back" : "Tap three cards to pass") : choice === "play" ? "Tap a lit card to play it" : view?.received.length ? "The dots mark the cards passed to you" : "";
     if (!match || match.phase !== "playing") hint.textContent = "";
     else hint.textContent = "Follow suit if you can. Each heart is 1 point and the queen of spades 13; the lowest score wins. Hearts can't be led until a heart or the queen has been played. Keys: arrows and Enter in your hand, P to pass, Esc to clear.";
     hint.parentNode.hidden = !hint.textContent;

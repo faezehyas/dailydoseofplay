@@ -40,6 +40,31 @@ slightly over time; the flow is the same.
 From then on, merging a PR into `main` deploys it. To roll back, pick an
 earlier version on the app's **Versions** page.
 
+## App links for the mobile app
+
+Invite links open the mobile app (bundle ID and Android package
+`com.dailydoseofplay.app`) once the site serves two files that name it:
+`/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`
+(see **Mobile app** in `ARCHITECTURE.md`). Their values come from two
+Wasmer secrets; each file is a 404 until its secret is set to a well-formed
+value.
+
+| Secret | Value | Where to find it |
+|---|---|---|
+| `APPLE_TEAM_ID` | The 10-character Apple team ID, e.g. `ABCDE12345` | Apple Developer → **Membership details** |
+| `ANDROID_CERT_SHA256` | The SHA-256 fingerprint of the app's signing certificate, 32 hex pairs with colons (`AB:CD:…`). Several, comma-separated, when both the upload key and Google Play's signing key should open links. | Play Console → the app → **Test and release → App integrity → App signing** |
+
+Set them in the dashboard (the app → **Settings → Secrets**) or with the
+CLI, then redeploy so the server reads them
+([Wasmer secrets](https://docs.wasmer.io/edge/learn/secrets)):
+
+```bash
+wasmer app secrets create --app faezeh_yass/dailydoseofplay APPLE_TEAM_ID ABCDE12345
+```
+
+Check with `curl -i https://www.dailydoseofplay.com/.well-known/assetlinks.json`:
+expect `200` and `content-type: application/json`.
+
 ## Domains
 
 | Address | What it does |
