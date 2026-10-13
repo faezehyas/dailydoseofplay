@@ -2518,6 +2518,70 @@ input::placeholder {
   margin: 0;
 }
 
+/* Phones: a compact tile, its art on the left and its quick play links in a
+   row underneath, so the list stays short. */
+@media (max-width: 600px) {
+  .game-grid {
+    gap: 8px;
+  }
+
+  .game-card {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-areas:
+      "icon name"
+      "icon text"
+      "icon meta"
+      "icon by"
+      "play play";
+    align-content: center;
+    gap: 0 12px;
+    padding: 8px 10px;
+    line-height: 1.25;
+  }
+
+  .game-icon {
+    grid-area: icon;
+    align-self: center;
+  }
+
+  .game-card h2 {
+    grid-area: name;
+    font-size: 1.05rem;
+  }
+
+  .game-card p {
+    grid-area: text;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    font-size: 0.85rem;
+  }
+
+  .game-card .made-by {
+    grid-area: by;
+    font-size: 0.75rem;
+  }
+
+  .game-meta {
+    grid-area: meta;
+  }
+
+  .game-meta .chip {
+    padding-block: 0;
+    font-size: 0.75rem;
+  }
+
+  .quick-play {
+    grid-area: play;
+    grid-template-columns: 1fr 1fr;
+    margin-top: 6px;
+  }
+
+  .quick-play .btn {
+    min-height: 44px;
+  }
+}
+
 @media (max-width: 520px) {
   .steps {
     flex-direction: column;

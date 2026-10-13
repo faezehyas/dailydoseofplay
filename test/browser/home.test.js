@@ -1,6 +1,6 @@
 // Headless-browser tests: every game tile on the home page is the same size,
 // whatever its description's length or its makers' handles, and a phone screen doesn't scroll
-// sideways or hide the first tile below the hero; placeholders hold the
+// sideways or hide the first tile below the hero and shows compact tiles; placeholders hold the
 // tiles' places while the list loads, and a failed load offers Retry; the
 // hero's scene loops, pauses off screen and in a hidden tab, and holds still
 // with reduced motion. Skips if Playwright is missing.
@@ -83,6 +83,9 @@ test("home page tiles are all the same size", { skip: !pw && "Playwright not ins
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, "no horizontal scroll at 360 px");
       const iconBottom = await page.locator(".game-card[data-slug] .game-icon").first().evaluate((e) => e.getBoundingClientRect().bottom);
       assert.ok(iconBottom <= 640, `first tile's picture ends at ${iconBottom} px, below a 640 px phone screen`);
+      assert.ok(cards[0].height <= 140, `tiles are ${cards[0].height} px tall, not compact`);
+      const links = await page.locator(".game-card[data-slug] .quick-play a").evaluateAll((els) => els.map((a) => a.getBoundingClientRect().height));
+      assert.ok(Math.min(...links) >= 44, `quick play links are ${Math.min(...links)} px tall, under 44 px`);
     }
     await page.screenshot({ path: `${ARTIFACTS}/home-${width}.png`, fullPage: true });
     await page.close();
