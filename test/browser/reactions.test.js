@@ -10,7 +10,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll, pick } from "./ludo.shared.js";
+import { ARTIFACTS, pw, wait, noHorizontalScroll } from "./ludo.shared.js";
 
 const PHONE = { viewport: { width: 360, height: 760 }, hasTouch: true, colorScheme: "light" };
 const DESKTOP = { viewport: { width: 1280, height: 900 }, colorScheme: "dark" };
@@ -135,7 +135,6 @@ test("four players: the tray and bubbles fit, at 360 px and 1280 px", { skip: !p
   ]) {
     const page = await open(name, opts, "Ada");
     await page.goto(`${srv.base}/ludo/`);
-    await pick(page, "robots", 3);
     await page.click("#play-robot");
     await wait(page, () => window.ddp.match?.phase === "playing");
     assert.equal(await page.locator(".pb-who").count(), 4);

@@ -132,8 +132,7 @@ test("illegal moves throw RuleError: out of turn, unknown move, after the game",
 test("config: unknown values fall back to the defaults; the room picks who starts", () => {
   assert.deepEqual(normalizeConfig(null), DEFAULT_CONFIG);
   assert.deepEqual(normalizeConfig({ finish: "teleport", sixAgain: "yes", first: 7, spin: "x" }), DEFAULT_CONFIG);
-  assert.deepEqual(normalizeConfig({ finish: "bounce", sixAgain: true, first: "guest", spin: "auto", robots: 3 }), { finish: "bounce", sixAgain: true, first: "guest", spin: "auto", robots: 3 });
-  assert.equal(normalizeConfig({ robots: 4 }).robots, 1, "at most three robots");
+  assert.deepEqual(normalizeConfig({ finish: "bounce", sixAgain: true, first: "guest", spin: "auto" }), { finish: "bounce", sixAgain: true, first: "guest", spin: "auto" });
   assert.equal(makeRules({ first: "host" }).newState(1).turn, 0);
   assert.equal(makeRules({ first: "guest" }).newState(0).turn, 1);
   assert.equal(makeRules({ first: "random" }).newState(1).turn, 1);

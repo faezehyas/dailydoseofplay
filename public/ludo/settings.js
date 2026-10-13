@@ -1,5 +1,5 @@
 // Ludo's settings: the house rules, playing on for places, who rolls first,
-// the move timer, and the robots' level and number.
+// the move timer, and the robots' level.
 import { gameSettings } from "../engine/settings.js";
 import { normalizeConfig } from "./rules.js";
 
@@ -11,8 +11,7 @@ const GROUPS = [
   { name: "places", legend: "When someone finishes", options: [[true, "Play for places"], [false, "Game ends"]], summary: (v) => (v ? "Play for places" : "First home wins") },
   { name: "first", legend: "First roll", options: [["random", "Coin toss"], ["host", "Me"], ["guest", "Next player", "first friend in"]], summary: (v, l) => ({ host: "You go first", guest: "Next player goes first" })[v] ?? l },
   { name: "moveSeconds", legend: "Time to move", options: [[0, "No limit"], [10, "10 s"], [20, "20 s"], [30, "30 s"]], summary: (v, l) => (v ? `${l} a move` : "No move limit") },
-  { name: "level", legend: "Robot level", robot: true, options: [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]], summary: (v, l) => `${l} robot` },
-  { name: "robots", legend: "Play vs robot", robot: true, options: [[1, "1 robot"], [2, "2 robots"], [3, "3 robots"]] },
+  { name: "level", legend: "Robot level", robot: true, options: [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]], summary: (v, l, c, robots) => `${l} ${robots > 1 ? "robots" : "robot"}` },
 ];
 
 export const settings = gameSettings({

@@ -32,7 +32,7 @@ test("two friends play Crazy Eights on the host's settings through the invite li
   // Host (laptop, light): classic defaults, then action cards on and the host first.
   const host = await open("host", "Ada", { colorScheme: "light" });
   await host.goto(`${srv.base}/crazy-eights/`);
-  for (const [name, value] of [["draw", "until"], ["strict", "true"], ["actions", "false"], ["first", "random"], ["moveSeconds", "0"], ["level", "easy"], ["robots", "3"], ["fourColor", "false"]]) {
+  for (const [name, value] of [["draw", "until"], ["strict", "true"], ["actions", "false"], ["first", "random"], ["moveSeconds", "0"], ["level", "easy"], ["fourColor", "false"]]) {
     assert.equal(await host.locator(`#ce-settings input[name="ce-${name}"]:checked`).getAttribute("value"), value, `classic default for ${name}`);
   }
   await pick(host, "actions", true);

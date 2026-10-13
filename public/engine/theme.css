@@ -549,6 +549,57 @@ input::placeholder {
   grid-template-columns: 1fr;
 }
 
+/* "Play vs robot" with how many play (lobby.js, settings.js), in one box on
+   a row of its own: the count beside the button, or above it on a phone. */
+.lobby-actions:has(.robot-play) {
+  grid-template-columns: 1fr;
+}
+
+.robot-play {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 16px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.robot-play .players-choice {
+  margin: 0;
+}
+
+/* A floated legend is laid out like any block, so it can be centred. */
+.robot-play .players-choice legend {
+  float: left;
+  width: 100%;
+  text-align: center;
+}
+
+.robot-play .seg-options {
+  clear: both;
+  justify-content: center;
+}
+
+.players-choice .seg-opt span {
+  min-width: 44px;
+  min-height: 44px;
+  justify-items: center;
+}
+
+/* The count picked is teal, the robots' colour, so coral stays with "Play with friends". */
+.robot-play .seg-opt input:checked + span {
+  background: var(--accent-2-text);
+  border-color: var(--accent-2-text);
+  color: var(--surface);
+}
+
+.players-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .lobby-note {
   color: var(--muted);
   font-size: 0.85rem;
@@ -2528,6 +2579,9 @@ input::placeholder {
     font-size: 0.85rem;
   }
   .lobby-actions {
+    grid-template-columns: 1fr;
+  }
+  .robot-play {
     grid-template-columns: 1fr;
   }
   .brand span {

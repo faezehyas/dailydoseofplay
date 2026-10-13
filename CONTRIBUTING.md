@@ -109,7 +109,7 @@ look. Write its text in `how-to-play.js` and pass it to `startGameShell()`
 (step 5): the engine draws the panel under the game, in this order, and the
 lobby card links to it. Leave out any section that doesn't apply. A section
 is a string (one paragraph) or an array (a list), in your own words;
-`**text**` is bold. Name every robot level and robot count, every setting and
+`**text**` is bold. Name every robot level and player count, every setting and
 clock, and every key.
 
 ```js
@@ -278,10 +278,10 @@ export const settings = gameSettings({
   normalize: normalizeConfig, // raw (or null) -> a complete, valid config
   hint: "In a friend game, the settings of whoever creates the room apply to both players.",
   groups: [
-    // summary(value, label, config): the text of this group's chip in the summary ("" leaves it out).
+    // summary(value, label, config, robots): the text of this group's chip in the summary ("" leaves it out).
     { name: "moveSeconds", legend: "Time per move", options: [[10, "10 s"], [0, "No limit"]], summary: (v, l) => (v ? `${l} a move` : "No move limit") },
     // scope: "device" tags the group "vs robot only", gives its chip a teal dot and keeps it off the waiting screen.
-    { name: "level", legend: "Robot level", scope: "device", options: [["easy", "Easy"], ["hard", "Hard"]], summary: (v, l) => `${l} robot` },
+    { name: "level", legend: "Robot level", scope: "device", options: [["easy", "Easy"], ["hard", "Hard"]], summary: (v, l, c, robots) => `${l} ${robots > 1 ? "robots" : "robot"}` },
     // scope: "view": this player's own view, never sent, and open to change during a game.
     { name: "hints", legend: "Legal moves", scope: "view", options: [[true, "Show"], [false, "Hide"]], summary: () => "" },
   ],
@@ -295,8 +295,8 @@ Each group has a `scope` (see **Settings** in `ARCHITECTURE.md`):
   guests as `setup {config}` (see **Room settings** under Tic Tac Toe in
   `ARCHITECTURE.md`); a robot game reads `settings.get("robot")` (below).
   Locked during a game.
-- `"device"`: only matters against robots (their level and number; older
-  games say `robot: true`). Locked during a game.
+- `"device"`: only matters against robots (their level; older games say
+  `robot: true`). Locked during a game.
 - `"view"`: how this player sees the game (coordinates, legal-move hints).
   Never sent; read `settings.get()` each time you draw or decide, so a change
   made in the settings panel mid-game applies at once.
@@ -310,9 +310,12 @@ game, both in `createRobot` and in `onSession`. Test `robotConfig` in
 `rules.test.js`. Games whose clocks are off by default need none of this.
 
 **More than two players.** Pass `minPlayers` and `maxPlayers` to
-`startGameShell()` (and `robots`, the robot seats in a robot game: a number,
-or a function such as `() => settings.get().robots`). The host
-gets a player list and a Start button. In `onSession`, use `session.players`
+`startGameShell()`. The host gets a player list and a Start button, and the
+engine offers how many play a robot game, from `max(2, minPlayers)` to
+`maxPlayers`, with "Play vs robot": don't add a setting for the number of
+robots. A full table comes first unless you pass `defaultPlayers` to
+`gameSettings()`; for a hint under a count, pass `playerNotes`, such as
+Hearts' `{ 3: "17 cards each" }`. In `onSession`, use `session.players`
 (`{seat, name}`), `session.index` (your seat) and `session.others`, pass
 `players: session.players.length` to `TurnMatch`, and write rules whose turn
 moves to the next seat. `newState(first, players)` receives the player count.

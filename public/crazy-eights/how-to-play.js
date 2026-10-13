@@ -4,7 +4,7 @@ export const howToPlay = {
   players: [
     "Two to four, with a standard 52-card deck.",
     "To play friends, create a room and send the invite link to up to three of them, then press **Start game**.",
-    "Against robots, pick 1, 2 or 3 robots and their level: Easy, Medium or Hard.",
+    "Against robots, pick how many play (**Players**, 2, 3 or 4, above **Play vs robot**) and the robots' level in the settings: Easy, Medium or Hard.",
   ],
   setup: "With two players everyone gets 7 cards; with three or four, 5 each. The next card is turned up to start the discard pile (an 8 goes to the bottom of the stock instead).",
   turn: [

@@ -516,7 +516,7 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `confirm.js` | `confirmDialog({ title, text, yes, no })`: a yes-or-no question in a modal `<dialog>` styled like the site. Focus moves to Cancel, Esc or Cancel says no, and focus returns to where it was (Leave). Resolves to `true` for yes. |
 | `how-to-play.js` | `howToPlayPanel(sections, top)`: the "How to play" panel (`details.rules#how-to-play`) with the same `<h3>` sections in every game, in one order: Goal, Players, Setup, On your turn, Winning, Settings and clocks, Fair play, Keyboard. A game leaves out what doesn't apply; a section is a paragraph or a list, and an unknown one throws. `top` goes first (the lobby's link to the tutorial). `startGameShell()` puts it under `#game`. `madeBy(credits)`: the panel's last line, "Made by @handle" with each handle linked to its GitHub profile. |
 | `tutorial.js` | `startTutorial()`: a game's lessons on its own board, with the lesson list and its ticks, the step runner, the highlight layer (lit squares and arrows), the hint, progress and the end screen (see **Tutorials**). The lobby imports it only when a tutorial opens. |
-| `settings.js` | `gameSettings()`: a game's settings (groups of segmented options such as clocks or board size), remembered per device under the game's key. The lobby shows them folded to a summary ("Game settings" over chips such as "No clocks", "Coin toss", "Easy robot", and Change) that opens to the options; a "device" group (`scope: "device"`, or `robot: true`) is tagged "vs robot only", its chip has a teal dot, and it is left out of the waiting screen's summary, like a "view" group. `form()` is the options themselves, shown in the lobby card and in the settings panel's "This game" tab, and each copy follows changes made in the other; `lock(on, mode)`, from the lobby, disables all but the "view" options while a game is on and shows that game's config. `get()` is the current config, which the game sends to its guests (`setup`); `get("robot")` is a robot game's, from the game's `robot(config, picked)` (see **Clocks against the robot**). It remembers which groups the player picked an option in (`picked`, kept with the config under the same key). |
+| `settings.js` | `gameSettings()`: a game's settings (groups of segmented options such as clocks or board size), remembered per device under the game's key. The lobby shows them folded to a summary ("Game settings" over chips such as "No clocks", "Coin toss", "Easy robot", and Change) that opens to the options; a "device" group (`scope: "device"`, or `robot: true`) is tagged "vs robot only", its chip has a teal dot, and it is left out of the waiting screen's summary, like a "view" group. `form()` is the options themselves, shown in the lobby card and in the settings panel's "This game" tab, and each copy follows changes made in the other; `lock(on, mode)`, from the lobby, disables all but the "view" options while a game is on and shows that game's config. `get()` is the current config, which the game sends to its guests (`setup`); `get("robot")` is a robot game's, from the game's `robot(config, picked)` (see **Clocks against the robot**). It remembers which groups the player picked an option in (`picked`, kept with the config under the same key). For a game that seats more than two it also keeps a robot game's player count there (`players`; see **How many play a robot game**): `offerPlayers(counts)`, `playersForm()` (the "Players" radio group, also in the panel's copy of `form()`) and `players()`. Settings saved before that kept the number of robots (`robots`), read as one more player (`savedPlayers()`). |
 | `sound.js` | Every game's sounds play through it (see **Sound levels**): `defineSounds()` takes a game's list of sounds, each with a role, and returns `play(name, opts, at)`. One audio context and one output for the site, the per-device mute and volume (a master gain after the output) from `prefs.js`, and preloading of short CC0 recordings (Sea Battle, Chess, Backgammon, Ludo and the card games, see each `sounds/LICENSE.txt`) |
 | `synth.js` | Building blocks for synthesized sounds: `tone()`, `noise()` (white or brown), `decay()` and a `pentatonic()` scale |
 | `loudness.js` | `loudness(samples, sampleRate)`: how loud a sound is to the ear, in LUFS (K-weighted, loudest 100 ms). No DOM; runs in node too. |
@@ -573,13 +573,32 @@ Guests keep their signaling socket while they wait, so the server's room size
 check (`room_full`) still counts them.
 
 In robot mode the engine builds a `localRoom()`: one in-memory group with a
-seat for the player and one per robot (`robots`, default 1, or a function the
-lobby calls when a robot game starts), and hands each
+seat for the player and one per robot, and hands each
 robot's `Session` to the game's `createRobot()`. **A robot is just another
 peer**, so robot games use exactly the same protocol and rules code as friend
 games. The lobby acts on `?room=`, `?robot` and `?friend` only after the
 game's module has finished loading, because a robot game's `onSession` runs at once and may
 use bindings the module declares after its `startGameShell()` call.
+
+**How many play a robot game.** The engine fills the table: a game seats
+`maxPlayers`, so a two-player game has one robot. When `maxPlayers` is above
+`max(2, minPlayers)`, "Play vs robot" sits in a box of its own with a
+"Players (you + robots)" radio group, one button per count from
+`max(2, minPlayers)` to `maxPlayers` (2 · 3 · 4 in Ludo, 3 · 4 in Hearts), and
+the button names the robots ("Play vs 2 robots"). The box has a row of its own
+under "Play with friends", the count beside the button, or above it on a
+phone; the count picked is teal, the robots' colour. The game's
+`gameSettings()` keeps the count on the device under the game's key; it
+starts at the game's `defaultPlayers` (Chutes and Ladders: 2) or a full table.
+The settings panel's "This game" tab shows the same choice after the robots'
+level, locked during a game, and a group's `summary()` gets the number of
+robots, so a chip can say "Easy robots". The game's `playerNotes` give a hint
+under the choice for some counts (Hearts: "17 cards each" for 3). Settings
+saved when each game had its own "robots" option keep their choice: 3 robots
+become 4 players. Friend games don't change: a room still fills up to
+`maxPlayers` with people. A game may still pass `robots` (a number, or a
+function the lobby calls when a robot game starts) to set the robot seats
+itself; then the lobby offers no choice.
 
 Side by side, only the group transport differs (dashed boxes):
 
@@ -723,8 +742,8 @@ End move between its two tabs:
 - **This game**, on a game page: the game's settings, the same options
   (`form()` in `settings.js`) as in the lobby card. A game gives each group a
   scope. **room** options (clocks, board size, who starts, house rules) go to
-  the other players as before; **device** options (the robots' level and
-  number) only matter against robots; **view** options (Chutes and Ladders'
+  the other players as before; **device** options (the robots' level) only
+  matter against robots, like the lobby's player count; **view** options (Chutes and Ladders'
   spinner) are this player's alone. While a game is on, room and device options
   are locked, with a note: a session keeps the settings its `setup` sent,
   rematches included, so a change applies from the next game started in the
@@ -1087,8 +1106,8 @@ checks that no game opens its own audio context or output.
 |---|---|
 | `index.html` | Page with `#lobby` and `#game` sections |
 | `how-to-play.js` | The "How to play" text, `export const howToPlay = { goal, players, setup, turn, winning, settings, fairPlay, keyboard }`, passed to `startGameShell()` |
-| `main.js` | `startGameShell({ slug, title, layout, settings, howToPlay, tutorial, createRobot, onSession, minPlayers, maxPlayers, robots })` and the view. The player counts default to 2 and `maxPlayers` must match `games.json`; the lobby's tagline is the game's `description` there (a `tagline` option still overrides it); `layout` picks the page column (see **Page column**). |
-| `settings.js` | Optional: the game's settings, `export const settings = gameSettings({ key, prefix, groups, normalize, hint, robot })`, passed to `startGameShell()` and read with `settings.get()` (`settings.get("robot")` in a robot game). Each group has a `scope`: `"room"` (the default), `"device"` or `"view"` (see **Settings**). `robot` is for clocks on by default (see **Clocks against the robot**). |
+| `main.js` | `startGameShell({ slug, title, layout, settings, howToPlay, tutorial, createRobot, onSession, minPlayers, maxPlayers })` and the view. The player counts default to 2 and `maxPlayers` must match `games.json`; with more than two, the lobby offers how many play a robot game (see **How many play a robot game**); the lobby's tagline is the game's `description` there (a `tagline` option still overrides it); `layout` picks the page column (see **Page column**). |
+| `settings.js` | Optional: the game's settings, `export const settings = gameSettings({ key, prefix, groups, normalize, hint, robot, defaultPlayers, playerNotes })`, passed to `startGameShell()` and read with `settings.get()` (`settings.get("robot")` in a robot game). Each group has a `scope`: `"room"` (the default), `"device"` or `"view"` (see **Settings**). `robot` is for clocks on by default (see **Clocks against the robot**); `defaultPlayers` and `playerNotes` are a robot game's first player count and hints for some counts. |
 | `rules.js` | Pure rules: no DOM, timers, network or `Math.random`. Randomness is passed in. |
 | `match.js` | Only for games with hidden information that isn't a deck of cards (Sea Battle's fleet): one player's protocol state machine. Card games use `engine/card-match.js`, the others `engine/turn-match.js`. |
 | `sounds.js` | Optional: the game's sounds, `export const sounds = defineSounds({...})` with a role for each (see **Sound levels**), and the `play` helpers `main.js` calls. The only file that imports `engine/sound.js`. |
@@ -1731,9 +1750,8 @@ setting means seat 1, the first friend in. The room creator's `setup` is
 accepted only from seat 0. Pawns are coral, teal, violet and amber by seat,
 the same on every screen, everywhere a player's colour shows
 (name, score, pawn, last-square ring, spin log). Two pawns on a square stand
-side by side; three or four stand staggered across it. A robot game has 1 to
-3 robots, from a per-device setting the lobby reads when the game starts
-(`robots` may be a function). The room starts when the host presses Start,
+side by side; three or four stand staggered across it. A robot game seats 2 to
+4, as the player picks in the lobby (see **How many play a robot game**). The room starts when the host presses Start,
 or by itself once four are in.
 
 ## Dots and Boxes in depth
@@ -1887,7 +1905,7 @@ three and four players stay well inside it.
 **Room settings.** Three 6s in a row lose the turn (on), blocks (off), a
 capture rolls again (off), play for places (on), who rolls first (the coin
 toss, the room's creator, or seat 1), and a time to move (off, 10, 20 or
-30 s). The robot level and the number of robots stay on the device and only
+30 s). The robot level and a robot game's player count stay on the device and only
 matter in a robot game.
 
 **Move timer.** There is no clock in the rules: running out never loses,

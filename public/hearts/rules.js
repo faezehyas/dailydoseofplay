@@ -31,11 +31,10 @@ export const TARGETS = [100, 50, 0]; // 0: one hand a game, the scores adding up
 export const MOONS = ["others", "minus"];
 export const MOVE_SECONDS = [0, 15, 30, 60];
 export const LEVELS = ["easy", "medium", "hard"];
-export const ROBOTS = [2, 3];
 export const MIN_PLAYERS = 3;
 export const MAX_PLAYERS = 4;
-// level, robots and fourColor are per device; the rules ignore them.
-export const DEFAULT_CONFIG = { target: 100, passing: true, moon: "others", jack: false, moveSeconds: 0, level: "easy", robots: 3, fourColor: false };
+// level and fourColor are per device; the rules ignore them.
+export const DEFAULT_CONFIG = { target: 100, passing: true, moon: "others", jack: false, moveSeconds: 0, level: "easy", fourColor: false };
 
 export function normalizeConfig(raw) {
   const c = raw && typeof raw === "object" ? raw : {};
@@ -47,7 +46,6 @@ export function normalizeConfig(raw) {
     jack: pick(c.jack, [true, false], DEFAULT_CONFIG.jack),
     moveSeconds: pick(c.moveSeconds, MOVE_SECONDS, DEFAULT_CONFIG.moveSeconds),
     level: pick(c.level, LEVELS, DEFAULT_CONFIG.level),
-    robots: pick(c.robots, ROBOTS, DEFAULT_CONFIG.robots),
     fourColor: pick(c.fourColor, [true, false], DEFAULT_CONFIG.fourColor),
   };
 }

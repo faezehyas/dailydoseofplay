@@ -33,7 +33,7 @@ test("two friends play Go Fish on the host's settings through the invite link, t
   // Host (laptop, light): classic defaults, then the lucky fish passes and the host goes first.
   const host = await open("host", "Ada", { colorScheme: "light" });
   await host.goto(`${srv.base}/go-fish/`);
-  for (const [name, value] of [["hand", "classic"], ["lucky", "again"], ["empty", "draw"], ["books", "4"], ["first", "random"], ["moveSeconds", "0"], ["level", "easy"], ["robots", "3"], ["fourColor", "false"]]) {
+  for (const [name, value] of [["hand", "classic"], ["lucky", "again"], ["empty", "draw"], ["books", "4"], ["first", "random"], ["moveSeconds", "0"], ["level", "easy"], ["fourColor", "false"]]) {
     assert.equal(await host.locator(`#gf-settings input[name="gf-${name}"]:checked`).getAttribute("value"), value, `classic default for ${name}`);
   }
   await pick(host, "lucky", "pass");
