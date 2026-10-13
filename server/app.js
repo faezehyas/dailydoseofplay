@@ -3,6 +3,8 @@
 //   /<slug>/     a game (public/<slug>/index.html)
 //   /ws          shared signaling WebSocket, rooms scoped by game slug, own pages only
 //   /healthz     JSON status, CORS open
+//   /.well-known/apple-app-site-association, /.well-known/assetlinks.json
+//                invite links open the mobile app (404 until its IDs are set)
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -43,6 +45,33 @@ const SECURITY_HEADERS = {
 // Only the card deck's worker compiles WebAssembly (see ARCHITECTURE.md).
 const DECK_WORKER = path.join("engine", "deck-worker.js");
 const DECK_WORKER_CSP = CSP.replace("default-src 'self';", "default-src 'self'; script-src 'self' 'wasm-unsafe-eval';");
+
+// The mobile app's bundle ID on iOS and package name on Android.
+const APP_ID = "com.dailydoseofplay.app";
+
+// The files that let invite links (/<slug>/?room=…) open the app, by path.
+// A file is left out (so it is a 404) while its value is unset or malformed:
+// a wrong one would be cached by Apple and Google. androidCertSha256 may list
+// several fingerprints, comma-separated.
+function appLinkFiles({ appleTeamId, androidCertSha256 } = {}) {
+  const files = new Map();
+  const team = String(appleTeamId || "").trim();
+  if (/^[A-Z0-9]{10}$/.test(team)) {
+    files.set("/.well-known/apple-app-site-association", {
+      applinks: { details: [{ appIDs: [`${team}.${APP_ID}`], components: [{ "/": "/*/", "?": { room: "?*" } }] }] },
+    });
+  }
+  const certs = String(androidCertSha256 || "").split(",").map((c) => c.trim().toUpperCase()).filter(Boolean);
+  if (certs.length && certs.every((c) => /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(c))) {
+    files.set("/.well-known/assetlinks.json", [
+      {
+        relation: ["delegate_permission/common.handle_all_urls"],
+        target: { namespace: "android_app", package_name: APP_ID, sha256_cert_fingerprints: certs },
+      },
+    ]);
+  }
+  return files;
+}
 
 export function parseRegistry(text) {
   const games = new Map();
@@ -136,6 +165,8 @@ export async function createApp({
   log = console.log,
   allowedOrigins = process.env.ALLOWED_ORIGINS,
   clientIpHeader = process.env.CLIENT_IP_HEADER,
+  appleTeamId = process.env.APPLE_TEAM_ID,
+  androidCertSha256 = process.env.ANDROID_CERT_SHA256,
   limits,
   now,
 } = {}) {
@@ -143,6 +174,7 @@ export async function createApp({
   const games = parseRegistry(await readText(path.join(publicDir, "games.json")));
   const signaling = createSignaling({ games, log, limits, clientIpHeader, now });
   const notFoundPage = path.join(publicDir, "404.html");
+  const appLinks = appLinkFiles({ appleTeamId, androidCertSha256 });
 
   // Plain fs.readFile: EdgeJS is not upstream Node, so stay on proven APIs.
   // The ETag is hashed on every request, so an edited file is never served stale.
@@ -220,6 +252,11 @@ export async function createApp({
     if (req.method !== "GET" && req.method !== "HEAD") {
       res.writeHead(405, { ...SECURITY_HEADERS, Allow: "GET, HEAD" });
       return res.end();
+    }
+    if (appLinks.has(pathname)) {
+      const body = JSON.stringify(appLinks.get(pathname));
+      res.writeHead(200, { ...SECURITY_HEADERS, "Content-Type": "application/json", "Cache-Control": "no-cache" });
+      return res.end(req.method === "HEAD" ? undefined : body);
     }
     serveStatic(req, res, pathname);
   });
