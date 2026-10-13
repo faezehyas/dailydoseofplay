@@ -1,6 +1,6 @@
 // Headless-browser tests: every game tile on the home page is the same size,
 // whatever its description's length or its makers' handles, and a phone screen doesn't scroll
-// sideways or hide the first tile below the hero; placeholders hold the
+// sideways or hide the first tile below the hero and shows compact tiles; placeholders hold the
 // tiles' places while the list loads, and a failed load offers Retry; the
 // hero's scene loops, pauses off screen and in a hidden tab, and holds still
 // with reduced motion. Skips if Playwright is missing.
@@ -46,7 +46,7 @@ test("home page tiles are all the same size", { skip: !pw && "Playwright not ins
   });
   const errors = [];
 
-  for (const width of [1280, 768, 360]) {
+  for (const width of [1280, 768, 560, 360]) {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     page.on("pageerror", (e) => errors.push(`${width}: ${e.message}`));
     await page.route("**/games.json", (route) => route.fulfill({ json: { games: credited } }));
@@ -83,6 +83,18 @@ test("home page tiles are all the same size", { skip: !pw && "Playwright not ins
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, "no horizontal scroll at 360 px");
       const iconBottom = await page.locator(".game-card[data-slug] .game-icon").first().evaluate((e) => e.getBoundingClientRect().bottom);
       assert.ok(iconBottom <= 640, `first tile's picture ends at ${iconBottom} px, below a 640 px phone screen`);
+    }
+    if (width < 600) {
+      assert.ok(cards[0].height <= 150, `${width} px: tiles are ${cards[0].height} px tall, not compact`);
+      // A tap anywhere in a 44 px tall band lands on the quick play link.
+      const reach = await page.locator(".game-card[data-slug]").first().locator(".quick-play a").evaluateAll((links) =>
+        links.map((a) => {
+          const box = a.getBoundingClientRect();
+          const mid = box.top + box.height / 2;
+          return [mid - 21.5, mid + 21.5].every((y) => document.elementFromPoint(box.left + box.width / 2, y)?.closest("a") === a);
+        }),
+      );
+      assert.deepEqual(reach, [true, true], `${width} px: quick play links take taps 44 px tall`);
     }
     await page.screenshot({ path: `${ARTIFACTS}/home-${width}.png`, fullPage: true });
     await page.close();
