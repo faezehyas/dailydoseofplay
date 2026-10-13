@@ -622,6 +622,35 @@ input::placeholder {
   margin: 0 0 8px;
 }
 
+/* Your record against the robots (engine/robot-record.js), with Reset as a link. */
+.robot-record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 8px;
+}
+
+/* In the robot box, on a row of its own under the count and the button. */
+.robot-play .robot-record {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.robot-record-reset {
+  min-height: 44px;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: var(--accent-2-text);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .divider {
   display: flex;
   align-items: center;

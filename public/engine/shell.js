@@ -29,13 +29,14 @@ export function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-function store(key, value) {
+// Safe localStorage: a blocked or full storage never throws.
+export function store(key, value) {
   try {
     if (value == null) localStorage.removeItem(key);
     else localStorage.setItem(key, value);
   } catch {}
 }
-function load(key) {
+export function load(key) {
   try {
     return localStorage.getItem(key);
   } catch {
