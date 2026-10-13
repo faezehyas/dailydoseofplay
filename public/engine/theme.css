@@ -2585,8 +2585,8 @@ input::placeholder {
   margin: 0;
 }
 
-/* Phones: a compact tile, its art on the left and its quick play links in a
-   row underneath, so the list stays short. */
+/* Phones: a compact tile without its credit, its art on the left and its
+   quick play links in a row underneath, so the list stays short. */
 @media (max-width: 600px) {
   .game-grid {
     grid-template-columns: 1fr;
@@ -2600,7 +2600,6 @@ input::placeholder {
       "icon name"
       "icon text"
       "icon meta"
-      "icon by"
       "play play";
     align-content: center;
     gap: 0 12px;
@@ -2626,8 +2625,7 @@ input::placeholder {
   }
 
   .game-card .made-by {
-    grid-area: by;
-    font-size: 0.75rem;
+    display: none;
   }
 
   .game-meta {
