@@ -46,7 +46,15 @@
       <section id="lobby">
         <div class="card lobby-card">
           <h1>Dots and Boxes</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="waiting" role="status">
+            <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+              <path class="mark teal" d="M22 12h18M22 12v24M22 36h18" />
+              <path class="mark draw-1" pathLength="1" d="M40 12v24" />
+              <circle class="dot" cx="22" cy="12" r="2.5" /><circle class="dot" cx="40" cy="12" r="2.5" /><circle class="dot" cx="58" cy="12" r="2.5" />
+              <circle class="dot" cx="22" cy="36" r="2.5" /><circle class="dot" cx="40" cy="36" r="2.5" /><circle class="dot" cx="58" cy="36" r="2.5" />
+            </svg>
+            <span class="sr-only">Loading…</span>
+          </p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
         </div>
       </section>

@@ -46,7 +46,15 @@
       <section id="lobby">
         <div class="card lobby-card">
           <h1>Gomoku</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="waiting" role="status">
+            <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+              <path class="grid" d="M22 6v36M34 6v36M46 6v36M58 6v36M16 12h48M16 24h48M16 36h48" />
+              <circle class="stone teal" cx="34" cy="24" r="5" />
+              <circle class="stone" cx="22" cy="36" r="5" />
+              <circle class="stone place" cx="46" cy="24" r="5" />
+            </svg>
+            <span class="sr-only">Loading…</span>
+          </p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
         </div>
       </section>

@@ -46,7 +46,22 @@
       <section id="lobby">
         <div class="card lobby-card">
           <h1>Ludo</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="waiting" role="status">
+            <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+              <ellipse class="shade" cx="40" cy="44" rx="9" ry="2.5" />
+              <g transform="translate(31 24)">
+                <g class="die">
+                  <rect class="die-face" width="18" height="18" rx="4" />
+                  <path class="pip" d="M5 3.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4zM9 7.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4zM13 11.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4z" />
+                  <g class="die-b">
+                    <rect class="die-face" x="1" y="1" width="16" height="16" rx="3" />
+                    <path class="pip" d="M5 3.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4zM13 3.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4zM9 7.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4zM5 11.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4zM13 11.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4z" />
+                  </g>
+                </g>
+              </g>
+            </svg>
+            <span class="sr-only">Loading…</span>
+          </p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
         </div>
       </section>

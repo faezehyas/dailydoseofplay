@@ -45,7 +45,16 @@
       <section id="lobby">
         <div class="card lobby-card">
           <h1>Sea Battle</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="waiting" role="status">
+            <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+              <ellipse class="water" cx="40" cy="36" rx="32" ry="10" />
+              <path class="wave" d="M16 38q4-3 8 0t8 0M50 40q4-3 8 0t8 0" />
+              <ellipse class="ripple" cx="40" cy="34" rx="14" ry="4.5" />
+              <ellipse class="ripple" cx="40" cy="34" rx="8" ry="2.6" />
+              <circle class="drip" cx="40" cy="18" r="3" />
+            </svg>
+            <span class="sr-only">Loading…</span>
+          </p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
         </div>
       </section>

@@ -54,7 +54,18 @@
       <section id="lobby">
         <div class="card lobby-card">
           <h1>Crazy Eights</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="waiting" role="status">
+            <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+              <g transform="translate(20 11) rotate(-10)"><rect class="card-back" width="22" height="30" rx="3" /><rect class="card-trim" x="3" y="3" width="16" height="24" rx="2" /></g>
+              <g transform="translate(38 9) rotate(8)">
+                <g class="flip">
+                  <rect class="card-face" width="22" height="30" rx="3" /><path class="heart" d="M11 19c-4-3-6-5-6-7.5a3 3 0 0 1 6-1 3 3 0 0 1 6 1c0 2.5-2 4.5-6 7.5z" />
+                  <g class="flip-back"><rect class="card-back" width="22" height="30" rx="3" /><rect class="card-trim" x="3" y="3" width="16" height="24" rx="2" /></g>
+                </g>
+              </g>
+            </svg>
+            <span class="sr-only">Loading…</span>
+          </p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
         </div>
       </section>

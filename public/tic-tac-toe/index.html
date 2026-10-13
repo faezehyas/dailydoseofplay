@@ -46,7 +46,15 @@
       <section id="lobby">
         <div class="card lobby-card">
           <h1>Tic Tac Toe</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="waiting" role="status">
+            <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+              <path class="grid" d="M33 4v40M47 4v40M20 17h40M20 31h40" />
+              <path class="mark draw-1" pathLength="1" d="M35.5 19.5l9 9" />
+              <path class="mark draw-2" pathLength="1" d="M44.5 19.5l-9 9" />
+              <circle class="mark teal draw-3" pathLength="1" cx="54" cy="10" r="4.5" transform="rotate(-90 54 10)" />
+            </svg>
+            <span class="sr-only">Loading…</span>
+          </p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
         </div>
       </section>

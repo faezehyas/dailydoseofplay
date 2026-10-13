@@ -46,7 +46,18 @@
       <section id="lobby">
         <div class="card lobby-card">
           <h1>Connect 4</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="waiting" role="status">
+            <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+              <g transform="translate(-236 -29)">
+                <circle class="disc" cx="262" cy="68" r="5" />
+                <circle class="disc" cx="276" cy="55" r="5" />
+                <circle class="disc teal" cx="276" cy="68" r="5" />
+                <circle class="disc teal drop" cx="290" cy="68" r="5" />
+                <path class="rack" fill-rule="evenodd" d="M256 47h40a4 4 0 0 1 4 4v21a4 4 0 0 1-4 4h-40a4 4 0 0 1-4-4v-21a4 4 0 0 1 4-4zM257 55a5 5 0 0 0 10 0a5 5 0 0 0-10 0zM271 55a5 5 0 0 0 10 0a5 5 0 0 0-10 0zM285 55a5 5 0 0 0 10 0a5 5 0 0 0-10 0zM257 68a5 5 0 0 0 10 0a5 5 0 0 0-10 0zM271 68a5 5 0 0 0 10 0a5 5 0 0 0-10 0zM285 68a5 5 0 0 0 10 0a5 5 0 0 0-10 0z" />
+              </g>
+            </svg>
+            <span class="sr-only">Loading…</span>
+          </p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
         </div>
       </section>

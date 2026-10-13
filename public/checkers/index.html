@@ -46,7 +46,18 @@
       <section id="lobby">
         <div class="card lobby-card">
           <h1>Checkers</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="waiting" role="status">
+            <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+              <g transform="translate(-79 -35)">
+                <rect class="square" x="92" y="54" width="54" height="28" />
+                <path class="square dark" d="M110 54h18v14h-18zM92 68h18v14h-18zM128 68h18v14h-18z" />
+                <g transform="translate(101 75)">
+                  <g class="checker"><ellipse class="checker-side" cy="2" rx="7" ry="5" /><ellipse class="checker-top" rx="7" ry="5" /></g>
+                </g>
+              </g>
+            </svg>
+            <span class="sr-only">Loading…</span>
+          </p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
         </div>
       </section>

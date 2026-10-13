@@ -381,11 +381,14 @@ has a `<link rel="modulepreload">` for every engine module its `main.js`
 imports statically (not the tutorial's `import()`), and the browser fetches
 them all at once. `test/preload.test.js` walks the real import graph and names
 any preload that is missing or extra. While they load, `#lobby` holds a static
-`.lobby-card` with the game's title and a spinner, which the lobby's first
-screen replaces; `theme.css` keeps the header's height free above it until
-`shell.js` adds the header, so nothing jumps. A `<noscript>` line in it says
-the games need JavaScript. `test/browser/page-loading.test.js` holds back
-`engine/lobby.js` and checks the title shows.
+`.lobby-card` with the game's title and, under it, a piece of the game making
+its move (`.loading-piece`: inline SVG animated by CSS alone, with the home
+hero's shapes and keyframes where it has them, still under reduced motion),
+which the lobby's first screen replaces; `theme.css` keeps the header's height
+free above it until `shell.js` adds the header, so nothing jumps. A
+`<noscript>` line in it says the games need JavaScript.
+`test/browser/page-loading.test.js` holds back `engine/lobby.js` and checks
+the title and every game's piece show.
 
 **Who may open `/ws`.** Browsers always send an `Origin` header on a
 WebSocket handshake, and a page can't change it, so the upgrade handler

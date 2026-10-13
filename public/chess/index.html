@@ -46,7 +46,24 @@
       <section id="lobby">
         <div class="card lobby-card">
           <h1>Chess</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="waiting" role="status">
+            <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+              <g transform="translate(-177 -36)">
+                <path class="square" d="M196 66h14v12h-14zM224 66h14v12h-14z" />
+                <path class="square dark" d="M210 66h14v12h-14z" />
+                <g transform="translate(203 76)">
+                  <g class="knight">
+                    <g transform="scale(-0.24 0.24) translate(-50 -86)">
+                      <path d="M30 78c0-12 5-20 14-26-5 2-10 5-14 8l-8-8c3-12 10-21 20-26l4-10 6 8c14 3 22 17 20 54z" />
+                      <path d="M24 78h52a4 4 0 0 1 4 4v2a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4v-2a4 4 0 0 1 4-4z" />
+                      <circle class="eye" cx="38" cy="38" r="4" />
+                    </g>
+                  </g>
+                </g>
+              </g>
+            </svg>
+            <span class="sr-only">Loading…</span>
+          </p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
         </div>
       </section>
