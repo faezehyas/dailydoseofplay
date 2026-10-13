@@ -294,9 +294,11 @@ test("Dots and Boxes vs the robot on a 360 px phone: touch, keyboard, pen stroke
   }
   assert.match(cursor, /^(Across|Down) from [A-E]\d to [A-E]\d: free$/);
   const drawnBefore = (await state(page)).drawn;
+  const mineBefore = (await state(page)).lines.filter((owner) => owner === 0).length;
   await page.keyboard.press("Enter");
   await wait(page, (n) => window.ddp.match.state.drawn > n, drawnBefore);
-  assert.equal((await state(page)).lines[(await state(page)).last.line], 0);
+  // The quick robot may have answered already: count my lines rather than read the last one.
+  assert.equal((await state(page)).lines.filter((owner) => owner === 0).length, mineBefore + 1);
 
   // With the sound muted nothing more plays.
   await page.click("#sound-toggle");
