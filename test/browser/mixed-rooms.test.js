@@ -86,8 +86,11 @@ test("two friends and two robots play a whole game of Hearts; each robot sees on
   assert.equal(await host.locator("#roster li.empty").count(), 0);
   await host.screenshot({ path: `${ARTIFACTS}/mr-1-waiting-dark.png` });
   await host.emulateMedia({ colorScheme: "light" });
-  await host.setViewportSize({ width: 360, height: 740 });
-  assert.ok(await noHorizontalScroll(host), "the waiting screen with robots fits 360 px");
+  for (const width of [534, 360]) {
+    await host.setViewportSize({ width, height: 740 });
+    assert.ok(await noHorizontalScroll(host), `the waiting screen with robots fits ${width} px`);
+    assert.ok(await host.evaluate(() => [...document.querySelectorAll(".site-footer p")].every((p) => p.getBoundingClientRect().right <= innerWidth)), `the footer wraps at ${width} px`);
+  }
   await host.screenshot({ path: `${ARTIFACTS}/mr-2-waiting-mobile-light.png`, fullPage: true });
   await host.emulateMedia({ colorScheme: "dark" });
   await host.setViewportSize({ width: 1280, height: 900 });
