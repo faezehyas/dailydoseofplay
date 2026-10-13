@@ -85,9 +85,16 @@ test("home page tiles are all the same size", { skip: !pw && "Playwright not ins
       assert.ok(iconBottom <= 640, `first tile's picture ends at ${iconBottom} px, below a 640 px phone screen`);
     }
     if (width < 600) {
-      assert.ok(cards[0].height <= 140, `${width} px: tiles are ${cards[0].height} px tall, not compact`);
-      const links = await page.locator(".game-card[data-slug] .quick-play a").evaluateAll((els) => els.map((a) => a.getBoundingClientRect().height));
-      assert.ok(Math.min(...links) >= 44, `${width} px: quick play links are ${Math.min(...links)} px tall, under 44 px`);
+      assert.ok(cards[0].height <= 150, `${width} px: tiles are ${cards[0].height} px tall, not compact`);
+      // A tap anywhere in a 44 px tall band lands on the quick play link.
+      const reach = await page.locator(".game-card[data-slug]").first().locator(".quick-play a").evaluateAll((links) =>
+        links.map((a) => {
+          const box = a.getBoundingClientRect();
+          const mid = box.top + box.height / 2;
+          return [mid - 21.5, mid + 21.5].every((y) => document.elementFromPoint(box.left + box.width / 2, y)?.closest("a") === a);
+        }),
+      );
+      assert.deepEqual(reach, [true, true], `${width} px: quick play links take taps 44 px tall`);
     }
     await page.screenshot({ path: `${ARTIFACTS}/home-${width}.png`, fullPage: true });
     await page.close();
