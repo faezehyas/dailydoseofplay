@@ -38,7 +38,7 @@ test("two friends play Ludo on the host's house rules through the invite link, t
   await pick(host, "captureBonus", true);
   await pick(host, "first", "host");
   assert.equal(await host.locator("#ld-settings legend .robot-only").count(), 1, "the robot level is marked as robot-only");
-  assert.deepEqual(await host.locator("#ld-settings .settings-line .chip.robot").allInnerTexts(), ["Easy robot", "4 players"], "robot-only choices are marked in the summary");
+  assert.deepEqual(await host.locator("#ld-settings .settings-line .chip.robot").allInnerTexts(), ["Easy robots"], "robot-only choices are marked in the summary");
   await host.click("#play-friend");
   await host.locator("#room-code").waitFor();
   assert.deepEqual(

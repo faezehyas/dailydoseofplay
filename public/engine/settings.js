@@ -11,15 +11,17 @@ import { el, segGroup } from "./shell.js";
 // "device" only applies to robot games (the robots' level; `robot: true` says
 // the same); "view" is this player's own view of the game and
 // can change during a game, which the game reads with get() when it needs it.
-// summary(value, label, config) is the text of the group's chip in the
-// summary (default: the label; "" leaves it out).
+// summary(value, label, config, robots) is the text of the group's chip in the
+// summary (default: the label; "" leaves it out); robots is how many play
+// against you in a robot game, when the lobby offers a choice (offerPlayers()).
 // normalize(raw) returns a complete, valid config (defaults for anything else).
 // robot(config, picked), optional, is the config for a robot game, given the
 // names of the groups the player picked an option in: a game whose clocks are
 // on by default turns off the ones not picked.
-// playerNotes, optional, are hints for some of the lobby's player counts
+// defaultPlayers, optional, is a robot game's player count until the player
+// picks one (else a full table); playerNotes are hints for some counts
 // ({ 3: "17 cards each" }; see offerPlayers()).
-export function gameSettings({ key, prefix, groups, normalize, hint, robot, playerNotes = {} }) {
+export function gameSettings({ key, prefix, groups, normalize, hint, robot, defaultPlayers, playerNotes = {} }) {
   let { config, picked, players } = load();
   let counts = []; // the player counts the lobby offers for a robot game
   let locked = false;
@@ -67,9 +69,8 @@ export function gameSettings({ key, prefix, groups, normalize, hint, robot, play
       .filter((g) => withRobot || scopeOf(g) === "room")
       .map((g) => {
         const label = g.options.find(([value]) => value === config[g.name])?.[1] ?? "";
-        return { text: g.summary ? g.summary(config[g.name], label, config) : label, robot: scopeOf(g) === "device" };
+        return { text: g.summary ? g.summary(config[g.name], label, config, counts.length ? seats() - 1 : undefined) : label, robot: scopeOf(g) === "device" };
       })
-      .concat(withRobot && counts.length ? [{ text: `${seats()} players`, robot: true }] : [])
       .filter((p) => p.text);
     return parts.flatMap(({ text, robot }, i) => [i ? el("span", { class: "sr-only" }, ", ") : "", el("span", { class: robot ? "chip robot" : "chip" }, text)]);
   }
@@ -77,7 +78,8 @@ export function gameSettings({ key, prefix, groups, normalize, hint, robot, play
   // "view" options can change, and they show the game's config. Each copy on
   // screen names its radio buttons after `id`, and follows changes made in
   // the others. Choosing the option already shown fires no change, but counts
-  // as picking it.
+  // as picking it. The settings panel's copy has the player count too; the
+  // lobby card shows it with "Play vs robot" instead.
   function form(id = prefix) {
     const note = el("p", { class: "notice", id: `${id}-locked` }, "Locked during a game: rematches keep the room's settings. Change them in the lobby for your next game.");
     const sets = groups.map((g) => {
@@ -86,7 +88,10 @@ export function gameSettings({ key, prefix, groups, normalize, hint, robot, play
       fieldset.addEventListener("click", (e) => e.target.checked && pick(g.name));
       return fieldset;
     });
-    const body = el("div", { class: "settings-body" }, note, sets, hint && el("p", { class: "hint" }, hint));
+    // The player count goes after the robots' own options.
+    const after = groups.findLastIndex((g) => scopeOf(g) === "device") + 1 || sets.length;
+    const players = id !== prefix && counts.length && playersForm(id);
+    const body = el("div", { class: "settings-body" }, note, sets.slice(0, after), players, sets.slice(after), hint && el("p", { class: "hint" }, hint));
     const update = () => {
       const values = locked ? current(mode) : config;
       note.hidden = !locked;
@@ -114,17 +119,28 @@ export function gameSettings({ key, prefix, groups, normalize, hint, robot, play
     return details;
   }
   // A robot game's player count, for a game that seats more than two: the
-  // lobby offers `counts` once (offerPlayers()), shows playersForm() by its
-  // "Play vs robot" button and starts with players() seats. The summary
-  // mentions it; the default is a full table.
+  // lobby offers `counts` once (offerPlayers()), shows playersForm() with its
+  // "Play vs robot" button and starts with players() seats. Like a "device"
+  // option, it is locked during a game.
   function offerPlayers(list) {
     counts = list;
   }
-  const seats = () => (counts.includes(players) ? players : counts.at(-1));
-  function playersForm() {
-    const options = counts.map((n) => [n, String(n), playerNotes[n]]);
-    const fieldset = segGroup({ name: `${prefix}-players`, legend: "Players", options, value: seats(), onChange: (n) => ((players = n), save(), refresh()) });
+  const seats = () => [players, defaultPlayers].find((n) => counts.includes(n)) ?? counts.at(-1);
+  function playersForm(id = prefix) {
+    const options = counts.map((n) => [n, String(n)]);
+    const tag = el("small", { class: "chip robot robot-only" }, "vs robot only");
+    const fieldset = segGroup({ name: `${id}-players`, legend: ["Players (you + robots)", id !== prefix && tag], options, value: seats(), onChange: (n) => ((players = n), save(), refresh()) });
+    const note = el("p", { class: "players-note", id: `${id}-players-note` });
     fieldset.classList.add("players-choice");
+    fieldset.append(note);
+    const update = () => {
+      fieldset.disabled = locked;
+      for (const input of fieldset.querySelectorAll("input")) input.checked = input.value === String(seats());
+      note.textContent = playerNotes[seats()] ?? "";
+      note.hidden = !note.textContent;
+    };
+    update();
+    shown.set(fieldset, update);
     return fieldset;
   }
   // lock(true, mode) while a game is on; the lobby calls it.

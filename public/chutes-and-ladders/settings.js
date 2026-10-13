@@ -24,5 +24,6 @@ export const settings = gameSettings({
   prefix: "cl",
   groups: GROUPS,
   normalize: normalizeConfig,
+  defaultPlayers: 2,
   hint: "Up to four players. In a friend game, the settings of whoever creates the room apply to everyone, except the spinner: each player picks their own.",
 });

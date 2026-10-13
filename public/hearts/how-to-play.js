@@ -4,7 +4,7 @@ export const howToPlay = {
   players: [
     "Four, or three: with three, the 2 of diamonds is left out and everyone gets 17 cards.",
     "To play friends, create a room, send the invite link to two or three of them, then press **Start game**.",
-    "Against robots, pick how many play (**Players**, 3 or 4, by **Play vs robot**) and the robots' level in the settings: Easy, Medium or Hard.",
+    "Against robots, pick how many play (**Players**, 3 or 4, above **Play vs robot**) and the robots' level in the settings: Easy, Medium or Hard.",
   ],
   setup: "A standard 52-card deck, 13 cards each. Before each hand you pass three cards: to the left, then the right, then across, then a hand with no pass, and round again (with three players, left then right). Everyone picks before anyone receives.",
   turn: [

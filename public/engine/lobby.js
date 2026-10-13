@@ -11,8 +11,9 @@
 // createRobot(session) drives one robot seat over an in-memory group.
 // maxPlayers must match the game's entry in games.json (the server enforces it).
 // A game that seats more than two lets the player pick how many sit at a robot
-// game's table, from max(2, minPlayers) to maxPlayers, by "Play vs robot";
-// settings keeps the choice (settings.js). Otherwise a robot game is full.
+// game's table, from max(2, minPlayers) to maxPlayers, just above "Play vs
+// robot", which names the robots; settings keeps the choice (settings.js).
+// Otherwise a robot game is full.
 // robots, optional, overrides how many robot seats there are (a number, or a
 // function read when a robot game starts); older games passed it.
 // The lobby tagline is the game's description in games.json; `tagline`
@@ -202,8 +203,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
         "div",
         { class: "lobby-actions" },
         el("button", { class: "btn primary big", id: "play-friend", type: "button", onclick: host }, duel ? "Play with a friend" : "Play with friends"),
-        el("button", { class: "btn big", id: "play-robot", type: "button", onclick: playRobot }, "Play vs robot"),
-        choosePlayers && settings.playersForm(),
+        robotPlay(),
         tutorial && el("button", { class: "btn learn", id: "learn", type: "button", onclick: learn }, "Learn"),
       ),
       el("p", { class: "lobby-note", id: "direct-note" }, "Games connect your browser directly to your friends'. Play with people you know."),
@@ -216,6 +216,21 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     showError(error);
     codeInput.focus();
     codeInput.select();
+  }
+
+  // "Play vs robot", with the player count above it when the game offers one:
+  // the button then says how many robots ("Play vs 2 robots").
+  function robotPlay() {
+    const button = el("button", { class: "btn big", id: "play-robot", type: "button", onclick: playRobot }, "Play vs robot");
+    if (!choosePlayers) return button;
+    const label = () => {
+      const count = settings.players() - 1;
+      button.textContent = count === 1 ? "Play vs robot" : `Play vs ${count} robots`;
+    };
+    const choice = settings.playersForm();
+    choice.addEventListener("change", label);
+    label();
+    return el("div", { class: "robot-play" }, choice, button);
   }
 
   // An invite link stops here first so the friend can pick a nickname before joining.

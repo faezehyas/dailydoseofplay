@@ -278,10 +278,10 @@ export const settings = gameSettings({
   normalize: normalizeConfig, // raw (or null) -> a complete, valid config
   hint: "In a friend game, the settings of whoever creates the room apply to both players.",
   groups: [
-    // summary(value, label, config): the text of this group's chip in the summary ("" leaves it out).
+    // summary(value, label, config, robots): the text of this group's chip in the summary ("" leaves it out).
     { name: "moveSeconds", legend: "Time per move", options: [[10, "10 s"], [0, "No limit"]], summary: (v, l) => (v ? `${l} a move` : "No move limit") },
     // scope: "device" tags the group "vs robot only", gives its chip a teal dot and keeps it off the waiting screen.
-    { name: "level", legend: "Robot level", scope: "device", options: [["easy", "Easy"], ["hard", "Hard"]], summary: (v, l) => `${l} robot` },
+    { name: "level", legend: "Robot level", scope: "device", options: [["easy", "Easy"], ["hard", "Hard"]], summary: (v, l, c, robots) => `${l} ${robots > 1 ? "robots" : "robot"}` },
     // scope: "view": this player's own view, never sent, and open to change during a game.
     { name: "hints", legend: "Legal moves", scope: "view", options: [[true, "Show"], [false, "Hide"]], summary: () => "" },
   ],
@@ -312,8 +312,9 @@ game, both in `createRobot` and in `onSession`. Test `robotConfig` in
 **More than two players.** Pass `minPlayers` and `maxPlayers` to
 `startGameShell()`. The host gets a player list and a Start button, and the
 engine offers how many play a robot game, from `max(2, minPlayers)` to
-`maxPlayers`, by "Play vs robot": don't add a setting for the number of robots.
-For a hint under a count, pass `playerNotes` to `gameSettings()`, such as
+`maxPlayers`, with "Play vs robot": don't add a setting for the number of
+robots. A full table comes first unless you pass `defaultPlayers` to
+`gameSettings()`; for a hint under a count, pass `playerNotes`, such as
 Hearts' `{ 3: "17 cards each" }`. In `onSession`, use `session.players`
 (`{seat, name}`), `session.index` (your seat) and `session.others`, pass
 `players: session.players.length` to `TurnMatch`, and write rules whose turn

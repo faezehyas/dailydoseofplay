@@ -12,7 +12,7 @@ const GROUPS = [
   { name: "moon", legend: "Shooting the moon", options: [["others", "Others +26", "classic"], ["minus", "Shooter −26"]], summary: (v) => (v === "minus" ? "Moon: shooter −26" : "") },
   { name: "jack", legend: "Jack of diamonds", options: [[false, "Off", "classic"], [true, "−10", "whoever takes it"]], summary: (v) => (v ? "Jack of diamonds −10" : "") },
   { name: "moveSeconds", legend: "Time per move", options: [[0, "No limit"], [15, "15 s"], [30, "30 s"], [60, "60 s"]], summary: (v, l) => (v ? `${l} a move` : "No time limit") },
-  { name: "level", legend: "Robot level", robot: true, options: [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]], summary: (v, l) => `${l} robot` },
+  { name: "level", legend: "Robot level", robot: true, options: [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]], summary: (v, l, c, robots) => `${l} ${robots > 1 ? "robots" : "robot"}` },
   { name: "fourColor", legend: "Card colours", options: [[false, "Two colours"], [true, "Four colours", "♦ blue · ♣ green"]], summary: () => "" },
 ];
 

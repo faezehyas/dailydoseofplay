@@ -14,7 +14,7 @@ const GROUPS = [
   { name: "books", legend: "Books", options: [[4, "Four of a kind", "classic"], [2, "Pairs", "easier for young players"]], summary: (v) => (v === 2 ? "Pairs" : "") },
   { name: "first", legend: "Who goes first", options: [["random", "Coin toss"], ["host", "Me"], ["guest", "Next player", "first friend in"]], summary: (v, l) => ({ host: "You go first", guest: "Next player goes first" })[v] ?? l },
   { name: "moveSeconds", legend: "Time to ask", options: [[0, "No limit"], [15, "15 s"], [30, "30 s"], [60, "60 s"]], summary: (v, l) => (v ? `${l} to ask` : "No time limit") },
-  { name: "level", legend: "Robot level", robot: true, options: [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]], summary: (v, l) => `${l} robot` },
+  { name: "level", legend: "Robot level", robot: true, options: [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]], summary: (v, l, c, robots) => `${l} ${robots > 1 ? "robots" : "robot"}` },
   { name: "fourColor", legend: "Card colours", options: [[false, "Two colours"], [true, "Four colours", "♦ blue · ♣ green"]], summary: () => "" },
 ];
 

@@ -4,7 +4,7 @@ export const howToPlay = {
   players: [
     "Two to four, each with a pawn.",
     "To play friends, create a room and send the invite link to up to three of them. Press **Start game** when everyone is in; a full room of four starts by itself.",
-    "Against robots, pick how many play (**Players**, 2, 3 or 4, by **Play vs robot**).",
+    "Against robots, pick how many play (**Players**, 2, 3 or 4, above **Play vs robot**).",
   ],
   setup: "Every pawn starts on the lawn below square 1. The track runs along the rows: left to right, up a row, right to left, and so on up to 100 at the top left.",
   turn: [
