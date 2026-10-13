@@ -16,3 +16,7 @@ export async function startServer({ publicDir, allowedOrigins, clientIpHeader, l
     },
   };
 }
+
+// An import in a module's source: group 1 or 2 is a static import's
+// specifier, group 3 a dynamic import()'s.
+export const IMPORT = /^\s*(?:import|export)\b[^;]*?\bfrom\s*["']([^"']+)["']|^\s*import\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)/gm;

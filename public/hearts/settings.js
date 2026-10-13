@@ -1,5 +1,5 @@
 // Hearts' settings: the game's length, passing, the moon, the jack of
-// diamonds, the time per move, the robots' level and number, and the
+// diamonds, the time per move, the robots' level, and the
 // four-colour deck (that one only changes how cards look on this device).
 import { gameSettings } from "../engine/settings.js";
 import { normalizeConfig } from "./rules.js";
@@ -12,8 +12,7 @@ const GROUPS = [
   { name: "moon", legend: "Shooting the moon", options: [["others", "Others +26", "classic"], ["minus", "Shooter −26"]], summary: (v) => (v === "minus" ? "Moon: shooter −26" : "") },
   { name: "jack", legend: "Jack of diamonds", options: [[false, "Off", "classic"], [true, "−10", "whoever takes it"]], summary: (v) => (v ? "Jack of diamonds −10" : "") },
   { name: "moveSeconds", legend: "Time per move", options: [[0, "No limit"], [15, "15 s"], [30, "30 s"], [60, "60 s"]], summary: (v, l) => (v ? `${l} a move` : "No time limit") },
-  { name: "level", legend: "Robot level", robot: true, options: [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]], summary: (v, l) => `${l} robot` },
-  { name: "robots", legend: "Play vs robot", robot: true, options: [[3, "3 robots", "four at the table"], [2, "2 robots", "three: 17 cards each"]] },
+  { name: "level", legend: "Robot level", robot: true, options: [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]], summary: (v, l, c, robots) => `${l} ${robots > 1 ? "robots" : "robot"}` },
   { name: "fourColor", legend: "Card colours", options: [[false, "Two colours"], [true, "Four colours", "♦ blue · ♣ green"]], summary: () => "" },
 ];
 
@@ -22,5 +21,6 @@ export const settings = gameSettings({
   prefix: "hr",
   groups: GROUPS,
   normalize: normalizeConfig,
+  playerNotes: { 3: "17 cards each" },
   hint: "Three or four players. With friends, the settings of whoever creates the room apply to everyone, except card colours, which are yours. When time runs out, a sensible card (or pass) is played for you.",
 });

@@ -1,5 +1,5 @@
 // Crazy Eights' settings: how drawing works, the action cards, who goes
-// first, the move timer, the robots' level and number, and the four-colour
+// first, the move timer, the robots' level, and the four-colour
 // deck (that one only changes how cards look on this device).
 import { gameSettings } from "../engine/settings.js";
 import { normalizeConfig } from "./rules.js";
@@ -12,8 +12,7 @@ const GROUPS = [
   { name: "actions", legend: "Action cards", options: [[false, "Off", "classic"], [true, "On", "2 draw two · Q skip · A reverse"]], summary: (v) => (v ? "Action cards" : "") },
   { name: "first", legend: "Who goes first", options: [["random", "Coin toss"], ["host", "Me"], ["guest", "Next player", "first friend in"]], summary: (v, l) => ({ host: "You go first", guest: "Next player goes first" })[v] ?? l },
   { name: "moveSeconds", legend: "Time to move", options: [[0, "No limit"], [15, "15 s"], [30, "30 s"], [60, "60 s"]], summary: (v, l) => (v ? `${l} a move` : "No move limit") },
-  { name: "level", legend: "Robot level", robot: true, options: [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]], summary: (v, l) => `${l} robot` },
-  { name: "robots", legend: "Play vs robot", robot: true, options: [[1, "1 robot"], [2, "2 robots"], [3, "3 robots"]] },
+  { name: "level", legend: "Robot level", robot: true, options: [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]], summary: (v, l, c, robots) => `${l} ${robots > 1 ? "robots" : "robot"}` },
   { name: "fourColor", legend: "Card colours", options: [[false, "Two colours"], [true, "Four colours", "♦ blue · ♣ green"]], summary: () => "" },
 ];
 

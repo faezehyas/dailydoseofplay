@@ -20,10 +20,9 @@ export const CHUTES = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 9
 export const FINISH = ["exact", "bounce", "any"];
 export const FIRST = ["random", "host", "guest"];
 export const SPIN_MODES = ["tap", "auto"];
-export const ROBOTS = [1, 2, 3];
 export const MAX_PLAYERS = 4;
-// spin and robots are per device: how your spinner works, and how many robots a robot game has.
-export const DEFAULT_CONFIG = { finish: "exact", sixAgain: false, first: "random", spin: "tap", robots: 1 };
+// spin is per device: how your spinner works.
+export const DEFAULT_CONFIG = { finish: "exact", sixAgain: false, first: "random", spin: "tap" };
 // Shared random draws per match: the coin toss, then one per spin. Two
 // players need about 60 spins on average and rarely more than 250; four
 // players finish sooner, as the first of four to reach 100 wins.
@@ -38,7 +37,6 @@ export function normalizeConfig(raw) {
     sixAgain: pick(c.sixAgain, [true, false], DEFAULT_CONFIG.sixAgain),
     first: pick(c.first, FIRST, DEFAULT_CONFIG.first),
     spin: pick(c.spin, SPIN_MODES, DEFAULT_CONFIG.spin),
-    robots: pick(c.robots, ROBOTS, DEFAULT_CONFIG.robots),
   };
 }
 

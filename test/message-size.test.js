@@ -87,7 +87,7 @@ const GAMES = {
   "chutes-and-ladders": async () => {
     const { makeRules, DEFAULT_CONFIG } = await import("../public/chutes-and-ladders/rules.js");
     const { chooseMove } = await import("../public/chutes-and-ladders/robot.js");
-    const config = { ...DEFAULT_CONFIG, robots: 3 };
+    const config = DEFAULT_CONFIG;
     return { config, players: 4, robot: turnRobot(makeRules(config), chooseMove) };
   },
   ludo: async () => {

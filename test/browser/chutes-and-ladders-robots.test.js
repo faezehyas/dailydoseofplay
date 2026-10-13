@@ -104,7 +104,7 @@ test("Chutes and Ladders against three robots", { skip: !pw && "Playwright not i
   page.on("pageerror", (e) => errors.push(e.message));
   await page.addInitScript(() => (globalThis.ddpRobotPace = 0.1));
   await page.goto(`${srv.base}/chutes-and-ladders/`);
-  await pick(page, "robots", 3);
+  await page.click('label:has(input[name="cl-players"][value="4"])');
   await page.click("#play-robot");
   await wait(page, () => window.ddp.match?.phase === "playing");
   assert.match(await page.locator(".pb-players").innerText(), /Robot 1[\s\S]*Robot 2[\s\S]*Robot 3/);
