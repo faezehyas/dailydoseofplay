@@ -120,6 +120,7 @@ flowchart TB
     e_celebrate["celebrate.js"]
     e_chimes["chimes.js"]
     e_confirm["confirm.js"]
+    e_robot_record["robot-record.js"]
     e_settings["settings.js"]
     e_prefs["prefs.js"]
     e_how_to_play["how-to-play.js"]
@@ -153,6 +154,7 @@ flowchart TB
   p_main --> e_lobby
   p_main --> e_players
   p_main --> e_result
+  p_main --> e_robot_record
   p_main --> e_session
   p_main --> e_shell
   p_main --> e_turn_match
@@ -251,6 +253,7 @@ flowchart TB
   e_lobby --> e_confirm
   e_lobby --> e_how_to_play
   e_lobby --> e_reactions
+  e_lobby --> e_robot_record
   e_lobby --> e_room
   e_lobby --> e_shell
   e_lobby --> e_tutorial
@@ -262,7 +265,9 @@ flowchart TB
   e_reactions --> e_sound
   e_reactions --> e_synth
   e_result --> e_celebrate
+  e_result --> e_robot_record
   e_result --> e_shell
+  e_robot_record --> e_shell
   e_room --> e_channel
   e_room --> e_group
   e_room --> e_peer
@@ -486,7 +491,7 @@ a blocked name over WebRTC either. Nicknames are never logged.
 
 | Module | Job |
 |---|---|
-| `shell.js` | Header with the home link in a `nav` landmark, a "Skip to content" link to the page's `<main>` (shown on focus), and light/dark and sound toggles (each keeps one label, "Dark mode" or "Mute sounds", and gives its state through `aria-pressed`) next to the gear that opens the settings panel (see **Settings**), the footer every page ends with (how games run, then links to this file, the repository and the privacy page; more links join `FOOTER_LINKS`), nickname in `localStorage` (`getNickname()` picks and saves a default when there is none) and the nickname field (`nicknameField()`, in the lobby and the panel), `segGroup()` (a group of segmented options), the theme on `<html data-theme>`, toasts (just below the header; a repeated one is announced again), a tab-title alert ("Your turn"), `el()` DOM helper, and `askBeforeLeaving()`, the panel's "Ask before leaving" switch |
+| `shell.js` | Header with the home link in a `nav` landmark, a "Skip to content" link to the page's `<main>` (shown on focus), and light/dark and sound toggles (each keeps one label, "Dark mode" or "Mute sounds", and gives its state through `aria-pressed`) next to the gear that opens the settings panel (see **Settings**), the footer every page ends with (how games run, then links to this file, the repository and the privacy page; more links join `FOOTER_LINKS`), nickname in `localStorage` (`getNickname()` picks and saves a default when there is none) and the nickname field (`nicknameField()`, in the lobby and the panel), `segGroup()` (a group of segmented options), the theme on `<html data-theme>`, toasts (just below the header; a repeated one is announced again), a tab-title alert ("Your turn"), `el()` DOM helper, `load()` and `store()` (`localStorage` reads and writes that never throw), and `askBeforeLeaving()`, the panel's "Ask before leaving" switch |
 | `prefs.js` | The general settings (see **Settings**): `getPrefs()`, `setPrefs(patch)`, `onPrefsChange(fn)`, and `normalizePrefs()` and `loadPrefs(storage)`, which moves the old `ddp-theme` and `ddp-sound` into `ddp-settings`. No DOM; runs in node too. |
 | `names.js` | `checkName()` and `cleanName()`: the nickname rules (see **Nicknames**), shared with the server; `defaultName()`, a friendly default name |
 | `theme.css` | Design tokens for light and dark, fonts and motion (see **Type and motion**), chips and `.mono`, buttons, cards, lobby, the home hero with its steps and its game-table scene, the home grid (tiles whose name links to the lobby, with "Made by @handle" under the description and Play friends and Play the robot links), the moves the tiles' previews use (see **Tile previews**) and its loading tiles (see **Colours and contrast**), the game page column (see **Page column**), the player bar with the reactions' tray and bubbles, the result panel, the result moment, the tutorial (see **Tutorials**), the confirm dialog, the settings panel and `.text-page` (the privacy page's reading column) |
@@ -506,11 +511,12 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `deck-crypto.js` | A synchronous layer over the vendored mental-poker WebAssembly (`vendor/mental-poker/`): keys, shuffles and their proofs, shares, opening, the audit. Bytes in, bytes out. |
 | `base64.js` | Bytes to base64 and back, strict about its input, for binary data in JSON messages |
 | `vendor/mental-poker/` | The built library, committed (see **Card games**): `cards_play_bg.wasm`, its loader `cards_play.js`, `LICENSE`, and `SOURCE` (the commit it was built from) |
-| `lobby.js` | `startGameShell()`: the game's `description` from `games.json` under its name (the lobby shows at once and the text fills in when the file arrives) and, at the end of "How to play", "Made by" from its `credits`, a "How to play" link under it that opens the game's `howToPlay` panel (see `how-to-play.js`, put under `#game`) and moves focus to its summary, the "Play with a friend" / "Play vs robot" / join-by-code UI with a quiet line under the Play buttons that games connect browsers directly, invite link with copy and share (a share that fails, other than a cancelled sheet, copies the link instead and says so), the waiting room (a player list and a Start button when a game allows more than two; Accept / Decline for anyone knocking), `?room=CODE&key=KEY` auto-join, `?robot=1` (a robot game), `?friend=1` (a new room at once, as if "Play with a friend" was pressed; dropped from the address bar so a reload doesn't make another) and `?learn` (the game's tutorial, also opened by a Learn button under the Play buttons and a link at the top of "How to play"; see **Tutorials**), connection-failure and player-left screens. It hands the game a `shell` with `leave()` and `setInProgress(on)` (see **Leaving**). With a game's `settings` it shows them inside the home screen's card, between the nickname and the Play buttons, and their summary on the host's waiting screen, so friends see the rules before the game starts; it passes them to the settings panel and locks them while a game is on. Each new screen moves focus to its heading (not on page load); progress such as "Creating a room…" or "Bo joined" is read out from one `role="status"` line, and the connection-problem screen uses `role="alert"`. The code field takes only the server's code letters (uppercased, spaces and dashes dropped, anything else refused with a hint) and joins by itself at four; a join that fails returns to it with the code still in, the error under the field and read out from the status line. It also sets which view is on show for the page column. |
+| `lobby.js` | `startGameShell()`: the game's `description` from `games.json` under its name (the lobby shows at once and the text fills in when the file arrives) and, at the end of "How to play", "Made by" from its `credits`, a "How to play" link under it that opens the game's `howToPlay` panel (see `how-to-play.js`, put under `#game`) and moves focus to its summary, the "Play with a friend" / "Play vs robot" / join-by-code UI with a quiet line under the Play buttons that games connect browsers directly, invite link with copy and share (a share that fails, other than a cancelled sheet, copies the link instead and says so), the waiting room (a player list and a Start button when a game allows more than two; Accept / Decline for anyone knocking), `?room=CODE&key=KEY` auto-join, `?robot=1` (a robot game), `?friend=1` (a new room at once, as if "Play with a friend" was pressed; dropped from the address bar so a reload doesn't make another) and `?learn` (the game's tutorial, also opened by a Learn button under the Play buttons and a link at the top of "How to play"; see **Tutorials**), your record against the robot under the Play buttons once you have one, with a Reset that asks first (see **Record against the robot**), connection-failure and player-left screens. It hands the game a `shell` with `leave()` and `setInProgress(on)` (see **Leaving**). With a game's `settings` it shows them inside the home screen's card, between the nickname and the Play buttons, and their summary on the host's waiting screen, so friends see the rules before the game starts; it passes them to the settings panel and locks them while a game is on. Each new screen moves focus to its heading (not on page load); progress such as "Creating a room…" or "Bo joined" is read out from one `role="status"` line, and the connection-problem screen uses `role="alert"`. The code field takes only the server's code letters (uppercased, spaces and dashes dropped, anything else refused with a hint) and joins by itself at four; a join that fails returns to it with the code still in, the error under the field and read out from the status line. It also sets which view is on show for the page column. |
 | `fair.js` | `commit` and `verifyCommit` (SHA-256 commitments), `HashChain` and `SharedRandom` (random draws all peers agree on). SHA-256 uses WebCrypto where the page has it, else a plain-JS copy (see below). |
 | `players.js` | `playerBar(session, { onLeave, classes })`: the bar above every game (see **Player bar**). |
 | `reactions.js` | Quick reactions in the player bar (see **Reactions**): the React tray, the bubbles with their pop, the checks on `$react`, and `robotBanter()`, which the lobby starts for every robot seat. |
-| `result.js` | `resultPanel(session, { onLeave, onShow, classes })`: the game-over panel of every game, with Rematch and Leave (see **Result panel**). |
+| `result.js` | `resultPanel(session, { onLeave, onShow, classes })`: the game-over panel of every game, with Rematch and Leave (see **Result panel**). It puts each finished robot match on your record (see **Record against the robot**). |
+| `robot-record.js` | `recordRobotResult(slug, outcome, players)`, `robotRecord(slug)` and `resetRobotRecord(slug)`: your record against the robots, on this device only (see **Record against the robot**). No DOM; runs in node too. |
 | `celebrate.js` | `celebrate({ outcome, flavour, highlight, anchor, board })`: the result moment a game plays from the panel's `onShow`, and `calm()`, which the panel calls when it hides (see **Result moment**). |
 | `chimes.js` | The result chimes: the site's jingle for each outcome in each game's timbre, through `sound.js` (see **Result moment**), and a tutorial's right move (`right-<flavour>`, see **Tutorials**). No DOM. |
 | `confirm.js` | `confirmDialog({ title, text, yes, no })`: a yes-or-no question in a modal `<dialog>` styled like the site. Focus moves to Cancel, Esc or Cancel says no, and focus returns to where it was (Leave). Resolves to `true` for yes. |
@@ -940,6 +946,20 @@ level, and follow the mute toggle. With `prefers-reduced-motion` only the
 colours change: the pieces glow, the board dims, the pills take their seat
 colour, and nothing moves. The colours stay while the panel is up; it calls
 `calm()` when it hides, for a rematch.
+
+**Record against the robot.** The lobby shows your record against the
+robots in this game under the Play buttons, once you've finished a robot
+game: "You vs robot: 3 wins · 1 draw · 2 losses" ("robots" in a game that
+seats more than two), with a Reset link that asks first in the confirm
+dialog. It is kept only on this device, in `ddp-robot-record` (`{ [slug]: {
+[players]: { win, draw, loss } } }`, through the safe `load()` and `store()`
+in `shell.js`), and never counts on a leaderboard. The result panel records
+it, once per robot match, when it opens on a finished match: a stopped
+match and friend games are left out, and a rematch is a new match. Someone
+else's win with more than two players (`"over"`) is a loss, and the number
+of players at the table is kept with each result. A game with its own
+game-over panel calls `recordRobotResult(session.game, outcome,
+session.players.length)` itself (Crazy Eights).
 
 **Tutorials.** A game can teach its rules with a short interactive
 tutorial, learnt by making moves on the real board rather than by reading.

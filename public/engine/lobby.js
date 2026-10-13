@@ -31,6 +31,7 @@ import { confirmDialog } from "./confirm.js";
 import { HostRoom, GuestRoom, RoomError, localRoom } from "./room.js";
 import { howToPlayPanel, madeBy } from "./how-to-play.js";
 import { robotBanter, setGameLines } from "./reactions.js";
+import { robotRecord, resetRobotRecord } from "./robot-record.js";
 
 const ERRORS = {
   no_such_room: "That room doesn't exist any more. Ask your friend for a fresh invite link.",
@@ -198,6 +199,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
         el("button", { class: "btn big", id: "play-robot", type: "button", onclick: playRobot }, "Play vs robot"),
         tutorial && el("button", { class: "btn learn", id: "learn", type: "button", onclick: learn }, "Learn"),
       ),
+      recordLine(),
       el("p", { class: "lobby-note", id: "direct-note" }, "Games connect your browser directly to your friends'. Play with people you know."),
       el("div", { class: "divider" }, el("span", {}, "or join with a code")),
       joinForm,
@@ -208,6 +210,28 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     showError(error);
     codeInput.focus();
     codeInput.select();
+  }
+
+  // Your record against the robots on this device (robot-record.js), once
+  // you've finished a robot game, with a Reset that asks first.
+  function recordLine() {
+    const { win, draw, loss, games } = robotRecord(slug);
+    if (!games) return null;
+    const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+    const line = el(
+      "p",
+      { class: "robot-record", id: "robot-record" },
+      el("span", {}, `You vs ${duel ? "robot" : "robots"}: ${n(win, "win", "wins")} · ${n(draw, "draw", "draws")} · ${n(loss, "loss", "losses")}`),
+      el("button", { class: "robot-record-reset", id: "robot-record-reset", type: "button", onclick: reset }, "Reset"),
+    );
+    async function reset() {
+      const yes = await confirmDialog({ title: "Reset your record?", text: `This clears your ${title} results against the robot${duel ? "" : "s"} on this device.`, yes: "Reset", no: "Keep" });
+      if (!yes) return;
+      resetRobotRecord(slug);
+      line.remove();
+      $("#play-robot")?.focus();
+    }
+    return line;
   }
 
   // An invite link stops here first so the friend can pick a nickname before joining.

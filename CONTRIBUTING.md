@@ -323,6 +323,7 @@ The view must provide:
 - The player bar from `engine/players.js` (see **Player bar** in `ARCHITECTURE.md`), first in the view: names, whose turn it is, the score and **Leave**. Don't build your own. Pass `badges` (a node per seat: a mark, disc or colour) and `notes` (a short line per seat, such as pips) to `update()` if the game has them, and `classes` to `playerBar()` if seats have colours of their own.
 - A clear status line.
 - On game over, the result panel from `engine/result.js` (see **Result panel** in `ARCHITECTURE.md`): call `show({ winner, stopped, reason, places, extra })` when the match ends and `hide()` while it is on. Don't build your own result box or Rematch button: the panel shows who won, a reason line, **Rematch** with everyone's votes, and Leave. Pass `places` (`[{ seat, note }]` in finishing order) if the game plays on for places, and `extra` for a node of your own (Sea Battle's fair-play verdict).
+- Your record against the robot (see **Record against the robot** in `ARCHITECTURE.md`): the result panel records each finished robot match once, when it opens on a match that wasn't stopped, so call `show()` with the real `winner` (with more than two players, the first to finish). A game with a game-over panel of its own calls `recordRobotResult(session.game, outcome, session.players.length)` from `engine/robot-record.js` once per finished robot match (`outcome` is `"win"`, `"draw"` or `"loss"`; anyone else finishing first is a loss), never for a stopped match or a friend game.
 - The result moment (see **Result moment** in `ARCHITECTURE.md`): from the panel's `onShow`, call `celebrate()` from `engine/celebrate.js` with the `outcome` it passes (`null` for a stopped match: play nothing), your game's `flavour` (`wood`, `paper`, `plastic`, `bell` or `water`, whichever its pieces sound like), `highlight` (the nodes that won the game, in the order they light up: a line, a king, the last piece home) and `board` (the node a loss dims). Don't add win or lose sounds of your own.
 - A draw state if the game has one.
 
@@ -535,6 +536,7 @@ The [PR template](.github/pull_request_template.md) repeats these lines, shorten
 - [ ] `layout` passed to `startGameShell()`, and the view's top-level box has no `max-width`
 - [ ] Names, turn, score and Leave come from `playerBar()`, not a bar of the game's own
 - [ ] The result, Rematch and Leave at game over come from `resultPanel()`, not a box of the game's own
+- [ ] A finished robot game adds to the record under the Play buttons once; a stopped one or a friend game doesn't
 - [ ] The panel's `onShow` plays `celebrate()` with the game's `flavour`, its winning pieces and its board; no win or lose sounds of its own
 - [ ] 360 px wide with no horizontal scroll, also with two 20-letter names; light and dark; touch and keyboard
 - [ ] Coral or teal text uses `--accent-text` or `--accent-2-text`; controls are outlined in `--control-border`
@@ -572,6 +574,7 @@ The [PR template](.github/pull_request_template.md) repeats these lines, shorten
 | `public/engine/players.js` | `playerBar()`: names, whose turn it is, the score, React and Leave, above every game |
 | `public/engine/reactions.js` | Quick reactions: the React tray, bubbles, mute, and the robots' banter |
 | `public/engine/result.js` | `resultPanel()`: the game-over panel with the result, Rematch and Leave, in every game |
+| `public/engine/robot-record.js` | `recordRobotResult()` and `robotRecord()`: your record against the robot, on this device only |
 | `public/engine/celebrate.js` | `celebrate()`: the win, loss and draw moment as the result panel opens, with its chimes from `chimes.js` |
 | `public/engine/confirm.js` | `confirmDialog()`: a yes-or-no question in a modal dialog, such as "Leave the game?" |
 | `public/engine/theme.css` | Design tokens (light and dark), fonts, motion and shared components |
