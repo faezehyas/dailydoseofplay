@@ -79,12 +79,6 @@ export function suitBurst(table, r, suit, g) {
   }
 }
 
-// A card that can't be played shakes.
-export function nudge(table, node) {
-  if (!node || table.fast()) return;
-  node.firstChild.animate([{ transform: "translateX(0)" }, { transform: "translateX(-6px)" }, { transform: "translateX(6px)" }, { transform: "translateX(0)" }], { duration: tokenMs("slow"), easing: easing("out") });
-}
-
 // The suit picker for an 8 (face): the suit you hold most of in `rest` takes
 // focus; pick(suit) or cancel(). Arrows move, 1 to 4 pick, Escape cancels.
 export function showPicker(picker, { face, rest, pick, cancel }) {

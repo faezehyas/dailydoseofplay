@@ -16,7 +16,7 @@ import { humanPause } from "../engine/cards/paced-robot.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { SUIT_NAMES, cardWords } from "../engine/cards/faces.js";
 import { makeRules, normalizeConfig, MAX_PLAYERS, SUIT_SIGNS, suitOf, points, cardName, toFollow, isEight, canDraw, canPass, playable } from "./rules.js";
-import { PACE, handOrder, tilt, drawPile, drawSuit, suitBurst, nudge, showPicker } from "./art.js";
+import { PACE, handOrder, tilt, drawPile, drawSuit, suitBurst, showPicker } from "./art.js";
 import { chooseMove, startRobot, timeoutMove } from "./robot.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
@@ -435,7 +435,7 @@ function mountGame(session, root, shell) {
     if (!myPlayable().includes(slot)) {
       const st = match.state;
       play("nope");
-      nudge(table, handCards.get(slot));
+      table.shake(handCards.get(slot)?.firstChild);
       return toast(`Play ${toFollow(st)}`);
     }
     clearTimeout(forcedTimer);

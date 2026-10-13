@@ -9,7 +9,7 @@ import { cardTable } from "../engine/cards/table.js";
 import { DECK, SUIT_NAMES, cardWords } from "../engine/cards/faces.js";
 import { card, cards, lessonDeck, lessonMove } from "../engine/cards/lesson-deck.js";
 import { makeRules, DEFAULT_CONFIG, SUIT_SIGNS, suitOf, isEight, canPass, playable } from "./rules.js";
-import { PACE, handOrder, tilt, drawPile, drawSuit, suitBurst, nudge, showPicker } from "./art.js";
+import { PACE, handOrder, tilt, drawPile, drawSuit, suitBurst, showPicker } from "./art.js";
 import { play as sound } from "./sounds.js";
 
 export { lessons } from "./lessons.js";
@@ -211,7 +211,7 @@ export function board() {
     // A card that doesn't play shakes, with the game's refusal.
     reject(move) {
       sound("nope");
-      if (move.play !== undefined) nudge(table, handCards.get(move.play));
+      if (move.play !== undefined) table.shake(handCards.get(move.play)?.firstChild);
     },
   };
 }

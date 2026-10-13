@@ -592,6 +592,12 @@ export function cardTable({ prefix, play, animate, done }) {
     card.remove();
   }
 
+  // Something that can't be played shakes: a card, a pile, a button.
+  function shake(node) {
+    if (!node || fast()) return;
+    node.animate([{ transform: "translateX(0)" }, { transform: "translateX(-6px)" }, { transform: "translateX(6px)" }, { transform: "translateX(0)" }], { duration: tokenMs("slow"), easing: easing("out") });
+  }
+
   // A word over a seat ("Pass", "Last card!"), in seat p's colour.
   function bubble(host, p, text, g, ms) {
     if (!live(g)) return;
@@ -695,6 +701,7 @@ export function cardTable({ prefix, play, animate, done }) {
     rectIn,
     fly,
     bubble,
+    shake,
     confetti,
     deal,
     enqueue,
