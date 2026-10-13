@@ -640,7 +640,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     history.pushState({ game: slug }, "");
     settings?.lock(true, session.mode);
     let inProgress = false;
-    state.mustAsk = () => inProgress && session.mode === "friend" && askBeforeLeaving();
+    // Only people are asked about: once robots play every other seat, Leave is as in a robot game.
+    state.mustAsk = () => inProgress && session.mode === "friend" && session.others.some((p) => !p.robot) && askBeforeLeaving();
     state.leave = async () => {
       if (state.mustAsk() && !(await confirmLeave(session))) return;
       leaveGame();
@@ -663,11 +664,12 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   }
 
   function confirmLeave(session) {
+    const people = session.others.filter((p) => !p.robot);
     const text =
       session.takeover && session.index !== 0
         ? "A robot takes your seat and the game goes on."
-        : session.players.length === 2
-          ? `${session.opponent.name} will be told you left.`
+        : people.length === 1
+          ? `${people[0].name} will be told you left.`
           : "It ends for everyone.";
     return confirmDialog({ title: "Leave the game?", text, yes: "Leave" });
   }

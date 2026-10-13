@@ -143,7 +143,7 @@ test("a finished friend match and a robot game leave at once, by Leave or Back",
   assert.deepEqual(errors, []);
 });
 
-test("with three players, a guest hears a robot takes their seat, and the host that the game ends for everyone", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
+test("with three players, a guest hears a robot takes their seat; the host is asked about the people left, and not once only robots remain", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
   const { open, room, errors } = await setup(t);
   const host = await open("Ada");
   const friends = [await open("Bo"), await open("Cy")];
@@ -152,13 +152,23 @@ test("with three players, a guest hears a robot takes their seat, and the host t
   await host.click("#start-game");
   for (const p of [host, ...friends]) await wait(p, () => window.ddp.match?.phase === "playing");
 
+  await host.click("#leave");
+  assert.equal(await host.locator("dialog#confirm p").innerText(), "It ends for everyone.");
+  await host.click("#confirm-no");
   await friends[0].click("#leave");
   assert.equal(await friends[0].locator("dialog#confirm p").innerText(), "A robot takes your seat and the game goes on.");
   await friends[0].click("#confirm-yes");
   for (const p of [host, friends[1]]) await p.locator(".pb-name", { hasText: "Bo (robot)" }).waitFor({ timeout: 20_000 });
+  // Only Cy is left to tell.
   await host.click("#leave");
-  assert.equal(await host.locator("dialog#confirm p").innerText(), "It ends for everyone.");
-  await host.click("#confirm-yes");
-  await friends[1].locator("#ended", { hasText: "Ada left the game." }).waitFor({ timeout: 20_000 });
+  assert.equal(await host.locator("dialog#confirm p").innerText(), "Cy will be told you left.");
+  await host.click("#confirm-no");
+  await friends[1].click("#leave");
+  await friends[1].click("#confirm-yes");
+  await host.locator(".pb-name", { hasText: "Cy (robot)" }).waitFor({ timeout: 20_000 });
+  // Robots in every other seat: Leave goes at once, as in a robot game.
+  await host.click("#leave");
+  await host.locator("#play-friend").waitFor();
+  assert.equal(await host.locator("dialog[open]").count(), 0);
   assert.deepEqual(errors, []);
 });

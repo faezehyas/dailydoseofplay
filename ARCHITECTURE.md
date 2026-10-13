@@ -777,7 +777,9 @@ stopped; while it is on in a friend game, `shell.leave()` opens
 `confirmDialog()`: "Leave the game? Bo will be told you left." with two
 players, "Leave the game? A robot takes your seat and the game goes on." for
 a guest in a mixed-room game, and "Leave the game? It ends for everyone." for
-its host. Cancel keeps playing. Robot games, finished matches and a game that never calls
+its host. Robots don't count: the host is told the one person still playing
+("Cy will be told you left."), and once robots play every other seat, Leave
+goes at once, as in a robot game. Cancel keeps playing. Robot games, finished matches and a game that never calls
 `setInProgress` leave at once, and so does a player who turned off "Ask
 before leaving" in the settings panel (`askBeforeLeaving()` in `shell.js`). The browser's Back (or a phone's back gesture) is
 Leave too: a game gets a history entry of its own when it starts, so Back
