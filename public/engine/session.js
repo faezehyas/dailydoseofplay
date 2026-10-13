@@ -212,19 +212,17 @@ export function admitGuest(link, { game }) {
 }
 
 // Host side: seat the admitted guests in order and start. guests: [{ link, name }].
-// robots: how many robots sit after them, in a room that takes robots (see
-// the top of this file); their Sessions come from session.seatRobot().
+// robots: the names of the robots that sit after them, in a room that takes
+// robots (see the top of this file); their Sessions come from session.seatRobot().
 export function startHub({ name, guests, game, mode = "friend", robots }) {
   const people = [name, ...guests.map((g) => g.name)];
-  const players = [...people, ...robotNames(robots ?? 0)];
-  const seats = robots === undefined ? undefined : players.map((_, seat) => seat).slice(people.length);
+  const players = [...people, ...(robots ?? [])];
+  const seats = robots?.map((_, i) => people.length + i);
   const group = new HubGroup({ links: guests.map((g, i) => [i + 1, g.link]) });
   const session = new Session({ group, mode, players, game, robots: seats });
   guests.forEach((g, i) => g.link.send({ t: "$start", seat: i + 1, players, robots: seats }));
   return session;
 }
-
-export const robotNames = (n) => Array.from({ length: n }, (_, i) => `Robot ${i + 1}`);
 
 // robots: which of `players` are robots.
 export function sendRoster(guests, players, robots = []) {

@@ -34,7 +34,7 @@ async function friendRoom(game, names, robots) {
 }
 
 test("robots sit after the people, every seat knows which are robots, and a robot hears everyone", async () => {
-  const sessions = await friendRoom("hearts", ["Ada", "Bo"], 2);
+  const sessions = await friendRoom("hearts", ["Ada", "Bo"], ["Robot 1", "Robot 2"]);
   assert.deepEqual(sessions.map((s) => s.index), [0, 1, 2, 3]);
   for (const s of sessions) {
     assert.deepEqual(s.players.map((p) => p.name), ["Ada", "Bo", "Robot 1", "Robot 2"]);
@@ -56,18 +56,18 @@ test("robots sit after the people, every seat knows which are robots, and a robo
   assert.ok(duel.every((s) => !s.takeover && s.players.every((p) => !p.robot)));
 });
 
-test("the host fills only empty seats with robots, and two-player rooms take none", () => {
+test("the host fills only empty seats with robots, named by the lowest number free, and two-player rooms take none", () => {
   const room = new HostRoom({ game: "hearts", name: "Ada", maxPlayers: 4 });
-  room.setRobots(5);
-  assert.equal(room.robots, 3, "only the empty seats");
   room.guests.set("bo", { name: "Bo", ready: true, link: { send() {} } });
-  room.setRobots(room.robots);
-  assert.deepEqual(room.players.map((p) => [p.name, !!p.robot]), [["Ada", false], ["Bo", false], ["Robot 1", true], ["Robot 2", true]]);
-  room.setRobots(-1);
-  assert.equal(room.robots, 0);
+  for (let i = 0; i < 3; i++) room.addRobot();
+  assert.deepEqual(room.robots, ["Robot 1", "Robot 2"], "only the empty seats");
+  room.removeRobot("Robot 1");
+  assert.deepEqual(room.players.map((p) => [p.name, !!p.robot]), [["Ada", false], ["Bo", false], ["Robot 2", true]]);
+  room.addRobot();
+  assert.deepEqual(room.robots, ["Robot 1", "Robot 2"]);
   const duel = new HostRoom({ game: "chess", name: "Ada" });
-  duel.setRobots(1);
-  assert.equal(duel.robots, 0);
+  duel.addRobot();
+  assert.deepEqual(duel.robots, []);
 });
 
 test("draws go on without a seat whose player left: everyone agrees, and so does the robot's copy", async () => {
@@ -94,7 +94,7 @@ test("draws go on without a seat whose player left: everyone agrees, and so does
 
 test("Ludo: a guest who leaves mid-game is replaced by a robot, and the game finishes the same everywhere", async () => {
   const rules = ludoRules({});
-  const sessions = await friendRoom("ludo", ["Ada", "Bo", "Cy"], 0);
+  const sessions = await friendRoom("ludo", ["Ada", "Bo", "Cy"], []);
   const [host, bo, cy] = sessions;
   let robot = null;
   const events = [];
@@ -135,7 +135,7 @@ test("Ludo: a guest who leaves mid-game is replaced by a robot, and the game fin
 
 test("cards: a guest leaving stops the hand, and the robot plays from the rematch without seeing anyone's cards", async () => {
   const rules = toyRules({ deckSize: 12, maxTurns: 40 });
-  const sessions = await friendRoom("toy", ["Ada", "Bo", "Cy"], 0);
+  const sessions = await friendRoom("toy", ["Ada", "Bo", "Cy"], []);
   const drive = (s, i) => startCardRobot(s, { rules, choose: toyMove, delay: 0, rng: rngFromSeed(`seat${i}`) });
   const robots = sessions.map(drive);
   let robot = null;

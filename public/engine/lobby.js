@@ -224,7 +224,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   // the button then says how many robots ("Play vs 2 robots"), and your
   // record against them under both.
   function robotPlay() {
-    const button = el("button", { class: "btn big", id: "play-robot", type: "button", onclick: playRobot }, "Play vs robot");
+    const button = el("button", { class: "btn big", id: "play-robot", type: "button", onclick: () => playRobot() }, "Play vs robot");
     if (!choosePlayers) return button;
     const label = () => {
       const count = settings.players() - 1;
@@ -304,7 +304,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
         {},
         duel
           ? "Send this link to a friend. The game starts as soon as they open it."
-          : `Send this link to up to ${maxPlayers - 1} friends, or fill seats with robots. Start when everyone is in; a room full of friends starts by itself.`,
+          : `Send this link to up to ${maxPlayers - 1} friends. Fill any seat with a robot if you like: a friend who joins later takes a robot's seat. A room full of friends starts by itself.`,
         " Someone who types the code instead has to be let in by you.",
       ),
       // Screen readers get the code from the label, spaced so each letter is
@@ -322,11 +322,11 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
           "div",
           { class: "room-settings", id: "room-settings" },
           el("p", { class: "room-settings-label" }, "Game settings"),
-          el("p", { class: "settings-line" }, settings.summary(false)),
+          el("p", { class: "settings-line" }, settings.summary(0)),
         ),
       el("ul", { class: "roster", id: "roster", "aria-label": "Players", hidden: duel }),
       el("p", { class: "waiting", id: "lobby-status" }),
-      !duel && el("button", { class: "btn primary", type: "button", id: "start-game", disabled: true, onclick: () => begin(room) }, "Start game"),
+      !duel && el("button", { class: "btn primary", type: "button", id: "start-game", disabled: true, onclick: () => (friendsIn(room) ? begin(room) : playRobot(room.players.length)) }, "Start game"),
       el("button", { class: "btn ghost", type: "button", onclick: () => showHome() }, "Cancel"),
     );
     setStatus(duel ? "Waiting for your friend to join…" : "Waiting for friends to join…");
@@ -346,8 +346,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     // after adding or removing a robot it stays on the seats.
     const hadFocus = list.contains(document.activeElement);
     const onSeat = hadFocus && !!document.activeElement.closest(".robot, .empty");
-    const setRobots = (n, text) => {
-      room.setRobots(n);
+    const seat = (change, text) => {
+      change();
       progress.textContent = text;
     };
     const empty = duel ? 0 : maxPlayers - players.length;
@@ -358,12 +358,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
               "li",
               { class: "ready robot" },
               el("span", {}, p.name),
-              el(
-                "span",
-                { class: "seat-actions" },
-                el("small", {}, "robot"),
-                el("button", { class: "btn small", type: "button", "aria-label": `Remove ${p.name}`, onclick: () => setRobots(room.robots - 1, `${p.name} removed`) }, "Remove"),
-              ),
+              el("button", { class: "btn small ghost", type: "button", "aria-label": `Remove ${p.name}`, onclick: () => seat(() => room.removeRobot(p.name), `${p.name} removed`) }, "Remove"),
             )
           : el("li", { class: p.ready ? "ready" : "" }, el("span", {}, p.name), el("small", {}, i === 0 ? "host" : p.ready ? "in" : "connecting…")),
       ),
@@ -372,7 +367,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
           "li",
           { class: "empty" },
           el("span", {}, "Empty seat"),
-          el("button", { class: "btn small", type: "button", id: i === 0 ? "add-robot" : undefined, onclick: () => setRobots(room.robots + 1, "Robot added") }, "Add robot"),
+          el("button", { class: "btn small", type: "button", id: i === 0 ? "add-robot" : undefined, onclick: () => seat(() => room.addRobot(), "Robot added") }, "Add robot"),
         ),
       ),
       ...knocks.map(({ id, name }) =>
@@ -392,12 +387,19 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     if (onSeat) ($("#add-robot") || $("#roster .robot button") || $("h1", lobbyRoot)).focus();
     else if (hadFocus) focusHeading();
     if (duel) return;
+    $("#room-settings .settings-line")?.replaceChildren(...settings.summary(room.robots.length));
     const ready = players.filter((p) => p.ready).length;
-    const friends = players.filter((p, i) => i > 0 && p.ready && !p.robot).length;
+    const friends = friendsIn(room);
+    // With no friend in yet, robots alone make a robot game.
     const start = $("#start-game");
-    start.disabled = ready < minPlayers || friends === 0;
-    start.textContent = ready < minPlayers ? `Start game (needs ${minPlayers} players)` : friends === 0 ? "Start game (needs a friend)" : `Start game (${ready} players)`;
+    start.disabled = ready < minPlayers;
+    start.textContent = ready < minPlayers ? `Start game (needs ${minPlayers} players)` : friends ? `Start game (${ready} players)` : "Play with robots only";
+    const status = !empty && friends ? "Every seat is taken. Start when you're ready." : !empty ? "Waiting for a friend: one who joins takes a robot's seat." : "Waiting for friends to join…";
+    const line = $("#lobby-status");
+    if (line.textContent !== status) line.replaceChildren(...(!empty && friends ? [] : [el("span", { class: "spinner" })]), status);
   }
+
+  const friendsIn = (room) => room.players.filter((p, i) => i > 0 && p.ready && !p.robot).length;
 
   function showBusy(text) {
     view(
@@ -424,7 +426,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
         "div",
         { class: "lobby-actions" },
         el("button", { class: "btn primary", type: "button", id: "retry", onclick: () => retry() }, "Try again"),
-        el("button", { class: "btn", type: "button", id: "play-robot", onclick: playRobot }, "Play vs robot"),
+        el("button", { class: "btn", type: "button", id: "play-robot", onclick: () => playRobot() }, "Play vs robot"),
       ),
       el("button", { class: "btn ghost", type: "button", onclick: () => showHome() }, "Back"),
     );
@@ -440,7 +442,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
       el(
         "div",
         { class: "lobby-actions" },
-        el("button", { class: "btn primary", type: "button", id: "play-robot", onclick: playRobot }, "Play vs robot"),
+        el("button", { class: "btn primary", type: "button", id: "play-robot", onclick: () => playRobot() }, "Play vs robot"),
         el("button", { class: "btn", type: "button", id: "retry", onclick: () => retry() }, "Try again"),
         tutorial && el("button", { class: "btn learn", id: "learn", type: "button", onclick: learn }, "Learn"),
       ),
@@ -507,6 +509,10 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
       const joining = players.find((p, i) => i > 0 && !p.ready);
       setStatus(joining ? `${joining.name} joined. Connecting directly…` : "Waiting for your friend to join…");
     });
+    room.on("seat-taken", ({ name: who, robot }) => {
+      if (!current()) return;
+      toast(`${who} takes ${robot}'s seat.`);
+    });
     room.on("guest-gone", ({ name: who, reason }) => {
       if (!current()) return;
       const why =
@@ -570,10 +576,11 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     startSession(session);
   }
 
-  function playRobot() {
+  // players: how many sit at the table, when the waiting room picked it.
+  function playRobot(players) {
     cleanupConnection();
     const name = currentName();
-    const count = typeof robots === "function" ? robots() : (robots ?? (choosePlayers ? settings.players() : maxPlayers) - 1);
+    const count = players ? players - 1 : typeof robots === "function" ? robots() : (robots ?? (choosePlayers ? settings.players() : maxPlayers) - 1);
     const names = [name, ...Array.from({ length: count }, (_, i) => (count === 1 ? "Robot" : `Robot ${i + 1}`))];
     const [session, ...robotSessions] = localRoom({ game: slug, names, mode: "robot" });
     robotSessions.forEach(seatRobot);

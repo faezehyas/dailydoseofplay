@@ -679,7 +679,9 @@ function mountGame(session, root, shell) {
     if (c.jack) parts.push("jack of diamonds −10");
     if (c.moveSeconds) parts.push(`${c.moveSeconds} s a move`);
     if (count === 3) parts.push("three players: no 2♦");
-    if (robotGame) parts.push(`${LEVEL_NAME[c.level]} robots`);
+    // Robot games, and friend rooms whose host seated robots (they play at the host's level).
+    const robotSeats = robotGame ? count - 1 : session.players.filter((p) => p.robot).length;
+    if (robotSeats) parts.push(`${LEVEL_NAME[c.level]} ${robotSeats > 1 ? "robots" : "robot"}`);
     return parts.join(" · ");
   }
 

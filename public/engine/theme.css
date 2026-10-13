@@ -433,6 +433,14 @@ body:has(.result-panel:not([hidden])) .site-footer {
   cursor: not-allowed;
 }
 
+/* A disabled coral fill at half opacity reads as a brown button you can press. */
+.btn.primary:disabled {
+  opacity: 1;
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--muted);
+}
+
 .btn.primary {
   background: var(--accent);
   border-color: transparent;
@@ -751,11 +759,17 @@ input::placeholder {
   color: var(--text);
 }
 
-.knock-actions,
-.seat-actions {
+.knock-actions {
   display: flex;
-  align-items: center;
   gap: 6px;
+}
+
+/* Add robot and Remove stay quieter than the invite and Start buttons. */
+.roster li.robot .btn,
+.roster li.empty .btn {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 0.875rem;
 }
 
 #start-game {

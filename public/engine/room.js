@@ -3,8 +3,9 @@
 // star over WebRTC today; a server relay or a mesh later) can change without
 // touching the lobby or any game.
 //
-//   new HostRoom({ game, name, maxPlayers }) open() -> code (and .key); emits "players", "knocks", "guest-gone", "lost" (reason);
-//                                       accept(id) / decline(id) a knock; setRobots(n) with more than two seats;
+//   new HostRoom({ game, name, maxPlayers }) open() -> code (and .key); emits "players", "knocks", "guest-gone", "lost" (reason),
+//                                       "seat-taken" ({ name, robot }: a friend took a robot's seat);
+//                                       accept(id) / decline(id) a knock; addRobot() / removeRobot(name) with more than two seats;
 //                                       start() -> [Session, ...each robot's Session]
 //   new GuestRoom({ game, code, key, name }) join() -> Session once the host starts; emits "status"
 //   localRoom({ game, names, mode })    one Session per seat, connected in memory (robots, tests)
@@ -12,7 +13,7 @@ import { Emitter, MESSAGE_TOO_BIG } from "./channel.js";
 import { RoomClient } from "./signaling.js";
 import { PeerChannel } from "./peer.js";
 import { localGroup } from "./group.js";
-import { Session, admitGuest, startHub, sendRoster, greetHost, robotNames } from "./session.js";
+import { Session, admitGuest, startHub, sendRoster, greetHost } from "./session.js";
 
 // A failure after the room was found: the lobby explains these differently
 // from signaling errors (SignalingError: no_such_room, room_full, ...).
@@ -35,7 +36,7 @@ export class HostRoom extends Emitter {
     this.name = name;
     this.signalingUrl = signalingUrl;
     this.maxPlayers = maxPlayers;
-    this.robots = 0; // robot seats, after the people: a game for more than two only
+    this.robots = []; // the robots' names ("Robot 1"), seated after the people: a game for more than two only
     this.rooms = null;
     this.code = null;
     this.key = null; // invite key: a link with it joins without asking
@@ -86,14 +87,23 @@ export class HostRoom extends Emitter {
 
   // Everyone in the room so far, host first, robots last. ready: connected and checked.
   get players() {
-    const robots = robotNames(this.robots).map((name) => ({ name, ready: true, robot: true }));
+    const robots = this.robots.map((name) => ({ name, ready: true, robot: true }));
     return [{ name: this.name, ready: true }, ...[...this.guests.values()].map(({ name, ready }) => ({ name, ready })), ...robots];
   }
 
-  // Robots fill seats nobody has taken; a friend who joins takes a robot's seat.
-  setRobots(n) {
-    if (this.maxPlayers <= 2 || this.started) return;
-    this.robots = Math.max(0, Math.min(n, this.maxPlayers - 1 - this.guests.size));
+  // A robot takes a seat nobody has, numbered by the lowest number free; a
+  // friend who joins a full room takes the last robot's seat (#link).
+  addRobot() {
+    if (this.maxPlayers <= 2 || this.started || this.players.length >= this.maxPlayers) return;
+    let n = 1;
+    while (this.robots.includes(`Robot ${n}`)) n++;
+    this.robots = [...this.robots, `Robot ${n}`].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+    this.#changed();
+  }
+
+  removeRobot(name) {
+    if (this.started || !this.robots.includes(name)) return;
+    this.robots = this.robots.filter((r) => r !== name);
     this.#changed();
   }
 
@@ -106,7 +116,7 @@ export class HostRoom extends Emitter {
     const link = new PeerChannel({ rooms: this.rooms, peerId: id, initiator: true });
     const guest = { name, link, ready: false };
     this.guests.set(id, guest);
-    this.robots = Math.min(this.robots, this.maxPlayers - 1 - this.guests.size);
+    if (this.players.length > this.maxPlayers) this.emit("seat-taken", { name, robot: this.robots.pop() });
     link.on("failed", (reason) => this.#drop(id, reason));
     link.on("close", (reason) => this.#drop(id, reason || "left"));
     link.on("open", async () => {

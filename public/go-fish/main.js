@@ -679,7 +679,9 @@ function mountGame(session, root, shell) {
   function describeConfig(c) {
     const parts = [c.hand === "classic" ? `${count === 4 ? 5 : 7} cards each` : `${c.hand} cards each`, c.books === 2 ? "pairs" : "books of four", c.lucky === "again" ? "a lucky fish goes again" : "a lucky fish passes", c.empty === "draw" ? "an empty hand draws one" : "an empty hand sits out"];
     if (c.moveSeconds) parts.push(`${c.moveSeconds} s to ask`);
-    if (robotGame) parts.push(`${LEVEL_NAME[c.level]} ${count > 2 ? "robots" : "robot"}`);
+    // Robot games, and friend rooms whose host seated robots (they play at the host's level).
+    const robotSeats = robotGame ? count - 1 : session.players.filter((p) => p.robot).length;
+    if (robotSeats) parts.push(`${LEVEL_NAME[c.level]} ${robotSeats > 1 ? "robots" : "robot"}`);
     return parts.join(" · ");
   }
 

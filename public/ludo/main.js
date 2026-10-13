@@ -566,7 +566,9 @@ function mountGame(session, root, shell) {
     const parts = [c.threeSixes ? "three 6s lose the turn" : "6s keep rolling", c.blocks ? "blocks on" : "no blocks", c.captureBonus ? "a capture rolls again" : "no capture bonus"];
     if (count > 2) parts.push(c.places ? "play for places" : "first home wins");
     if (c.moveSeconds) parts.push(`${c.moveSeconds} s to move`);
-    if (robotGame) parts.push(`${LEVEL_NAME[c.level]} ${count > 2 ? "robots" : "robot"}`);
+    // Robot games, and friend rooms whose host seated robots (they play at the host's level).
+    const robotSeats = robotGame ? count - 1 : session.players.filter((p) => p.robot).length;
+    if (robotSeats) parts.push(`${LEVEL_NAME[c.level]} ${robotSeats > 1 ? "robots" : "robot"}`);
     return parts.join(" · ");
   }
 

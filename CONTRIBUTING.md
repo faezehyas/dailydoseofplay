@@ -285,7 +285,7 @@ export const settings = gameSettings({
   groups: [
     // summary(value, label, config, robots): the text of this group's chip in the summary ("" leaves it out).
     { name: "moveSeconds", legend: "Time per move", options: [[10, "10 s"], [0, "No limit"]], summary: (v, l) => (v ? `${l} a move` : "No move limit") },
-    // scope: "device" tags the group "vs robot only", gives its chip a teal dot and keeps it off the waiting screen.
+    // scope: "device" tags the group "vs robot only" ("for robots" with more than two seats), gives its chip a teal dot and keeps it off the waiting screen until the host seats a robot.
     { name: "level", legend: "Robot level", scope: "device", options: [["easy", "Easy"], ["hard", "Hard"]], summary: (v, l, c, robots) => `${l} ${robots > 1 ? "robots" : "robot"}` },
     // scope: "view": this player's own view, never sent, and open to change during a game.
     { name: "hints", legend: "Legal moves", scope: "view", options: [[true, "Show"], [false, "Hide"]], summary: () => "" },

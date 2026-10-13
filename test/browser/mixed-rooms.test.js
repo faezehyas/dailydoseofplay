@@ -1,7 +1,8 @@
-// Headless-browser test for friend rooms that mix people and robots: two
-// friends fill a Hearts table with two robots and finish a game, the robots
-// on the host each seeing only their own seat; and a guest who leaves Ludo
-// mid-game is replaced by a robot while the others play on. Skips if
+// Headless-browser test for friend rooms that mix people and robots: the
+// host adds and removes robots, a friend takes a robot's seat, and two friends
+// and two robots finish a Hearts game, the robots on the host each seeing only
+// their own seat; robots alone start a robot game; and a guest who leaves
+// Ludo mid-game is replaced by a robot while the others play on. Skips if
 // Playwright is missing.
 //
 //   npm run test:browser
@@ -49,28 +50,39 @@ test("two friends and two robots play a whole game of Hearts; each robot sees on
   await host.click("#play-friend");
   await host.locator("#room-code").waitFor();
   assert.equal(await host.locator("#roster li.empty").count(), 3, "three empty seats");
+  assert.doesNotMatch(await host.locator("#room-settings").innerText(), /robot/i, "no robots, no robot level");
   await host.click("#add-robot");
   await host.locator("#roster li.robot", { hasText: "Robot 1" }).waitFor();
   assert.match(await host.locator("#start-game").innerText(), /needs 3 players/);
+  assert.match(await host.locator("#room-settings").innerText(), /(Easy|Medium|Hard) robot\b/, "the robots' level shows once one sits");
   await host.click("#add-robot");
   await host.locator("#roster li.robot", { hasText: "Robot 2" }).waitFor();
-  assert.equal(await host.locator("#start-game").innerText(), "Start game (needs a friend)");
-  assert.ok(await host.locator("#start-game").isDisabled());
-  // Remove and add again, by keyboard: focus stays on the seats.
-  await host.locator("#roster li.robot button").last().focus();
+  assert.match(await host.locator("#room-settings").innerText(), /(Easy|Medium|Hard) robots/);
+  // No friend yet: robots alone make a robot game.
+  assert.equal(await host.locator("#start-game").innerText(), "Play with robots only");
+  assert.ok(await host.locator("#start-game").isEnabled());
+  // Remove is for its own row: Robot 2 keeps its name. Focus stays on the seats.
+  await host.getByRole("button", { name: "Remove Robot 1" }).focus();
   await host.keyboard.press("Enter");
-  await host.locator("#roster li.robot").nth(1).waitFor({ state: "detached" });
+  await host.locator("#roster li.robot", { hasText: "Robot 1" }).waitFor({ state: "detached" });
+  assert.deepEqual(await host.locator("#roster li.robot > span").allInnerTexts(), ["Robot 2"]);
   assert.equal(await host.evaluate(() => document.activeElement.id), "add-robot");
   await host.keyboard.press("Enter");
-  await host.locator("#roster li.robot", { hasText: "Robot 2" }).waitFor();
+  await host.click("#add-robot");
+  assert.deepEqual(await host.locator("#roster li.robot > span").allInnerTexts(), ["Robot 1", "Robot 2", "Robot 3"]);
+  await host.locator("#lobby-status", { hasText: "one who joins takes a robot's seat" }).waitFor();
 
+  // A friend joins the full room and takes the last robot's seat.
   const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
   const bo = await open("Bo", { viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "light" });
   await bo.goto(invite);
   await bo.click("#join-room");
+  await host.locator("#toast", { hasText: "Bo takes Robot 3's seat." }).waitFor({ state: "attached" });
   await host.locator("#roster li.ready:not(.robot)", { hasText: "Bo" }).waitFor();
   await bo.locator("#lobby-status", { hasText: "2 players and 2 robots in" }).waitFor();
+  assert.deepEqual(await host.locator("#roster li.robot > span").allInnerTexts(), ["Robot 1", "Robot 2"]);
   assert.equal(await host.locator("#start-game").innerText(), "Start game (4 players)");
+  assert.equal(await host.locator("#lobby-status").innerText(), "Every seat is taken. Start when you're ready.");
   assert.equal(await host.locator("#roster li.empty").count(), 0);
   await host.screenshot({ path: `${ARTIFACTS}/mr-1-waiting-dark.png` });
   await host.emulateMedia({ colorScheme: "light" });
@@ -87,6 +99,7 @@ test("two friends and two robots play a whole game of Hearts; each robot sees on
     assert.match(await p.locator(".pb-players").innerText(), /Robot 1[\s\S]*Robot 2/);
     assert.deepEqual(await p.evaluate(() => window.ddp.session.players.map((x) => x.robot)), [false, false, true, true]);
     assert.equal(await p.evaluate(() => window.ddp.session.mode), "friend");
+    assert.match(await p.locator("#hr-config").innerText(), /(Easy|Medium|Hard) robots/, "everyone sees the robots' level");
   }
   // Each robot is a seat of its own on the host, with its own match and keys.
   assert.deepEqual(await host.evaluate(() => window.ddp.robots.map((r) => [r.match.me, r.match !== window.ddp.match, r.match.key !== window.ddp.match.key])), [[2, true, true], [3, true, true]]);
@@ -115,6 +128,21 @@ test("two friends and two robots play a whole game of Hearts; each robot sees on
   }
   // A mixed room is a friend game: it never counts toward the record against the robots.
   assert.equal(await host.evaluate(() => localStorage.getItem("ddp-robot-record")), null);
+  assert.deepEqual(errors, []);
+});
+
+test("with robots and no friend in yet, Start plays them as a robot game", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
+  const { srv, open, errors } = await setup(t);
+  const host = await open("Ada");
+  await host.goto(`${srv.base}/ludo/`);
+  await host.click("#play-friend");
+  await host.locator("#room-code").waitFor();
+  assert.equal(await host.locator("#start-game").innerText(), "Start game (needs 2 players)");
+  await host.click("#add-robot");
+  await host.click("#start-game");
+  await wait(host, () => window.ddp.match?.phase === "playing");
+  assert.equal(await host.evaluate(() => window.ddp.session.mode), "robot");
+  assert.equal(await host.evaluate(() => window.ddp.session.players.length), 2);
   assert.deepEqual(errors, []);
 });
 
