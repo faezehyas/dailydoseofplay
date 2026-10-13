@@ -1,9 +1,9 @@
 // Headless-browser tests: while a ready game's home tile is hovered or has
 // keyboard focus, it loops a short preview of the game in place of its icon,
 // without changing size, and shows the icon again after (also when a click
-// left focus in the tile); on a touch screen it
-// loops while the tile is in view; with reduced motion, or without a preview,
-// the icon stays. Skips if Playwright is missing.
+// left focus in the tile); on a touch screen only the tile crossing a line
+// across the screen loops; with reduced motion, or without a preview, the
+// icon stays. Skips if Playwright is missing.
 //
 //   npm run test:browser
 import test from "node:test";
@@ -160,13 +160,21 @@ test("previews loop in view on a touch screen and never play with reduced motion
   });
   const errors = [];
 
-  // Touch: only the tiles that have come into view play.
+  // Touch: one tile plays at a time, and scrolling down the page gives each one its turn.
   const phone = await openHome(browser, srv, errors, { viewport: { width: 360, height: 740 }, hasTouch: true, isMobile: true });
   const last = ready.at(-1).slug;
   assert.equal(await preview(phone, last), null, "a tile below the screen waits");
-  await phone.locator(`.game-card[data-slug="${last}"]`).scrollIntoViewIfNeeded();
-  await phone.locator(`.game-card[data-slug="${last}"] svg.tile-preview`).waitFor();
-  assert.ok(started(await preview(phone, last)), "it plays once it is in view");
+  const played = new Set();
+  const end = await phone.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+  for (let y = 0; y <= end; y += 40) {
+    await phone.evaluate((y) => scrollTo(0, y), y);
+    await phone.waitForTimeout(150);
+    const playing = await phone.locator(".game-card:has(svg.tile-preview)").evaluateAll((els) => els.map((e) => e.dataset.slug));
+    assert.ok(playing.length <= 1, `${playing.join(" and ")} play at once`);
+    for (const slug of playing) played.add(slug);
+    if (playing[0] === last) assert.ok(started(await preview(phone, last)), "the last tile plays");
+  }
+  assert.deepEqual([...played].sort(), ready.map((g) => g.slug).sort(), "every tile gets its turn");
   await phone.evaluate(() => scrollTo(0, 0));
   await phone.locator(`.game-card[data-slug="${last}"] .game-icon img`).waitFor();
   assert.equal(await preview(phone, last), null, "out of view, it shows its icon again");

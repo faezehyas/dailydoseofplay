@@ -2589,6 +2589,7 @@ input::placeholder {
    row underneath, so the list stays short. */
 @media (max-width: 600px) {
   .game-grid {
+    grid-template-columns: 1fr;
     gap: 8px;
   }
 

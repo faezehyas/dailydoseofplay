@@ -46,7 +46,7 @@ test("home page tiles are all the same size", { skip: !pw && "Playwright not ins
   });
   const errors = [];
 
-  for (const width of [1280, 768, 360]) {
+  for (const width of [1280, 768, 560, 360]) {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     page.on("pageerror", (e) => errors.push(`${width}: ${e.message}`));
     await page.route("**/games.json", (route) => route.fulfill({ json: { games: credited } }));
@@ -83,9 +83,11 @@ test("home page tiles are all the same size", { skip: !pw && "Playwright not ins
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, "no horizontal scroll at 360 px");
       const iconBottom = await page.locator(".game-card[data-slug] .game-icon").first().evaluate((e) => e.getBoundingClientRect().bottom);
       assert.ok(iconBottom <= 640, `first tile's picture ends at ${iconBottom} px, below a 640 px phone screen`);
-      assert.ok(cards[0].height <= 140, `tiles are ${cards[0].height} px tall, not compact`);
+    }
+    if (width < 600) {
+      assert.ok(cards[0].height <= 140, `${width} px: tiles are ${cards[0].height} px tall, not compact`);
       const links = await page.locator(".game-card[data-slug] .quick-play a").evaluateAll((els) => els.map((a) => a.getBoundingClientRect().height));
-      assert.ok(Math.min(...links) >= 44, `quick play links are ${Math.min(...links)} px tall, under 44 px`);
+      assert.ok(Math.min(...links) >= 44, `${width} px: quick play links are ${Math.min(...links)} px tall, under 44 px`);
     }
     await page.screenshot({ path: `${ARTIFACTS}/home-${width}.png`, fullPage: true });
     await page.close();
