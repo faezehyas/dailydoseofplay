@@ -8,9 +8,14 @@
 // shell.leave() goes back to the lobby; while the game says a friend match is
 // on (shell.setInProgress(true)), it asks first. The browser's Back does the same,
 // and closing or reloading the tab gets the browser's own prompt.
-// createRobot(session) drives one robot seat over an in-memory group; robots
-// is how many seats (a number, or a function read when a robot game starts).
+// createRobot(session) drives one robot seat over an in-memory group.
 // maxPlayers must match the game's entry in games.json (the server enforces it).
+// A game that seats more than two lets the player pick how many sit at a robot
+// game's table, from max(2, minPlayers) to maxPlayers, just above "Play vs
+// robot", which names the robots; settings keeps the choice (settings.js).
+// Otherwise a robot game is full.
+// robots, optional, overrides how many robot seats there are (a number, or a
+// function read when a robot game starts); older games passed it.
 // The lobby tagline is the game's description in games.json; `tagline`
 // overrides it (older games passed their own).
 // layout is the page column while the game is on show: "narrow", "medium" or
@@ -66,7 +71,7 @@ const LAYOUTS = ["narrow", "medium", "wide"];
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 4;
 
-export function startGameShell({ slug, title, tagline = "", createRobot, onSession, minPlayers = 2, maxPlayers = 2, robots = 1, layout = "wide", settings, howToPlay, tutorial, banter = {} }) {
+export function startGameShell({ slug, title, tagline = "", createRobot, onSession, minPlayers = 2, maxPlayers = 2, robots, layout = "wide", settings, howToPlay, tutorial, banter = {} }) {
   initShell({ title, settings });
   const lobbyRoot = $("#lobby");
   const gameRoot = $("#game");
@@ -84,6 +89,9 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   if (page) page.dataset.layout = LAYOUTS.includes(layout) ? layout : "wide";
   showView("lobby");
   const duel = maxPlayers === 2;
+  const fewest = Math.max(2, minPlayers);
+  const choosePlayers = robots === undefined && settings && maxPlayers > fewest;
+  if (choosePlayers) settings.offerPlayers(Array.from({ length: maxPlayers - fewest + 1 }, (_, i) => fewest + i));
   const state = { room: null, session: null, game: null, tutorial: null, mustAsk: () => false, leave: null, robot: null, robots: [], attempt: 0 };
   window.ddp = state; // handy for debugging and browser tests
 
@@ -112,7 +120,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     })
     .catch(() => {});
 
-  // A new view takes focus to its heading, except on page load.
+  // A new view takes focus to its heading, except on page load. The first
+  // replaces the page's loading placeholder (index.html).
   function view(...children) {
     const card = el("div", { class: "card lobby-card" }, ...children);
     const old = $(".lobby-card", lobbyRoot);
@@ -196,10 +205,10 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
         "div",
         { class: "lobby-actions" },
         el("button", { class: "btn primary big", id: "play-friend", type: "button", onclick: host }, duel ? "Play with a friend" : "Play with friends"),
-        el("button", { class: "btn big", id: "play-robot", type: "button", onclick: playRobot }, "Play vs robot"),
+        robotPlay(),
         tutorial && el("button", { class: "btn learn", id: "learn", type: "button", onclick: learn }, "Learn"),
       ),
-      recordLine(),
+      !choosePlayers && recordLine(),
       el("p", { class: "lobby-note", id: "direct-note" }, "Games connect your browser directly to your friends'. Play with people you know."),
       el("div", { class: "divider" }, el("span", {}, "or join with a code")),
       joinForm,
@@ -210,6 +219,22 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     showError(error);
     codeInput.focus();
     codeInput.select();
+  }
+
+  // "Play vs robot", with the player count above it when the game offers one:
+  // the button then says how many robots ("Play vs 2 robots"), and your
+  // record against them under both.
+  function robotPlay() {
+    const button = el("button", { class: "btn big", id: "play-robot", type: "button", onclick: playRobot }, "Play vs robot");
+    if (!choosePlayers) return button;
+    const label = () => {
+      const count = settings.players() - 1;
+      button.textContent = count === 1 ? "Play vs robot" : `Play vs ${count} robots`;
+    };
+    const choice = settings.playersForm();
+    choice.addEventListener("change", label);
+    label();
+    return el("div", { class: "robot-play" }, choice, button, recordLine());
   }
 
   // Your record against the robots on this device (robot-record.js), once
@@ -494,7 +519,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   function playRobot() {
     cleanupConnection();
     const name = currentName();
-    const count = typeof robots === "function" ? robots() : robots;
+    const count = typeof robots === "function" ? robots() : (robots ?? (choosePlayers ? settings.players() : maxPlayers) - 1);
     const names = [name, ...Array.from({ length: count }, (_, i) => (count === 1 ? "Robot" : `Robot ${i + 1}`))];
     const [session, ...robotSessions] = localRoom({ game: slug, names, mode: "robot" });
     state.robots = robotSessions.map((robotSession) => {

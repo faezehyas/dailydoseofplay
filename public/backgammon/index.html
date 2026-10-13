@@ -12,11 +12,43 @@
     <link rel="preload" href="/engine/fonts/fredoka.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/engine/theme.css" />
     <link rel="stylesheet" href="./style.css" />
+    <link rel="modulepreload" href="/engine/lobby.js" />
+    <link rel="modulepreload" href="/engine/session.js" />
+    <link rel="modulepreload" href="/engine/turn-match.js" />
+    <link rel="modulepreload" href="/engine/shell.js" />
+    <link rel="modulepreload" href="/engine/players.js" />
+    <link rel="modulepreload" href="/engine/result.js" />
+    <link rel="modulepreload" href="/engine/celebrate.js" />
+    <link rel="modulepreload" href="/engine/confirm.js" />
+    <link rel="modulepreload" href="/engine/robot-record.js" />
+    <link rel="modulepreload" href="/engine/room.js" />
+    <link rel="modulepreload" href="/engine/how-to-play.js" />
+    <link rel="modulepreload" href="/engine/reactions.js" />
+    <link rel="modulepreload" href="/engine/channel.js" />
+    <link rel="modulepreload" href="/engine/group.js" />
+    <link rel="modulepreload" href="/engine/names.js" />
+    <link rel="modulepreload" href="/engine/fair.js" />
+    <link rel="modulepreload" href="/engine/robot-pace.js" />
+    <link rel="modulepreload" href="/engine/prefs.js" />
+    <link rel="modulepreload" href="/engine/chimes.js" />
+    <link rel="modulepreload" href="/engine/rng.js" />
+    <link rel="modulepreload" href="/engine/settings.js" />
+    <link rel="modulepreload" href="/engine/sound.js" />
+    <link rel="modulepreload" href="/engine/signaling.js" />
+    <link rel="modulepreload" href="/engine/peer.js" />
+    <link rel="modulepreload" href="/engine/synth.js" />
+    <link rel="modulepreload" href="/engine/loudness.js" />
     <script type="module" src="./main.js"></script>
   </head>
   <body>
     <main class="page">
-      <section id="lobby"></section>
+      <section id="lobby">
+        <div class="card lobby-card">
+          <h1>Backgammon</h1>
+          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
+        </div>
+      </section>
       <section id="game" hidden></section>
     </main>
   </body>

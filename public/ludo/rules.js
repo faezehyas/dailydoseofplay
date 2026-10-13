@@ -28,8 +28,7 @@ export const SAFE = new Set([...STARTS, ...STARS]);
 export const FIRST = ["random", "host", "guest"];
 export const MOVE_SECONDS = [0, 10, 20, 30];
 export const LEVELS = ["easy", "medium", "hard"];
-export const ROBOTS = [1, 2, 3];
-// level and robots are per device: they only count against robots.
+// level is per device: it only counts against robots.
 export const DEFAULT_CONFIG = {
   threeSixes: true,
   blocks: false,
@@ -38,7 +37,6 @@ export const DEFAULT_CONFIG = {
   first: "random",
   moveSeconds: 0,
   level: "easy",
-  robots: 3,
 };
 // Shared random draws per match: the coin toss, then one per roll.
 // rules.test.js plays seeded games with every house rule to check the margin.
@@ -56,7 +54,6 @@ export function normalizeConfig(raw) {
     first: pick(c.first, FIRST, DEFAULT_CONFIG.first),
     moveSeconds: pick(c.moveSeconds, MOVE_SECONDS, DEFAULT_CONFIG.moveSeconds),
     level: pick(c.level, LEVELS, DEFAULT_CONFIG.level),
-    robots: pick(c.robots, ROBOTS, DEFAULT_CONFIG.robots),
   };
 }
 

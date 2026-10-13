@@ -43,6 +43,7 @@ const square = (sq) => `.ck-sq[data-sq="${sq}"]`;
 
 // The path the page's player should play now: the robot's best move at
 // `level`, or the first legal move ("first"). Loaded from the page's own modules.
+// Ties between equal moves break the same way every run.
 function nextPath(page, level) {
   return page.evaluate(async (level) => {
     const match = window.ddp.match;
@@ -51,7 +52,7 @@ function nextPath(page, level) {
       return legalMoves(match.state.board, match.me)[0];
     }
     const { chooseMove } = await import("/checkers/robot.js");
-    return chooseMove(match.state, match.me, Math.random, { level, randomChance: 0 }).path;
+    return chooseMove(match.state, match.me, () => 0, { level, randomChance: 0 }).path;
   }, level);
 }
 
@@ -248,7 +249,16 @@ test("Checkers vs the robot on a 360 px phone: a full game by touch, then a rema
   await pick(page, "first", "host");
   assert.ok(await noHorizontalScroll(page), "settings fit at 360 px");
   await page.screenshot({ path: `${ARTIFACTS}/checkers-5-lobby-mobile-light.png`, fullPage: true });
-  await page.click("#play-robot");
+  // The robot keeps the Math.random it starts with: a seeded one makes its
+  // random moves, and so this game, the same every run. Unseeded, about one
+  // game in 100 ends in a draw on the 40-turn rule.
+  await page.evaluate(async () => {
+    const { rngFromSeed } = await import("/engine/rng.js");
+    const random = Math.random;
+    Math.random = rngFromSeed("checkers");
+    document.querySelector("#play-robot").click();
+    Math.random = random;
+  });
   await wait(page, () => window.ddp.match?.phase === "playing");
   assert.match(await page.locator(".pb-players").innerText(), /Cleo[\s\S]*Robot/);
   assert.equal(await page.locator("#ck-config").innerText(), "8 × 8 checkers · no move limit · no game clock · Easy robot");

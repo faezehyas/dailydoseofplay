@@ -63,7 +63,6 @@ startGameShell({
   settings,
   minPlayers: MIN_PLAYERS,
   maxPlayers: MAX_PLAYERS,
-  robots: () => settings.get().robots,
   createRobot: (session) => {
     const config = settings.get();
     return startRobot(session, {
