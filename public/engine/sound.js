@@ -6,9 +6,11 @@
 // to their role. A synthesized sound carries a `trim` that brings it there,
 // which the sound-levels browser test checks for every sound of every game.
 // Muting and the volume are per-device settings (prefs.js) shared by every
-// game; the volume is a master gain after the output.
+// game; the volume is a master gain after the output. Inside the mobile app
+// a move or a result also gives a light haptic (native.js), sound on or off.
 import { loudness, fromDb } from "./loudness.js";
 import { getPrefs, onPrefsChange } from "./prefs.js";
+import { isApp, haptic } from "./native.js";
 
 const soundOn = () => getPrefs().sound;
 
@@ -23,6 +25,9 @@ export const ROLES = {
   highlight: -21, // something happened: a capture, a box, a hit, a ladder
   fanfare: -19, // the big moments: a win, a loss, a sunk ship, a nuke
 };
+
+// The roles of moves and results, which the app feels as well as plays.
+const HAPTIC_ROLES = new Set(["action", "highlight", "fanfare"]);
 
 // How far a sound may land from its role (and the most a sound may set
 // itself apart from its role with `offset`), in dB.
@@ -178,7 +183,9 @@ export function defineSounds(defs) {
     names: Object.keys(defs),
     defs,
     play(name, opts = {}, at = 0) {
-      if (!soundOn() || !defs[name]) return false;
+      if (!defs[name]) return false;
+      if (isApp && HAPTIC_ROLES.has(defs[name].role)) setTimeout(haptic, at * 1000, "light");
+      if (!soundOn()) return false;
       globalThis.ddpSounds?.push(name); // browser tests count what played
       try {
         // No click or key press on this page yet: skip, rather than queue

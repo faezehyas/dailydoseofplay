@@ -128,6 +128,45 @@ test("web manifest: served as a manifest, and every icon it lists exists at its 
   }
 });
 
+test("app links: the two .well-known files are JSON with the app's IDs, and 404 while those are unset", async (t) => {
+  const appleTeamId = "ABCDE12345";
+  const cert = Array.from({ length: 32 }, (_, i) => i.toString(16).padStart(2, "0").toUpperCase()).join(":");
+  const srv = await startServer({ appleTeamId, androidCertSha256: ` ${cert.toLowerCase()} ` });
+  const unset = await startServer({ appleTeamId: "", androidCertSha256: "" });
+  const malformed = await startServer({ appleTeamId: "ABC", androidCertSha256: "AB:CD" });
+  t.after(() => Promise.all([srv.close(), unset.close(), malformed.close()]));
+  const security = ["content-security-policy", "strict-transport-security", "cross-origin-opener-policy", "permissions-policy", "x-content-type-options", "referrer-policy"];
+  const home = (await fetch(`${srv.base}/`)).headers;
+
+  const apple = await fetch(`${srv.base}/.well-known/apple-app-site-association`);
+  assert.equal(apple.status, 200);
+  assert.equal(apple.headers.get("content-type"), "application/json");
+  for (const name of security) assert.equal(apple.headers.get(name), home.get(name), name);
+  assert.deepEqual(await apple.json(), {
+    applinks: { details: [{ appIDs: ["ABCDE12345.com.dailydoseofplay.app"], components: [{ "/": "/*/", "?": { room: "?*" } }] }] },
+  });
+
+  const android = await fetch(`${srv.base}/.well-known/assetlinks.json`);
+  assert.equal(android.status, 200);
+  assert.equal(android.headers.get("content-type"), "application/json");
+  for (const name of security) assert.equal(android.headers.get(name), home.get(name), name);
+  assert.deepEqual(await android.json(), [
+    {
+      relation: ["delegate_permission/common.handle_all_urls"],
+      target: { namespace: "android_app", package_name: "com.dailydoseofplay.app", sha256_cert_fingerprints: [cert] },
+    },
+  ]);
+  assert.equal((await fetch(`${srv.base}/.well-known/assetlinks.json`, { method: "HEAD" })).status, 200);
+
+  for (const base of [unset.base, malformed.base]) {
+    for (const file of ["apple-app-site-association", "assetlinks.json"]) {
+      const res = await fetch(`${base}/.well-known/${file}`);
+      assert.equal(res.status, 404, file);
+      for (const name of security) assert.equal(res.headers.get(name), home.get(name), `${file}: ${name}`);
+    }
+  }
+});
+
 test("sea battle: every recorded sound exists and is credited", () => {
   const main = fs.readFileSync(new URL("../public/sea-battle/sounds.js", import.meta.url), "utf8");
   const credits = fs.readFileSync(new URL("../public/sea-battle/sounds/LICENSE.txt", import.meta.url), "utf8");
