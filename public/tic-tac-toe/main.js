@@ -200,7 +200,7 @@ function mountTicTacToe(session, root, shell) {
       case "playing":
         return st.turn === me ? `Your turn. Place your ${markOf(st, me)}.` : `${oppName} is thinking…`;
       case "over":
-        if (st.winner === DRAW) return `It's a draw. Nobody got ${IN_A_ROW_WORD[st.k]} in a row.`;
+        if (st.winner === DRAW) return "It's a draw. The board is full.";
         if (st.reason === "timeout") return st.winner === me ? `${oppName} ran out of time. You win!` : "You ran out of time.";
         return st.winner === me ? `You win with ${IN_A_ROW_WORD[st.k]} in a row!` : `${oppName} wins this round.`;
       default:

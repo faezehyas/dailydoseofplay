@@ -938,6 +938,8 @@ input::placeholder {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pb-note:empty {
