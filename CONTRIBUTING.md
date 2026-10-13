@@ -462,7 +462,12 @@ rolls it (Chutes and Ladders' `spin`). When the dice come before a choice,
 put the roll in the position instead and roll it in `load`, so the board
 shows the dice before the move (Backgammon, Ludo). The engine lights a cell
 with a box shadow; on a board drawn in SVG, make `cell(c)` return a shape of
-your own with the class `tut-ring` (Ludo, Chutes and Ladders). Pass `tutorial: () => import("./tutorial.js")` to
+your own with the class `tut-ring` (Ludo, Chutes and Ladders). A card game
+deals its lessons from `engine/cards/lesson-deck.js`: fixed hands, `card("10H")`
+for a card (a slot is its face) and `lessonMove()` as `play`, so no shuffle
+runs; when the other seats move more than once before your turn, the
+adapter's `play` takes a list of moves as the `reply` (Crazy Eights is the
+shortest, Hearts has the list). Pass `tutorial: () => import("./tutorial.js")` to
 `startGameShell()`, so the page loads it only when someone opens it. Test it
 with `lessons.test.js` (step 7).
 

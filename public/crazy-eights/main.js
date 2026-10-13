@@ -14,9 +14,9 @@ import { recordRobotResult } from "../engine/robot-record.js";
 import { cardTable, DECK_WORK as BUSY, still, tokenMs, easing } from "../engine/cards/table.js";
 import { humanPause } from "../engine/cards/paced-robot.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
-import { suitSvg } from "../engine/cards/art.js";
 import { SUIT_NAMES, cardWords } from "../engine/cards/faces.js";
-import { makeRules, normalizeConfig, MAX_PLAYERS, SUIT_SIGNS, suitOf, rankOf, points, cardName, toFollow, isEight, canDraw, canPass, playable } from "./rules.js";
+import { makeRules, normalizeConfig, MAX_PLAYERS, SUIT_SIGNS, suitOf, points, cardName, toFollow, isEight, canDraw, canPass, playable } from "./rules.js";
+import { PACE, handOrder, tilt, drawPile, drawSuit, suitBurst, showPicker } from "./art.js";
 import { chooseMove, startRobot, timeoutMove } from "./robot.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
@@ -25,7 +25,6 @@ import { howToPlay } from "./how-to-play.js";
 // How long robots think, before each move (robotPause() scales these in tests).
 const ROBOT_PACE = { forced: 420, again: 320, think: 560, option: 130, eight: 450, max: 1800 };
 const FORCED_DELAY = 700; // before a draw or pass you have no choice about is made for you
-const PACE = { deal: 70, dealFly: 300, fly: 420, mine: 280, draw: 360, flip: 420, between: 240, bubble: 700, gather: 520 };
 const CLAIM_GRACE_MS = 6000; // past a player's time before we say their browser is quiet
 const LEVEL_NAME = { easy: "Easy", medium: "Medium", hard: "Hard" };
 const PLACE = ["", "1st", "2nd", "3rd", "4th"];
@@ -48,6 +47,7 @@ startGameShell({
   slug: "crazy-eights",
   title: "Crazy Eights",
   howToPlay,
+  tutorial: () => import("./tutorial.js"),
   layout: "wide",
   settings,
   minPlayers: 2,
@@ -99,7 +99,7 @@ function mountGame(session, root, shell) {
   const four = () => settings.get().fourColor;
   // The shared table: cards, seats, stock, hand and motion (engine/cards/table.js).
   const table = cardTable({ prefix: "ce", play, animate: (ev, g) => animate(ev, g), done: (idle) => replayed(idle) });
-  const { cardEl, setFace, miniCard, fly, live, fast, pace, wait, rectIn, flyLayer, hand, handCards } = table;
+  const { miniCard, fly, live, fast, pace, wait, rectIn, flyLayer, hand, handCards } = table;
 
   // One session handler: "setup" is for this view (and only from the room's creator), the rest goes to the matches.
   let route = () => {};
@@ -172,12 +172,7 @@ function mountGame(session, root, shell) {
   }
   const faceOf = (slot) => match?.face(slot) ?? null;
 
-  // My hand, by suit (alternating colours) then rank.
-  const ORDER = [0, 1, 3, 2];
-  const sortKey = (slot) => {
-    const f = faceOf(slot);
-    return f === null ? 1000 + slot : ORDER[suitOf(f)] * 13 + ((rankOf(f) + 12) % 13);
-  };
+  const sortKey = (slot) => handOrder(slot, faceOf(slot));
 
   function myPlayable() {
     const d = decision();
@@ -210,37 +205,10 @@ function mountGame(session, root, shell) {
     }
   }
 
-  // A pile card's tilt, the same for a slot on every render.
-  const tilt = (slot) => ((slot * 37) % 15) - 7;
   function renderCentre() {
     table.renderStock(view.stock);
-    const top = view.discard.slice(-3);
-    const want = top.map((slot) => String(slot));
-    if ([...pile.children].map((c) => c.dataset.slot).join() !== want.join()) {
-      pile.replaceChildren(
-        ...top.map((slot) => {
-          const card = cardEl(faceOf(slot));
-          card.dataset.slot = slot;
-          return card;
-        }),
-      );
-    }
-    for (const card of pile.children) {
-      const slot = Number(card.dataset.slot);
-      const face = faceOf(slot);
-      setFace(card, face);
-      card.classList.toggle("down", face === null);
-      card.style.transform = `rotate(${tilt(slot)}deg)`;
-      card.style.opacity = view.arriving.has(slot) ? "0" : "";
-    }
-    const topFace = view.discard.length ? faceOf(view.discard.at(-1)) : null;
-    pile.setAttribute("aria-label", topFace === null ? "Discard pile" : `Discard pile: ${cardName(topFace)} on top`);
-    if (view.suit >= 0) {
-      suitBadge.hidden = false;
-      suitBadge.className = `ce-suit-badge s-${view.suit} ${view.named ? "named" : ""}`;
-      suitBadge.innerHTML = `${suitSvg(view.suit)}<span>${view.named ? `${SUIT_NAMES[view.suit]}, named` : SUIT_NAMES[view.suit]}</span>`;
-      suitBadge.setAttribute("aria-label", `Suit to follow: ${SUIT_NAMES[view.suit]}${view.named ? ", named by an 8" : ""}`);
-    } else suitBadge.hidden = true;
+    drawPile(table, pile, view.discard, { face: faceOf, arriving: view.arriving });
+    drawSuit(suitBadge, view.suit, view.named);
     // With aces turning play round, which way it goes: towards the player after you.
     dirChip.hidden = !(config?.actions && count > 2 && view.suit >= 0);
     dirChip.classList.toggle("ccw", view.dir === -1);
@@ -264,36 +232,6 @@ function mountGame(session, root, shell) {
 
   function bubble(p, text, g, ms = PACE.bubble) {
     table.bubble(p === me ? meArea : seatOf(p).node, p, text, g, ms);
-  }
-
-  // Pips of the named suit burst from the pile; a ring spreads under them.
-  function suitBurst(suit, g) {
-    if (fast() || !live(g)) return;
-    const r = pileRect();
-    const cx = r.x + r.w / 2;
-    const cy = r.y + r.h / 2;
-    const ring = el("span", { class: "pc-fx ring" });
-    ring.style.transform = `translate(${cx}px, ${cy}px)`;
-    flyLayer.append(ring);
-    ring.animate([{ transform: `translate(${cx}px, ${cy}px) scale(.4)`, opacity: 1 }, { transform: `translate(${cx}px, ${cy}px) scale(2.6)`, opacity: 0 }], { duration: tokenMs("slow") * 2.2, easing: easing("out") }).finished.then(() => ring.remove(), () => ring.remove());
-    const n = 10;
-    for (let i = 0; i < n; i++) {
-      const node = el("span", { class: `pc-fx s-${suit}` });
-      node.innerHTML = suitSvg(suit);
-      flyLayer.append(node);
-      const a = (i / n) * Math.PI * 2 + Math.random() * 0.4;
-      const d = 60 + Math.random() * 50;
-      node
-        .animate(
-          [
-            { transform: `translate(${cx}px, ${cy}px) scale(.3)`, opacity: 1 },
-            { transform: `translate(${cx + Math.cos(a) * d}px, ${cy + Math.sin(a) * d}px) scale(1.1) rotate(${(Math.random() - 0.5) * 90}deg)`, opacity: 1, offset: 0.6 },
-            { transform: `translate(${cx + Math.cos(a) * d * 1.25}px, ${cy + Math.sin(a) * d * 1.25 + 14}px) scale(.8)`, opacity: 0 },
-          ],
-          { duration: 900 + Math.random() * 300, easing: easing("out") },
-        )
-        .finished.then(() => node.remove(), () => node.remove());
-    }
   }
 
   // Confetti in the winner's colour (and the others'), from where they sit.
@@ -375,7 +313,7 @@ function mountGame(session, root, shell) {
       addLog({ player: p, face: ev.face, text: describePlay(ev) });
       if (ev.eight) {
         play("eight", { suit: ev.suit }, 0.05);
-        suitBurst(ev.suit, g);
+        suitBurst(table, pileRect(), ev.suit, g);
         bubble(p, `${SUIT_SIGNS[ev.suit]} ${SUIT_NAMES[ev.suit]}!`, g);
         await wait(380 * k, g);
       }
@@ -497,7 +435,7 @@ function mountGame(session, root, shell) {
     if (!myPlayable().includes(slot)) {
       const st = match.state;
       play("nope");
-      nudge(handCards.get(slot));
+      table.shake(handCards.get(slot)?.firstChild);
       return toast(`Play ${toFollow(st)}`);
     }
     clearTimeout(forcedTimer);
@@ -527,11 +465,6 @@ function mountGame(session, root, shell) {
     match.play({ pass: true });
   }
 
-  function nudge(node) {
-    if (!node || fast()) return;
-    node.firstChild.animate([{ transform: "translateX(0)" }, { transform: "translateX(-6px)" }, { transform: "translateX(6px)" }, { transform: "translateX(0)" }], { duration: tokenMs("slow"), easing: easing("out") });
-  }
-
   table.onPick((slot) => playSlot(slot));
 
   // D draws and P passes, wherever focus is (but not while typing).
@@ -545,42 +478,8 @@ function mountGame(session, root, shell) {
   // ---------- the suit picker ----------
   function openPicker(slot) {
     picking = slot;
-    const rest = view.hands[me].filter((s) => s !== slot).map(faceOf).filter((f) => f !== null && !isEight(f));
-    const n = [0, 1, 2, 3].map((s) => rest.filter((f) => suitOf(f) === s).length);
-    const best = n.indexOf(Math.max(...n));
-    const buttons = [0, 1, 2, 3].map((s) => {
-      const btn = el("button", { class: `ce-pick s-${s} ${s === best ? "best" : ""}`, type: "button", dataset: { suit: s }, "aria-label": `${SUIT_NAMES[s]}${n[s] ? `, you hold ${n[s]}` : ""}` });
-      btn.innerHTML = `${suitSvg(s)}<span>${SUIT_NAMES[s]}</span>`;
-      btn.addEventListener("click", () => pickSuit(s));
-      return btn;
-    });
-    picker.replaceChildren(
-      el(
-        "div",
-        { class: "ce-picker-card" },
-        el("h2", { id: "ce-picker-title" }, `Play ${cardName(faceOf(slot))}: name a suit`),
-        el("div", { class: "ce-picker-suits", role: "group", "aria-label": "Suits" }, buttons),
-        el("button", { class: "btn small ghost", type: "button", onclick: () => closePicker() }, "Cancel"),
-      ),
-    );
-    picker.hidden = false;
-    picker.onkeydown = (e) => {
-      if (e.key === "Escape") return closePicker();
-      if (e.key === "Tab") {
-        // Modal: Tab cycles through the picker's own buttons.
-        const all = [...picker.querySelectorAll("button")];
-        const i = all.indexOf(document.activeElement);
-        e.preventDefault();
-        return all[(i + (e.shiftKey ? -1 : 1) + all.length) % all.length].focus();
-      }
-      const i = buttons.indexOf(document.activeElement);
-      const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-      if (step && i >= 0) {
-        e.preventDefault();
-        buttons[(i + step + 4) % 4].focus();
-      } else if (/^[1-4]$/.test(e.key)) pickSuit(Number(e.key) - 1);
-    };
-    buttons[best].focus();
+    const rest = view.hands[me].filter((s) => s !== slot).map(faceOf);
+    showPicker(picker, { face: faceOf(slot), rest, pick: pickSuit, cancel: closePicker });
     render();
   }
 
