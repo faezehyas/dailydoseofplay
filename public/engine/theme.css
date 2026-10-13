@@ -622,6 +622,35 @@ input::placeholder {
   margin: 0 0 8px;
 }
 
+/* Your record against the robots (engine/robot-record.js), with Reset as a link. */
+.robot-record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 8px;
+}
+
+/* In the robot box, on a row of its own under the count and the button. */
+.robot-play .robot-record {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.robot-record-reset {
+  min-height: 44px;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: var(--accent-2-text);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .divider {
   display: flex;
   align-items: center;
@@ -2565,6 +2594,106 @@ input::placeholder {
   justify-content: space-between;
   gap: 8px;
   margin: 0;
+}
+
+/* Phones: a compact tile without its credit. Its art sits on the left, with
+   the name, two lines of description and the players beside it, a chevron for
+   the tile's own link, and light quick play links in a row underneath, so the
+   games stand out more than the buttons. */
+@media (max-width: 600px) {
+  .game-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .game-card {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr) 8px;
+    grid-template-rows: auto 1fr auto auto;
+    grid-template-areas:
+      "icon name go"
+      "icon text go"
+      "icon meta go"
+      "play play play";
+    gap: 0 12px;
+    padding: 10px;
+    line-height: 1.3;
+  }
+
+  .game-card:has(h2 a)::after {
+    content: "";
+    grid-area: go;
+    align-self: center;
+    width: 7px;
+    height: 7px;
+    border: solid var(--muted);
+    border-width: 2px 2px 0 0;
+    transform: translateX(-2px) rotate(45deg);
+  }
+
+  /* Its corners follow the card's, less the padding between them. */
+  .game-icon {
+    grid-area: icon;
+    align-self: start;
+    border-radius: 6px;
+  }
+
+  .game-card h2 {
+    grid-area: name;
+    font-size: 1.1rem;
+  }
+
+  .game-card p {
+    grid-area: text;
+    font-size: 0.85rem;
+  }
+
+  .game-meta {
+    grid-area: meta;
+  }
+
+  /* A plain fact, not a pill that looks like a control. */
+  .game-meta .chip {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 400;
+  }
+
+  .quick-play {
+    grid-area: play;
+    grid-template-columns: 1fr 1fr;
+    margin-top: 10px;
+  }
+
+  /* Outlined, with coral only in the first link's text. Each link is 36 px
+     tall, and its ::before stretches what a tap hits to 44 px. */
+  .quick-play .btn {
+    position: relative;
+    min-height: 36px;
+    border-color: var(--control-border);
+    background: transparent;
+    color: var(--text);
+    font-size: 0.9rem;
+  }
+
+  .quick-play .btn.primary {
+    color: var(--accent-text);
+  }
+
+  .quick-play .btn:hover:not(:disabled) {
+    background: var(--surface-2);
+    filter: none;
+  }
+
+  .quick-play .btn::before {
+    content: "";
+    position: absolute;
+    inset: -5px -1px;
+  }
 }
 
 @media (max-width: 520px) {

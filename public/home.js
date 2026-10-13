@@ -34,7 +34,7 @@ function card(game) {
 }
 
 // While a ready tile is hovered or has keyboard focus, or on a touch screen
-// while it is mostly in view, it loops a short preview of its game, then
+// while it crosses the line below, it loops a short preview of its game, then
 // shows its icon again. A click focuses a link too, but that focus stays
 // after the pointer leaves (and on a page restored by Back), so it doesn't
 // count. preview.svg is inlined so its animations, which start paused, can
@@ -94,8 +94,25 @@ function watchPreview(tile, img, slug) {
   tile.addEventListener("mouseleave", () => set("hover", false));
   tile.addEventListener("focusin", (e) => set("focus", e.target.matches(":focus-visible")));
   tile.addEventListener("focusout", (e) => tile.contains(e.relatedTarget) || set("focus", false));
-  if (canHover) return;
-  new IntersectionObserver(([entry]) => set("view", entry.intersectionRatio >= 0.6), { threshold: [0, 0.6] }).observe(tile);
+  if (!canHover) touchTiles.set(tile, set);
+}
+
+// On a touch screen only the tile (or row of tiles) crossing a line plays. The
+// line moves down the screen as the page scrolls, from the top at the start to
+// the bottom at the end, so the first and last tiles get their turn too.
+const touchTiles = new Map(); // tile -> its set()
+let frame = 0;
+function followScroll() {
+  frame = 0;
+  const end = document.documentElement.scrollHeight - innerHeight;
+  const line = end > 0 ? (scrollY / end) * innerHeight : innerHeight / 2;
+  for (const [tile, set] of touchTiles) {
+    const box = tile.getBoundingClientRect();
+    set("view", box.top <= line && line < box.bottom);
+  }
+}
+if (!canHover) {
+  for (const type of ["scroll", "resize"]) addEventListener(type, () => (frame ||= requestAnimationFrame(followScroll)), { passive: true });
 }
 
 const list = $("#games");
@@ -111,6 +128,7 @@ async function load(retrying = false) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const { games } = await res.json();
     list.replaceChildren(...games.map(card));
+    followScroll();
   } catch {
     list.replaceChildren(
       el(

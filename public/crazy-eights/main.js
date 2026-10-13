@@ -10,6 +10,7 @@ import { matchRouter } from "../engine/session.js";
 import { CardMatch } from "../engine/card-match.js";
 import { el, toast, setTabAlert } from "../engine/shell.js";
 import { playerBar } from "../engine/players.js";
+import { recordRobotResult } from "../engine/robot-record.js";
 import { cardTable, DECK_WORK as BUSY, still, tokenMs, easing } from "../engine/cards/table.js";
 import { humanPause } from "../engine/cards/paced-robot.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
@@ -772,6 +773,8 @@ function mountGame(session, root, shell) {
       tableWrap.scrollIntoView?.({ block: "nearest", behavior: still() ? "auto" : "smooth" });
       if (phase === "over" && !celebrated) {
         celebrated = true;
+        // Crazy Eights has its own game-over panel, so it records a robot match itself.
+        if (robotGame) recordRobotResult(session.game, st.winner === me ? "win" : "loss", count);
         play(st.winner === me ? "win" : "lose");
         confetti(st.winner, table.gen);
       }
