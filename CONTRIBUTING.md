@@ -476,8 +476,8 @@ like any other. Use it only if a maintainer asks. Fields: `slug`, `name`, `statu
 `maxPlayers` (2, or the same `maxPlayers` you pass to `startGameShell()` for a game with more players), and a one-sentence original `description`. The home tile and
 the lobby both show it. Add yourself to `credits` by GitHub handle, such as
 `"credits": [{ "github": "your-handle" }]` (one entry per person who built the
-game): the home tile and the end of "How to play" show "Made by @your-handle".
-Then run `node scripts/credits.js` to add you to the README's Contributors list.
+game), then run `node scripts/credits.js` to add you to the README's
+Contributors list.
 The server reads `games.json` once at startup, so
 restart `npm start` after editing it, or creating a room will fail with `bad_game`.
 The browser test reads the "Coming soon" count from the registry, so it needs

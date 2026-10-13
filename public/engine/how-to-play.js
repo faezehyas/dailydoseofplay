@@ -6,7 +6,6 @@
 //
 // top is an optional node shown first, such as the link to the game's tutorial.
 // A section is a string (one paragraph) or an array (a list); **text** is bold.
-// madeBy(credits) is the panel's last line, from the game's credits in games.json.
 import { el } from "./shell.js";
 
 export const SECTIONS = {
@@ -36,9 +35,4 @@ export function howToPlayPanel(sections, top = null) {
         return [el("h3", {}, title), Array.isArray(body) ? el("ul", {}, body.map((item) => el("li", {}, rich(item)))) : el("p", {}, rich(body))];
       }),
   );
-}
-
-// "Made by @handle", each handle linked to its GitHub profile.
-export function madeBy(credits) {
-  return el("p", { class: "made-by" }, "Made by ", credits.flatMap(({ github }, i) => [i > 0 && ", ", el("a", { href: `https://github.com/${github}` }, `@${github}`)]));
 }
