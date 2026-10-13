@@ -78,7 +78,8 @@ test("theme and volume set on the home page apply in a game", { skip: !pw && "Pl
   await page.goto(`${srv.base}/tic-tac-toe/?robot=1`);
   await page.locator(".ttt-cell").first().waitFor();
   assert.deepEqual(await html(page), { theme: "dark" });
-  await page.tap('.ttt-cell[data-i="4"]');
+  // The robot may move first, and may take any cell: tap a free one on my turn.
+  await page.locator('.ttt-cell[aria-disabled="false"]').first().tap();
   await page.waitForFunction(() => window.ddpMaster);
   assert.ok(Math.abs((await page.evaluate(() => window.ddpMaster.gain.value)) - 0.16) < 1e-6, "the volume reaches the game's sound");
 
