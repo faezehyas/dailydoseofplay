@@ -80,7 +80,7 @@ your protocol:
 
 ```
 public/<slug>/
-├── index.html       page shell: copy public/sea-battle/index.html, change title and description; keep the icon, manifest and theme-color tags
+├── index.html       page shell: copy public/sea-battle/index.html, change title, description, the placeholder's <h1> and the modulepreload links; keep the icon, manifest and theme-color tags
 ├── style.css        game-specific styles; only var(--…) tokens from /engine/theme.css, light and dark
 ├── main.js          startGameShell(...) and the view
 ├── rules.js         pure rules
@@ -98,7 +98,12 @@ public/<slug>/
 
 Keep `index.html`'s `<section id="lobby">` and `<section id="game" hidden>`;
 the engine renders into them. Keep them in its `<main>` too: the header's
-"Skip to content" link jumps there. Don't make `#lobby` a live region: the
+"Skip to content" link jumps there. `#lobby` starts with a placeholder card
+(the game's name as in `games.json`, a spinner and a `<noscript>` line) that
+the lobby replaces. List a `<link rel="modulepreload">` for each engine module
+your `main.js` imports, directly or through your other files, so they load at
+once: `npm test` (`test/preload.test.js`) prints each link that is missing or
+extra. Don't make `#lobby` a live region: the
 lobby moves focus to each new screen and reads out its own progress. Shared
 styles (`.card`, `.btn`, `.btn.small`, `.rules` for the "How to play" panel,
 `.rematch-status`, `.overlay`, `.spinner`, `.sr-only`) live in

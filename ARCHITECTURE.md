@@ -332,6 +332,20 @@ a matching `If-None-Match` (GET or HEAD) gets `304` with no body. The hash is
 taken on each request, so a deploy or a local edit shows up on the next load.
 `/healthz`, `/ws` and the 404 page carry no `ETag`.
 
+**Page loading.** A game page's modules import each other in a chain
+(`main.js` → `engine/lobby.js` → `engine/reactions.js` → `engine/sound.js` →
+`engine/loudness.js`), and a browser finds each level only when the one above
+has arrived: about 6 round trips before the lobby. So each game's `index.html`
+has a `<link rel="modulepreload">` for every engine module its `main.js`
+imports statically (not the tutorial's `import()`), and the browser fetches
+them all at once. `test/preload.test.js` walks the real import graph and names
+any preload that is missing or extra. While they load, `#lobby` holds a static
+`.lobby-card` with the game's title and a spinner, which the lobby's first
+screen replaces; `theme.css` keeps the header's height free above it until
+`shell.js` adds the header, so nothing jumps. A `<noscript>` line in it says
+the games need JavaScript. `test/browser/page-loading.test.js` holds back
+`engine/lobby.js` and checks the title shows.
+
 **Who may open `/ws`.** Browsers always send an `Origin` header on a
 WebSocket handshake, and a page can't change it, so the upgrade handler
 (`wsOriginAllowed` in `server/app.js`) checks it. Without the check any
@@ -1085,7 +1099,7 @@ checks that no game opens its own audio context or output.
 
 | File | Job |
 |---|---|
-| `index.html` | Page with `#lobby` and `#game` sections |
+| `index.html` | Page with `#lobby` and `#game` sections; a `modulepreload` link for each engine module `main.js` imports, and the title as a placeholder in `#lobby` (see **Page loading**) |
 | `how-to-play.js` | The "How to play" text, `export const howToPlay = { goal, players, setup, turn, winning, settings, fairPlay, keyboard }`, passed to `startGameShell()` |
 | `main.js` | `startGameShell({ slug, title, layout, settings, howToPlay, tutorial, createRobot, onSession, minPlayers, maxPlayers, robots })` and the view. The player counts default to 2 and `maxPlayers` must match `games.json`; the lobby's tagline is the game's `description` there (a `tagline` option still overrides it); `layout` picks the page column (see **Page column**). |
 | `settings.js` | Optional: the game's settings, `export const settings = gameSettings({ key, prefix, groups, normalize, hint, robot })`, passed to `startGameShell()` and read with `settings.get()` (`settings.get("robot")` in a robot game). Each group has a `scope`: `"room"` (the default), `"device"` or `"view"` (see **Settings**). `robot` is for clocks on by default (see **Clocks against the robot**). |

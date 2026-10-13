@@ -523,6 +523,22 @@ input::placeholder {
   text-align: left;
 }
 
+/* While the modules load, a game page shows its own .lobby-card with the
+   title and a spinner (index.html), which the lobby's first screen replaces.
+   Until shell.js adds the header, the header's height (40px buttons, 10px
+   padding) is kept free, so the page doesn't jump. */
+@media (scripting: enabled) {
+  body > .page:first-child:has(> #lobby) {
+    margin-top: 60px;
+  }
+}
+
+@media (scripting: none) {
+  .lobby-card .waiting {
+    display: none;
+  }
+}
+
 .tagline {
   color: var(--muted);
   margin-top: 0;

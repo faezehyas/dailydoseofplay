@@ -111,7 +111,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     })
     .catch(() => {});
 
-  // A new view takes focus to its heading, except on page load.
+  // A new view takes focus to its heading, except on page load. The first
+  // replaces the page's loading placeholder (index.html).
   function view(...children) {
     const card = el("div", { class: "card lobby-card" }, ...children);
     const old = $(".lobby-card", lobbyRoot);
