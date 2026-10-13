@@ -272,8 +272,11 @@ test("Chess vs the robot on a 360 px phone: a full game, then a loss on the move
   assert.ok(await noHorizontalScroll(page));
 
   // Play a full game by tapping: take the most valuable piece on offer, else the first legal move.
+  // Every move should knock with a recording: let them finish loading first.
   await page.evaluate(async () => {
     window.chessRules = await import("/chess/rules.js");
+    const [{ sounds }, { preload }] = await Promise.all([import("/chess/sounds.js"), import("/engine/sound.js")]);
+    await preload(Object.values(sounds.defs).flatMap((d) => d.samples));
   });
   let taps = 0;
   const replies = [];
@@ -307,8 +310,10 @@ test("Chess vs the robot on a 360 px phone: a full game, then a loss on the move
   const st = await page.evaluate(() => window.ddp.match.state);
   assert.ok(st.reason, `the game ended by rule: ${st.reason}`);
   assert.ok(st.moves.length >= 2 * taps - 1, "the robot answered every move");
+  // A piece knocks as it lands, a moment after its move: a quick robot can end the game before the last two have.
+  await wait(page, (n) => window.knocks + window.clacks >= n, st.moves.length);
   const fx = await effects(page);
-  assert.ok(fx.knocks + fx.clacks >= st.moves.length - 1, `a sound for every move: ${JSON.stringify(fx)}`);
+  assert.ok(fx.knocks + fx.clacks >= st.moves.length, `a sound for every move: ${JSON.stringify(fx)}`);
   assert.ok(fx.clacks > 0, "captures clack");
   assert.ok(Math.min(...replies) >= 250, `the robot never answers instantly: ${replies}`);
   const average = replies.reduce((a, b) => a + b, 0) / replies.length;

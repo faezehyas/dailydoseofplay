@@ -116,12 +116,13 @@ test("two friends play Gin Rummy on the host's settings through the invite link,
   await host.click("#rematch");
   for (const p of [host, guest]) await wait(p, () => window.ddp.match.m === 3 && window.ddp.match.phase === "playing", undefined, 60_000);
   await host.evaluate(() => {
-    // The host's deck work for the audit takes 4 s longer, once.
+    // The host's deck work for the audit waits, once, until the rematch has begun.
     const deck = window.ddp.match.deck;
     const faces = deck.faces;
+    const held = new Promise((r) => (window.releaseAudit = r));
     deck.faces = async (...args) => {
       deck.faces = faces;
-      await new Promise((r) => setTimeout(r, 4000));
+      await held;
       return faces(...args);
     };
   });
@@ -132,6 +133,7 @@ test("two friends play Gin Rummy on the host's settings through the invite link,
   await host.click("#rematch");
   for (const p of [host, guest]) await wait(p, () => window.ddp.match.m === 4 && window.ddp.match.phase === "playing", undefined, 60_000);
   assert.equal(await host.evaluate(() => document.querySelector("#gr-note").textContent.includes("verified")), false, "the rematch began before the verdict");
+  await host.evaluate(() => window.releaseAudit());
   await host.locator("#gr-note").filter({ hasText: "Last game: fair play verified" }).waitFor({ timeout: 30_000 });
 
   // Bo's browser never sends its key again; the fourth game, Bo leaves during the audit.
