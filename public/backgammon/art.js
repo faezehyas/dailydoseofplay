@@ -9,9 +9,23 @@ export const STACK = 5; // checkers drawn on a point; a taller stack shows its c
 const TOP = [13, 14, 15, 16, 17, 18, "bar-top", 19, 20, 21, 22, 23, 24, "off-top"];
 const BOTTOM = [12, 11, 10, 9, 8, 7, BAR, 6, 5, 4, 3, 2, 1, OFF];
 
+// An opponent's point number as the cell key it is drawn in.
+export const theirKey = (n) => (n === BAR ? "bar-top" : n === OFF ? "off-top" : 25 - n);
+
+export const rollText = (roll) => (roll[0] === roll[1] ? `double ${roll[0]}s` : `${roll[0]} and ${roll[1]}`);
+
 export function dieFace(value, cls) {
   const spots = { 1: [5], 2: [3, 7], 3: [3, 5, 7], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] }[value];
   return el("span", { class: `die ${cls}`, role: "img", "aria-label": `${value}${cls.includes("used") ? ", played" : ""}` }, spots.map((s) => el("i", { style: `grid-area: s${s}` })));
+}
+
+// A roll's dice faces with their classes; a new roll tumbles in.
+export function rollDice(faces, classes, tumble) {
+  return faces.map((v, k) => {
+    const die = dieFace(v, classes[k] + (tumble ? " tumble" : ""));
+    if (tumble) die.style.setProperty("--spin", `${(Math.random() < 0.5 ? -1 : 1) * (200 + Math.random() * 160)}deg`);
+    return die;
+  });
 }
 
 export function checkerStack(count, whose, cls = "") {
@@ -44,6 +58,69 @@ export function boardCells(board) {
     }
   }
   return cells;
+}
+
+// Draws `pos` from player `me`'s side. hidden: cell key -> checkers still in
+// the air; sources and dests: the cells a checker can move from and, for the
+// picked one (`selected`, unless `held` in a drag), to; marks: the
+// opponent's last play, { left, came } as cell key -> checkers.
+export function drawBoard(board, cells, pos, me, { hidden, sources, dests, selected, held, marks, oppName }) {
+  const opp = 1 - me;
+  for (const [key, cell] of cells) {
+    let label;
+    if (!pos) {
+      cell.replaceChildren();
+      continue;
+    }
+    if (key === "bar-top" || key === "off-top") {
+      const n = pos[opp][key === "bar-top" ? BAR : OFF];
+      cell.replaceChildren(...(key === "bar-top" ? checkerStack(n, "theirs") : trayStack(n, "theirs")));
+    } else if (key === BAR) {
+      const n = pos[me][BAR];
+      cell.replaceChildren(...checkerStack(n, "mine"));
+      label = n ? `Your bar: ${n} checker${n > 1 ? "s" : ""}` : "Your bar: empty";
+    } else if (key === OFF) {
+      const n = pos[me][OFF];
+      cell.replaceChildren(...trayStack(n, "mine"));
+      label = `Borne off: ${n} of yours`;
+    } else {
+      const mine = pos[me][key];
+      const theirs = pos[opp][25 - key];
+      cell.replaceChildren(...(mine ? checkerStack(mine, "mine") : checkerStack(theirs, "theirs")));
+      label = `Point ${key}: ${mine ? `${mine} of yours` : theirs ? `${theirs} of ${oppName}'s` : "empty"}`;
+    }
+    const items = cell.querySelectorAll(".checker, .slab");
+    const pending = hidden.get(key) || 0;
+    for (let i = Math.max(0, items.length - pending); i < items.length; i++) items[i].classList.add("pending");
+    const shown = items.length - pending;
+    const top = items[shown - 1];
+    top?.classList.add("top");
+    // Where a picked checker would land: the next free spot, or around a
+    // full stack's top checker, or around the blot it would hit.
+    if (dests.has(key) && cell.classList.contains("point")) {
+      if (top?.classList.contains("theirs")) top.classList.add("target");
+      else if (shown >= STACK) top.classList.add("target");
+      else cell.append(el("span", { class: "slot", "aria-hidden": "true" }));
+    }
+    // The opponent's last play: an outline where each checker left, a ring on each that arrived.
+    if (marks && cell.classList.contains("point")) {
+      const came = Math.min(marks.came.get(key) || 0, shown);
+      for (let i = shown - came; i < shown; i++) if (items[i].classList.contains("theirs")) items[i].classList.add("arrived");
+      const gone = Math.min(marks.left.get(key) || 0, STACK - shown);
+      for (let i = 0; i < gone; i++) cell.append(el("span", { class: "vacated", "aria-hidden": "true" }));
+    }
+    cell.classList.toggle("src", sources.has(key));
+    cell.classList.toggle("selected", selected === key && held !== key);
+    cell.classList.toggle("dest", dests.has(key));
+    if (cell.tagName === "BUTTON") {
+      if (dests.has(key)) label += key === OFF ? ", bear off here" : ", move here";
+      else if (selected === key) label += ", picked";
+      else if (sources.has(key)) label += ", can move";
+      cell.setAttribute("aria-label", label);
+      cell.setAttribute("aria-disabled", String(!sources.has(key) && !dests.has(key)));
+    }
+  }
+  board.classList.toggle("armed", sources.size > 0);
 }
 
 // The cell an arrow key moves focus to from `cell`: null when there is none

@@ -13,7 +13,7 @@ export const lessons = [
     title: "Moving by the dice",
     steps: [
       {
-        text: "You play coral, round to your home at the bottom right. Each die moves one checker that many points. You rolled 3 and 1: move a checker from 8 to 5, then one from 6 to 5.",
+        text: "You play coral, round to your home at the bottom right. Each die moves one checker that many points. You rolled 3 and 1: move a checker from 8 to 5, then one from 6 to 5, and press Confirm. Undo takes a step back.",
         position: { ...START, roll: [3, 1] },
         highlight: [8, 6, 5],
         arrows: [[8, 5], [6, 5]],
@@ -32,7 +32,7 @@ export const lessons = [
     title: "Doubles",
     steps: [
       {
-        text: "A double is played four times. You rolled double 3s: move two checkers from 8 to 5, and two from 6 to 3.",
+        text: "A double is played four times. You rolled double 3s: move two checkers from 8 to 5, and two from 6 to 3, then Confirm.",
         position: { ...START, roll: [3, 3] },
         highlight: [8, 6, 5, 3],
         arrows: [[8, 5], [6, 3]],
@@ -44,7 +44,7 @@ export const lessons = [
     title: "Hitting a blot",
     steps: [
       {
-        text: "A lone checker is a blot. Land on a teal blot to hit it: it goes to the bar and starts again. Hit the blot on 4 from 8, then cover your checker with one from 6.",
+        text: "A lone checker is a blot. Land on a teal blot to hit it: it goes to the bar and starts again. Hit the blot on 4 from 8, then cover your checker with one from 6, and Confirm.",
         position: { mine: START.mine, theirs: { 1: 1, 4: 1, 12: 5, 17: 3, 19: 5 }, roll: [4, 2] },
         highlight: [8, 6, 4],
         arrows: [[8, 4], [6, 4]],
@@ -56,7 +56,7 @@ export const lessons = [
     title: "Entering from the bar",
     steps: [
       {
-        text: "A hit checker waits on the bar, and nothing else moves until it comes back in, at the top right: a 2 enters on 23, a 6 on 19. Teal blocks 19, so enter with the 2, then play the 6 with any checker.",
+        text: "A hit checker waits on the bar, and nothing else moves until it comes back in, at the top right: a 2 enters on 23, a 6 on 19. Teal blocks 19, so enter with the 2, then play the 6 with any checker, and Confirm.",
         position: { mine: { 25: 1, 24: 1, 13: 5, 8: 3, 6: 5 }, theirs: START.theirs, roll: [6, 2] },
         highlight: [25, 23],
         arrows: [[25, 23]],
@@ -68,7 +68,7 @@ export const lessons = [
     title: "Bearing off",
     steps: [
       {
-        text: "Once all your checkers are in your home board, you bear them off: a die takes a checker off its point. Bear off from 6 and from 4.",
+        text: "Once all your checkers are in your home board, you bear them off: a die takes a checker off its point. Bear off from 6 and from 4, then Confirm.",
         position: { mine: { 6: 2, 4: 2, 2: 1 }, theirs: { 24: 2, 20: 3 }, roll: [6, 4] },
         highlight: [6, 4, 0],
         arrows: [[6, 0], [4, 0]],

@@ -23,14 +23,14 @@ export const lessons = [
     title: "Placing your fleet",
     steps: [
       {
-        text: "Before the battle you place your five ships on your own board, where only you can see them. Ships can't touch side by side. Tap the Destroyer, then the left lit square, to move it there.",
+        text: "Before the battle you place your five ships on your own board, where only you can see them. Ships can't touch side by side. Drag the Destroyer along the arrow onto the lit squares.",
         position: { fleet: FLEET },
         highlight: [mine(5, 4), mine(5, 5), mine(2, 3), mine(2, 4)],
         arrows: [[mine(5, 4), mine(2, 3)]],
         expect: { type: "place", ship: 4, r: 2, c: 3, vertical: false },
       },
       {
-        text: "Tap a picked ship again to turn it. Turn the Destroyer upright.",
+        text: "The ship you moved stays picked: tap it to turn it. Turn the Destroyer upright.",
         highlight: [mine(2, 3), mine(3, 3)],
         expect: { type: "place", ship: 4, r: 2, c: 3, vertical: true },
       },

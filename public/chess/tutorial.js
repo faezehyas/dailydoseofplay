@@ -1,9 +1,12 @@
 // Chess's tutorial: its lessons (lessons.js) on the game's own squares and
-// pieces (art.js, style.css), every move checked by rules.js. The adapter
-// engine/tutorial.js asks for.
+// pieces (art.js, style.css), moving and sounding as in the game (motion.js,
+// sounds.js), every move checked by rules.js. The adapter engine/tutorial.js
+// asks for.
 import { el } from "../engine/shell.js";
 import { stateFromFen, applyMove, listMoves, inCheck, squareName, colorOf, typeOf, PAWN } from "./rules.js";
 import { pieceSvg, pieceName, promoOptions } from "./art.js";
+import { landMove, dragPieces, reducedMotion } from "./motion.js";
+import { playMove } from "./sounds.js";
 
 export { lessons } from "./lessons.js";
 export const flavour = "wood";
@@ -13,16 +16,18 @@ export const load = (fen) => stateFromFen(fen);
 export const play = (state, move) => applyMove(state, state.turn, move);
 export const cells = (move) => [move.from, move.to];
 
-const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-// White at the bottom. Tap or press Enter on a piece, then on its square.
+// White at the bottom. Tap or press Enter on a piece, then on its square,
+// or drag it there. The board takes moves only while a step waits for one.
 export function board() {
   let state = null;
+  let live = false;
   let selected = -1;
   let focusSq = -1;
   let moveFn = () => {};
+  let dropping = false; // true while a drag-and-drop plays its move
+  let dropped = null; // a move dropped in place: no slide needed
   const squares = [];
-  const grid = el("div", { class: "chess-board armed", role: "group", "aria-label": "Chessboard" });
+  const grid = el("div", { class: "chess-board", role: "group", "aria-label": "Chessboard" });
   for (let r = 7; r >= 0; r--) {
     const row = el("div", { class: "chess-row" });
     for (let f = 0; f < 8; f++) {
@@ -42,14 +47,19 @@ export function board() {
   const own = (sq) => state.board[sq] && colorOf(state.board[sq]) === state.side;
 
   function onSquare(sq) {
-    if (!state || !promoBox.hidden) return;
+    if (!live || !promoBox.hidden) return;
     if (selected >= 0 && selected !== sq && !own(sq)) {
       const from = selected;
       if (movesFrom(from).filter((mv) => mv.to === sq).length > 1) return openPromo(from, sq);
       select(-1);
-      return moveFn({ from, to: sq });
+      return send({ from, to: sq });
     }
     select(own(sq) && selected !== sq ? sq : -1);
+  }
+
+  function send(move) {
+    dropped = dropping ? move : null;
+    moveFn(move);
   }
 
   function select(sq) {
@@ -64,7 +74,7 @@ export function board() {
     };
     promoBox.replaceChildren(
       el("p", {}, "Promote to"),
-      promoOptions(state.side, (promo) => (close(), moveFn({ from, to, promo }))),
+      promoOptions(state.side, (promo) => (close(), send({ from, to, promo }))),
       el("button", { type: "button", class: "btn ghost small", onclick: () => (close(), squares[focusSq].focus()) }, "Cancel"),
     );
     promoBox.hidden = false;
@@ -74,6 +84,15 @@ export function board() {
   grid.addEventListener("click", (e) => {
     const btn = e.target.closest(".sq");
     if (btn) onSquare(Number(btn.dataset.sq));
+  });
+  dragPieces(grid, {
+    pieceAt: (sq) => (live && promoBox.hidden && own(sq) ? state.board[sq] : 0),
+    lift: select,
+    drop: (sq) => {
+      dropping = true;
+      onSquare(sq);
+      dropping = false;
+    },
   });
   grid.addEventListener("focusin", (e) => {
     const btn = e.target.closest(".sq");
@@ -104,6 +123,7 @@ export function board() {
     const last = state.moves.at(-1);
     const checkSq = inCheck(state) ? state.kings[state.side] : -1;
     if (focusSq < 0) focusSq = state.kings[state.side];
+    grid.classList.toggle("armed", live);
     for (let sq = 0; sq < 64; sq++) {
       const btn = squares[sq];
       const piece = state.board[sq];
@@ -131,11 +151,19 @@ export function board() {
     node,
     cell: (sq) => squares[sq],
     onMove: (fn) => (moveFn = fn),
-    render(st) {
+    // A move just played lands as in the game, with its sound.
+    render(st, played) {
       state = st;
+      live = !played;
       selected = -1;
       promoBox.hidden = true;
       draw();
+      const drop = dropped;
+      dropped = null;
+      const moved = played?.find((e) => e.type === "moved");
+      if (!moved) return;
+      const still = reducedMotion() || (drop && drop.from === moved.from && drop.to === moved.to);
+      return landMove(squares, moved, (st.side << 3) | moved.captured, still).then(() => playMove(moved));
     },
     // The piece flies to where it was dropped and springs back home.
     reject({ from, to }) {

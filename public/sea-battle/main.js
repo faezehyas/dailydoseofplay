@@ -11,7 +11,7 @@ import { startRobot } from "./robot.js";
 import * as R from "./rules.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
-import { shipSvg, createBoard, shipEl, placeShipEl, shipFromCells, paintCells } from "./art.js";
+import { createBoard, shipEl, shipFromCells, paintCells, fleetLeft, ownShipEl, shipKey, turnings, dragShip, launch, land, follow } from "./art.js";
 import { howToPlay } from "./how-to-play.js";
 
 const WEAPON_ICON = {
@@ -24,13 +24,6 @@ const WEAPON_ICON = {
 
 // The robot "thinks" this long (plus up to half again) before each shot.
 const AI_DELAY = 1400;
-// Seconds a shell is in the air before it lands (sound and visuals wait for it).
-const FLIGHT = { shot: 0.45, big: 0.55, rain: 0.6, nuke: 1.0, carpet: 0.6 };
-// Rolling booms, one every BOOM_STEP seconds: 7 for missile rain (one per
-// square) and 10 for the carpet bomb (one per square along its line). Each
-// square lands on its boom.
-const BOOM_STEP = 0.17;
-const LAUNCH_SOUND = { shot: "launch", big: "launch-big", rain: "launch-rain", nuke: "launch-nuke", carpet: "launch-rain" };
 const CLAIM_GRACE_MS = 5000; // past the opponent's limit before we stop waiting for their shot
 
 startGameShell({
@@ -135,17 +128,6 @@ function mountSeaBattle(session, root, shell) {
     ),
   );
 
-  function fleetLeft(view, board) {
-    const left = board ? R.remainingShips(board) : [...R.FLEET];
-    view.fleetInfo.replaceChildren(
-      ...R.FLEET.map((len) => {
-        const k = left.indexOf(len);
-        if (k >= 0) left.splice(k, 1);
-        return el("span", { class: `pip len${len} ${k >= 0 ? "" : "gone"}`, title: `${R.SHIP_NAMES[len]} (${len})${k >= 0 ? "" : ", sunk"}` });
-      }),
-    );
-  }
-
   // ---------- render ----------
   function render() {
     if (destroyed) return;
@@ -194,17 +176,12 @@ function mountSeaBattle(session, root, shell) {
     // Own board: ships + incoming fire (left alone while a ship is being dragged)
     if (!dragging) ownBoard.shipsLayer.replaceChildren(
       ...fleet.map((ship, k) => {
-        const node = shipEl(ship, k === selectedShip && placing ? "selected" : "");
-        node.dataset.k = k;
-        if (placing && !match.locked) {
-          node.classList.add("draggable");
-          node.tabIndex = 0;
-          node.setAttribute("role", "button");
-          node.setAttribute("aria-label", `${R.SHIP_NAMES[ship.len]}, ${ship.len} squares at ${R.cellName(R.idx(ship.r, ship.c))}, ${ship.vertical ? "vertical" : "horizontal"}. Arrow keys move, R rotates.`);
+        const draggable = placing && !match.locked;
+        const node = ownShipEl(ship, k, { selected: k === selectedShip && placing, draggable, board: st?.boards[me] });
+        if (draggable) {
           node.addEventListener("pointerdown", (e) => startDrag(e, k));
           node.addEventListener("keydown", (e) => keyMove(e, k));
         }
-        if (st && st.boards[me].sunk.some((s) => s.cells.join() === R.shipCells(ship).sort((a, b) => a - b).join())) node.classList.add("sunk");
         return node;
       }),
     );
@@ -307,15 +284,6 @@ function mountSeaBattle(session, root, shell) {
     }
   }
   const ticker = setInterval(tick, 200);
-
-  // On phones the two boards don't fit on one screen: keep the action in view.
-  function follow(view) {
-    if (innerWidth >= 760) return;
-    const r = view.board.getBoundingClientRect();
-    if (r.top >= 0 && r.bottom <= innerHeight) return;
-    const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
-    view.wrap.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "nearest" });
-  }
 
   function renderWeapons() {
     const st = match.state;
@@ -436,93 +404,26 @@ function mountSeaBattle(session, root, shell) {
 
   function rotateShip(k) {
     if (k < 0 || match.locked) return;
-    const ship = fleet[k];
-    const turned = { ...ship, vertical: !ship.vertical };
-    // Try in place, then nudged back inside the board.
-    const tries = [turned];
-    for (let d = 1; d < ship.len; d++) tries.push(turned.vertical ? { ...turned, r: turned.r - d } : { ...turned, c: turned.c - d });
-    if (!tries.some((t) => tryMove(k, t))) toast("No room to rotate this ship here");
+    if (!turnings(fleet[k]).some((t) => tryMove(k, t))) toast("No room to rotate this ship here");
     render();
   }
 
   function keyMove(e, k) {
     if (match.locked || dragging) return;
-    const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
-    if (moves[e.key]) {
-      e.preventDefault();
-      const [dr, dc] = moves[e.key];
-      tryMove(k, { ...fleet[k], r: fleet[k].r + dr, c: fleet[k].c + dc });
-    } else if (e.key === "r" || e.key === "R" || e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      rotateShip(k);
-    } else return;
+    const act = shipKey(e.key);
+    if (!act) return;
+    e.preventDefault();
+    if (act === "turn") rotateShip(k);
+    else tryMove(k, { ...fleet[k], r: fleet[k].r + act[0], c: fleet[k].c + act[1] });
     selectedShip = k;
     render();
     ownBoard.shipsLayer.querySelector(`[data-k="${k}"]`)?.focus();
   }
 
-  function cellAt(view, x, y) {
-    const rect = view.board.getBoundingClientRect();
-    return {
-      r: Math.floor(((y - rect.top) / rect.height) * R.SIZE),
-      c: Math.floor(((x - rect.left) / rect.width) * R.SIZE),
-    };
-  }
-
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
   function startDrag(e, k) {
     if (match.locked || e.button > 0) return;
-    e.preventDefault();
-    const node = e.currentTarget;
-    node.setPointerCapture?.(e.pointerId);
-    const origin = fleet[k];
-    const others = fleet.filter((_, j) => j !== k);
-    const grab = cellAt(ownBoard, e.clientX, e.clientY);
-    let vertical = origin.vertical;
-    // Which square of the ship is under the pointer.
-    let off = {
-      r: clamp(grab.r - origin.r, 0, vertical ? origin.len - 1 : 0),
-      c: clamp(grab.c - origin.c, 0, vertical ? 0 : origin.len - 1),
-    };
-    let pointer = { x: e.clientX, y: e.clientY };
-    let moved = false;
-    let candidate = origin;
     dragging = true;
-    node.classList.add("dragging");
-    const update = () => {
-      const at = cellAt(ownBoard, pointer.x, pointer.y);
-      const next = {
-        ...origin,
-        vertical,
-        r: clamp(at.r - off.r, 0, R.SIZE - (vertical ? origin.len : 1)),
-        c: clamp(at.c - off.c, 0, R.SIZE - (vertical ? 1 : origin.len)),
-      };
-      if (next.r === candidate.r && next.c === candidate.c && next.vertical === candidate.vertical) return;
-      moved = moved || next.r !== origin.r || next.c !== origin.c || next.vertical !== origin.vertical;
-      candidate = next;
-      placeShipEl(node, candidate);
-      node.classList.toggle("bad", !R.canPlace(others, candidate));
-    };
-    const onMove = (ev) => {
-      pointer = { x: ev.clientX, y: ev.clientY };
-      update();
-    };
-    // R while dragging rotates the ship around the square you're holding.
-    const onKey = (ev) => {
-      if (ev.key !== "r" && ev.key !== "R") return;
-      ev.preventDefault();
-      ev.stopPropagation();
-      vertical = !vertical;
-      off = { r: off.c, c: off.r };
-      node.innerHTML = shipSvg(origin.len, vertical);
-      update();
-    };
-    const onUp = () => {
-      node.removeEventListener("pointermove", onMove);
-      node.removeEventListener("pointerup", onUp);
-      node.removeEventListener("pointercancel", onUp);
-      removeEventListener("keydown", onKey, true);
+    dragShip(e, ownBoard, fleet, k, (candidate, moved) => {
       dragging = false;
       if (match.locked) return render(); // Ready was pressed mid-drag: snap back
       if (!moved) {
@@ -534,11 +435,7 @@ function mountSeaBattle(session, root, shell) {
         selectedShip = k;
       }
       render();
-    };
-    node.addEventListener("pointermove", onMove);
-    node.addEventListener("pointerup", onUp);
-    node.addEventListener("pointercancel", onUp);
-    addEventListener("keydown", onKey, true);
+    });
   }
 
   function onReady() {
@@ -616,56 +513,6 @@ function mountSeaBattle(session, root, shell) {
     }
   }
 
-  // Which boom of a rolling volley a square lands on: rain squares in order,
-  // carpet squares by their place along the line.
-  function boomOf(w, dir, cell, k) {
-    if (w !== "carpet") return k;
-    return dir === "col" ? R.rowOf(cell) : R.colOf(cell);
-  }
-
-  // The shell lands: impact sounds and, for heavy weapons, a blast on the board.
-  function land(board, w, events) {
-    const view = board === me ? ownBoard : enemyBoard;
-    const sunk = events.some((e) => e.type === "sunk");
-    const hits = events.filter((e) => e.type === "hit");
-    if (w === "nuke") {
-      play("nuke");
-      play("roar");
-    } else if (w === "rain" || w === "carpet") {
-      const rolled = play(w);
-      events
-        .filter((e) => e.type === "hit" || e.type === "miss")
-        .forEach((e, k) =>
-          setTimeout(() => {
-            if (e.type === "hit") play("rain-hit");
-            else if (!rolled) play("rain-miss");
-          }, boomOf(w, volleyDir[board], e.cell, k) * BOOM_STEP * 1000),
-        );
-    } else if (w === "big") {
-      if (hits.length && play("blast")) play("hit", { offset: -4 });
-      else if (!hits.length) play("miss", { offset: 2 });
-    } else play(hits.length ? "hit" : "miss");
-    if (sunk) {
-      // A second, deeper blast as the ship blows apart; it groans and goes under.
-      const at = w === "nuke" ? 900 : 250;
-      setTimeout(() => play("sink") && play("groan"), at);
-      setTimeout(() => play("miss", { offset: -4 }), at + 500);
-    }
-    if (events.some((e) => e.type === "gift" && e.by === me)) setTimeout(() => play("gift"), 300);
-    if (w === "nuke" || w === "big" || w === "carpet") {
-      const shots = events.filter((e) => e.type === "hit" || e.type === "miss").map((e) => e.cell);
-      const r = shots.reduce((s, i) => s + R.rowOf(i), 0) / Math.max(1, shots.length);
-      const c = shots.reduce((s, i) => s + R.colOf(i), 0) / Math.max(1, shots.length);
-      view.board.style.setProperty("--bx", `${(c + 0.5) * 10}%`);
-      view.board.style.setProperty("--by", `${(r + 0.5) * 10}%`);
-      const cls = w === "nuke" ? "nuked" : "blasted";
-      view.board.classList.remove(cls);
-      void view.board.offsetWidth; // restart the animation
-      view.board.classList.add(cls);
-      setTimeout(() => view.board.classList.remove(cls), w === "nuke" ? 1800 : 700);
-    }
-  }
-
   function newMatch() {
     m += 1;
     fleet = R.randomFleet(Math.random);
@@ -688,17 +535,8 @@ function mountSeaBattle(session, root, shell) {
     match.on("fired", ({ by, weapon: w, dir, cells }) => {
       const target = by === me ? enemyBoard : ownBoard;
       if (by === opp) follow(ownBoard);
-      const flight = FLIGHT[w] ?? FLIGHT.shot;
-      landsAt[R.other(by)] = performance.now() + flight * 1000;
+      landsAt[R.other(by)] = performance.now() + launch(target, w, dir, cells) * 1000;
       volleyDir[R.other(by)] = dir;
-      target.board.style.setProperty("--impact-delay", `${flight}s`);
-      for (const c of target.cells) c.style.removeProperty("--impact-delay");
-      cells.forEach((c, k) => {
-        // Rain and carpet bombs land square by square, in step with their booms.
-        if (w === "rain" || w === "carpet") target.cells[c].style.setProperty("--impact-delay", `${flight + boomOf(w, dir, c, k) * BOOM_STEP}s`);
-        target.cells[c].classList.add("incoming");
-      });
-      play(LAUNCH_SOUND[w] ?? "launch");
     });
     match.on("events", ({ shooter, weapon: w, events }) => {
       const board = R.other(shooter);
@@ -709,7 +547,7 @@ function mountSeaBattle(session, root, shell) {
       const current = match;
       setTimeout(() => {
         if (destroyed || match !== current) return; // a rematch started meanwhile
-        land(board, w, events);
+        land(board === me ? ownBoard : enemyBoard, w, volleyDir[board], events, me);
         describe(shooter, w, events);
       }, wait);
     });

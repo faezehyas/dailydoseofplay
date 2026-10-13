@@ -21,19 +21,17 @@ import {
   WHITE,
   DRAW,
   PAWN,
-  ROOK_HOP,
 } from "./rules.js";
 import { startRobot } from "./robot.js";
 import { settings, LEVEL_NAMES } from "./settings.js";
 import { playMove } from "./sounds.js";
 import { howToPlay } from "./how-to-play.js";
 import { COLOR_NAMES, PIECE_NAMES, pieceSvg, pieceName, promoOptions } from "./art.js";
+import { landMove, dragPieces, reducedMotion } from "./motion.js";
 
 const ROBOT_SEARCH_MS = 250; // search cap, so a slow phone still answers quickly
-const SLIDE_MS = 190;
 const CLAIM_GRACE_MS = 5000; // past the opponent's limit before we stop waiting for their forfeit
 const VALUES = [0, 1, 3, 3, 5, 9, 0];
-const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 startGameShell({
   slug: "chess",
@@ -207,65 +205,26 @@ function mountChess(session, root, shell) {
 
   board.addEventListener("click", (e) => {
     const btn = e.target.closest(".sq");
-    if (btn && !dragged) onSquare(Number(btn.dataset.sq));
+    if (btn) onSquare(Number(btn.dataset.sq));
   });
-
-  // Drag a piece with a mouse or finger; a press that doesn't move is a tap.
-  let drag = null;
-  let dragged = false;
-  board.addEventListener("pointerdown", (e) => {
-    dragged = false;
-    // A drag released outside the window never got its pointerup.
-    if (drag?.ghost) {
-      drag.ghost.remove();
-      squares[drag.from]?.classList.remove("lifted");
-    }
-    drag = null;
-    const btn = e.target.closest(".sq");
-    if (!btn || e.button !== 0 || !match?.canMove() || promoFor) return;
-    const from = Number(btn.dataset.sq);
-    const piece = match.state.board[from];
-    if (piece && colorOf(piece) === myColor()) drag = { from, id: e.pointerId, x: e.clientX, y: e.clientY, ghost: null };
-  });
-  function onPointerMove(e) {
-    if (!drag || e.pointerId !== drag.id) return;
-    if (!drag.ghost) {
-      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6 || !match.canMove()) return;
-      const size = squares[drag.from].getBoundingClientRect().width;
-      drag.ghost = el("div", { class: "chess-ghost", "aria-hidden": "true" });
-      drag.ghost.innerHTML = pieceSvg(match.state.board[drag.from]);
-      drag.ghost.style.width = drag.ghost.style.height = `${size * 1.15}px`;
-      root.querySelector(".chess").append(drag.ghost);
-      squares[drag.from].classList.add("lifted");
-      select(drag.from);
-    }
-    drag.ghost.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`;
-  }
-  function endDrag(e) {
-    if (!drag || e.pointerId !== drag.id) return;
-    const { from, ghost } = drag;
-    drag = null;
-    if (!ghost) return;
-    dragged = true;
-    ghost.remove();
-    squares[from]?.classList.remove("lifted");
-    const target = e.type === "pointerup" && document.elementFromPoint(e.clientX, e.clientY)?.closest(".sq");
-    if (target && board.contains(target) && Number(target.dataset.sq) !== from) {
+  const stopDrag = dragPieces(board, {
+    pieceAt: (sq) => {
+      const piece = match?.canMove() && !promoFor ? match.state.board[sq] : 0;
+      return piece && colorOf(piece) === myColor() ? piece : 0;
+    },
+    lift: select,
+    drop: (sq) => {
       dropping = true;
-      onSquare(Number(target.dataset.sq));
+      onSquare(sq);
       dropping = false;
-    }
-  }
-  addEventListener("pointermove", onPointerMove);
-  addEventListener("pointerup", endDrag);
-  addEventListener("pointercancel", endDrag);
+    },
+  });
   board.addEventListener("focusin", (e) => {
     const btn = e.target.closest(".sq");
     if (btn) focusSq = Number(btn.dataset.sq);
   });
   // Arrow keys move between squares as seen on screen; Enter or Space picks up and puts down.
   board.addEventListener("keydown", (e) => {
-    dragged = false;
     const btn = e.target.closest(".sq");
     if (e.key === "Escape" && selected >= 0) return select(-1);
     const step = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] }[e.key];
@@ -483,52 +442,8 @@ function mountChess(session, root, shell) {
   function animateMove(moved) {
     const still = reducedMotion() || (dropped && dropped.from === moved.from && dropped.to === moved.to);
     dropped = null;
-    if (!still) {
-      slide(moved.from, moved.to);
-      if (moved.san.startsWith("O-O")) slide(...ROOK_HOP[moved.to], 120);
-    }
-    if (moved.captured && !reducedMotion()) takeAway(moved, still ? 0 : SLIDE_MS * 0.6);
-    setTimeout(() => !destroyed && playMove(moved), still ? 0 : SLIDE_MS);
-  }
-
-  function slide(from, to, delay = 0) {
-    const target = squares[to];
-    const a = squares[from].getBoundingClientRect();
-    const b = target.getBoundingClientRect();
-    target.classList.add("moving");
-    target.firstChild
-      .animate([{ transform: `translate(${a.left - b.left}px, ${a.top - b.top}px)` }, { transform: "none" }], {
-        duration: SLIDE_MS,
-        delay,
-        easing: "cubic-bezier(0.25, 0.8, 0.35, 1)",
-        fill: "backwards",
-      })
-      .finished.catch(() => {})
-      .finally(() => target.classList.remove("moving"));
-  }
-
-  // The taken piece is knocked off its square with a small burst.
-  function takeAway(moved, delay) {
-    const wrap = board.parentElement;
-    const r = squares[moved.capturedAt].getBoundingClientRect();
-    const w = wrap.getBoundingClientRect();
     const loser = ((colorOfPlayer(match.state, moved.player) ^ 1) << 3) | moved.captured;
-    const fx = el("div", { class: "chess-fx", "aria-hidden": "true" });
-    fx.innerHTML = `${pieceSvg(loser)}<span class="burst"></span>`;
-    Object.assign(fx.style, { left: `${r.left - w.left}px`, top: `${r.top - w.top}px`, width: `${r.width}px`, height: `${r.height}px` });
-    wrap.append(fx);
-    fx.firstChild.animate(
-      [
-        { transform: "none", opacity: 1 },
-        { transform: "scale(1.2) rotate(-10deg)", opacity: 0.9, offset: 0.3 },
-        { transform: "translateY(25%) scale(0.35) rotate(20deg)", opacity: 0 },
-      ],
-      { duration: 360, delay, easing: "ease-in", fill: "both" },
-    );
-    fx.lastChild
-      .animate([{ transform: "scale(0.3)", opacity: 0.9 }, { transform: "scale(1.25)", opacity: 0 }], { duration: 420, delay: delay + 30, easing: "ease-out", fill: "both" })
-      .finished.catch(() => {})
-      .finally(() => fx.remove());
+    landMove(squares, moved, loser, still).then(() => !destroyed && playMove(moved));
   }
 
   function render() {
@@ -643,9 +558,7 @@ function mountChess(session, root, shell) {
     destroy() {
       destroyed = true;
       clearInterval(ticker);
-      removeEventListener("pointermove", onPointerMove);
-      removeEventListener("pointerup", endDrag);
-      removeEventListener("pointercancel", endDrag);
+      stopDrag();
       for (const off of offs) off();
     },
   };
