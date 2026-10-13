@@ -240,7 +240,12 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
       el("button", {
         class: "btn",
         type: "button",
-        onclick: () => navigator.share({ title: `${title} on Daily Dose of Play`, text: "Play with me!", url: link }).catch(() => {}),
+        // A cancelled share sheet needs nothing; any other failure copies the link instead.
+        onclick: () =>
+          navigator.share({ title: `${title} on Daily Dose of Play`, text: "Play with me!", url: link }).catch(async (e) => {
+            if (e.name === "AbortError") return;
+            toast((await copyText(link)) ? "Sharing didn't work, so the invite link was copied" : "Sharing failed: select the link and copy it");
+          }),
       }, "Share");
     view(
       el("h1", {}, duel ? "Invite a friend" : "Invite friends"),
