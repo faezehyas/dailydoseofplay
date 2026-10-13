@@ -133,14 +133,23 @@ test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, k
     return picks[(picks.indexOf(document.activeElement) + 1) % 4].dataset.suit;
   }));
   await page.keyboard.press("ArrowRight");
-  const ply = (await state(page)).moves;
+  // Record the table as my 8 lands: the next robot can play on before the test looks.
+  await page.evaluate(() => {
+    const m = window.ddp.match;
+    const badge = document.querySelector("#ce-suit");
+    window.eight = { sounds: window.ddpSounds.length, badge: [] };
+    window.eight.stop = m.on("events", ({ player }) => player === 0 && (window.eight.state ??= structuredClone(m.state)));
+    window.eight.watch = new MutationObserver(() => window.eight.badge.push(badge.className));
+    window.eight.watch.observe(badge, { attributeFilter: ["class"] });
+  });
   await page.keyboard.press("Enter");
-  await wait(page, (n) => window.ddp.match.state.moves > n, ply);
-  const named = await state(page);
+  await wait(page, () => window.eight.state);
+  const named = await page.evaluate(() => window.eight.state);
   assert.deepEqual([named.suit, named.named], [chosen, true], "the 8 named the suit picked");
   if (named.hands[0].length) assert.ok(await page.evaluate(() => document.activeElement.classList.contains("ce-hcard")), "focus goes back to the hand");
-  await wait(page, () => window.ddpSounds.includes("eight"), undefined, 10_000);
-  await page.locator("#ce-suit.named").waitFor();
+  await wait(page, () => window.ddpSounds.slice(window.eight.sounds).includes("eight"), undefined, 10_000);
+  await wait(page, () => window.eight.badge.some((c) => c.split(" ").includes("named")));
+  await page.evaluate(() => (window.eight.stop(), window.eight.watch.disconnect()));
 
   // Muted: nothing more plays.
   await page.click("#sound-toggle");

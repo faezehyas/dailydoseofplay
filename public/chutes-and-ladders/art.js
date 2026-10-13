@@ -1,7 +1,11 @@
-// Board art: an SVG helper and the little pictures on the squares where a
-// ladder or chute starts and ends. As on the classic board, a good deed sits
-// at the foot of each ladder and its reward at the top; a bit of mischief sits
-// at the top of each chute and what comes of it at the bottom.
+// Board art: an SVG helper, the board with its ladders, chutes and pawns,
+// and the spinner (shared by the game and its tutorial), and the little
+// pictures on the squares where a ladder or chute starts and ends. As on the
+// classic board, a good deed sits at the foot of each ladder and its reward
+// at the top; a bit of mischief sits at the top of each chute and what comes
+// of it at the bottom.
+import { cellOf, LADDERS, CHUTES, LAST, SIZE, SPINNER } from "./rules.js";
+
 const NS = "http://www.w3.org/2000/svg";
 
 export function s(tag, attrs = {}, ...children) {
@@ -192,4 +196,292 @@ export const VIGNETTES = {
 
 export function icon(name, x, y, scale = 1) {
   return s("g", { class: `ico ${name}`, transform: `translate(${x} ${y}) scale(${scale})` }, s("circle", { class: "ico-badge", r: 21 }), ICONS[name]());
+}
+
+// ---------- the board ----------
+export const U = 100; // one square, in board units
+const BOARD = SIZE * U;
+const GROUND = 96; // the start lawn under the board
+export const FOOT = 26; // a pawn stands this far below its square's centre
+const SHARE = 22; // two pawns on one square stand apart by twice this
+const CROWD = 72; // three or four pawns on one square spread across this
+export const PAWN_SCALE = 1.15;
+const START_SPOTS = [150, 225, 300, 375].map((x) => ({ x, y: BOARD + 66 }));
+
+export function center(n) {
+  const { row, col } = cellOf(n);
+  return { x: col * U + U / 2, y: (SIZE - 1 - row) * U + U / 2 };
+}
+
+// Where `player`'s pawn stands on square n, given the seats of every pawn
+// there (`crowd`, in seat order). Three or four stand staggered.
+export function spot(n, player, crowd = [player]) {
+  if (n === 0) return { ...START_SPOTS[player] };
+  const c = center(n);
+  const k = crowd.length;
+  if (k < 2) return { x: c.x, y: c.y + FOOT };
+  const i = crowd.indexOf(player);
+  const step = k === 2 ? 2 * SHARE : CROWD / (k - 1);
+  return { x: c.x + (i - (k - 1) / 2) * step, y: c.y + FOOT + (k > 2 ? (i % 2 ? -8 : 4) : 0) };
+}
+
+// Each chute bends one way or the other so neighbours don't overlap.
+const BEND = { 16: 0.5, 47: -0.9, 49: 0.7, 56: 1.0, 62: -0.6, 64: 0.8, 87: 0.55, 93: -0.9, 95: 0.85, 98: -0.75 };
+const CHUTE_COLORS = { 16: 0, 47: 1, 49: 2, 56: 3, 62: 4, 64: 5, 87: 1, 93: 2, 95: 0, 98: 4 };
+
+export function chuteCurve(from, to) {
+  const a = center(from);
+  const b = center(to);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  const px = -dy / len;
+  const py = dx / len;
+  const w = Math.min(130, Math.max(40, len * 0.24)) * BEND[from];
+  const p1 = { x: a.x + dx * 0.28 + px * w, y: a.y + dy * 0.28 + py * w };
+  const p2 = { x: a.x + dx * 0.72 - px * w, y: a.y + dy * 0.72 - py * w };
+  return { a, b, p1, p2, d: `M${a.x} ${a.y} C${p1.x} ${p1.y} ${p2.x} ${p2.y} ${b.x} ${b.y}` };
+}
+
+// A point on a cubic Bézier, and its direction.
+export function bezier({ a, p1, p2, b }, t) {
+  const u = 1 - t;
+  const x = u * u * u * a.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * b.x;
+  const y = u * u * u * a.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * b.y;
+  const tx = 3 * u * u * (p1.x - a.x) + 6 * u * t * (p2.x - p1.x) + 3 * t * t * (b.x - p2.x);
+  const ty = 3 * u * u * (p1.y - a.y) + 6 * u * t * (p2.y - p1.y) + 3 * t * t * (b.y - p2.y);
+  return { x, y, angle: Math.atan2(ty, tx) };
+}
+
+// ---------- board art ----------
+export const r1 = (v) => Math.round(v * 10) / 10;
+
+function ladderArt(from, to) {
+  const a = center(from);
+  const b = center(to);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  const ux = dx / len;
+  const uy = dy / len;
+  const px = -uy * 15;
+  const py = ux * 15;
+  const ext = 16;
+  const A = { x: a.x - ux * ext, y: a.y - uy * ext };
+  // The ladder to 100 stops short, under the trophy.
+  const top = to === LAST ? -28 : ext;
+  const B = { x: b.x + ux * top, y: b.y + uy * top };
+  const rail = (sgn) => `M${r1(A.x + px * sgn)} ${r1(A.y + py * sgn)} L${r1(B.x + px * sgn)} ${r1(B.y + py * sgn)}`;
+  const count = Math.max(2, Math.round(len / 36));
+  const rungs = [];
+  const reach = to === LAST ? (len - 34) / len : 1;
+  for (let i = 0; i <= count; i++) {
+    const t = (i / count) * reach;
+    const x = a.x + dx * t;
+    const y = a.y + dy * t;
+    rungs.push(`M${r1(x - px)} ${r1(y - py)} L${r1(x + px)} ${r1(y + py)}`);
+  }
+  const rungPath = rungs.join("");
+  const rails = rail(-1) + rail(1);
+  return s(
+    "g",
+    { class: "ladder", "data-from": from },
+    s("path", { class: "ladder-shadow", d: rails + rungPath, transform: "translate(5 7)" }),
+    s("path", { class: "ladder-rung", d: rungPath }),
+    s("path", { class: "ladder-rail", d: rails }),
+    s("path", { class: "ladder-rail-hi", d: rails }),
+  );
+}
+
+function chuteArt(from, to) {
+  const curve = chuteCurve(from, to);
+  const { a, b, d } = curve;
+  const c = CHUTE_COLORS[from];
+  const deg = (t) => (bezier(curve, t).angle * 180) / Math.PI;
+  return s(
+    "g",
+    { class: `chute c${c}`, "data-from": from },
+    s("path", { class: "chute-shadow", d, transform: "translate(5 8)" }),
+    s("path", { class: "chute-rim", d }),
+    s("path", { class: "chute-wall", d }),
+    s("path", { class: "chute-bed", d }),
+    s("path", { class: "chute-shine", d }),
+    // The run-out at the bottom, flared along the slide.
+    s(
+      "g",
+      { transform: `translate(${r1(b.x)} ${r1(b.y)}) rotate(${r1(deg(1))})` },
+      s("ellipse", { class: "chute-lip", cx: 2, cy: 0, rx: 16, ry: 25 }),
+      s("ellipse", { class: "chute-lip-in", cx: 2, cy: 0, rx: 10, ry: 17 }),
+    ),
+    // The deck at the top, with a handrail on each side.
+    s(
+      "g",
+      { transform: `translate(${r1(a.x)} ${r1(a.y)}) rotate(${r1(deg(0))})` },
+      s("rect", { class: "chute-deck", x: -20, y: -26, width: 18, height: 52, rx: 6 }),
+      s("path", { class: "chute-rail", d: "M-14 -27 C-2 -36 14 -30 22 -22 M-14 27 C-2 36 14 30 22 22" }),
+    ),
+  );
+}
+
+// A little kid on a stand, like the board game's cardboard pawns.
+function pawnArt(whose) {
+  const fig = s(
+    "g",
+    { class: "pawn-fig" },
+    s("ellipse", { class: "pawn-base", cx: 0, cy: -3, rx: 17, ry: 6.5 }),
+    s("path", { class: "pawn-body", d: "M-13.5 -6 C-15 -22 -10 -32 0 -32 C10 -32 15 -22 13.5 -6 Z" }),
+    s("path", { class: "pawn-arm", d: "M-12 -24 L-18 -14 M12 -24 L18 -14" }),
+    s("circle", { class: "pawn-head", cx: 0, cy: -42, r: 11.5 }),
+    s("path", { class: "pawn-hair", d: "M-11.6 -42.5 A11.6 11.6 0 0 1 11.6 -42.5 C7 -46.5 -2 -48 -11.6 -42.5 Z" }),
+    s("circle", { class: "pawn-eye", cx: -4, cy: -41, r: 1.7 }),
+    s("circle", { class: "pawn-eye", cx: 4, cy: -41, r: 1.7 }),
+    s("path", { class: "pawn-smile", d: "M-4 -36.6 Q0 -33.4 4 -36.6" }),
+  );
+  const g = s("g", { class: `pawn ${whose}` }, s("ellipse", { class: "pawn-shadow", cx: 0, cy: 0, rx: 18, ry: 6 }), s("g", { class: "pawn-bob" }, fig));
+  return { g, fig };
+}
+
+function trophyArt() {
+  return s(
+    "g",
+    { class: "trophy", transform: `translate(${center(LAST).x + 4} ${center(LAST).y - 6}) scale(0.9)` },
+    s("path", { class: "trophy-cup", d: "M-20 -30 H20 C20 -8 12 2 0 4 C-12 2 -20 -8 -20 -30 Z" }),
+    s("path", { class: "trophy-handles", d: "M-20 -24 C-34 -24 -32 -6 -14 -6 M20 -24 C34 -24 32 -6 14 -6" }),
+    s("path", { class: "trophy-cup", d: "M-4 3 H4 V13 H12 V20 H-12 V13 H-4 Z" }),
+    s("path", { class: "trophy-star", d: "M0 -25 l3.5 7.2 7.9 1.1 -5.7 5.6 1.3 7.9 -7 -3.7 -7 3.7 1.3 -7.9 -5.7 -5.6 7.9 -1.1 Z" }),
+  );
+}
+
+function lawnArt() {
+  const y = BOARD;
+  const blades = [];
+  for (let x = 8; x < BOARD; x += 17) blades.push(`M${x} ${y + 14} q3 -9 1 -14 M${x + 6} ${y + 14} q-2 -7 2 -11`);
+  const flowers = [[330, 40, 0], [470, 64, 1], [610, 34, 2], [760, 60, 0], [905, 38, 1]].map(([x, dy, c]) =>
+    s(
+      "g",
+      { class: `flower f${c}`, transform: `translate(${x} ${y + dy})` },
+      s("path", { class: "flower-stem", d: "M0 4 V22" }),
+      [0, 72, 144, 216, 288].map((deg) => s("ellipse", { class: "flower-petal", cx: 0, cy: -7, rx: 5, ry: 7.5, transform: `rotate(${deg})` })),
+      s("circle", { class: "flower-heart", r: 4.5 }),
+    ),
+  );
+  return s(
+    "g",
+    { class: "lawn" },
+    s("rect", { class: "lawn-ground", x: 0, y, width: BOARD, height: GROUND }),
+    s("path", { class: "lawn-blades", d: blades.join("") }),
+    flowers,
+    s(
+      "g",
+      { class: "start-sign", transform: `translate(52 ${y + 12})` },
+      s("path", { class: "sign-post", d: "M0 18 V78" }),
+      s("rect", { class: "sign-board", x: -40, y: 0, width: 80, height: 34, rx: 8 }),
+      s("text", { class: "sign-text", x: 0, y: 24 }, "START"),
+    ),
+  );
+}
+
+// The pictures at both ends of every ladder and chute, each in the corner of
+// its square that points away from where the ladder or chute leaves it.
+const CORNERS = [{ x: 26, y: -20 }, { x: 26, y: 24 }, { x: -26, y: 24 }];
+function vignettes() {
+  const out = [];
+  const place = (n, name, dir) => {
+    if (!name) return;
+    const c = center(n);
+    const best = CORNERS.reduce((a, b) => (a.x * dir.x + a.y * dir.y <= b.x * dir.x + b.y * dir.y ? a : b));
+    out.push(icon(name, c.x + best.x, c.y + best.y, 1.05));
+  };
+  const unit = (dx, dy) => ({ x: dx / Math.hypot(dx, dy), y: dy / Math.hypot(dx, dy) });
+  for (const [from, [start, end]] of Object.entries(VIGNETTES.ladders)) {
+    const a = center(Number(from));
+    const b = center(LADDERS[from]);
+    place(Number(from), start, unit(b.x - a.x, b.y - a.y));
+    place(LADDERS[from], end, unit(a.x - b.x, a.y - b.y));
+  }
+  for (const [from, [start, end]] of Object.entries(VIGNETTES.chutes)) {
+    const curve = chuteCurve(Number(from), CHUTES[from]);
+    const t0 = bezier(curve, 0).angle;
+    const t1 = bezier(curve, 1).angle;
+    place(Number(from), start, { x: Math.cos(t0), y: Math.sin(t0) });
+    place(CHUTES[from], end, { x: -Math.cos(t1), y: -Math.sin(t1) });
+  }
+  return s("g", { class: "vignettes" }, out);
+}
+
+export function buildBoard(players) {
+  const squares = [];
+  const numbers = [];
+  for (let n = 1; n <= LAST; n++) {
+    const { row, col } = cellOf(n);
+    const x = col * U;
+    const y = (SIZE - 1 - row) * U;
+    const tone = (row * 3 + col * 2 + (row % 2)) % 5;
+    const kind = LADDERS[n] ? "up" : CHUTES[n] ? "down" : n === LAST ? "goal" : "";
+    squares.push(s("rect", { class: `sq t${tone} ${kind}`, x, y, width: U, height: U, "data-n": n }));
+    numbers.push(s("text", { class: `num ${kind}`, x: x + 9, y: y + 25 }, String(n)));
+  }
+  const ladders = Object.entries(LADDERS).map(([a, b]) => ladderArt(Number(a), b));
+  const chutes = Object.entries(CHUTES).map(([a, b]) => chuteArt(Number(a), b));
+  const marks = s("g", { class: "marks" });
+  const pawns = Array.from({ length: players }, (_, k) => pawnArt(`p${k}`));
+  const fx = s("g", { class: "fx" });
+  const svgEl = s(
+    "svg",
+    { class: "cl-board", id: "cl-board", viewBox: `-6 -6 ${BOARD + 12} ${BOARD + GROUND + 12}`, role: "img" },
+    s("rect", { class: "frame", x: -6, y: -6, width: BOARD + 12, height: BOARD + GROUND + 12, rx: 22 }),
+    s("g", { class: "squares" }, squares),
+    s("g", { class: "grid-lines" }, s("path", { d: Array.from({ length: SIZE - 1 }, (_, i) => `M${(i + 1) * U} 0V${BOARD}M0 ${(i + 1) * U}H${BOARD}`).join("") })),
+    marks,
+    vignettes(),
+    trophyArt(),
+    lawnArt(),
+    s("g", { class: "chutes" }, chutes),
+    s("g", { class: "ladders" }, ladders),
+    s("g", { class: "numbers" }, numbers),
+    s("g", { class: "pawns" }, pawns.map((p) => p.g).reverse()),
+    fx,
+  );
+  return { svg: svgEl, pawns, marks, fx, layer: svgEl.querySelector(".pawns") };
+}
+
+// ---------- spinner ----------
+export const WEDGE = 360 / SPINNER;
+export function spinnerArt() {
+  const wedges = [];
+  for (let v = 1; v <= SPINNER; v++) {
+    const a0 = ((v - 1) * WEDGE - WEDGE / 2 - 90) * (Math.PI / 180);
+    const a1 = a0 + WEDGE * (Math.PI / 180);
+    const R = 92;
+    const d = `M0 0 L${r1(R * Math.cos(a0))} ${r1(R * Math.sin(a0))} A${R} ${R} 0 0 1 ${r1(R * Math.cos(a1))} ${r1(R * Math.sin(a1))} Z`;
+    const mid = (a0 + a1) / 2;
+    wedges.push(
+      s("path", { class: `wedge w${v}`, d }),
+      s("text", { class: "wedge-num", x: r1(64 * Math.cos(mid)), y: r1(64 * Math.sin(mid) + 9) }, String(v)),
+    );
+  }
+  const pegs = [];
+  for (let v = 0; v < SPINNER; v++) {
+    const a = (v * WEDGE + WEDGE / 2 - 90) * (Math.PI / 180);
+    pegs.push(s("circle", { class: "peg", cx: r1(92 * Math.cos(a)), cy: r1(92 * Math.sin(a)), r: 3.5 }));
+  }
+  const arrow = s(
+    "g",
+    { class: "arrow" },
+    s("path", { class: "arrow-shadow", d: "M0 -76 L11 -8 L5 26 H-5 L-11 -8 Z", transform: "translate(3 4)" }),
+    s("path", { class: "arrow-body", d: "M0 -76 L11 -8 L5 26 H-5 L-11 -8 Z" }),
+    s("path", { class: "arrow-shine", d: "M0 -66 L5 -10 L0 -10 Z" }),
+  );
+  const svgEl = s(
+    "svg",
+    { class: "cl-spinner", viewBox: "-104 -104 208 208", "aria-hidden": "true" },
+    s("circle", { class: "dial-rim", r: 101 }),
+    wedges,
+    s("circle", { class: "dial-ring", r: 92 }),
+    pegs,
+    arrow,
+    s("circle", { class: "hub", r: 15 }),
+    s("circle", { class: "hub-dot", r: 5 }),
+  );
+  return { svg: svgEl, arrow };
 }
