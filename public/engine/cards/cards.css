@@ -3,7 +3,8 @@
    the table's palette for light and dark: felt and rim, card paper (white in
    both themes), suits and backs. Players take colours by seat, the same on
    every screen: coral, teal, violet and amber, each with a fill (--c) and an
-   ink for text (--c-ink). A game can override any token on its root. */
+   ink for text (--c-ink). A game can override any token on its root. Trick
+   games add the trick, the tricks each seat won and the pass's marks. */
 .pc-game {
   --pc-p2: #7c55e6;
   --pc-p2-ink: #6640d0;
@@ -707,6 +708,159 @@ button.pc-stock:disabled {
   text-align: center;
 }
 
+/* ---------- a trick game: the trick, the tricks won, the pass ---------- */
+/* The trick: each seat's card lands in front of it, round the middle of the felt. */
+.pc-trick {
+  position: relative;
+  width: calc(var(--cw) * 3 + 12px);
+  height: calc(var(--ch) * 1.9);
+  max-width: 100%;
+}
+
+.pc-trick-spot {
+  position: absolute;
+  width: var(--cw);
+  height: var(--ch);
+  border-radius: 8px;
+}
+
+.pc-trick-spot.pos-bottom { left: calc(50% - var(--cw) / 2); bottom: 0; }
+.pc-trick-spot.pos-top { left: calc(50% - var(--cw) / 2); top: 0; }
+.pc-trick-spot.pos-left { left: 0; top: calc(50% - var(--ch) / 2); }
+.pc-trick-spot.pos-right { right: 0; top: calc(50% - var(--ch) / 2); }
+
+/* An empty spot: a faint outline in the seat's colour. */
+.pc-trick-spot::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 7px;
+  border: 2px dashed color-mix(in srgb, var(--c) 45%, transparent);
+}
+
+.pc-trick-spot .pc-card {
+  position: relative;
+  z-index: 1;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+/* The card that led: a tab in its seat's colour. */
+.pc-trick-spot.lead::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: -5px;
+  left: 50%;
+  width: 22px;
+  height: 8px;
+  margin-left: -11px;
+  border-radius: 999px;
+  background: var(--c);
+  box-shadow: 0 0 0 2px var(--pc-felt-2);
+}
+
+.pc-trick-spot.wins .pc-card .front {
+  box-shadow: 0 0 0 3px var(--pc-glow), 0 0 18px rgb(255 211 107 / 60%);
+}
+
+/* Under the trick: the suit to follow, and whatever else the game adds. */
+.pc-trick-info {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.pc-trick-info > * {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 30%);
+  color: var(--pc-felt-ink);
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pc-trick-info > [hidden] {
+  display: none;
+}
+
+.pc-follow .pc-suit-sign {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--pc-paper);
+}
+
+.pc-follow .pc-suit {
+  width: 12px;
+  height: 12px;
+}
+
+/* The tricks a seat has won: a little stack of backs and the count. */
+.pc-won {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.pc-won .stack {
+  position: relative;
+  width: calc(var(--ow) * 0.62);
+  height: calc(var(--ow) * 0.87);
+}
+
+.pc-won .stack .pc-card {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.pc-won .stack .pc-card:nth-child(2) { transform: translate(2px, -2px) rotate(4deg); }
+.pc-won .stack .pc-card:nth-child(3) { transform: translate(4px, -3px) rotate(-3deg); }
+
+.pc-won .n {
+  min-width: 1.4em;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--c);
+  color: #17201d;
+  text-align: center;
+}
+
+.pc-won.none .stack {
+  border-radius: 4px;
+  border: 1.5px dashed rgb(255 255 255 / 35%);
+}
+
+/* The pass: cards you picked stand up in your colour; cards passed to you are marked until you play. */
+.pc-hcard.picked .pc-card .front {
+  box-shadow: 0 0 0 3px var(--c), 0 8px 18px var(--pc-shadow);
+}
+
+.pc-hcard.received::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: -6px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--received, var(--pc-glow));
+  box-shadow: 0 0 0 2px var(--pc-felt-2);
+}
+
 /* ---------- flying cards and effects ---------- */
 .pc-fly {
   position: absolute;
@@ -857,7 +1011,8 @@ button.pc-stock:disabled {
   .pc-card .in,
   .pc-hcard,
   .pc-meld-mark,
-  .pc-spread .pc-card {
+  .pc-spread .pc-card,
+  .pc-trick-spot .pc-card {
     transition: none;
   }
 }

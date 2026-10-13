@@ -1,14 +1,14 @@
 // A deck for rules tests that knows every face, with the same API the rules
 // get from CardMatch (see public/engine/card-match.js): cards, face, owner,
-// deal, open and shuffle. view(seat) is the face function a seat's robot
-// would get: its own cards and the open ones.
+// deal, pass, open and shuffle. view(seat) is the face function a seat's robot
+// would get: its own cards, the open ones and the ones it passed on.
 import { RuleError } from "../../public/engine/turn-match.js";
 import { rngFromSeed } from "../../public/engine/rng.js";
 
 export class KnownDeck {
   // faces: the deck, top first; seed: how shuffle() reorders.
   constructor(faces, seed = "known") {
-    this.slots = faces.map((face) => ({ face, owner: -1, open: false, gone: false }));
+    this.slots = faces.map((face) => ({ face, owner: -1, open: false, gone: false, held: [] }));
     this.cards = faces.map((_, i) => i);
     this.rng = rngFromSeed(seed);
     this.ops = [];
@@ -28,9 +28,17 @@ export class KnownDeck {
   }
   deal(id, seat) {
     const s = this.#get(id);
-    if (s.owner !== -1 && s.owner !== seat && !s.open) throw new RuleError("a hidden card can't change hands");
+    if (s.owner !== -1 && s.owner !== seat && !s.open) throw new RuleError("a hidden card in a hand changes hands with deck.pass()");
     s.owner = seat;
     this.ops.push({ type: "deal", id, seat });
+  }
+  pass(id, seat) {
+    const s = this.#get(id);
+    if (s.owner === -1) throw new RuleError("only a card in a hand can be passed");
+    if (s.owner === seat) return;
+    s.held.push(s.owner); // CardMatch would deal a card passed in its dealing call straight on
+    s.owner = seat;
+    this.ops.push({ type: "pass", id, seat });
   }
   open(id) {
     this.#get(id).open = true;
@@ -47,13 +55,13 @@ export class KnownDeck {
       [faces[i], faces[j]] = [faces[j], faces[i]];
     }
     this.ops.push({ type: "shuffle", ids });
-    return faces.map((face) => this.slots.push({ face, owner: -1, open: false, gone: false }) - 1);
+    return faces.map((face) => this.slots.push({ face, owner: -1, open: false, gone: false, held: [] }) - 1);
   }
-  // What `seat` may see: its own cards and the open ones.
+  // What `seat` may see: its own cards, the open ones and the ones it passed on.
   view(seat) {
     return (id) => {
       const s = this.slots[id];
-      return s && (s.open || s.owner === seat) ? s.face : null;
+      return s && (s.open || s.owner === seat || s.held.includes(seat)) ? s.face : null;
     };
   }
 }

@@ -1,7 +1,7 @@
 # Architecture
 
 Daily Dose of Play is a free, no-login site of browser games for two or more
-players (Chutes and Ladders, Ludo, Crazy Eights and Go Fish seat up to four). One small Node server
+players (Chutes and Ladders, Ludo, Crazy Eights, Go Fish and Hearts seat up to four). One small Node server
 on Wasmer Edge serves the pages and introduces players to each other. The games
 themselves run browser to browser over WebRTC DataChannels: with more than
 two players, every guest connects to the room creator's browser, which
@@ -104,6 +104,7 @@ flowchart TB
     e_deck_service["deck-service.js"]
     e_deck_worker["deck-worker.js<br>Web Worker"]
     e_deck_crypto["deck-crypto.js"]
+    e_seal["seal.js<br>WebCrypto"]
     e_vendor_mental_poker_cards_play["vendor/mental-poker/cards_play.js"]
     e_base64["base64.js"]
     e_fair["fair.js"]
@@ -203,6 +204,7 @@ flowchart TB
   e_card_match --> e_deck_service
   e_card_match --> e_fair
   e_card_match --> e_robot_pace
+  e_card_match --> e_seal
   e_card_match --> e_session
   e_card_match --> e_turn_match
   e_cards_art --> e_cards_faces
@@ -478,7 +480,8 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `session.js` → `matchRouter()` | Routes game messages to the current match by match number `m`, with the sender's seat, and holds messages for a rematch that hasn't started yet |
 | `robot-pace.js` | `robotPause(ms)`: every robot's pause before it moves goes through it, so browser tests can speed robots up by setting `globalThis.ddpRobotPace` (1 for players) |
 | `turn-match.js` | `TurnMatch` and `startTurnRobot()`: a generic protocol for open-information turn games, for two or more players. Agreed coin toss for who starts, every peer validates every move with the same rules (only the seat on turn may move), and luck moves (dice) use `SharedRandom`. A rules object may set `draws`, the most shared draws one match needs (default 256). This is the default for future games. Card games use `card-match.js`; Sea Battle hides a fleet, not cards, so it has its own `match.js`. |
-| `card-match.js` | `CardMatch` and `startCardRobot()`: turn games with hidden cards and no dealer (mental poker, see **Card games**). Like `TurnMatch`, plus a deck the rules deal from (`deck.deal`, `deck.open`, `deck.shuffle`, `deck.face`), every shuffle and share checked as it arrives, and an audit when the match ends. |
+| `card-match.js` | `CardMatch` and `startCardRobot()`: turn games with hidden cards and no dealer (mental poker, see **Card games**). Like `TurnMatch`, plus a deck the rules deal from (`deck.deal`, `deck.pass`, `deck.open`, `deck.shuffle`, `deck.face`), every shuffle and share checked as it arrives, a hidden card passed in secret, and an audit when the match ends. |
+| `seal.js` | Sealing a hidden card's shares to one player, through WebCrypto (ECDH P-256, HKDF-SHA256, AES-GCM): each player's seal key, `seal()` and `unseal()` (either side's private key opens an envelope), and `revealedKey()`, which accepts a key revealed for the audit only if it belongs to the published one. |
 | `deck-service.js` | `deckService()`: the deck cryptography as async calls, in one Web Worker per tab (`deck-worker.js`) or in-process in Node. Replaces the worker if the WebAssembly crashes. Also `DeckError` and the byte sizes. |
 | `deck-worker.js` | The worker: runs `deck-crypto.js` off the main thread |
 | `deck-crypto.js` | A synchronous layer over the vendored mental-poker WebAssembly (`vendor/mental-poker/`): keys, shuffles and their proofs, shares, opening, the audit. Bytes in, bytes out. |
@@ -502,8 +505,8 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `cards/faces.js` | The standard 52-card deck: a face is 0–51, `suitOf()`, `rankOf()`, and the names of suits, ranks and cards. Pure, so rules use it too. |
 | `cards/melds.js` | Rummy melds over the standard deck, pure, so rules, views and robots share it: sets and runs (aces low), every candidate meld in a hand, `bestMelds()` (the arrangement with the least deadwood, tried exhaustively and remembered by the cards left: well under a millisecond for 11 cards), `fits()` and `bestLayoffs()` (onto someone else's melds, a run taking the next card in turn), and `bestDefence()` (your own melds and lay-offs that leave the least, which may break up a meld to lay off more). Deadwood counts aces 1 and court cards 10 unless a game passes its own `points`. |
 | `cards/art.js` | Playing-card art as inline SVG: `symbols()` (the shapes every card uses, added once), `faceSvg(face)`, `BACK_SVG` and `suitSvg(suit)` (see **Crazy Eights in depth** for the drawing) |
-| `cards/table.js` | `cardTable({ prefix, play, animate, done })`: the pieces of a card table. Cards that turn over (`cardEl`, `setFace`, `miniCard`), another player's seat (a fan of backs, with the cards everyone knows face up when the game passes `face`, and a pill with the count), the stock with its riffle while the deck is shuffled, the deck's work shown after 450 ms (`DECK_WORK` has the words), your hand fanned along an arc (it overlaps, then scrolls in its own row; one tab stop, arrow keys, Home and End), or laid flat in `groups` (melds set apart, closer together, with a mark under each), and rearranged when the game sets `onMove()` (drag a card along the row, or Shift and an arrow key; a vertical swipe still scrolls the page), a hand laid face up on the table (`makeSpread()`: groups of overlapping cards sized to fit the row, a mark under each), flying cards, bubbles over a seat, confetti, the deal card by card, and the animation queue: in order, faster when it piles up, at once with reduced motion (read at each use) or a hidden tab, and a generation per match so a rematch drops the old one. Each part has the class `pc-<part>` and the game's `<prefix>-<part>`. |
-| `cards/cards.css` | The table's look for `cards/table.js`, linked by card games after `theme.css`: the status line, the layout with its side panel and the log, the felt and rim, cards (paper-white in both themes; `.four-colour` draws diamonds blue and clubs green), seats, stock, hand, flights, and the seat colours `p-0` to `p-3` (coral, teal, violet, amber), on a root with the class `pc-game` |
+| `cards/table.js` | `cardTable({ prefix, play, animate, done })`: the pieces of a card table. Cards that turn over (`cardEl`, `setFace`, `miniCard`), another player's seat (a fan of backs, with the cards everyone knows face up when the game passes `face`, and a pill with the count), the stock with its riffle while the deck is shuffled, the deck's work shown after 450 ms (`DECK_WORK` has the words), your hand fanned along an arc (it overlaps, then scrolls in its own row; one tab stop, arrow keys, Home and End), or laid flat in `groups` (melds set apart, closer together, with a mark under each), and rearranged when the game sets `onMove()` (drag a card along the row, or Shift and an arrow key; a vertical swipe still scrolls the page), a hand laid face up on the table (`makeSpread()`: groups of overlapping cards sized to fit the row, a mark under each), flying cards, bubbles over a seat, confetti, the deal card by card, and the animation queue: in order, faster when it piles up, at once with reduced motion (read at each use) or a hidden tab, and a generation per match so a rematch drops the old one. For trick games: the trick (`makeTrick()`, each seat's card landing in front of it, the lead marked by a tab in its colour, the suit to follow under it in `info`, the winning card lit, and `gather()`, which slides the cards onto the winning one and flies them face down to the winner), the tricks a seat has won (`makeWon()`, a little stack of backs and the count), and the pass (`sendCards()`: cards leaving face down toward a seat; the hand marks cards you picked with `picked` and cards passed to you with `received`). Each part has the class `pc-<part>` and the game's `<prefix>-<part>`. |
+| `cards/cards.css` | The table's look for `cards/table.js`, linked by card games after `theme.css`: the status line, the layout with its side panel and the log, the felt and rim, cards (paper-white in both themes; `.four-colour` draws diamonds blue and clubs green), seats, stock, hand, flights, the trick, won tricks and the pass's marks, and the seat colours `p-0` to `p-3` (coral, teal, violet, amber), on a root with the class `pc-game` |
 | `cards/paced-robot.js` | `startPacedRobot()`: a card robot that asks the view how long to pause before each move (-1 waits for the screen to finish replaying), keeps a move it chose while waiting, and makes the game's fallback move when one is refused. `humanPause()` is the view's side: a blink in a hidden tab, less with reduced motion. |
 | `cards/leave-notice.js` | `leaveNotice()`: what a card game adds to the lobby's "Game ended" notice: whether the game got checked, and with three or more players that it is over for everyone, with each player's line. `verdictText()` and `abortText()` word a failed audit and a stopped match. |
 | `cards/card-sounds.js` | Sounds for a card game's `sounds.js` to list. `cardSounds`, handling the cards: a riffle, a deal flick, a card played, a card drawn, cards gathered; CC0 recordings in `cards/sounds/` (credited in its `LICENSE.txt`), each with a synthesized stand-in. `tableSounds`, synthesized: your turn, a refusal, the timer's tick. Also `bell()` and `note()` for a game's own sounds. |
@@ -654,7 +657,9 @@ grow with the deck, so `CardMatch` sends them in parts (see **Card games**);
 its largest message, with four players and a 108-card deck, is 3063 (a part
 of a `shuffle`); Crazy Eights' (four players, 52 cards) is about the same,
 3063 to 3065 as reshuffles add digits to the round number, Go Fish's
-3063 and Gin Rummy's 3064 to 3065 (two players, the deck shuffled again every hand).
+3063, Gin Rummy's 3064 to 3065 (two players, the deck shuffled again every
+hand) and Hearts' 3064 (four players, a game to 50). A pass's sealed cards go
+in a `seal` message of about 704 characters (three cards, four players).
 
 **Why a pre-negotiated channel.** With the default in-band handshake, the
 guest's channel opens when the host's open request arrives, and Chrome
@@ -666,7 +671,8 @@ side's first message can arrive before the other side has the channel.
 Engine messages start with `$`. Everything else belongs to the game. The
 game receives messages through `session.onMessage((msg, fromSeat) => …)`,
 which buffers until a handler is attached. The handshake's protocol version is
-2; a page from before groups gets "a different version of this page".
+3; a page from before the card engine's secret pass (2), or before groups,
+gets "a different version of this page" when it connects, before any game.
 
 | Engine message, during a game | Meaning |
 |---|---|
@@ -792,7 +798,7 @@ the lobby cards:
 | Lobby, invite, waiting room | 520 px | all |
 | Game, `layout: "narrow"` | 520 px | Tic Tac Toe, Connect 4, Chess, Checkers |
 | Game, `layout: "medium"` | 640 px | Gomoku, Backgammon |
-| Game, `layout: "wide"` (the default) | 980 px | Sea Battle, Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy |
+| Game, `layout: "wide"` (the default) | 980 px | Sea Battle, Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts |
 
 Below that width the column is the page's width less its 16 px gutters. A
 game's own top-level box has no `max-width`, so it fills `#game`. The default
@@ -816,7 +822,7 @@ most two to a row; under 600 px they sit in a 2×2 grid beside Leave (React
 under it) over a slimmer score, so four fit a 360 px phone. A pill and its score read
 `--seat` and `--seat-text`, which are `--mine` and `--theirs` unless the game
 gives each seat a class of its own that sets them (Chutes and Ladders `p0`
-to `p3`, Ludo its board colours, Crazy Eights, Go Fish and Gin Rummy `p-0` to `p-3`).
+to `p3`, Ludo its board colours, the card games `p-0` to `p-3`).
 
 **Reactions.** Players can't type to each other: there would be nothing to
 stop a stranger's words reaching a child. Instead the player bar's React
@@ -904,11 +910,12 @@ Toe, Connect 4 and Gomoku, the mated king in Chess, the last capture in
 Checkers, the last checker borne off in Backgammon, the last ship sunk in
 Sea Battle (once its shell lands), the pawn on 100 in Chutes and Ladders,
 the last box in Dots and Boxes, the winner's tokens home in Ludo, the
-winners' books in Go Fish, and the winner's melds on the table in Gin Rummy. The
+winners' books in Go Fish, the winner's melds on the table in Gin Rummy, and the
+winner's pill and tricks in Hearts. The
 chimes (`chimes.js`) are one melody, a C-major pentatonic jingle, in a
 timbre that fits the game's pieces (`flavour`): `wood` for Chess, Checkers,
 Backgammon and Ludo; `paper` for Tic Tac Toe, Gomoku, Dots and Boxes and Gin Rummy;
-`plastic` for Connect 4; `bell` for Chutes and Ladders; `water` (a bubble
+`plastic` for Connect 4; `bell` for Chutes and Ladders and Hearts; `water` (a bubble
 under the bell) for Sea Battle and Go Fish. They are synthesized, at the `fanfare`
 level, and follow the mute toggle. With `prefers-reduced-motion` only the
 colours change: the pieces glow, the board dims, the pills take their seat
@@ -1059,17 +1066,20 @@ that started the room, and has no dealer. `engine/card-match.js` does it with
 mental poker: every player holds a share of the deck's key, and a card can
 only be read with every share. With three or more players, a modified host
 can still read a hand (see **A modified host** below). The rules contract is
-at the top of that file; Crazy Eights, Go Fish and Gin Rummy use it (see
-**Crazy Eights in depth**, **Go Fish in depth** and **Gin Rummy in depth**).
+at the top of that file; Crazy Eights, Go Fish, Gin Rummy and Hearts use it
+(see **Crazy Eights in depth**, **Go Fish in depth**, **Gin Rummy in depth**
+and **Hearts in depth**).
 
 **How a match runs.** Every message carries `m`, as in `TurnMatch`.
 
-1. **Keys.** Each browser makes a key and sends `hello {tip, key}`: its
-   `SharedRandom` chain tip, and its public key with a proof that it holds
-   the secret. The proof covers the match number, the seat and the tip, so a
-   key can't be reused by another seat or in another match. Everyone checks
-   every proof and adds the keys into one joint key. One shared draw picks
-   who starts.
+1. **Keys.** Each browser makes a key and sends `hello {tip, key, seal}`:
+   its `SharedRandom` chain tip, its public key with a proof that it holds
+   the secret, and the public half of a second key, its seal key (see
+   **Passing a hidden card** below). The proof covers the match number, the
+   seat, the tip and the seal key, so a key can't be reused by another seat
+   or in another match, and the two keys can't be swapped apart. Everyone
+   checks every proof and adds the keys into one joint key. One shared draw
+   picks who starts.
 2. **The shuffle.** The deck starts as the cards 0 to `deckSize` − 1 in
    order. Seat 0 re-encrypts every card under the joint key, permutes them,
    and sends the result with a proof that it is still the same cards
@@ -1086,11 +1096,14 @@ at the top of that file; Crazy Eights, Go Fish and Gin Rummy use it (see
 4. **Reshuffles.** `deck.shuffle(slots)` sends those cards, say a discard
    pile, through another round of shuffles by every seat, into new slots.
    Faces that were open are hidden again.
-5. **The audit.** When `state.winner` is set, everyone sends their secret key
-   (`audit {key}`). Each browser checks every key against the one that player
-   used, reads every card it couldn't see, and replays the game from the deal
-   with every face known. The result is `match.verdict`: `{ ok: true }`, or
-   what went wrong and, when it was a move, whose. Once the audit has
+5. **Passing.** `deck.pass(slot, seat)` moves a card in someone's hand to
+   another seat in secret (below).
+6. **The audit.** When `state.winner` is set, everyone sends their secret
+   keys (`audit {key, seal}`). Each browser checks every key against the one
+   that player used, opens and checks every sealed card, reads every card it
+   couldn't see, and replays the game from the deal with every face known.
+   The result is `match.verdict`: `{ ok: true }`, or what went wrong and,
+   when it was a move, whose. Once the audit has
    passed, `match.face()` returns every card, so a game can show the hands
    left at the end (Crazy Eights counts their penalty points). During play
    it returns only the open cards and your own, as before, and after a
@@ -1102,18 +1115,63 @@ at the top of that file; Crazy Eights, Go Fish and Gin Rummy use it (see
 | A shuffle that swaps, copies or drops a card, or one passed off as another seat's | At once: the proof fails, and the match stops naming the shuffler. |
 | A wrong share, or a share for another card | At once: its proof fails. |
 | Showing a card that isn't in your hand, or moving out of turn | At once, like any illegal move. |
+| Passing a card with a bad sealed share, or a share for another card | At once, by its receiver, who stops the match naming the giver; then the two of them settle it (below). If the receiver kept quiet, in the audit. |
+| Saying a good sealed card is bad | When the giver and the receiver reveal their seal keys after the match stops: everyone opens the envelope and names the receiver. |
 | Breaking a rule that depends on a hidden card ("draw only if nothing plays") | In the audit, where `deck.face()` returns every face, so the rule throws. The result stands; the audit only reports. |
-| Revealing a different key at the end | In the audit. |
+| Revealing a different key (card or seal) at the end | In the audit. |
 
 The audit needs every player's key. A player who leaves after the last move,
 or never sends their key, leaves the match unverified (`verdict` stays null):
 the view should say so. Nothing stops stalling either: a player who never
 sends their shares holds the game up until someone leaves. A seat that sends
 more than `MAX_AHEAD` shuffle or share parts ahead of the match is flooding,
-and is blamed for it. A hidden card can't pass from one player to another
-(Hearts' pass): that needs a private message, and every message here goes
-to everyone. A card that is already open can, so Go Fish shows the cards an
-answer hands over before dealing them to the asker.
+and is blamed for it.
+
+**Passing a hidden card.** A dealt card can be read only by its holder,
+because every other player's share of it went out to everyone, and the
+holder's own share never did. Every message goes to everyone, so giving that
+share away in the open would let anyone read the card. Instead the holder's
+browser seals it to the receiver: an ECDH key on P-256 between the giver's
+and the receiver's seal keys, HKDF-SHA256 bound to the match, the deck step,
+the slot and the two seats, and AES-GCM (`engine/seal.js`, WebCrypto, no
+library). Either side's private key opens it, nobody else's.
+
+- The rules call `deck.pass(slot, seat)`, from any move: Hearts passes the
+  mover's own cards, and Old Maid would take one from someone else's hand.
+  The card's holder's browser seals by itself as the round runs, like a
+  share round (`seal {k, i, n, d}`, the envelopes in parts). The room
+  creator relays envelopes it can't open.
+- A pass carries every share that hasn't gone to everyone, except the
+  receiver's own: the first holder's share, which the next holder forwards
+  if it passes the card on. The receiver opens the envelope, checks each
+  share's Chaum–Pedersen proof against its player's key and the card, and
+  reads the card. Everyone else records that the card changed hands and
+  keeps the envelope for the audit. The giver still knows the card it gave.
+- When the holder later shows the card, its move carries every share still
+  missing with its proof (`move {move, sh}`), so everyone opens and checks
+  it at once. A move may carry at most 16 shares.
+- A card dealt and passed in one call goes straight to its last seat, and a
+  card opened in the same call needs no envelope.
+- A receiver that finds a bad envelope stops the match, naming the giver
+  (`abort {reason, about, dispute}`, `about` the giver, `dispute` the deck
+  step). Only the receiver could check it, so the giver and the receiver
+  then reveal their seal keys (`unseal {key}`); a browser that was behind
+  catches up to that step first, and an abort that arrives meanwhile
+  doesn't stop it short. A dispute about a step where nothing was sealed to
+  the accuser names the accuser. Everyone accepts the first key that
+  belongs to its published key, opens the envelope, and names whoever
+  lied: the giver, or a receiver who accused falsely (`match.verdict`, with
+  the match stopped; `match.disputing` while it waits). The card keys stay
+  secret, so the hands stay hidden, but the two seal keys also open the
+  other cards those two passed or were passed in that game.
+- At the end the audit reveals every seal key, accepts only those that
+  agree with the published ones (an ECDH with the auditor's own key must
+  match), and opens every envelope with its giver's key. A bad one names
+  the giver, even if its receiver kept quiet.
+
+A card that is already open changes hands with `deck.deal()`, which Go Fish
+uses to hand over cards an answer shows; `deck.deal()` refuses a hidden card
+in a hand.
 
 **A modified host, with three or more players.** Every message goes through
 the host's browser (see **Groups**), and messages aren't signed. A modified
@@ -1123,8 +1181,11 @@ real game goes on, and the host can read your hand and play your seat.
 Signing moves wouldn't close this, because the host also relays the keys a
 signature would be checked against, and could swap in its own. It would
 take direct links between every pair of players (a mesh, see **Groups**).
-With two players the host is your only opponent, so this gives them nothing
-the game doesn't already.
+Seal keys are no different: the host could swap in its own at the hello
+(both keys at once, with a proof of its own) and read the cards passed to
+that player, or relay a different envelope to each player so their verdicts
+differ. With two players the host is your only opponent, so this gives them
+nothing the game doesn't already.
 
 **Writing rules.** The rules see slots, never ciphertexts, and `deck.face()`
 only returns faces every player can see, so the state is the same in every
@@ -1179,14 +1240,17 @@ table's pieces and motion, the robots' pacing and the leaving notice. A game
 builds its own layout from those pieces, keeps its own rules, robot and
 special moments, and links `cards/cards.css` after `theme.css`. Each part
 carries the class `pc-<part>` for the shared styles and `<prefix>-<part>`
-(`ce-` for Crazy Eights, `gf-` for Go Fish, `gr-` for Gin Rummy) for the
+(`ce-` for Crazy Eights, `gf-` for Go Fish, `gr-` for Gin Rummy, `hr-` for Hearts) for the
 game's own styles and tests.
 
 **Sizes.** A card is 66 bytes, a share 131. A shuffle message is 66 bytes a
 card plus its proof (7.7 KB for 52 cards, 13 KB for 108), so `CardMatch` sends
 it in parts of 3000 base64 characters (`shuffle {k, i, n, d}`), and shares 16
 to a message (`shares {k, i, n, d}`), and a move may show at most 16 hidden
-cards. Every message stays under 4 K characters (see **Message size**). In the
+cards. A seal key is 65 bytes; a sealed card is 28 bytes plus its shares
+(159 bytes, 212 characters, for a card's usual one share), and `seal` sends as
+many envelopes to a part as fit 3000 characters with every share a pass
+could need. Every message stays under 4 K characters (see **Message size**). In the
 browser test, four robots with 52 cards and seven-card hands have the deck
 shuffled in about 2.6 s, and finish 30 turns and the audit in about 4 s.
 
@@ -2036,8 +2100,9 @@ is shown and goes again, or with **Turn passes** the turn always ends. A
 lucky card laid straight into its book is shown all the same, so it goes
 again too.
 
-**Cards change hands face up.** A hidden card can't be dealt to another
-player, so a give names its cards in `reveals()`: they open, every browser
+**Cards change hands face up.** An answer shows its cards anyway (the asker
+must see they are the rank asked for), so rather than pass them sealed, a give
+names its cards in `reveals()`: they open, every browser
 checks they are the rank asked for, and the rules then deal those open cards
 to the asker. Books and lucky fish are reveals too (at most four hidden
 cards, under the 16-per-move limit). Every card ends the game face up in a
@@ -2251,6 +2316,131 @@ their `paper` timbre.
 
 **Leaving.** The shared notice (`engine/cards/leave-notice.js`): whether the
 game was checked before they left.
+
+## Hearts in depth
+
+Hearts is the fourth game on `CardMatch` (see **Card games**) and the first
+whose cards change hands in secret: the pass goes through `deck.pass()`
+(see **Passing a hidden card**). Four players with 13 cards each, or three
+with 17. It draws its table with the shared pieces, the trick ones included
+(see **The shared table**).
+
+**Three players.** Friend rooms are never filled with robots (see
+**Groups**), so three friends could only play if the game took three. With
+three, the 2 of diamonds is left out: the rules get a 51-card deck whose
+faces skip it (`cardFace()` in `rules.js` maps them back to the standard
+deck for the view and the robots), everyone gets 17 cards, and the pass
+goes left, then right. Two players can't start a game (`minPlayers` 3).
+
+**One match is a whole game**, as in Gin Rummy: between hands
+`deck.shuffle()` sends all the cards through another round of shuffles by
+every browser, into new slots (about 2.6 s with four seats, shown by the
+shared riffle and the deck's chip), and the next hand is dealt from them.
+With **One hand** a game, a match is a single hand and the view adds the
+scores up across rematches.
+
+**A hand as moves.** `CardMatch` only takes a move from `state.turn`, so each
+step is a move by whoever makes it, and `state.phase` says which:
+
+| Phase | Whose move | Moves |
+|---|---|---|
+| `pass` | each seat in turn from the hand's opener | `{ pass: [three slots] }`: recorded, not given; the last pick calls `deck.pass()` for all of them at once, so everyone picks before anyone receives |
+| `find` | each seat in turn from the opener | `{ play: slot }` if it's the 2 of clubs (shown, checked live), else `{ none: true }` |
+| `play` | the seat on turn, then the trick's winner | `{ play: slot }` |
+| `result` | the last trick's winner | `{ next: true }`: shuffles and deals the next hand |
+
+The opener moves on a seat each hand and passes first. The pass cycles left,
+right, across, none (left and right with three), or never with passing off.
+
+**Finding the 2 of clubs.** Nobody can see who holds it, so the seats say in
+turn whether they have it, as a forced move: the holder plays it and the
+others say "no 2♣". A "no" from the holder is a lie only the audit sees; if
+every seat says no, the game stops at once (`winner` -2, no winners) so the
+audit can name the liar instead of looping.
+
+**What's checked when.** A played card is shown (`reveals()`), so its face,
+the 2 of clubs lead, the suit to follow, the trick's winner (the highest of
+the suit led, aces high), hearts breaking (a heart or the queen of spades),
+the points and the moon are all checked live. The rest of your hand is
+hidden, so these throw only in the audit, which names the player: not
+following suit while holding it, leading a heart before hearts are broken
+while holding something else, a heart or the queen on the first trick while
+holding something else, and saying you haven't got the 2 of clubs when you
+have. The state never depends on a hidden face. Your own browser never
+offers an illegal card: only legal ones light up and can be tapped.
+
+**Scoring.** A heart is 1 point and the queen of spades 13. Taking all 26
+(shooting the moon) gives everyone else 26 (classic), or takes 26 off the
+shooter (a room setting). With the jack of diamonds on, whoever takes it
+gets −10 (the moon too). The game ends when someone reaches the target (100,
+or 50) and the lowest score wins; **if two or more are level at the bottom,
+another hand is played** until one is lowest alone. In a one-hand game,
+players level at the bottom share the win (the result says "Draw" and names
+them).
+
+**Robot** (`robot.js`). A robot uses only the public state (every card
+played this hand, the voids they show, who took which points), its own
+`face()` and the cards it passed or was passed. The 2 of clubs, an only
+legal card and the next hand are `forcedMove()`. `robot.test.js` checks a
+robot asks for no other face, and that dealing the cards hidden from it
+differently changes none of its choices.
+
+| Level | Pass | Play |
+|---|---|---|
+| Easy | three at random | a random legal card |
+| Medium | its most dangerous cards: the queen (unless it has five spades), the ace and king of spades, then high hearts | ducks under the trick when it can (the highest card that loses); can't duck: the highest if it plays last, else the lowest; void: the queen, then its highest heart, then its highest card |
+| Hard | the same danger, plus emptying a short club or diamond suit to make a void, keeping low spades to guard a queen it keeps; with a moon hand (five hearts or more with the ace and the king or queen, five queens, kings and aces in all, and the queen of spades guarded), its low cards | counts every card and void: leads low in suits where many higher cards are out and nobody is void, flushes the queen with low spades and never leads the ace or king of spades while she's out; spots an opponent taking every point (7 or more) and takes a heart off them; goes for the moon with a moon hand, or once it holds every point so far (10 or more) and nothing out beats its cards but one |
+
+Hard wins about 95% of games against three Easy robots and about 40% against
+three Medium (a fair share would be 25%); `robot.test.js` checks over 75%
+and 28% on 80 games. A choice takes under 2 ms. Robots pause like a person
+(`startPacedRobot()`): a blink for "no 2♣", a beat for a forced card, 0.6
+to 2 s for a choice and about 1.5 s for the pass, waiting while your screen
+replays.
+
+**Your turn.** To pass, tap three cards (they stand up in your colour) and
+**Pass left** (right, across); you may pick and press it before your turn,
+and your three go when it comes. The cards passed to you are marked with a
+heart-pink dot until you play them. To play, tap a lit card. On a keyboard
+the hand is one tab stop (arrow keys, Enter plays or picks); P passes, Esc
+puts the picks back. The move timer (15, 30 or 60 s, off by default) times
+your real choices and plays Hard's choice for you, or your three picks if
+you made them.
+
+**Table.** A rose velvet table in a rosewood rim with a coral inlay. The
+others sit on your left, across and on your right (with three, left and
+right), each with a fan of backs, a pill, the tricks they have won and their
+points this hand; on a wide table the side seats sit beside the trick, on a
+phone all three above it. In the middle each card lands in front of its
+seat, the lead marked by a tab in its colour, with chips under the trick for
+the suit to follow, hearts broken and, while passing, where your three go.
+At the end of a hand a tally card counts each seat's points into the totals
+(the lowest in its colour). The player bar's score is each player's total
+and its note their cards in hand. The result panel holds the score sheet, a
+row a hand and a column a player with the totals at the foot (the rows
+scroll inside it, so the panel fits a phone), and the fair-play verdict.
+
+**Motion.** The shared riffle and deal (13 each). The pass: your three slide
+face down toward their seat, everyone's leave at once, and the three passed
+to you land face down and turn over. A card flies to the trick from its seat,
+turning face up from a hidden hand; the winning card lights, the trick slides
+together and flies face down to the winner's tricks. The queen of spades
+drops onto the trick with weight: the table jolts and a shadow spreads.
+Hearts breaking cracks the chip's heart in two with a heartbeat and a ring of
+small hearts. The hand's points count up, a moon rises over the table with
+confetti in the shooter's colour, and between hands the cards gather back to
+the deck. The game's end is the result moment, the winner's pill and tricks
+lighting up.
+
+**Sound** (`sounds.js`). The shared card sounds (shuffle, deal, a card
+played, gathering the cards) and your turn, a refusal and the timer;
+synthesized: the pass's whoosh, a trick swept in, a heartbeat for hearts
+breaking, an ominous low note for the queen of spades, the points ticking up
+and a fanfare for the moon. A win or a loss plays the result chimes in their
+`bell` timbre.
+
+**Leaving.** The shared notice (`engine/cards/leave-notice.js`), with each
+player's points.
 
 ## Differences from the reference (wasmerio/edge-multiplayer-games)
 

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff1ec"/>
+      <stop offset="1" stop-color="#f6d6cf"/>
+    </linearGradient>
+    <radialGradient id="velvet" cx="0.5" cy="0.45" r="0.75">
+      <stop offset="0" stop-color="#a23a56"/>
+      <stop offset="1" stop-color="#561629"/>
+    </radialGradient>
+    <path id="heart" d="M0 8.8C-1.6 6.8-9.4 1.6-9.4-3.2C-9.4-6.5-7-8.8-4.4-8.8C-2.4-8.8-0.8-7.6 0-5.8C0.8-7.6 2.4-8.8 4.4-8.8C7-8.8 9.4-6.5 9.4-3.2C9.4 1.6 1.6 6.8 0 8.8Z"/>
+    <path id="spade" d="M0-9.4C1.8-6.6 9-2.6 9 1.8C9 4.6 7 6.4 4.6 6.4C3 6.4 1.8 5.6 1.1 4.6C1.4 6.6 2.4 8.2 3.6 9.4H-3.6C-2.4 8.2-1.4 6.6-1.1 4.6C-1.8 5.6-3 6.4-4.6 6.4C-7 6.4-9 4.6-9 1.8C-9-2.6-1.8-6.6 0-9.4Z"/>
+    <g id="club"><circle cx="0" cy="-4.4" r="4.3"/><circle cx="-4.7" cy="1.6" r="4.3"/><circle cx="4.7" cy="1.6" r="4.3"/><circle cx="0" cy="0.4" r="2.4"/><path d="M-1.2 1.5C-1.1 5.2-2.2 7.8-4 9.4H4C2.2 7.8 1.1 5.2 1.2 1.5Z"/></g>
+    <!-- Ranks drawn as strokes, so the icon needs no font. -->
+    <path id="r2" d="M0.6 3.8A4.2 4.2 0 1 1 8 5.6C6.6 8.6 1.6 11.4 0.4 15H9" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path id="r7" d="M0 0H9L3.2 15" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <g id="rQ" fill="none" stroke-width="2.6" stroke-linecap="round"><ellipse cx="4.8" cy="7" rx="4.6" ry="6.8"/><path d="M5.6 10.4L9.6 15.4"/></g>
+    <path id="rA" d="M0 15L4.8 0L9.6 15M1.8 10H7.8" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <g id="face"><rect width="50" height="70" rx="5" fill="#fffdf8" stroke="#cfc5b3" stroke-width="1.2"/></g>
+  </defs>
+  <rect width="320" height="200" fill="url(#paper)"/>
+  <!-- the table: rose velvet in a rosewood rim with a coral inlay -->
+  <rect x="14" y="16" width="292" height="170" rx="38" fill="#5a2a24"/>
+  <rect x="20" y="22" width="280" height="158" rx="33" fill="#2e1410"/>
+  <rect x="22.5" y="24.5" width="275" height="153" rx="31" fill="url(#velvet)" stroke="#ff8a6b" stroke-width="1.6"/>
+
+  <!-- the trick, a card from each seat: the 2 of clubs led, a 7 and the ace of hearts, and the queen of spades on top -->
+  <g transform="translate(78 70) rotate(-14 25 35)">
+    <rect x="3" y="4" width="50" height="70" rx="5" fill="#2a0712" opacity=".35"/>
+    <use href="#face"/><use href="#r7" x="6" y="7" stroke="#c62a3b"/><use href="#heart" transform="translate(25 43) scale(1.25)" fill="#c62a3b"/>
+  </g>
+  <g transform="translate(135 100) rotate(4 25 35)">
+    <rect x="3" y="4" width="50" height="70" rx="5" fill="#2a0712" opacity=".35"/>
+    <use href="#face"/><use href="#r2" x="6" y="7" stroke="#20242e"/><use href="#club" transform="translate(25 43) scale(1.25)" fill="#20242e"/>
+  </g>
+  <g transform="translate(192 68) rotate(12 25 35)">
+    <rect x="3" y="4" width="50" height="70" rx="5" fill="#2a0712" opacity=".35"/>
+    <use href="#face"/><use href="#rA" x="6" y="7" stroke="#c62a3b"/><use href="#heart" transform="translate(25 43) scale(1.6)" fill="#c62a3b"/>
+  </g>
+  <!-- the queen of spades: a crown over her spade -->
+  <g transform="translate(133 30) rotate(-3 27 38)">
+    <rect x="3" y="4" width="54" height="76" rx="5" fill="#2a0712" opacity=".45"/>
+    <rect width="54" height="76" rx="5" fill="#fffdf8" stroke="#cfc5b3" stroke-width="1.2"/>
+    <use href="#rQ" x="6" y="7" stroke="#20242e"/>
+    <rect x="17" y="17" width="31" height="51" rx="3" fill="#f7efe0" stroke="#20242e" stroke-width="1.2"/>
+    <path d="M22 33L25 24L30 30L33 21L36 30L41 24L44 33Z" fill="#e0ad2a" stroke="#a87a12" stroke-width="1"/>
+    <use href="#spade" transform="translate(33 50) scale(1.15)" fill="#20242e"/>
+  </g>
+
+  <!-- the moon, for whoever takes every heart -->
+  <g transform="translate(262 52)">
+    <circle cx="2" cy="-1" r="19" fill="#ffe7a3" opacity=".2"/>
+    <path d="M6-14A15 15 0 1 0 14 6A12 12 0 1 1 6-14Z" fill="#ffe7a3"/>
+  </g>
+  <g fill="#ffe7a3"><path d="M236 34l1.8 4 4.2.5-3.1 2.9.9 4.2-3.8-2.2-3.8 2.2.9-4.2-3.1-2.9 4.2-.5z"/><circle cx="286" cy="84" r="2.4"/><circle cx="248" cy="80" r="1.8"/></g>
+  <!-- loose hearts on the felt -->
+  <g fill="#ff5d73"><use href="#heart" transform="translate(52 150) scale(.9) rotate(-12)"/><use href="#heart" transform="translate(262 150) scale(.7) rotate(14)"/><use href="#heart" transform="translate(70 44) scale(.5)"/></g>
+</svg>

@@ -161,8 +161,9 @@ peers call `applyMove` with the same arguments, so it must be deterministic.
 
 For a card game (`CardMatch`), the rules object also has `deckSize`, and
 `newState(first, players, deck)` and `applyMove(state, player, move, deck)`
-get the deck: `deck.deal()`, `deck.open()`, `deck.shuffle()`, `deck.face()`
-and `deck.owner()`, plus, in `newState`, `deck.cards` (the shuffled deck's
+get the deck: `deck.deal()`, `deck.pass()` (a hidden card to another hand,
+sealed to it), `deck.open()`, `deck.shuffle()`, `deck.face()` and
+`deck.owner()`, plus, in `newState`, `deck.cards` (the shuffled deck's
 slots). A move that plays a card from a hand names it in `reveals(state,
 player, move)`; `settle(state, deck)` runs after cards are dealt. The contract
 is at the top of `engine/card-match.js`, and `test/fixtures/toy-cards.js` is a
@@ -548,7 +549,7 @@ The [PR template](.github/pull_request_template.md) repeats these lines, shorten
 | `public/engine/group.js` | The group transport: send to everyone, receive `(msg, fromSeat)`; today a star through the host |
 | `public/engine/session.js` | `Session` (players, rematch, leave), the start handshake, and `matchRouter()` |
 | `public/engine/turn-match.js` | `TurnMatch` and `startTurnRobot()` for open-information turn games |
-| `public/engine/card-match.js` | `CardMatch` and `startCardRobot()` for turn games with hidden cards; the deck runs in `deck-service.js` / `deck-worker.js` / `deck-crypto.js` |
+| `public/engine/card-match.js` | `CardMatch` and `startCardRobot()` for turn games with hidden cards; the deck runs in `deck-service.js` / `deck-worker.js` / `deck-crypto.js`, and a passed card is sealed with `seal.js` |
 | `public/engine/cards/` | The card games' shared table: faces and art, the table's pieces and motion, card sounds, paced robots, the leaving notice |
 | `vendor/`, `scripts/build-mental-poker.sh` | The mental-poker library (submodule), our patches and lock file, and the script that builds it into `public/engine/vendor/mental-poker/` |
 | `public/engine/robot-pace.js` | `robotPause()`: robots' pauses, which browser tests shorten |

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" class="tile-preview pv-hr">
+<style>.pv-hr .bg{fill:var(--surface-2)}
+.pv-hr .felt{fill:var(--accent);opacity:.13}
+.pv-hr .face{fill:var(--surface);stroke:var(--border)}
+.pv-hr .cb{fill:var(--accent);stroke:var(--accent-ink)}
+.pv-hr .red{color:var(--danger);fill:var(--danger)}
+.pv-hr .black{color:var(--text);fill:var(--text)}
+.pv-hr .crown{fill:var(--hit-2)}
+.pv-hr .shade{fill:var(--text);opacity:.18}
+.pv-hr .say{fill:var(--surface);stroke:currentColor;stroke-width:2}
+.pv-hr .words{font:600 13px var(--font-display);fill:var(--text)}</style>
+<defs>
+<path id="pv-hr-heart" d="M0 8.8C-1.6 6.8-9.4 1.6-9.4-3.2C-9.4-6.5-7-8.8-4.4-8.8C-2.4-8.8-0.8-7.6 0-5.8C0.8-7.6 2.4-8.8 4.4-8.8C7-8.8 9.4-6.5 9.4-3.2C9.4 1.6 1.6 6.8 0 8.8Z"/>
+<path id="pv-hr-spade" d="M0-9.4C1.8-6.6 9-2.6 9 1.8C9 4.6 7 6.4 4.6 6.4C3 6.4 1.8 5.6 1.1 4.6C1.4 6.6 2.4 8.2 3.6 9.4H-3.6C-2.4 8.2-1.4 6.6-1.1 4.6C-1.8 5.6-3 6.4-4.6 6.4C-7 6.4-9 4.6-9 1.8C-9-2.6-1.8-6.6 0-9.4Z"/>
+<g id="pv-hr-club"><circle cx="0" cy="-4.4" r="4.3"/><circle cx="-4.7" cy="1.6" r="4.3"/><circle cx="4.7" cy="1.6" r="4.3"/><circle cx="0" cy="0.4" r="2.4"/><path d="M-1.2 1.5C-1.1 5.2-2.2 7.8-4 9.4H4C2.2 7.8 1.1 5.2 1.2 1.5Z"/></g>
+<!-- Ranks drawn as strokes in the card's colour (currentColor), so the preview needs no font. -->
+<g id="pv-hr-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M0.4 3A3.3 3.3 0 1 1 6.4 4.4C5.3 6.8 1.3 9 0.3 12H7"/></g>
+<g id="pv-hr-9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="3.5" cy="3.6" r="3.3"/><path d="M6.8 3.6C6.8 8 5.6 11 2 12"/></g>
+<g id="pv-hr-Q" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="3.7" cy="5.6" rx="3.5" ry="5.4"/><path d="M4.4 8.3L7.4 12.2"/></g>
+<g id="pv-hr-K" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M0.5 0V12M7 0L0.8 6.6M3 4.4L7.4 12"/></g>
+<g id="pv-hr-back"><rect width="30" height="42" rx="4" stroke-opacity=".7"/><rect x="4" y="4" width="22" height="34" rx="3" fill="none" stroke-opacity=".45"/></g>
+</defs>
+<rect class="bg" width="320" height="200"/>
+<ellipse class="felt" cx="160" cy="96" rx="140" ry="82"/>
+<!-- the others: on your left, across and on your right -->
+<use class="cb" href="#pv-hr-back" x="14" y="66"/><use class="cb" href="#pv-hr-back" x="20" y="72"/>
+<use class="cb" href="#pv-hr-back" x="134" y="-24"/><use class="cb" href="#pv-hr-back" x="156" y="-24"/>
+<use class="cb" href="#pv-hr-back" x="276" y="66"/><use class="cb" href="#pv-hr-back" x="270" y="72"/>
+<!-- your hand -->
+<g transform="translate(104 168)"><rect class="face" width="30" height="42" rx="4"/><use href="#pv-hr-9" class="red" x="4" y="5"/></g>
+<g transform="translate(128 168)"><rect class="face" width="30" height="42" rx="4"/><use href="#pv-hr-K" class="red" x="4" y="5"/></g>
+<g transform="translate(176 168)"><rect class="face" width="30" height="42" rx="4"/><use href="#pv-hr-Q" class="black" x="4" y="5"/></g>
+<!-- the trick, which goes to the king of clubs at the end -->
+<g class="gone" style="--d:3.3s">
+<!-- you lead the 2 of clubs -->
+<g class="slide" style="--d:0.2s;--x:12px;--y:60px"><g transform="translate(145 108)"><rect class="face" width="30" height="42" rx="4"/><use href="#pv-hr-2" class="black" x="4" y="5"/><use href="#pv-hr-club" class="black" transform="translate(15 27) scale(.75)"/></g></g>
+<!-- the 9 of clubs from your left -->
+<g class="fade" style="--d:0.9s"><g class="slide" style="--d:0.9s;--x:-90px;--y:-6px"><g transform="translate(108 80) rotate(-8 15 21)"><rect class="face" width="30" height="42" rx="4"/><use href="#pv-hr-9" class="black" x="4" y="5"/><use href="#pv-hr-club" class="black" transform="translate(15 27) scale(.75)"/></g></g></g>
+<!-- the queen of spades from across, dropped with weight -->
+<g class="pop" style="--d:1.75s"><ellipse class="shade" cx="160" cy="80" rx="34" ry="12"/></g>
+<g class="fall" style="--d:1.6s;--y:-70px"><g transform="translate(145 46) rotate(3 15 21)"><rect class="face" width="30" height="42" rx="4"/><use href="#pv-hr-Q" class="black" x="4" y="5"/><path class="crown" d="M10 17L12 12L15 16L17 11L19 16L22 12L24 17Z"/><use href="#pv-hr-spade" class="black" transform="translate(17 29) scale(.65)"/></g></g>
+<!-- the king of clubs from your right takes it -->
+<g class="fade" style="--d:2.4s"><g class="slide" style="--d:2.4s;--x:90px;--y:-6px"><g transform="translate(182 80) rotate(8 15 21)"><rect class="face" width="30" height="42" rx="4"/><use href="#pv-hr-K" class="black" x="4" y="5"/><use href="#pv-hr-club" class="black" transform="translate(15 27) scale(.75)"/></g></g></g>
+</g>
+<g class="c"><g class="pop" style="--d:3.5s"><rect class="say" x="228" y="112" width="56" height="26" rx="13"/><use href="#pv-hr-heart" class="red" transform="translate(242 125) scale(.6)"/><text class="words" x="251" y="130">13</text></g></g>
+<!-- player tags, lit in turn: you, left, across, right -->
+<g class="a"><rect class="tag" x="182" y="6" width="30" height="14" rx="7"/><circle cx="190" cy="13" r="4" fill="currentColor"/><rect class="name" x="197" y="11.5" width="10" height="3" rx="1.5"/></g>
+<g class="b"><rect class="tag" x="216" y="6" width="30" height="14" rx="7"/><circle cx="224" cy="13" r="4" fill="currentColor"/><rect class="name" x="231" y="11.5" width="10" height="3" rx="1.5"/></g>
+<g class="d"><rect class="tag" x="250" y="6" width="30" height="14" rx="7"/><circle cx="258" cy="13" r="4" fill="currentColor"/><rect class="name" x="265" y="11.5" width="10" height="3" rx="1.5"/></g>
+<g class="c"><rect class="tag" x="284" y="6" width="30" height="14" rx="7"/><circle cx="292" cy="13" r="4" fill="currentColor"/><rect class="name" x="299" y="11.5" width="10" height="3" rx="1.5"/></g>
+<rect class="lit a" x="180" y="4" width="34" height="18" rx="9" style="--d:0s;--l:0.9s"/>
+<rect class="lit b" x="214" y="4" width="34" height="18" rx="9" style="--d:0.9s;--l:0.7s"/>
+<rect class="lit d" x="248" y="4" width="34" height="18" rx="9" style="--d:1.6s;--l:0.8s"/>
+<rect class="lit c stay" x="282" y="4" width="34" height="18" rx="9" style="--d:2.4s"/>
+</svg>
