@@ -186,9 +186,9 @@ export class CardMatch extends Emitter {
     if (this.phase === "starting" || this.phase === "playing") {
       return this.abort("left. Every card needs every player's key, so this game stops here; a robot takes their seat from the next one.", seat);
     }
-    // Over, but their audit key never came: this game can't be checked.
+    // Over, but their audit key never came: this game can't be verified.
     if (this.phase !== "over" || this.verdict || this.seen.has(`audit:${seat}`)) return;
-    this.verdict = { ok: false, reason: "left before the audit finished, so this game couldn't be checked", seat };
+    this.verdict = { ok: false, reason: "left before the audit finished, so this game couldn't be verified", seat };
     this.busy = null;
     this.emit("verified", this.verdict);
     this.emit("update");

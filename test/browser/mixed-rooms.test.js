@@ -145,7 +145,7 @@ test("a guest who leaves Ludo mid-game is replaced by a robot, and the others fi
   await cy.click("#confirm-yes");
   await cy.locator("#play-friend").waitFor();
   for (const p of [host, friends[0]]) {
-    await p.locator(".toast", { hasText: "Cy left, so a robot plays their seat." }).waitFor({ state: "attached", timeout: 20_000 });
+    await p.locator(".toast", { hasText: "Cy left. A robot plays their seat." }).waitFor({ state: "attached", timeout: 20_000 });
     await p.locator(".pb-name", { hasText: "Cy (robot)" }).waitFor();
   }
   assert.equal(await host.evaluate(() => window.ddp.robots.length), 1);

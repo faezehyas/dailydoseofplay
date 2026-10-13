@@ -133,12 +133,14 @@ test("three friends fill a room through the invite link, play on shared dice, re
   const [a2, b2, c2] = await playOut(pages);
   assert.deepEqual([b2, c2], [a2, a2]);
 
-  // One player leaving ends the game for the others, who are told who left.
+  // A guest leaving: a robot plays on for them, and the others are told.
   await cy.close();
-  for (const p of [host, bo]) {
-    await p.locator("#ended").waitFor({ timeout: 20_000 });
-    assert.match(await p.locator("#ended").innerText(), /Cy (left the game|.*lost)/);
-  }
+  for (const p of [host, bo]) await p.locator("#toast", { hasText: /Cy left|connection to Cy was lost/ }).waitFor({ state: "attached", timeout: 20_000 });
+  await wait(host, () => window.ddp.session.players[2].robot && window.ddp.robots.length === 1);
+  // The host leaving ends the game for the others, who are told who left.
+  await host.close();
+  await bo.locator("#ended").waitFor({ timeout: 20_000 });
+  assert.match(await bo.locator("#ended").innerText(), /Ada (left the game|.*lost)/);
   assert.deepEqual(errors, []);
 });
 
@@ -199,7 +201,7 @@ test("a browser that sends an oversized message is cut off, and the others are t
     return (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
   }
 
-  // A guest sends it during the game: the host refuses it unread and ends the game for everyone.
+  // A guest sends it during the game: the host refuses it unread, cuts them off and a robot takes their seat.
   const ada = await open("Ada");
   const invite = await room(ada);
   const bo = await open("Bo");
@@ -211,7 +213,7 @@ test("a browser that sends an oversized message is cut off, and the others are t
   await cy.click("#join-room");
   for (const p of [ada, bo, cy]) await wait(p, () => window.ddp.match?.phase === "playing");
   await cy.evaluate(huge);
-  for (const p of [ada, bo]) await p.locator("#ended", { hasText: UNEXPECTED }).waitFor({ timeout: 20_000 });
+  for (const p of [ada, bo]) await p.locator("#toast", { hasText: `${UNEXPECTED} A robot plays their seat.` }).waitFor({ state: "attached", timeout: 20_000 });
   await cy.locator("#ended", { hasText: "The connection to Ada was lost." }).waitFor({ timeout: 20_000 });
 
   // A guest sends it in the waiting room (its first message, padded with spaces, is still valid JSON).

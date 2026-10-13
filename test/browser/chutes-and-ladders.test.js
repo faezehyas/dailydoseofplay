@@ -115,9 +115,10 @@ test("two friends play Chutes and Ladders on the host's settings through the inv
   assert.match(await host.locator("#score").innerText(), new RegExp(`You\\s+${(won.winner === 0) + (again.winner === 0)}\\s+Bo\\s+${(won.winner === 1) + (again.winner === 1)}`));
   assert.ok(await noHorizontalScroll(guest));
 
-  // The friend closes the tab: the host is told.
+  // The friend closes the tab: a robot plays on for them.
   await guest.close();
-  await host.locator("#ended").waitFor({ timeout: 20_000 });
-  assert.match(await host.locator("#ended").innerText(), /Bo (left the game|.*lost)/);
+  await host.locator("#toast", { hasText: /Bo left|connection to Bo was lost/ }).waitFor({ state: "attached", timeout: 20_000 });
+  await host.locator(".pb-name", { hasText: "Bo (robot)" }).waitFor();
+  assert.equal(await host.locator("#ended").count(), 0);
   assert.deepEqual(errors, []);
 });

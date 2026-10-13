@@ -79,14 +79,14 @@ test("a 4-seat room reads out who joins and keeps focus after Accept", { skip: !
   await host.locator("#lobby-progress", { hasText: "Cy joined" }).waitFor();
   assert.equal(await focused(host), "H1 Invite friends");
 
-  // Someone leaving mid-game: the overlay's heading takes focus.
+  // The host leaving mid-game: the overlay's heading takes focus.
   await press(host, host.locator("#start-game"));
   for (const p of [host, bo, cy]) await wait(p, () => window.ddp.match?.phase === "playing");
-  await cy.close();
-  await host.locator("#ended").waitFor({ timeout: 20_000 });
-  assert.equal(await focused(host), "H2 Game ended");
-  assert.match(await host.locator("#ended h2").evaluate((h) => document.getElementById(h.getAttribute("aria-describedby")).textContent), /Cy (left the game|.*lost)/);
-  await press(host, host.getByRole("button", { name: "Back to lobby" }));
-  assert.equal(await focused(host), "H1 Ludo");
+  await host.close();
+  await bo.locator("#ended").waitFor({ timeout: 20_000 });
+  assert.equal(await focused(bo), "H2 Game ended");
+  assert.match(await bo.locator("#ended h2").evaluate((h) => document.getElementById(h.getAttribute("aria-describedby")).textContent), /Ada (left the game|.*lost)/);
+  await press(bo, bo.getByRole("button", { name: "Back to lobby" }));
+  assert.equal(await focused(bo), "H1 Ludo");
   assert.deepEqual(errors, []);
 });

@@ -124,10 +124,11 @@ test("two friends play Ludo on the host's house rules through the invite link, t
   const wins = (seat) => (won.winner === seat) + (again.winner === seat);
   assert.match(await host.locator("#score").innerText(), new RegExp(`You\\s+${wins(0)}\\s+Bo\\s+${wins(1)}`));
 
-  // The friend closes the tab: the host is told.
+  // The friend closes the tab: a robot plays on for them.
   await guest.close();
-  await host.locator("#ended").waitFor({ timeout: 20_000 });
-  assert.match(await host.locator("#ended").innerText(), /Bo (left the game|.*lost)/);
+  await host.locator("#toast", { hasText: /Bo left|connection to Bo was lost/ }).waitFor({ state: "attached", timeout: 20_000 });
+  await host.locator(".pb-name", { hasText: "Bo (robot)" }).waitFor();
+  assert.equal(await host.locator("#ended").count(), 0);
   assert.deepEqual(errors, []);
 });
 

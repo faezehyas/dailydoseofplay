@@ -26,7 +26,7 @@ export class HubGroup extends Emitter {
     this.seat = 0;
     this.links = new Map(); // seat -> link
     this.offs = [];
-    this.keep = null; // keep(seat): true when someone took over a seat whose link closed (session.js)
+    this.keep = null; // keep(seat, reason): true when someone took over a seat whose link closed (session.js)
     for (const [seat, link] of links) this.add(seat, link);
   }
 
@@ -59,7 +59,7 @@ export class HubGroup extends Emitter {
   #drop(seat, reason) {
     if (!this.links.delete(seat)) return;
     // A robot took the seat over: the others never hear that it was empty.
-    if (this.keep?.(seat)) return;
+    if (this.keep?.(seat, reason)) return;
     const frame = reason === MESSAGE_TOO_BIG ? { left: seat, reason } : { left: seat };
     for (const link of this.links.values()) link.send(frame);
     this.emit("leave", seat, frame.reason);

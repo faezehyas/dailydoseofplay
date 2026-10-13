@@ -760,7 +760,8 @@ closes with `message_too_big`.
   received, so it measures the frame again before forwarding. An oversized one
   cuts off its sender, never the guests it was meant for.
 - Before the start, the host drops that guest from the waiting room. During a
-  mixed-room game a robot takes their seat (see **Leaving**). During any other
+  mixed-room game a robot takes their seat (see **Leaving**), and the toast
+  says the player's browser sent something unexpected. During any other
   game, the session ends for everyone with `message_too_big` and the seat: the
   hub tells the other guests why in its `{left, reason}` frame. The lobby
   shows "A player's browser sent something unexpected." The cut-off browser
@@ -801,7 +802,7 @@ game.
 | `$bye` | I am leaving: the session ends for everyone, unless a guest leaves a mixed-room game (see **Leaving**). |
 | `$rematch` | My vote for a rematch. |
 | `$react {i}` | A reaction: `i` indexes the fixed list in `reactions.js`, never text. |
-| `$robot {seat, why}` | From the host: a robot took over that seat (`why`: `left` or `closed`); see **Mixed rooms**. |
+| `$robot {seat, why}` | From the host: a robot took over that seat (`why`: `left`, `closed` or `message_too_big`); see **Mixed rooms**. |
 
 A page from before reactions ignores `$react`, as it ignores any `$` message
 it doesn't know, so the protocol version stays 2.

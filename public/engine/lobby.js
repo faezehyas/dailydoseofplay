@@ -627,7 +627,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     session.on("takeover", (seat, why, robot) => {
       if (robot) seatRobot(robot);
       const who = session.players[seat].name;
-      toast(why === "left" ? `${who} left, so a robot plays their seat.` : `The connection to ${who} was lost, so a robot plays their seat.`);
+      const what = why === "message_too_big" ? ERRORS.message_too_big : why === "left" ? `${who} left.` : `The connection to ${who} was lost.`;
+      toast(`${what} A robot plays their seat.`);
     });
     session.on("end", (reason, seat) => {
       inProgress = false;

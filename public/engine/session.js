@@ -49,7 +49,7 @@ export class Session extends Emitter {
       // Only a spoke is ever cut off from the group: the hub went away.
       group.on("close", (why) => this.#end(why === MESSAGE_TOO_BIG ? why : "closed", 0)),
     ];
-    if (this.takeover && this.index === 0) group.keep = (seat) => this.#takeover(seat);
+    if (this.takeover && this.index === 0) group.keep = (seat, reason) => this.#takeover(seat, reason);
   }
 
   #onMessage(msg, from) {
@@ -69,7 +69,7 @@ export class Session extends Emitter {
         const { seat } = msg;
         if (from !== 0 || !this.takeover || !Number.isInteger(seat) || seat < 1 || seat === this.index || !this.players[seat] || this.players[seat].robot) return;
         this.#robot(seat);
-        return this.emit("takeover", seat, msg.why === "left" ? "left" : "closed");
+        return this.emit("takeover", seat, ["left", MESSAGE_TOO_BIG].includes(msg.why) ? msg.why : "closed");
       }
       default:
         if (!msg.t.startsWith("$")) this.#deliver(msg, from);
@@ -91,10 +91,10 @@ export class Session extends Emitter {
   }
 
   // Hub: a guest's link closed. A robot takes their seat over, and the
-  // others hear $robot instead of the seat leaving (group.js).
-  #takeover(seat) {
+  // others hear $robot instead of the seat leaving (group.js). why: as for "end".
+  #takeover(seat, reason) {
     if (this.ended) return false;
-    const why = this.byes.has(seat) ? "left" : "closed";
+    const why = reason === MESSAGE_TOO_BIG ? reason : this.byes.has(seat) ? "left" : "closed";
     this.group.send({ t: "$robot", seat, why });
     const robot = this.seatRobot(seat, this.#robot(seat));
     this.emit("takeover", seat, why, robot);
