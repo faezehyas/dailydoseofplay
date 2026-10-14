@@ -30,7 +30,8 @@
 // game and linked from the lobby card.
 // tutorial loads the game's tutorial.js (() => import("./tutorial.js")): a
 // Learn button in the lobby, a link at the top of "How to play" and
-// /<slug>/?learn open it (see tutorial.js).
+// /<slug>/?learn open it (see tutorial.js), and "Learn while you wait" on the
+// waiting screen opens it with the room still open.
 // banter is optional: how robots react during a game ({ score, strong, lines },
 // see robotBanter() in reactions.js). Without it robots say "Good game!" at the end.
 import { initShell, el, $, toast, copyText, getNickname, setNickname, nicknameField, setTabAlert, askBeforeLeaving } from "./shell.js";
@@ -326,6 +327,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
         ),
       el("ul", { class: "roster", id: "roster", "aria-label": "Players", hidden: duel }),
       el("p", { class: "waiting", id: "lobby-status" }),
+      learnButton(),
       !duel && el("button", { class: "btn primary", type: "button", id: "start-game", disabled: true, onclick: () => (friendsIn(room) ? begin(room) : playRobot(room.players.length)) }, "Start game"),
       el("button", { class: "btn ghost", type: "button", onclick: () => showHome() }, "Cancel"),
     );
@@ -401,10 +403,11 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
 
   const friendsIn = (room) => room.players.filter((p, i) => i > 0 && p.ready && !p.robot).length;
 
-  function showBusy(text) {
+  function showBusy(text, ...extra) {
     view(
       el("h1", {}, title),
       el("p", { class: "waiting", id: "lobby-status" }),
+      ...extra,
       el("button", { class: "btn ghost", type: "button", onclick: () => showHome() }, "Cancel"),
     );
     setStatus(text);
@@ -455,6 +458,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   // Every user action bumps `attempt`; async steps from an older attempt
   // (e.g. a create that resolves after Cancel) must not touch the UI.
   function cleanupConnection() {
+    closeTutorial(true);
     state.attempt += 1;
     const room = state.room;
     state.room = null;
@@ -491,9 +495,11 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     let knockCount = 0;
     room.on("knocks", (knocks) => {
       if (!current()) return;
-      if (knocks.length > knockCount) progress.textContent = `${knocks.at(-1).name} wants to join`;
+      const knocked = knocks.length > knockCount && `${knocks.at(-1).name} wants to join`;
+      if (knocked) progress.textContent = knocked;
       knockCount = knocks.length;
       showRoster(room);
+      if (knocked) backToRoom(knocked);
     });
     let seated = [name]; // who is in, in join order, to say who just joined
     room.on("players", (players) => {
@@ -502,12 +508,16 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
       if (people.length >= maxPlayers) return begin(room);
       if (!duel) {
         const inRoom = people.map((p) => p.name);
-        if (inRoom.length > seated.length) progress.textContent = `${inRoom.find((n, i) => n !== seated[i])} joined`;
+        const joined = inRoom.length > seated.length && `${inRoom.find((n, i) => n !== seated[i])} joined`;
+        if (joined) progress.textContent = joined;
         seated = inRoom;
-        return showRoster(room);
+        showRoster(room);
+        if (joined) backToRoom(joined);
+        return;
       }
       const joining = players.find((p, i) => i > 0 && !p.ready);
       setStatus(joining ? `${joining.name} joined. Connecting directly…` : "Waiting for your friend to join…");
+      if (joining) backToRoom(`${joining.name} joined`);
     });
     room.on("seat-taken", ({ name: who, robot }) => {
       if (!current()) return;
@@ -543,10 +553,13 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     state.room?.close();
     const attempt = state.attempt;
     const current = () => attempt === state.attempt;
-    showBusy(`Joining room ${code}…`);
+    // Only a guest who may wait gets "Learn while you wait": a friend with an
+    // invite link to a two-player game starts at once.
+    showBusy(`Joining room ${code}…`, (!duel || !key) && learnButton());
     const room = new GuestRoom({ game: slug, code, key, name });
     state.room = room;
     let host = "your friend";
+    let others = null; // who is in, to say who just joined
     room.on("status", ({ step, host: hostName, players, robots }) => {
       if (!current()) return;
       if (step === "knocking") {
@@ -560,6 +573,10 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
         const people = players && (robots ? `${players.length - robots} players and ${robots} ${robots === 1 ? "robot" : "robots"} in` : `${players.length} players in`);
         const count = players ? [" (", el("span", { class: "mono" }, people), ")"] : [];
         setStatus(`Connected! Waiting for ${host} to start`, ...count, "…");
+        if (!players) return;
+        const friend = others && players.length - robots > others.people && (players.find((n) => !others.names.includes(n)) ?? "A friend");
+        others = { names: players, people: players.length - robots };
+        if (friend) backToRoom(`${friend} joined`);
       }
     });
     let session;
@@ -603,17 +620,10 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   async function learn() {
     cleanupConnection();
     const attempt = state.attempt;
-    const [{ startTutorial }, module] = await Promise.all([import("./tutorial.js"), tutorial()]);
+    const loaded = await loadTutorial();
     if (attempt !== state.attempt) return;
     if (!new URLSearchParams(location.search).has("learn")) history.pushState({ learn: slug }, "", "?learn");
-    showView("game");
-    lobbyRoot.hidden = true;
-    gameRoot.hidden = false;
-    state.tutorial = startTutorial({
-      root: gameRoot,
-      slug,
-      title,
-      tutorial: module,
+    openTutorial(loaded, {
       onClose: leaveTutorial,
       onPlayRobot: () => {
         closeTutorial();
@@ -623,9 +633,47 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     });
   }
 
-  function closeTutorial() {
-    state.tutorial?.destroy();
+  // From the waiting screen the room stays open underneath. Its history entry
+  // keeps the address, so Back returns to the room, as does a friend joining;
+  // the game starting closes it too.
+  async function learnWhileWaiting() {
+    const attempt = state.attempt;
+    const loaded = await loadTutorial();
+    if (attempt !== state.attempt || !state.room || state.tutorial) return;
+    history.pushState({ learn: slug }, "");
+    openTutorial(loaded, { back: "Back to the room", onClose: () => backToRoom() });
+  }
+
+  const loadTutorial = () => Promise.all([import("./tutorial.js"), tutorial()]);
+
+  function openTutorial([{ startTutorial }, module], options) {
+    showView("game");
+    lobbyRoot.hidden = true;
+    gameRoot.hidden = false;
+    state.tutorial = startTutorial({ root: gameRoot, slug, title, tutorial: module, ...options });
+  }
+
+  const learnButton = () => tutorial && el("button", { class: "btn", type: "button", id: "learn-wait", onclick: learnWhileWaiting }, "Learn while you wait");
+
+  // back: also drop the tutorial's history entry.
+  function closeTutorial(back) {
+    if (!state.tutorial) return;
+    state.tutorial.destroy();
     state.tutorial = null;
+    if (back && history.state?.learn === slug) history.back();
+  }
+
+  // Closes the tutorial opened while waiting: the waiting screen as it was,
+  // with focus back on "Learn while you wait". note says what in the room
+  // closed it ("Bo joined").
+  function backToRoom(note) {
+    if (!state.tutorial) return;
+    closeTutorial(true);
+    showView("lobby");
+    lobbyRoot.hidden = false;
+    gameRoot.hidden = true;
+    $("#learn-wait").focus();
+    if (note) toast(note);
   }
 
   function leaveTutorial() {
@@ -638,13 +686,17 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   // ---------- game hand-off ----------
   function startSession(session) {
     state.session = session;
+    // A tutorial opened while waiting hands its history entry to the game.
+    const learning = !!state.tutorial && history.state?.learn === slug;
+    closeTutorial();
     clearRoomParam();
     showView("game");
     lobbyRoot.hidden = true;
     gameRoot.hidden = false;
     gameRoot.replaceChildren();
     // The game has a history entry of its own, so Back leaves it as Leave does.
-    history.pushState({ game: slug }, "");
+    if (learning) history.replaceState({ game: slug }, "");
+    else history.pushState({ game: slug }, "");
     settings?.lock(true, session.mode);
     let inProgress = false;
     // Only people are asked about: once robots play every other seat, Leave is as in a robot game.
@@ -722,8 +774,9 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
 
   // Back during a game: stay on the game's entry and leave as Leave does. Back
   // while the question or the settings panel is open closes it, like Esc. Back
-  // in the tutorial returns to the lobby.
+  // in the tutorial returns to the lobby, or to the room it was opened from.
   addEventListener("popstate", () => {
+    if (state.tutorial && state.room) return backToRoom();
     if (state.tutorial) {
       closeTutorial();
       return showHome();

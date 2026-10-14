@@ -6,8 +6,10 @@
 // No server, no timer, no score. Finished lessons get a tick, kept on this
 // device only.
 //
-//   startTutorial({ root, slug, title, tutorial, onPlayRobot, onClose }) -> { destroy }
+//   startTutorial({ root, slug, title, tutorial, onPlayRobot, onClose, back }) -> { destroy }
 //
+// back labels the button that calls onClose ("Back to the lobby"). Without
+// onPlayRobot the end screen offers that button instead of "Play the robot now".
 // tutorial is the game's tutorial.js module:
 //   lessons                  [{ title, steps: [{ text, position, highlight, arrows, expect, reply }] }]
 //                            (lessons.js). A step without a position goes on from the last one.
@@ -61,7 +63,7 @@ const same = (a, b) => (Array.isArray(b) ? Array.isArray(a) && a.length === b.le
 const matches = (move, want) => Object.keys(want).every((k) => same(move?.[k], want[k]));
 const expected = (step) => [].concat(step.expect);
 
-export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClose }) {
+export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClose, back = "Back to the lobby" }) {
   const { lessons, flavour } = tutorial;
   const view = tutorial.board();
   const timers = new Set();
@@ -158,7 +160,7 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
           ),
         ),
         el("p", { class: "tut-summary mono", id: "tut-summary" }, `${done.size} of ${lessons.length} done`),
-        el("button", { class: "btn ghost", type: "button", onclick: onClose }, "Back to the lobby"),
+        el("button", { class: "btn ghost", type: "button", onclick: onClose }, back),
       ),
       h1,
     );
@@ -265,7 +267,9 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
         el(
           "div",
           { class: "tut-end-actions" },
-          el("button", { class: "btn primary big", type: "button", id: "tut-play-robot", onclick: onPlayRobot }, "Play the robot now"),
+          onPlayRobot
+            ? el("button", { class: "btn primary big", type: "button", id: "tut-play-robot", onclick: onPlayRobot }, "Play the robot now")
+            : el("button", { class: "btn primary big", type: "button", onclick: onClose }, back),
           el("button", { class: "btn", type: "button", onclick: () => showList() }, "Back to lessons"),
         ),
       ),
