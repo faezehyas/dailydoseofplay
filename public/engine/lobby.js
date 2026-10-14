@@ -640,6 +640,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     lobbyRoot.hidden = true;
     gameRoot.hidden = false;
     gameRoot.replaceChildren();
+    // The game starts at the top, however far down the lobby's Play button was.
+    scrollTo(0, 0);
     // The game has a history entry of its own, so Back leaves it as Leave does.
     history.pushState({ game: slug }, "");
     settings?.lock(true, session.mode);
