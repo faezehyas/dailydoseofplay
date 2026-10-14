@@ -1,11 +1,6 @@
-// Shared by the Go Fish browser tests: Playwright and the page helpers.
-export { ARTIFACTS, pw, wait, noHorizontalScroll, bg, resultInView } from "./ludo.shared.js";
+// Shared by the Go Fish browser tests: the page helpers.
+export { bg, resultInView } from "./ludo.shared.js";
 
-// The settings fold to a summary line in the lobby card; open it first.
-export async function pick(page, name, value) {
-  if (!(await page.locator("#gf-settings[open]").count())) await page.click("#gf-settings > summary");
-  await page.click(`#gf-settings label:has(input[name="gf-${name}"][value="${value}"])`);
-}
 export const state = (page) => page.evaluate(() => window.ddp.match.state);
 
 // Makes this page's asks in the page itself: a random card, then a random

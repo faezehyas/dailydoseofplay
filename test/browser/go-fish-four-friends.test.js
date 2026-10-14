@@ -6,41 +6,24 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll, pick, state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./go-fish.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll, pick } from "../helpers.js";
+import { state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./go-fish.shared.js";
 
-test("four friends play Go Fish in four browsers, with every hand hidden and the game audited, then one leaves", { skip: !pw && "Playwright not installed", timeout: 360_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(nickname, opts = {}) {
-    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, reducedMotion: "reduce", ...opts });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${nickname}: ${e.message}`));
-    page.on("console", (m) => m.type() === "error" && errors.push(`${nickname}: ${m.text()}`));
-    return page;
-  }
+const skip = skipWithoutPlaywright();
+
+test("four friends play Go Fish in four browsers, with every hand hidden and the game audited, then one leaves", { skip, timeout: 360_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const laptop = { viewport: { width: 1366, height: 900 }, reducedMotion: "reduce" };
   // The host picks Pairs, where an empty hand sits out: the last player with cards takes the pond.
-  const host = await open("Ada");
+  const host = await open("Ada", { nickname: "Ada", ...laptop });
   await host.goto(`${srv.base}/go-fish/`);
   await pick(host, "books", 2);
   await pick(host, "empty", "out");
   assert.equal(await host.locator("#play-friend").innerText(), "Play with friends");
-  await host.click("#play-friend");
-  await host.locator("#room-code").waitFor();
-  const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
   const friends = [];
-  for (const [name, opts] of [["Bo", { viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "dark" }], ["Cy", {}], ["Di", {}]]) {
-    const page = await open(name, opts);
-    await page.goto(invite);
-    await page.click("#join-room");
+  for (const [name, opts] of [["Bo", { phone: true, reducedMotion: "reduce", colorScheme: "dark" }], ["Cy", laptop], ["Di", laptop]]) {
+    const page = await open(name, { nickname: name, ...opts });
+    await joinByInvite(host, page, srv);
     friends.push(page);
     if (friends.length === 2) {
       // Three in: the waiting room's Start button could start a three-player game now.
@@ -51,15 +34,15 @@ test("four friends play Go Fish in four browsers, with every hand hidden and the
   }
   // The fourth fills the room, which starts by itself.
   const pages = [host, ...friends];
-  for (const p of pages) await wait(p, () => window.ddp.match?.phase === "playing", undefined, 60_000);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match?.phase === "playing", undefined, { timeout: 60_000 });
   assert.deepEqual(await Promise.all(pages.map((p) => p.evaluate(() => window.ddp.session.index))), [0, 1, 2, 3]);
   const st0 = await state(host);
   assert.equal(st0.stock.length + st0.log.filter((e) => e.t === "draw").length, 52 - 20, "four players get 5 cards each");
   for (const [seat, p] of pages.entries()) {
     assert.equal(await p.locator(".pc-seat").count(), 3);
     // Each seat's count matches its hand, once this screen has caught up.
-    await wait(p, () => {
-      const st = window.ddp.match.state;
+    await waitForState(p, (ddp) => {
+      const st = ddp.match.state;
       return [...document.querySelectorAll(".pc-seat")].every((e) => Number(e.querySelector(".count").textContent) === st.hands[Number(e.dataset.seat)].length);
     });
     // The next player sits on your left, then across, then on your right; colours follow the seat everywhere.
@@ -72,9 +55,9 @@ test("four friends play Go Fish in four browsers, with every hand hidden and the
   await friends[0].screenshot({ path: `${ARTIFACTS}/gf-4-four-mobile-dark.png`, fullPage: true });
 
   await Promise.all(pages.map(autoplay));
-  await wait(host, () => window.ddp.match.state.books.flat().length >= 8 || window.ddp.match.phase !== "playing", undefined, 120_000);
+  await waitForState(host, (ddp) => ddp.match.state.books.flat().length >= 8 || ddp.match.phase !== "playing", undefined, { timeout: 120_000 });
   await friends[0].screenshot({ path: `${ARTIFACTS}/gf-5-four-mobile-midgame.png`, fullPage: true });
-  for (const p of pages) await wait(p, () => window.ddp.match.phase === "over", undefined, 240_000);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match.phase === "over", undefined, { timeout: 240_000 });
   await Promise.all(pages.map(stopAutoplay));
   for (const p of pages) {
     assert.deepEqual(await leaks(p), [], "no seat knew another's card during play");
@@ -83,7 +66,7 @@ test("four friends play Go Fish in four browsers, with every hand hidden and the
   const states = await Promise.all(pages.map(state));
   for (const st of states.slice(1)) assert.deepEqual(st, states[0], "all four browsers end on the same state");
   for (const p of pages) {
-    await wait(p, () => window.ddp.match.verdict, undefined, 60_000);
+    await waitForState(p, (ddp) => ddp.match.verdict, undefined, { timeout: 60_000 });
     assert.deepEqual(await p.evaluate(() => window.ddp.match.verdict), { ok: true });
     await p.locator("#gf-standings").waitFor();
     assert.equal(await p.locator("#gf-standings li").count(), 4);
@@ -108,14 +91,14 @@ test("four friends play Go Fish in four browsers, with every hand hidden and the
   await friends[2].locator("#rematch-status").filter({ hasText: "Ada, Bo and Cy want a rematch!" }).waitFor();
   await host.locator("#rematch-status").filter({ hasText: "Waiting for Di" }).waitFor();
   await friends[2].click("#rematch");
-  for (const p of pages) await wait(p, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing", undefined, 60_000);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing", undefined, { timeout: 60_000 });
   await Promise.all(pages.map(autoplay));
-  await wait(host, () => window.ddp.match.state.moves >= 12 || window.ddp.match.phase !== "playing", undefined, 60_000);
+  await waitForState(host, (ddp) => ddp.match.state.moves >= 12 || ddp.match.phase !== "playing", undefined, { timeout: 60_000 });
   await Promise.all(pages.map(stopAutoplay));
   // Cy leaves: their key went with them, so this hand stops, and a robot takes their seat from the next.
   await friends[1].close();
   for (const p of [host, friends[0], friends[2]]) {
-    await wait(p, () => window.ddp.match.phase === "aborted" && window.ddp.match.abortSeat === 2, undefined, 20_000);
+    await waitForState(p, (ddp) => ddp.match.phase === "aborted" && ddp.match.abortSeat === 2);
     await p.locator("body", { hasText: "Cy left. Every card needs every player's key" }).waitFor();
     await p.locator(".pb-name", { hasText: "Cy (robot)" }).waitFor();
   }
@@ -128,5 +111,5 @@ test("four friends play Go Fish in four browsers, with every hand hidden and the
     assert.match(await p.locator("#gf-ended").innerText(), /The game stopped before the end, so it wasn't checked\./);
   }
   await friends[0].screenshot({ path: `${ARTIFACTS}/gf-8-four-left-mobile.png` });
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

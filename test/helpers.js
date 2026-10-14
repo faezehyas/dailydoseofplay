@@ -169,11 +169,11 @@ export async function joinByInvite(host, guests, srv) {
 
 // Records every "events" the page's matches emit, with a copy of the state
 // right after, in window.ddpEvents: tests check what happened rather than
-// race the next move. eventsSince(page, ply) is the records from the
-// ply-th on.
+// race the next move. Returns how many there are so far: eventsSince(page,
+// ply) is the records from the ply-th on.
 export function recordEvents(page) {
   return page.evaluate(() => {
-    if (window.ddpEvents) return;
+    if (window.ddpEvents) return window.ddpEvents.length;
     window.ddpEvents = [];
     const ddp = window.ddp;
     const watched = new WeakSet();
@@ -193,6 +193,7 @@ export function recordEvents(page) {
         watch(m);
       },
     });
+    return 0;
   });
 }
 

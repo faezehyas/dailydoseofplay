@@ -7,31 +7,18 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll, bg, pick, state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./gin-rummy.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll, pick } from "../helpers.js";
+import { bg, state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./gin-rummy.shared.js";
 
-test("two friends play Gin Rummy on the host's settings through the invite link, and the score carries through a rematch", { skip: !pw && "Playwright not installed", timeout: 420_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(name, nickname, opts = {}) {
-    // Reduced motion plays every card at once, so whole games fit the test.
-    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, reducedMotion: "reduce", ...opts });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    page.on("console", (m) => m.type() === "error" && errors.push(`${name}: ${m.text()}`));
-    return page;
-  }
+const skip = skipWithoutPlaywright();
+// Reduced motion plays every card at once, so whole games fit the test.
+const laptop = { viewport: { width: 1366, height: 900 }, reducedMotion: "reduce" };
+
+test("two friends play Gin Rummy on the host's settings through the invite link, and the score carries through a rematch", { skip, timeout: 420_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
 
   // Host (laptop, light): classic defaults, then one hand a game, Oklahoma knocking, and the host deals first.
-  const host = await open("host", "Ada", { colorScheme: "light" });
+  const host = await open("host", { ...laptop, nickname: "Ada", colorScheme: "light" });
   await host.goto(`${srv.base}/gin-rummy/`);
   for (const [name, value] of [["target", "100"], ["knock", "classic"], ["bigGin", "false"], ["dealer", "random"], ["moveSeconds", "0"], ["level", "easy"], ["fourColor", "false"]]) {
     assert.equal(await host.locator(`#gr-settings input[name="gr-${name}"]:checked`).getAttribute("value"), value, `classic default for ${name}`);
@@ -39,17 +26,19 @@ test("two friends play Gin Rummy on the host's settings through the invite link,
   await pick(host, "target", 0);
   await pick(host, "knock", "oklahoma");
   await pick(host, "dealer", "host");
-  await host.click("#play-friend");
-  await host.locator("#room-code").waitFor();
-  const invite = await host.locator("#invite-link").inputValue();
+  const { invite } = await joinByInvite(host, [], srv);
   assert.match(invite, /\/gin-rummy\/\?room=[A-Z0-9]{4}&key=[\w-]{22}$/);
 
   // The friend (360 px phone, dark, four-colour deck, Big Gin on their own device) opens the link.
-  const guest = await open("guest", "Bo", { viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "dark" });
-  await guest.addInitScript(() => localStorage.setItem("ddp-gin-rummy-settings", JSON.stringify({ fourColor: true, bigGin: true })));
-  await guest.goto(invite.replace(/^https?:\/\/[^/]+/, srv.base));
-  await guest.click("#join-room");
-  for (const p of [host, guest]) await wait(p, () => window.ddp.match?.phase === "playing", undefined, 60_000);
+  const guest = await open("guest", {
+    nickname: "Bo",
+    phone: true,
+    reducedMotion: "reduce",
+    colorScheme: "dark",
+    init: () => localStorage.setItem("ddp-gin-rummy-settings", JSON.stringify({ fourColor: true, bigGin: true })),
+  });
+  await joinByInvite(host, guest, srv);
+  for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match?.phase === "playing", undefined, { timeout: 60_000 });
   await guest.locator("#gr-config").filter({ hasText: "Oklahoma" }).waitFor();
   assert.equal(await guest.locator("#gr-config").innerText(), "One hand a game · Oklahoma: the upcard sets the knock limit");
   assert.equal(await host.locator("#gr-config").innerText(), await guest.locator("#gr-config").innerText(), "the host's settings reach the friend, not the friend's own");
@@ -62,7 +51,7 @@ test("two friends play Gin Rummy on the host's settings through the invite link,
   }
   const st0 = await state(host);
   assert.deepEqual([st0.dealer, st0.turn, st0.hands[0].length, st0.hands[1].length], [0, 1, 10, 10], "the host deals, so Bo is offered the upcard");
-  await wait(host, () => window.ddp.match.state.limit !== null);
+  await waitForState(host, (ddp) => ddp.match.state.limit !== null);
   // The friend's four-colour deck is theirs alone.
   assert.equal(await guest.locator(".gin-rummy.four-colour").count(), 1);
   assert.equal(await host.locator(".gin-rummy.four-colour").count(), 0);
@@ -75,12 +64,12 @@ test("two friends play Gin Rummy on the host's settings through the invite link,
 
   async function finish(m) {
     await Promise.all([autoplay(host), autoplay(guest)]);
-    for (const p of [host, guest]) await wait(p, (n) => window.ddp.match.m === n && window.ddp.match.phase === "over", m, 150_000);
+    for (const p of [host, guest]) await waitForState(p, (ddp, n) => ddp.match.m === n && ddp.match.phase === "over", m, { timeout: 150_000 });
     await Promise.all([stopAutoplay(host), stopAutoplay(guest)]);
     for (const p of [host, guest]) {
       assert.deepEqual(await leaks(p), [], "no hidden face was known during play");
       assert.deepEqual(await domLeaks(p), [], "no hidden face was drawn");
-      await wait(p, () => window.ddp.match.verdict, undefined, 60_000);
+      await waitForState(p, (ddp) => ddp.match.verdict, undefined, { timeout: 60_000 });
       assert.deepEqual(await p.evaluate(() => window.ddp.match.verdict), { ok: true });
       await p.locator("#gr-verdict.ok").waitFor();
       assert.match(await p.locator("#gr-verdict").innerText(), /Fair play verified/);
@@ -106,7 +95,7 @@ test("two friends play Gin Rummy on the host's settings through the invite link,
   await guest.click("#rematch");
   await host.locator("#rematch-status").filter({ hasText: "Bo wants a rematch!" }).waitFor();
   await host.click("#rematch");
-  for (const p of [host, guest]) await wait(p, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing", undefined, 60_000);
+  for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing", undefined, { timeout: 60_000 });
   for (const p of [host, guest]) assert.deepEqual([await p.locator("#score .p-0 dd").innerText(), await p.locator("#score .p-1 dd").innerText()], first.scores.map(String));
   const second = await finish(2);
   for (const p of [host, guest]) assert.deepEqual([await p.locator("#score .p-0 dd").innerText(), await p.locator("#score .p-1 dd").innerText()], [0, 1].map((s) => String(first.scores[s] + second.scores[s])), "the score adds up across rematches");
@@ -114,7 +103,7 @@ test("two friends play Gin Rummy on the host's settings through the invite link,
   // A third game, and a rematch that starts before the host's audit has finished: the verdict still reaches the screen.
   await guest.click("#rematch");
   await host.click("#rematch");
-  for (const p of [host, guest]) await wait(p, () => window.ddp.match.m === 3 && window.ddp.match.phase === "playing", undefined, 60_000);
+  for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match.m === 3 && ddp.match.phase === "playing", undefined, { timeout: 60_000 });
   await host.evaluate(() => {
     // The host's deck work for the audit waits, once, until the rematch has begun.
     const deck = window.ddp.match.deck;
@@ -127,11 +116,11 @@ test("two friends play Gin Rummy on the host's settings through the invite link,
     };
   });
   await Promise.all([autoplay(host), autoplay(guest)]);
-  for (const p of [host, guest]) await wait(p, () => window.ddp.match.phase === "over", undefined, 150_000);
+  for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match.phase === "over", undefined, { timeout: 150_000 });
   await Promise.all([stopAutoplay(host), stopAutoplay(guest)]);
   await guest.click("#rematch");
   await host.click("#rematch");
-  for (const p of [host, guest]) await wait(p, () => window.ddp.match.m === 4 && window.ddp.match.phase === "playing", undefined, 60_000);
+  for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match.m === 4 && ddp.match.phase === "playing", undefined, { timeout: 60_000 });
   assert.equal(await host.evaluate(() => document.querySelector("#gr-note").textContent.includes("verified")), false, "the rematch began before the verdict");
   await host.evaluate(() => window.releaseAudit());
   await host.locator("#gr-note").filter({ hasText: "Last game: fair play verified" }).waitFor({ timeout: 30_000 });
@@ -142,43 +131,30 @@ test("two friends play Gin Rummy on the host's settings through the invite link,
     window.ddp.session.send = (msg) => (msg.t === "audit" ? true : send(msg));
   });
   await Promise.all([autoplay(host), autoplay(guest)]);
-  for (const p of [host, guest]) await wait(p, () => window.ddp.match.phase === "over", undefined, 150_000);
+  for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match.phase === "over", undefined, { timeout: 150_000 });
   await Promise.all([stopAutoplay(host), stopAutoplay(guest)]);
   await host.locator("#gr-verdict:not(.ok)").waitFor();
   assert.equal(await host.evaluate(() => window.ddp.match.busy), "auditing", "still waiting for Bo's key");
   await guest.close();
   await host.locator("#ended").waitFor({ timeout: 20_000 });
   assert.match(await host.locator("#gr-ended").innerText(), /Bo left before the audit finished, so this game couldn't be verified\./);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("two friends play a game to 100: several hands, each shuffled again, and the bonuses at the end", { skip: !pw && "Playwright not installed", timeout: 420_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
+test("two friends play a game to 100: several hands, each shuffled again, and the bonuses at the end", { skip, timeout: 420_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
   const pages = [];
-  for (const [name, nick] of [["host", "Ada"], ["guest", "Bo"]]) {
-    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, reducedMotion: "reduce" });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nick);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    page.on("console", (m) => m.type() === "error" && errors.push(`${name}: ${m.text()}`));
-    pages.push(page);
-  }
+  for (const [name, nickname] of [["host", "Ada"], ["guest", "Bo"]]) pages.push(await open(name, { ...laptop, nickname }));
   const [host, guest] = pages;
   await host.goto(`${srv.base}/gin-rummy/?friend=1`);
-  const invite = await host.locator("#invite-link").inputValue();
-  await guest.goto(invite.replace(/^https?:\/\/[^/]+/, srv.base));
-  await guest.click("#join-room");
-  for (const p of pages) await wait(p, () => window.ddp.match?.phase === "playing", undefined, 60_000);
+  // ?friend=1 opens the room by itself.
+  await host.locator("#room-code").waitFor();
+  await joinByInvite(host, guest, srv);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match?.phase === "playing", undefined, { timeout: 60_000 });
   // Play the first hand, stop at its score, and look at the table.
   await Promise.all(pages.map((p) => p.evaluate(() => (window.__hold = true))));
   await Promise.all(pages.map(autoplay));
-  for (const p of pages) await wait(p, () => window.ddp.match.state.history.length >= 1 && !document.querySelector(".gr-fly .pc-card"), undefined, 120_000);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match.state.history.length >= 1 && !document.querySelector(".gr-fly .pc-card"), undefined, { timeout: 120_000 });
   const mid = await state(host);
   await host.screenshot({ path: `${ARTIFACTS}/gr-4-friend-hand-scored.png` });
   if (mid.history[0].kind !== "draw") {
@@ -193,27 +169,28 @@ test("two friends play a game to 100: several hands, each shuffled again, and th
   if (mid.phase === "result") {
     for (const p of pages) await p.locator("#gr-next:not([hidden])").waitFor();
     for (let i = 0; i < 2; i++) for (const p of pages) await p.keyboard.press("n");
-    for (const p of pages) await wait(p, () => window.ddp.match.phase === "over" || (window.ddp.match.state.hand === 2 && window.ddp.match.state.phase === "result"), undefined, 120_000);
+    for (const p of pages) await waitForState(p, (ddp) => ddp.match.phase === "over" || (ddp.match.state.hand === 2 && ddp.match.state.phase === "result"), undefined, { timeout: 120_000 });
   }
   if ((await state(host)).phase === "result") {
-    await host.waitForTimeout(1500);
+    // Hand 2's score is on both tables, where a carried-over N would have said Next hand.
+    for (const p of pages) await waitForState(p, () => document.querySelector("#gr-next:not([hidden])"));
     const held = await state(host);
     assert.deepEqual([held.hand, held.phase, held.ready], [2, "result", 0], "hand 2's score waits for both players");
   }
   await Promise.all(pages.map((p) => p.evaluate(() => (window.__hold = false))));
-  for (const p of pages) await wait(p, () => window.ddp.match.phase === "over", undefined, 300_000);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match.phase === "over", undefined, { timeout: 300_000 });
   await Promise.all(pages.map(stopAutoplay));
   const st = await state(host);
   assert.deepEqual(await state(guest), st);
   assert.ok(st.history.length >= 2, `${st.history.length} hands`);
   assert.ok(Math.max(...st.scores) >= 100);
   for (const p of pages) {
-    await wait(p, () => window.ddp.match.verdict, undefined, 60_000);
+    await waitForState(p, (ddp) => ddp.match.verdict, undefined, { timeout: 60_000 });
     assert.deepEqual(await p.evaluate(() => window.ddp.match.verdict), { ok: true });
     assert.equal(await p.locator("#gr-standings tbody tr").count(), 2);
     assert.ok(await resultInView(p), "the result fits without scrolling, with both hands laid out");
   }
   assert.match(await host.locator("#result-reason").innerText(), new RegExp(`reached 100 first, after ${st.history.length} hands: ${st.final.totals[st.winner]} to ${st.final.totals[1 - st.winner]} with the bonuses`));
   await host.screenshot({ path: `${ARTIFACTS}/gr-5-friend-game-over.png` });
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

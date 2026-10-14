@@ -5,38 +5,21 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll, state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./crazy-eights.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll } from "../helpers.js";
+import { state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./crazy-eights.shared.js";
 
-test("four friends play Crazy Eights in four browsers, with every hand hidden and the game audited, then one leaves", { skip: !pw && "Playwright not installed", timeout: 360_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(nickname, opts = {}) {
-    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, reducedMotion: "reduce", ...opts });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${nickname}: ${e.message}`));
-    page.on("console", (m) => m.type() === "error" && errors.push(`${nickname}: ${m.text()}`));
-    return page;
-  }
-  const host = await open("Ada");
+const skip = skipWithoutPlaywright();
+
+test("four friends play Crazy Eights in four browsers, with every hand hidden and the game audited, then one leaves", { skip, timeout: 360_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const laptop = { viewport: { width: 1366, height: 900 }, reducedMotion: "reduce" };
+  const host = await open("Ada", { nickname: "Ada", ...laptop });
   await host.goto(`${srv.base}/crazy-eights/`);
   assert.equal(await host.locator("#play-friend").innerText(), "Play with friends");
-  await host.click("#play-friend");
-  await host.locator("#room-code").waitFor();
-  const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
   const friends = [];
-  for (const [name, opts] of [["Bo", { viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "dark" }], ["Cy", {}], ["Di", {}]]) {
-    const page = await open(name, opts);
-    await page.goto(invite);
-    await page.click("#join-room");
+  for (const [name, opts] of [["Bo", { phone: true, reducedMotion: "reduce", colorScheme: "dark" }], ["Cy", laptop], ["Di", laptop]]) {
+    const page = await open(name, { nickname: name, ...opts });
+    await joinByInvite(host, page, srv);
     friends.push(page);
     if (friends.length === 2) {
       // Three in: the waiting room's Start button could start a three-player game now.
@@ -47,7 +30,7 @@ test("four friends play Crazy Eights in four browsers, with every hand hidden an
   }
   // The fourth fills the room, which starts by itself.
   const pages = [host, ...friends];
-  for (const p of pages) await wait(p, () => window.ddp.match?.phase === "playing", undefined, 60_000);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match?.phase === "playing", undefined, { timeout: 60_000 });
   assert.deepEqual(await Promise.all(pages.map((p) => p.evaluate(() => window.ddp.session.index))), [0, 1, 2, 3]);
   // Four players get 5 cards each (whoever goes first may already have drawn).
   const st0 = await state(host);
@@ -55,8 +38,8 @@ test("four friends play Crazy Eights in four browsers, with every hand hidden an
   for (const [seat, p] of pages.entries()) {
     assert.equal(await p.locator(".ce-seat").count(), 3);
     // Each seat's count matches its hand, once this screen has caught up.
-    await wait(p, () => {
-      const st = window.ddp.match.state;
+    await waitForState(p, (ddp) => {
+      const st = ddp.match.state;
       return [...document.querySelectorAll(".ce-seat")].every((e) => Number(e.querySelector(".count").textContent) === st.hands[Number(e.dataset.seat)].length);
     });
     // The next player sits on your left, then across, then on your right; colours follow the seat everywhere.
@@ -69,9 +52,9 @@ test("four friends play Crazy Eights in four browsers, with every hand hidden an
   await friends[0].screenshot({ path: `${ARTIFACTS}/ce-4-four-mobile-dark.png`, fullPage: true });
 
   await Promise.all(pages.map(autoplay));
-  await wait(host, () => window.ddp.match.state.moves >= 8 || window.ddp.match.phase !== "playing", undefined, 120_000);
+  await waitForState(host, (ddp) => ddp.match.state.moves >= 8 || ddp.match.phase !== "playing", undefined, { timeout: 120_000 });
   await friends[0].screenshot({ path: `${ARTIFACTS}/ce-5-four-mobile-midgame.png`, fullPage: true });
-  for (const p of pages) await wait(p, () => window.ddp.match.phase === "over", undefined, 240_000);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match.phase === "over", undefined, { timeout: 240_000 });
   await Promise.all(pages.map(stopAutoplay));
   for (const p of pages) {
     assert.deepEqual(await leaks(p), [], "no seat knew another's card during play");
@@ -80,7 +63,7 @@ test("four friends play Crazy Eights in four browsers, with every hand hidden an
   const states = await Promise.all(pages.map(state));
   for (const st of states.slice(1)) assert.deepEqual(st, states[0], "all four browsers end on the same state");
   for (const p of pages) {
-    await wait(p, () => window.ddp.match.verdict, undefined, 60_000);
+    await waitForState(p, (ddp) => ddp.match.verdict, undefined, { timeout: 60_000 });
     assert.deepEqual(await p.evaluate(() => window.ddp.match.verdict), { ok: true });
     await p.locator("#ce-standings").waitFor();
     assert.equal(await p.locator("#ce-standings li").count(), 4);
@@ -101,14 +84,14 @@ test("four friends play Crazy Eights in four browsers, with every hand hidden an
   await friends[2].locator("#rematch-status").filter({ hasText: "Ada, Bo and Cy want a rematch!" }).waitFor();
   await host.locator("#rematch-status").filter({ hasText: "Waiting for Di" }).waitFor();
   await friends[2].click("#rematch");
-  for (const p of pages) await wait(p, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing", undefined, 60_000);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing", undefined, { timeout: 60_000 });
   await Promise.all(pages.map(autoplay));
-  await wait(host, () => window.ddp.match.state.moves >= 4 || window.ddp.match.phase !== "playing", undefined, 60_000);
+  await waitForState(host, (ddp) => ddp.match.state.moves >= 4 || ddp.match.phase !== "playing", undefined, { timeout: 60_000 });
   await Promise.all(pages.map(stopAutoplay));
   // Cy leaves: their key went with them, so this hand stops, and a robot takes their seat from the next.
   await friends[1].close();
   for (const p of [host, friends[0], friends[2]]) {
-    await wait(p, () => window.ddp.match.phase === "aborted" && window.ddp.match.abortSeat === 2, undefined, 20_000);
+    await waitForState(p, (ddp) => ddp.match.phase === "aborted" && ddp.match.abortSeat === 2);
     await p.locator("body", { hasText: "Cy left. Every card needs every player's key" }).waitFor();
     await p.locator(".pb-name", { hasText: "Cy (robot)" }).waitFor();
   }
@@ -121,5 +104,5 @@ test("four friends play Crazy Eights in four browsers, with every hand hidden an
     assert.match(await p.locator("#ce-ended").innerText(), /The game stopped before the end, so it wasn't checked\./);
   }
   await friends[0].screenshot({ path: `${ARTIFACTS}/ce-8-four-left-mobile.png` });
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

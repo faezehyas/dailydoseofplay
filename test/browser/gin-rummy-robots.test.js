@@ -6,31 +6,19 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll, pick, state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./gin-rummy.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, waitForPhase, noHorizontalScroll, pick } from "../helpers.js";
+import { state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./gin-rummy.shared.js";
+
+const skip = skipWithoutPlaywright();
 
 // It is my choice, with the screen caught up: the upcard, a draw, a discard (or the game is over).
-const myChoice = (page, ids) => wait(page, (sel) => !!document.querySelector(sel) || window.ddp.match.phase !== "playing", ids.map((id) => `#${id}:not([hidden])`).join(", "), 60_000);
+const myChoice = (page, ids) => waitForState(page, (ddp, sel) => !!document.querySelector(sel) || ddp.match.phase !== "playing", ids.map((id) => `#${id}:not([hidden])`).join(", "), { timeout: 60_000 });
 const handOrder = (page) => page.evaluate(() => [...document.querySelectorAll(".gr-hcard")].sort((a, b) => new DOMMatrix(a.style.transform).m41 - new DOMMatrix(b.style.transform).m41).map((b) => Number(b.dataset.slot)));
 
-test("Gin Rummy against the robot on a 360 px phone: deal, sounds, mute, keyboard, rearranging, timer and a verified game", { skip: !pw && "Playwright not installed", timeout: 480_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling", "--autoplay-policy=no-user-gesture-required"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "light" });
-  await ctx.addInitScript(() => (window.ddpSounds = []));
-  await ctx.addInitScript(() => (globalThis.ddpRobotPace = 0.1));
-  const page = await ctx.newPage();
-  page.on("pageerror", (e) => errors.push(e.message));
-  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+test("Gin Rummy against the robot on a 360 px phone: deal, sounds, mute, keyboard, rearranging, timer and a verified game", { skip, timeout: 480_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { phone: true, colorScheme: "light", clock: true, init: () => (window.ddpSounds = []) });
   const heard = () => page.evaluate(() => window.ddpSounds.slice());
-  await page.clock.install();
 
   await page.goto(`${srv.base}/`);
   await page.click('.game-card[data-slug="gin-rummy"] h2 a, .game-card[data-slug="gin-rummy"]');
@@ -46,12 +34,12 @@ test("Gin Rummy against the robot on a 360 px phone: deal, sounds, mute, keyboar
   // The deck is shuffled by both seats with proofs; the table says so while it works.
   await page.locator("#gr-busy:not([hidden])").waitFor();
   await page.screenshot({ path: `${ARTIFACTS}/gr-10-robot-shuffling.png` });
-  await wait(page, () => window.ddp.match?.phase === "playing", undefined, 60_000);
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing", undefined, { timeout: 60_000 });
   assert.match(await page.locator(".pb-players").innerText(), /Cleo[\s\S]*Robot/);
   assert.equal(await page.locator("#gr-config").innerText(), "Game to 100 · knock with 10 or less · 15 s a move · Hard robot");
   assert.equal(await page.locator(".gin-rummy.four-colour").count(), 1, "the four-colour deck is on");
   assert.ok(await noHorizontalScroll(page));
-  await wait(page, () => document.querySelectorAll(".gr-hcard").length === 10 && !document.querySelector(".gr-fly .pc-card") && !!document.querySelector("#gr-pile .pc-card:not(.down)"), undefined, 30_000);
+  await waitForState(page, () => document.querySelectorAll(".gr-hcard").length === 10 && !document.querySelector(".gr-fly .pc-card") && !!document.querySelector("#gr-pile .pc-card:not(.down)"), undefined, { timeout: 30_000 });
   const sounds = await heard();
   for (const name of ["shuffle", "deal", "play"]) assert.ok(sounds.includes(name), `played ${name}: ${sounds.join(" ")}`);
   assert.ok(sounds.filter((s) => s === "deal").length >= 20, "a flick per card dealt");
@@ -60,7 +48,7 @@ test("Gin Rummy against the robot on a 360 px phone: deal, sounds, mute, keyboar
   // The upcard, by keyboard: P passes.
   await myChoice(page, ["gr-pass"]);
   await page.keyboard.press("p");
-  await wait(page, () => window.ddp.match.state.log.some((e) => e.t === "pass" && e.p === 0));
+  await waitForState(page, (ddp) => ddp.match.state.log.some((e) => e.t === "pass" && e.p === 0));
 
   // A draw by keyboard (D), unless both passed and the stock's card came to me.
   await myChoice(page, ["gr-draw", "gr-discard"]);
@@ -71,7 +59,7 @@ test("Gin Rummy against the robot on a 360 px phone: deal, sounds, mute, keyboar
   // My discard turn: the hand holds still. Suit sorts; Shift and an arrow moves a card; a drag moves one, and throws nothing.
   await page.click("#gr-sort-suit");
   assert.equal(await page.locator("#gr-sort-suit").getAttribute("aria-pressed"), "true");
-  await wait(page, () => !document.querySelector(".gr-fly .pc-card"));
+  await waitForState(page, () => !document.querySelector(".gr-fly .pc-card"));
   const before = await handOrder(page);
   const last = before.at(-1);
   await page.locator(`.gr-hcard[data-slot="${last}"]`).focus();
@@ -84,7 +72,7 @@ test("Gin Rummy against the robot on a 360 px phone: deal, sounds, mute, keyboar
   // Drag the first deadwood card to the far right with the mouse.
   const dead = await page.evaluate(() => [...document.querySelectorAll(".gr-hcard:not(.inmeld)")].map((b) => Number(b.dataset.slot)));
   if (dead.length >= 2) {
-    await wait(page, () => !document.querySelector("#gr-hand").getAnimations({ subtree: true }).length); // the cards have settled
+    await waitForState(page, () => !document.querySelector("#gr-hand").getAnimations({ subtree: true }).length); // the cards have settled
     const card = page.locator(`.gr-hcard[data-slot="${dead[0]}"]`);
     const box = await card.boundingBox();
     const handBox = await page.locator("#gr-hand").boundingBox();
@@ -118,7 +106,7 @@ test("Gin Rummy against the robot on a 360 px phone: deal, sounds, mute, keyboar
     assert.ok(await page.locator(".gr-hcard.chosen").count(), "Enter picked the card");
     assert.match(await page.locator("#gr-discard").innerText(), /^Discard the /);
     await page.keyboard.press("Enter");
-    await wait(page, (s) => window.ddp.match.state.log.some((e) => e.t === "discard" && e.p === 0 && e.slot === s), throwable[0]);
+    await waitForState(page, (ddp, s) => ddp.match.state.log.some((e) => e.t === "discard" && e.p === 0 && e.slot === s), throwable[0]);
   }
 
   // From here on reduced motion plays every event at once.
@@ -130,7 +118,7 @@ test("Gin Rummy against the robot on a 360 px phone: deal, sounds, mute, keyboar
   const quiet = (await heard()).length;
   const moves = (await state(page)).moves;
   await autoplay(page);
-  await wait(page, (n) => window.ddp.match.state.moves > n + 12 || window.ddp.match.phase !== "playing", moves, 60_000);
+  await waitForState(page, (ddp, n) => ddp.match.state.moves > n + 12 || ddp.match.phase !== "playing", moves, { timeout: 60_000 });
   await stopAutoplay(page);
   assert.equal((await heard()).length, quiet, "no sound while muted");
   await page.click("#sound-toggle");
@@ -143,16 +131,16 @@ test("Gin Rummy against the robot on a 360 px phone: deal, sounds, mute, keyboar
       await page.locator("#gr-timer:not([hidden])").waitFor();
       const from = (await state(page)).moves;
       await page.clock.fastForward("00:16");
-      await wait(page, (n) => window.ddp.match.state.moves > n, from, 15_000);
+      await waitForState(page, (ddp, n) => ddp.match.state.moves > n, from, { timeout: 15_000 });
       await page.locator("#toast", { hasText: "Time's up" }).waitFor({ state: "attached" });
     }
   }
 
   // The rest at speed.
   await autoplay(page);
-  await wait(page, () => window.ddp.match.phase === "over", undefined, 300_000);
+  await waitForState(page, (ddp) => ddp.match.phase === "over", undefined, { timeout: 300_000 });
   await stopAutoplay(page);
-  await wait(page, () => window.ddp.robots[0].match.phase === "over");
+  await waitForPhase(page);
   const st = await state(page);
   assert.deepEqual(await page.evaluate(() => window.ddp.robots[0].match.state), st, "the robot agrees");
   assert.deepEqual(await leaks(page), []);
@@ -172,12 +160,12 @@ test("Gin Rummy against the robot on a 360 px phone: deal, sounds, mute, keyboar
   // The robot accepts a rematch; dark mode still fits the phone.
   const m = await page.evaluate(() => window.ddp.match.m);
   await page.click("#rematch");
-  await wait(page, (n) => window.ddp.match.m === n + 1 && window.ddp.match.phase === "playing", m, 60_000);
+  await waitForState(page, (ddp, n) => ddp.match.m === n + 1 && ddp.match.phase === "playing", m, { timeout: 60_000 });
   await page.click("#theme-toggle");
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "dark");
   assert.ok(await noHorizontalScroll(page));
   await page.screenshot({ path: `${ARTIFACTS}/gr-15-robot-dark.png`, fullPage: true });
   await page.click("#leave");
   await page.locator("#play-friend").waitFor();
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

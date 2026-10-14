@@ -6,51 +6,40 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll, bg, pick, state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./crazy-eights.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll, pick } from "../helpers.js";
+import { bg, state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./crazy-eights.shared.js";
 
-test("two friends play Crazy Eights on the host's settings through the invite link, then a rematch", { skip: !pw && "Playwright not installed", timeout: 300_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(name, nickname, opts = {}) {
-    // Reduced motion plays every card at once, so whole games fit the test.
-    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, reducedMotion: "reduce", ...opts });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    page.on("console", (m) => m.type() === "error" && errors.push(`${name}: ${m.text()}`));
-    return page;
-  }
+const skip = skipWithoutPlaywright();
+
+test("two friends play Crazy Eights on the host's settings through the invite link, then a rematch", { skip, timeout: 300_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  // Reduced motion plays every card at once, so whole games fit the test.
+  const laptop = { viewport: { width: 1366, height: 900 }, reducedMotion: "reduce" };
 
   // Host (laptop, light): classic defaults, then action cards on and the host first.
-  const host = await open("host", "Ada", { colorScheme: "light" });
+  const host = await open("host", { nickname: "Ada", ...laptop, colorScheme: "light" });
   await host.goto(`${srv.base}/crazy-eights/`);
   for (const [name, value] of [["draw", "until"], ["strict", "true"], ["actions", "false"], ["first", "random"], ["moveSeconds", "0"], ["level", "easy"], ["fourColor", "false"]]) {
     assert.equal(await host.locator(`#ce-settings input[name="ce-${name}"]:checked`).getAttribute("value"), value, `classic default for ${name}`);
   }
   await pick(host, "actions", true);
   await pick(host, "first", "host");
-  await host.click("#play-friend");
-  await host.locator("#room-code").waitFor();
-  const invite = await host.locator("#invite-link").inputValue();
+  const { invite } = await joinByInvite(host, [], srv);
   assert.match(invite, /\/crazy-eights\/\?room=[A-Z0-9]{4}&key=[\w-]{22}$/);
 
   // The friend (360 px phone, dark, four-colour deck) opens the link; the host presses Start with two in.
-  const guest = await open("guest", "Bo", { viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "dark" });
-  await guest.addInitScript(() => localStorage.setItem("ddp-crazy-eights-settings", JSON.stringify({ fourColor: true, draw: "one" })));
-  await guest.goto(invite.replace(/^https?:\/\/[^/]+/, srv.base));
-  await guest.click("#join-room");
+  const guest = await open("guest", {
+    nickname: "Bo",
+    phone: true,
+    reducedMotion: "reduce",
+    colorScheme: "dark",
+    init: () => localStorage.setItem("ddp-crazy-eights-settings", JSON.stringify({ fourColor: true, draw: "one" })),
+  });
+  await joinByInvite(host, guest, srv);
   await host.locator("#roster li.ready", { hasText: "Bo" }).waitFor();
   assert.match(await host.locator("#start-game").innerText(), /2 players/);
   await host.click("#start-game");
-  for (const p of [host, guest]) await wait(p, () => window.ddp.match?.phase === "playing", undefined, 60_000);
+  for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match?.phase === "playing", undefined, { timeout: 60_000 });
   await guest.locator("#ce-config").filter({ hasText: "action cards on" }).waitFor();
   assert.equal(await guest.locator("#ce-config").innerText(), "draw until you can play · draw only when nothing plays · action cards on");
   assert.equal(await host.locator("#ce-config").innerText(), await guest.locator("#ce-config").innerText(), "the host's settings reach the friend, not the friend's own");
@@ -66,7 +55,7 @@ test("two friends play Crazy Eights on the host's settings through the invite li
   const dealt = (st, p) => st.hands[p].length - st.draws[p] + st.plays[p];
   assert.equal(dealt(await state(host), 0), 7, "two players get 7 cards");
   // The friend's screen shows the host's hand as it is now, which adds up to the same 7.
-  await wait(guest, () => document.querySelector(".ce-seat .count").textContent === String(window.ddp.match.state.hands[0].length));
+  await waitForState(guest, (ddp) => document.querySelector(".ce-seat .count").textContent === String(ddp.match.state.hands[0].length));
   assert.equal(dealt(await state(guest), 0), 7, "the friend sees the host's 7 cards");
   // The friend's four-colour deck is theirs alone.
   assert.equal(await guest.locator(".crazy-eights.four-colour").count(), 1);
@@ -77,12 +66,12 @@ test("two friends play Crazy Eights on the host's settings through the invite li
 
   async function finish() {
     await Promise.all([autoplay(host), autoplay(guest)]);
-    for (const p of [host, guest]) await wait(p, () => window.ddp.match.phase === "over", undefined, 120_000);
+    for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match.phase === "over", undefined, { timeout: 120_000 });
     await Promise.all([stopAutoplay(host), stopAutoplay(guest)]);
     for (const p of [host, guest]) {
       assert.deepEqual(await leaks(p), [], "no hidden face was known during play");
       assert.deepEqual(await domLeaks(p), [], "no hidden face was drawn");
-      await wait(p, () => window.ddp.match.verdict, undefined, 60_000);
+      await waitForState(p, (ddp) => ddp.match.verdict, undefined, { timeout: 60_000 });
       assert.deepEqual(await p.evaluate(() => window.ddp.match.verdict), { ok: true });
       await p.locator("#ce-verdict.ok").waitFor();
       assert.match(await p.locator("#ce-verdict").innerText(), /Fair play verified/);
@@ -109,7 +98,7 @@ test("two friends play Crazy Eights on the host's settings through the invite li
   await host.locator("#rematch-status").filter({ hasText: "Bo wants a rematch!" }).waitFor();
   await guest.locator("#rematch-status").filter({ hasText: "Waiting for Ada" }).waitFor();
   await host.click("#rematch");
-  for (const p of [host, guest]) await wait(p, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing", undefined, 60_000);
+  for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing", undefined, { timeout: 60_000 });
   assert.equal(dealt(await state(host), 0), 7);
   const second = await finish();
   const wins = [0, 1].map((p) => [first, second].filter((st) => st.winner === p).length);
@@ -121,13 +110,13 @@ test("two friends play Crazy Eights on the host's settings through the invite li
   // A third game, where Bo's browser never sends its key and Bo leaves during the audit.
   await guest.click("#rematch");
   await host.click("#rematch");
-  for (const p of [host, guest]) await wait(p, () => window.ddp.match.m === 3 && window.ddp.match.phase === "playing", undefined, 60_000);
+  for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match.m === 3 && ddp.match.phase === "playing", undefined, { timeout: 60_000 });
   await guest.evaluate(() => {
     const send = window.ddp.session.send.bind(window.ddp.session);
     window.ddp.session.send = (msg) => (msg.t === "audit" ? true : send(msg));
   });
   await Promise.all([autoplay(host), autoplay(guest)]);
-  for (const p of [host, guest]) await wait(p, () => window.ddp.match.phase === "over", undefined, 120_000);
+  for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match.phase === "over", undefined, { timeout: 120_000 });
   await Promise.all([stopAutoplay(host), stopAutoplay(guest)]);
   await host.locator("#ce-verdict:not(.ok)").waitFor();
   assert.equal(await host.evaluate(() => window.ddp.match.busy), "auditing", "still waiting for Bo's key");
@@ -135,5 +124,5 @@ test("two friends play Crazy Eights on the host's settings through the invite li
   await guest.close();
   await host.locator("#ce-verdict", { hasText: "Bo left before the audit finished, so this game couldn't be verified." }).waitFor({ timeout: 20_000 });
   await host.locator(".pb-name", { hasText: "Bo (robot)" }).waitFor();
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
