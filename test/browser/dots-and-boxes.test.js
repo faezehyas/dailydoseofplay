@@ -7,7 +7,7 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll, pick } from "../helpers.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, waitForPhase, joinByInvite, noHorizontalScroll, pick } from "../helpers.js";
 
 const skip = skipWithoutPlaywright();
 const bg = (page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
@@ -266,6 +266,8 @@ test("Dots and Boxes vs the robot on a 360 px phone: touch, keyboard, pen stroke
     if (await armed(page)) await drawLine(page, { tap: true });
     else await page.waitForTimeout(40);
   }
+  // The last move reaches the robot's table after mine: wait for its match to end too.
+  await waitForPhase(page);
   const st = await state(page);
   assert.equal(st.score[0] + st.score[1], 16);
   assert.equal(await page.evaluate(() => window.ddp.robot.match.state.drawn), 40, "the robot saw every line");

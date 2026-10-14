@@ -6,7 +6,7 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, noHorizontalScroll, pick } from "../helpers.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, waitForPhase, noHorizontalScroll, pick } from "../helpers.js";
 import { START, ply, playTurnByHand, setPosition, autoplay } from "./backgammon.shared.js";
 
 const skip = skipWithoutPlaywright();
@@ -101,7 +101,8 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
   // checks above catch its checkers in flight).
   await page.evaluate(() => (globalThis.ddpRobotPace = 0.1));
   await autoplay(page, 50);
-  await waitForState(page, (ddp) => ddp.match.phase === "over", undefined, { timeout: 120_000 });
+  // The last move reaches the robot's table after mine: wait for its match to end too.
+  await waitForPhase(page, "over", { timeout: 120_000 });
   const st = await page.evaluate(() => window.ddp.match.state);
   assert.equal(st.reason, "off");
   assert.equal(st.pos[st.winner][0], 15);

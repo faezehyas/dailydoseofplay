@@ -5,7 +5,7 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, noHorizontalScroll, pick } from "../helpers.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, waitForPhase, waitForSameState, noHorizontalScroll, pick } from "../helpers.js";
 import { state, settled, spinUntilOver } from "./chutes-and-ladders.shared.js";
 
 const skip = skipWithoutPlaywright();
@@ -60,6 +60,8 @@ test("Chutes and Ladders vs the robot on a 360 px phone: spinner, hops, sounds, 
   // The rest of the game at speed: reduced motion plays each spin out at once.
   await page.emulateMedia({ reducedMotion: "reduce" });
   await spinUntilOver(page, { tap: true });
+  // The last spin reaches the robot's table after mine: wait for its match to end too.
+  await waitForPhase(page);
   const st = await state(page);
   assert.equal(st.pos[st.winner], 100);
   assert.equal(await page.evaluate(() => window.ddp.robot.match.state.ply), st.ply, "the robot saw every spin");
@@ -92,7 +94,8 @@ test("Chutes and Ladders against three robots", { skip, timeout: 120_000 }, asyn
   assert.match(await page.locator(".pb-players").innerText(), /Robot 1[\s\S]*Robot 2[\s\S]*Robot 3/);
   assert.ok(await noHorizontalScroll(page));
   await spinUntilOver(page);
-  const st = await state(page);
+  // The last spin reaches the robots' tables after mine: wait until they agree.
+  const st = await waitForSameState(page);
   assert.equal(st.players, 4);
   assert.equal(st.pos[st.winner], 100);
   for (let k = 0; k < 3; k++) assert.deepEqual(await page.evaluate((k) => window.ddp.robots[k].match.state, k), st, `robot ${k + 1} agrees`);
