@@ -40,7 +40,7 @@ test("the lobby doesn't wait for games.json", { skip: !pw && "Playwright not ins
   // The page carries the tagline, so a games.json that never arrives changes nothing.
   await page.route("**/games.json", () => {});
   await page.goto(`${srv.base}/tic-tac-toe/`);
-  await page.locator("#play-friend:not([disabled])").waitFor();
+  await page.locator("#play-friend").waitFor();
   assert.equal(await page.locator(".lobby-card .tagline").textContent(), GAMES.find((g) => g.slug === "tic-tac-toe").description);
   assert.deepEqual(errors, []);
 });

@@ -69,8 +69,17 @@
             <button class="btn primary big" type="button" disabled>Play with a friend</button>
             <button class="btn big" type="button" disabled>Play vs robot</button>
             <button class="btn learn" type="button" disabled>Learn</button>
+            <p class="loading" role="status">
+              <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+                <ellipse class="water" cx="40" cy="36" rx="32" ry="10" />
+                <path class="wave" d="M16 38q4-3 8 0t8 0M50 40q4-3 8 0t8 0" />
+                <ellipse class="ripple" cx="40" cy="34" rx="14" ry="4.5" />
+                <ellipse class="ripple" cx="40" cy="34" rx="8" ry="2.6" />
+                <circle class="drip" cx="40" cy="18" r="3" />
+              </svg>
+              <span class="sr-only">Loading…</span>
+            </p>
           </div>
-          <p class="loading" role="status"><span class="spinner"></span><span class="sr-only">Loading…</span></p>
         </div>
       </section>
       <section id="game" hidden></section>

@@ -1,8 +1,9 @@
-// Headless-browser test: a game page shows its lobby at once, with the
-// buttons disabled, while its modules load, and fetches the engine modules in
-// parallel instead of one import level at a time. Nothing moves when the real
-// lobby replaces it, and a spinner shows only after 400 ms. Without
-// JavaScript it says the games need it. Skips if Playwright is missing.
+// Headless-browser test: a game page shows its lobby at once while its
+// modules load, with a piece of the game where the buttons go, and fetches
+// the engine modules in parallel instead of one import level at a time.
+// Nothing moves when the real lobby replaces it, and the piece shows only
+// after 400 ms. Without JavaScript it says the games need it. Skips if
+// Playwright is missing.
 //
 //   npm run test:browser
 import test from "node:test";
@@ -43,7 +44,7 @@ const box = async (locator) => {
   return { x, y, width, height };
 };
 
-test("every game shows its lobby, disabled, while it loads, and nothing moves when it arrives", { skip: !pw && "Playwright not installed", timeout: 180_000 }, async (t) => {
+test("every game shows its icon, title and piece while it loads, and nothing moves when the lobby arrives", { skip: !pw && "Playwright not installed", timeout: 180_000 }, async (t) => {
   const { srv, open } = await setup(t);
   for (const game of GAMES) {
     const { page, errors } = await open();
@@ -59,44 +60,53 @@ test("every game shows its lobby, disabled, while it loads, and nothing moves wh
     const icon = card.locator(".lobby-icon img");
     await page.waitForFunction(() => document.querySelector(".lobby-icon img")?.complete && document.fonts.status === "loaded");
     assert.ok(await icon.evaluate((img) => img.naturalWidth > 0), `${game.name}: the icon shows`);
-    const buttons = card.locator(".lobby-actions button");
-    assert.ok((await buttons.count()) >= 2, game.name);
-    for (const button of await buttons.all()) assert.ok(await button.isDisabled(), `${game.name}: ${await button.textContent()} is disabled`);
-    assert.equal(await card.getByRole("status").textContent(), "Loading…");
+    // The piece fades in after 400 ms; the buttons under it are hidden, not disabled and tappable.
+    const piece = card.locator(".lobby-actions .loading-piece");
+    await page.waitForFunction(() => getComputedStyle(document.querySelector(".loading-piece")).opacity === "1");
+    assert.ok(await piece.isVisible(), `${game.name}: the piece shows`);
+    const { width, height } = await piece.boundingBox();
+    assert.deepEqual([width, height], [160, 96], `${game.name}: the piece is 160 x 96`);
+    assert.equal(await card.locator(".lobby-actions button:visible").count(), 0, `${game.name}: no buttons until they work`);
+    assert.equal(await card.getByRole("status").textContent().then((s) => s.trim()), "Loading…");
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${game.name}: no sideways scroll at 360 px`);
     await preloaded;
-    const before = { title: await box(card.locator("h1")), icon: await box(icon), friend: await box(buttons.nth(0)), robot: await box(card.locator(".lobby-actions .btn.big").nth(1)) };
+    const before = { title: await box(card.locator("h1")), icon: await box(icon), row: await box(card.locator(".lobby-actions")) };
 
     release();
-    await page.locator("#play-friend:not([disabled])").waitFor();
+    await page.locator("#play-friend").waitFor();
     assert.equal(await page.locator("#lobby h1").count(), 1, `${game.name}: the lobby replaced the placeholder`);
-    assert.equal(await page.locator("#lobby .spinner").count(), 0);
-    const after = { title: await box(page.locator("#lobby h1")), icon: await box(page.locator(".lobby-icon img")), friend: await box(page.locator("#play-friend")), robot: await box(page.locator("#play-robot")) };
-    assert.deepEqual(after, before, `${game.name}: the title, icon and buttons don't move when the lobby arrives`);
+    assert.equal(await page.locator("#lobby .loading-piece").count(), 0);
+    const after = { title: await box(page.locator("#lobby h1")), icon: await box(page.locator(".lobby-icon img")), row: await box(page.locator(".lobby-actions")) };
+    assert.deepEqual(after, before, `${game.name}: the title, icon and button row don't move when the lobby arrives`);
     assert.deepEqual(errors, []);
     await page.context().close();
   }
 });
 
-test("the spinner waits 400 ms, and doesn't show under reduced motion", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
+test("nothing shows moving in the first 400 ms, and nothing animates under reduced motion", { skip: !pw && "Playwright not installed", timeout: 90_000 }, async (t) => {
   const { srv, open } = await setup(t);
-  const { page } = await open();
-  await holdLobby(page);
-  await page.goto(`${srv.base}/tic-tac-toe/`, { waitUntil: "commit" });
-  const spinner = page.locator("#lobby .spinner");
-  await spinner.waitFor({ state: "attached" });
-  // Nothing animates in the first 400 ms: every animation on the page waits that long, the spinner's too.
-  const delays = await page.evaluate(() => document.getAnimations().map((a) => a.effect.getTiming().delay));
-  assert.ok(delays.length > 0 && delays.every((d) => d >= 400), `animation delays: ${delays}`);
-  await page.waitForFunction(() => getComputedStyle(document.querySelector("#lobby .spinner")).opacity === "1");
+  for (const game of GAMES) {
+    const { page } = await open();
+    await holdLobby(page);
+    await page.goto(`${srv.base}/${game.slug}/`, { waitUntil: "commit" });
+    await page.locator("#lobby .loading-piece").waitFor({ state: "attached" });
+    // The piece's own moves may start at once, but it shows only when its fade-in, 400 ms on, ends; nothing else moves before then.
+    const early = await page.evaluate(() =>
+      document.getAnimations().filter((a) => !a.effect.target.closest(".loading-piece") || a.effect.target.matches(".loading-piece")).map((a) => a.effect.getTiming().delay),
+    );
+    assert.ok(early.length === 1 && early[0] >= 400, `${game.name}: animation delays outside the piece: ${early}`);
+    await page.context().close();
 
-  const calm = await open({ reducedMotion: "reduce" });
-  await holdLobby(calm.page);
-  await calm.page.goto(`${srv.base}/tic-tac-toe/`, { waitUntil: "commit" });
-  await calm.page.locator("#lobby h1").waitFor();
-  await calm.page.waitForTimeout(600);
-  assert.equal(await calm.page.locator("#lobby .spinner").isVisible(), false);
-  assert.equal(await calm.page.evaluate(() => document.getAnimations().length), 0, "no animation under reduced motion");
+    const calm = await open({ reducedMotion: "reduce" });
+    await holdLobby(calm.page);
+    await calm.page.goto(`${srv.base}/${game.slug}/`, { waitUntil: "commit" });
+    const piece = calm.page.locator("#lobby .loading-piece");
+    await piece.waitFor();
+    assert.equal(await piece.evaluate((e) => getComputedStyle(e).opacity), "1", `${game.name}: the piece shows at once, still`);
+    await calm.page.waitForTimeout(100);
+    assert.equal(await calm.page.evaluate(() => document.getAnimations().length), 0, `${game.name}: no animation under reduced motion`);
+    await calm.page.context().close();
+  }
 });
 
 test("the home tile's icon and the lobby's share a view-transition name", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
@@ -106,7 +116,7 @@ test("the home tile's icon and the lobby's share a view-transition name", { skip
   const name = (sel) => page.locator(sel).evaluate((e) => getComputedStyle(e).viewTransitionName);
   assert.equal(await name('.game-card[data-slug="tic-tac-toe"] .game-icon'), "icon-tic-tac-toe");
   await page.goto(`${srv.base}/tic-tac-toe/`);
-  await page.locator("#play-friend:not([disabled])").waitFor();
+  await page.locator("#play-friend").waitFor();
   assert.equal(await name(".lobby-icon"), "icon-tic-tac-toe");
   assert.deepEqual(errors, []);
 });
@@ -119,5 +129,5 @@ test("without JavaScript a game page says the games need it", { skip: !pw && "Pl
   const notice = page.locator("#lobby .notice");
   assert.match(await notice.textContent(), /^The games need JavaScript\./);
   assert.ok(await notice.isVisible());
-  assert.equal(await page.locator("#lobby .spinner").isVisible(), false, "no spinner: nothing is loading");
+  assert.equal(await page.locator("#lobby .loading-piece").isVisible(), false, "no piece: nothing is loading");
 });

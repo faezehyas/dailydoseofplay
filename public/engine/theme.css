@@ -548,37 +548,36 @@ input::placeholder {
 }
 
 /* While the modules load, a game page shows its own .lobby-card (index.html):
-   the home screen's markup with its controls disabled, which the real one
-   replaces without moving. Until shell.js adds the header, the header's
-   height (40px buttons, 10px padding) is kept free, so the page doesn't jump.
-   A spinner shows under the buttons only if loading takes over 400 ms. */
+   the home screen's markup up to its buttons, with its controls disabled,
+   which the real one replaces without moving. Until shell.js adds the header,
+   the header's height (40px buttons, 10px padding) is kept free, so the page
+   doesn't jump. */
 @media (scripting: enabled) {
   body > .page:first-child:has(> #lobby) {
     margin-top: 60px;
   }
 }
 
-.lobby-card .loading {
-  display: flex;
-  justify-content: center;
+/* The button row holds the home screen's buttons, hidden, so it is as tall as
+   the real one, and over them a piece of the game making its move. */
+.lobby-actions:has(> .loading) > :not(.loading) {
+  visibility: hidden;
+}
+
+.lobby-actions:has(> .loading) {
+  position: relative;
+}
+
+.lobby-actions > .loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   margin: 0;
 }
 
-.lobby-card .loading .spinner {
-  opacity: 0;
-  animation:
-    appear 1ms 400ms forwards,
-    spin 0.8s linear 400ms infinite;
-}
-
-@keyframes appear {
-  to {
-    opacity: 1;
-  }
-}
-
-@media (scripting: none), (prefers-reduced-motion: reduce) {
-  .lobby-card .loading .spinner {
+@media (scripting: none) {
+  .lobby-actions > .loading {
     display: none;
   }
 }
@@ -1959,7 +1958,9 @@ input::placeholder {
 
 .hero-scene .lamp,
 .hero-scene .card-back,
-.hero-scene .disc.teal {
+.hero-scene .disc.teal,
+.loading-piece .card-back,
+.loading-piece .disc.teal {
   fill: var(--accent-2);
 }
 
@@ -1981,51 +1982,63 @@ input::placeholder {
   fill: transparent;
 }
 
-.hero-scene .shade {
+.hero-scene .shade,
+.loading-piece .shade {
   fill: var(--text);
   opacity: 0.1;
 }
 
-.hero-scene .card-trim {
+.hero-scene .card-trim,
+.loading-piece .card-trim {
   fill: none;
   stroke: var(--surface);
   stroke-width: 1.2;
 }
 
 .hero-scene .card-face,
-.hero-scene .die-face {
+.hero-scene .die-face,
+.loading-piece .card-face,
+.loading-piece .die-face {
   fill: var(--surface);
   stroke: var(--control-border);
 }
 
-.hero-scene .die-b .die-face {
+.hero-scene .die-b .die-face,
+.loading-piece .die-b .die-face {
   stroke: none;
 }
 
-.hero-scene .heart {
+.hero-scene .heart,
+.loading-piece .heart {
   fill: var(--danger);
 }
 
-.hero-scene .square {
+.hero-scene .square,
+.loading-piece .square {
   fill: var(--surface-2);
   stroke: var(--border);
 }
 
-.hero-scene .square.dark {
+.hero-scene .square.dark,
+.loading-piece .square.dark {
   fill: var(--control-border);
   stroke: none;
 }
 
-.hero-scene .checker-side {
+.hero-scene .checker-side,
+.loading-piece .checker-side {
   fill: var(--accent-text);
 }
 
 .hero-scene .checker-top,
-.hero-scene .disc {
+.hero-scene .disc,
+.loading-piece .checker-top,
+.loading-piece .disc {
   fill: var(--accent);
 }
 
-.hero-scene .pip {
+.hero-scene .pip,
+.loading-piece .pip {
   fill: var(--text);
 }
 
@@ -2033,12 +2046,14 @@ input::placeholder {
   fill: var(--ok);
 }
 
-.hero-scene .rack {
+.hero-scene .rack,
+.loading-piece .rack {
   fill: var(--ship);
 }
 
 /* Face 5 shows only between the die's rolls. */
-.hero-scene .die-b {
+.hero-scene .die-b,
+.loading-piece .die-b {
   opacity: 0;
 }
 
@@ -2319,6 +2334,344 @@ input::placeholder {
   96% {
     opacity: 1;
     transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+/* A game page's loading card (index.html) shows a piece of its game making
+   its move on a loop, in its button row: the hero's shapes and moves where it
+   has them. It fades in after 400 ms, so a fast load never flashes it; without
+   motion it shows at once and stands still. */
+.loading-piece {
+  display: block;
+  width: 160px;
+  height: 96px;
+  opacity: 0;
+  animation: appear 1ms 400ms forwards;
+}
+
+@keyframes appear {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-piece {
+    opacity: 1;
+    animation: none;
+  }
+}
+
+/* Boards and grids a step stronger than the hero's, to show on the card. */
+.loading-piece .square {
+  fill: var(--border);
+  stroke: var(--control-border);
+}
+
+.loading-piece .grid {
+  fill: none;
+  stroke: var(--control-border);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.loading-piece .eye {
+  fill: var(--accent-ink);
+}
+
+.loading-piece .dot {
+  fill: var(--text);
+}
+
+.loading-piece .knight,
+.loading-piece .stone {
+  fill: var(--accent);
+}
+
+.loading-piece .stone.teal {
+  fill: var(--accent-2);
+}
+
+.loading-piece .mark {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke: var(--accent);
+}
+
+.loading-piece .mark.teal {
+  stroke: var(--accent-2);
+}
+
+.loading-piece .water {
+  fill: var(--water);
+}
+
+.loading-piece .wave {
+  fill: none;
+  stroke: var(--water-line);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.loading-piece .drip {
+  fill: var(--miss);
+}
+
+.loading-piece .ripple {
+  fill: none;
+  stroke: var(--miss);
+  stroke-width: 1.5;
+}
+
+.loading-piece .flip-back {
+  opacity: 0;
+}
+
+.loading-piece .die,
+.loading-piece .flip,
+.loading-piece .place,
+.loading-piece .ripple {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* The other player's pieces. */
+.loading-piece .rival,
+.loading-piece .rival .checker-top {
+  fill: var(--accent-2);
+}
+
+.loading-piece .rival .checker-side {
+  fill: var(--accent-2-text);
+}
+
+/* The knight squashes on its base, like the hero's pawn. */
+.loading-piece .knight {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .loading-piece * {
+    animation-timing-function: var(--ease-out);
+    animation-iteration-count: infinite;
+  }
+  .loading-piece .die {
+    animation-name: scene-die;
+    animation-duration: 1.6s;
+  }
+  /* Its face changes in the air, on every other roll. */
+  .loading-piece .die-b {
+    animation-name: scene-die-face;
+    animation-duration: 3.2s;
+    animation-delay: -0.72s;
+  }
+  .loading-piece .flip {
+    animation-name: loading-flip;
+    animation-duration: 2.4s;
+  }
+  .loading-piece .flip-back {
+    animation-name: loading-flip-back;
+    animation-duration: 2.4s;
+  }
+  .loading-piece .drop {
+    animation-name: scene-drop;
+    animation-duration: 1.6s;
+  }
+  .loading-piece .checker {
+    animation-name: scene-checker;
+    animation-duration: 1.6s;
+  }
+  .loading-piece .knight {
+    animation-name: loading-knight;
+    animation-duration: 2.4s;
+  }
+  .loading-piece .draw-1,
+  .loading-piece .draw-2,
+  .loading-piece .draw-3 {
+    stroke-dasharray: 1;
+  }
+  .loading-piece .draw-1 {
+    animation-name: loading-draw-1;
+    animation-duration: 2.4s;
+  }
+  .loading-piece .draw-2 {
+    animation-name: loading-draw-2;
+    animation-duration: 2.4s;
+  }
+  .loading-piece .draw-3 {
+    animation-name: loading-draw-3;
+    animation-duration: 2.4s;
+  }
+  .loading-piece .place {
+    animation-name: loading-place;
+    animation-duration: 2s;
+  }
+  .loading-piece .drip {
+    animation-name: loading-drip;
+    animation-duration: 2s;
+  }
+  .loading-piece .ripple {
+    animation-name: loading-ripple;
+    animation-duration: 2s;
+  }
+  .loading-piece .ripple + .ripple {
+    animation-delay: -1.7s;
+  }
+}
+
+/* The card turns over to its back, and back again. */
+@keyframes loading-flip {
+  15%,
+  85% {
+    transform: none;
+  }
+  25%,
+  75% {
+    transform: scaleX(0);
+  }
+  35%,
+  65% {
+    transform: none;
+  }
+}
+
+@keyframes loading-flip-back {
+  from,
+  25% {
+    opacity: 0;
+  }
+  25.1%,
+  75% {
+    opacity: 1;
+  }
+  75.1%,
+  to {
+    opacity: 0;
+  }
+}
+
+/* Strokes (pathLength="1") draw one after another, as in Tic Tac Toe, then
+   fade. Hidden until they start: a round cap would show as a dot. */
+@keyframes loading-draw-1 {
+  from {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+  15%,
+  85% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes loading-draw-2 {
+  from,
+  15% {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+  30%,
+  85% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes loading-draw-3 {
+  from,
+  40% {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+  60%,
+  85% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* The knight jumps its L (one square across, two up) and back, squashing on
+   each landing like the hero's pawn. */
+@keyframes loading-knight {
+  8% {
+    transform: scale(1.12, 0.84);
+  }
+  22% {
+    transform: translate(6px, -26px);
+  }
+  34% {
+    transform: translate(12px, -20px) scale(1.1, 0.88);
+  }
+  40%,
+  58% {
+    transform: translate(12px, -20px);
+  }
+  72% {
+    transform: translate(6px, -26px);
+  }
+  84% {
+    transform: scale(1.08, 0.9);
+  }
+  92% {
+    transform: none;
+  }
+}
+
+/* A stone comes down onto its point, then fades. */
+@keyframes loading-place {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(1.3);
+  }
+  30%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* A shot falls into the water and rings spread from it. */
+@keyframes loading-drip {
+  from {
+    transform: none;
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(16px);
+    animation-timing-function: step-end;
+  }
+  31%,
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes loading-ripple {
+  from,
+  30% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  31% {
+    opacity: 1;
   }
   to {
     opacity: 0;
@@ -2835,8 +3188,9 @@ input.mono {
    - no motion starts without a user action, except the room code settling,
      the result moment when a match ends, the hero's scene and, on a touch
      screen, a tile's preview.
-   Loading indicators (.spinner, the home page's loading tiles) are the one
-   exception: they run only while something loads.
+   Loading indicators (.spinner, a game page's .loading-piece, the home
+   page's loading tiles) are the one exception: they run only while
+   something loads.
    Timings come from --dur-fast, --dur-med and --dur-slow, easing from
    --ease-out and --ease-spring. */
 

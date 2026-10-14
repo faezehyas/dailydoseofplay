@@ -80,7 +80,7 @@ your protocol:
 
 ```
 public/<slug>/
-├── index.html       page shell: copy public/sea-battle/index.html, change title, description, the loading card and the modulepreload links; keep the icon, manifest and theme-color tags
+├── index.html       page shell: copy public/sea-battle/index.html, change title, description, the loading card and its piece, and the modulepreload links; keep the icon, manifest and theme-color tags
 ├── style.css        game-specific styles; only var(--…) tokens from /engine/theme.css, light and dark
 ├── main.js          startGameShell(...) and the view
 ├── rules.js         pure rules
@@ -106,10 +106,14 @@ disable the field and buttons, mark How to play and the settings `inert` and
 leave out the settings' options. It starts with the icon
 (`<div class="lobby-icon" style="view-transition-name: icon-<slug>">`), the
 game's name as in `games.json` and its description as the tagline, then the
-`<noscript>` line, and ends with the `role="status"` "Loading…" line and its
-spinner. `npm test` checks the top, and `test/browser/page-loading.test.js`
-that nothing moves. List a `<link rel="modulepreload">` for each engine module
-your `main.js` imports, directly or through your other files, so they load at
+`<noscript>` line. Last in the button row goes the `role="status"` line with
+a piece of your game and "Loading…" for screen readers: an inline
+`<svg class="loading-piece" viewBox="0 0 80 48">` from the shapes and
+animation classes under `.loading-piece` in `theme.css`; copy the closest
+game's. `npm test` checks the top of the card, and
+`test/browser/page-loading.test.js` that nothing moves. List a
+`<link rel="modulepreload">` for each engine module your `main.js` imports,
+directly or through your other files, so they load at
 once: `npm test` (`test/preload.test.js`) prints each link that is missing or
 extra. Don't make `#lobby` a live region: the
 lobby moves focus to each new screen and reads out its own progress. Shared

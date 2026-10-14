@@ -72,8 +72,27 @@
             <button class="btn primary big" type="button" disabled>Play with a friend</button>
             <button class="btn big" type="button" disabled>Play vs robot</button>
             <button class="btn learn" type="button" disabled>Learn</button>
+            <p class="loading" role="status">
+              <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+                <rect class="square" x="10" y="16" width="60" height="30" />
+                <path class="square dark" d="M22 16h12v10h-12zM46 16h12v10h-12zM10 26h12v10h-12zM34 26h12v10h-12zM58 26h12v10h-12zM22 36h12v10h-12zM46 36h12v10h-12z" />
+                <g class="rival" transform="translate(64 24) scale(0.17) translate(-50 -86)">
+                  <path d="M41 46h18l9 32H32z" /><ellipse cx="50" cy="46" rx="13" ry="4.5" /><circle cx="50" cy="30" r="12" />
+                  <path d="M24 78h52a4 4 0 0 1 4 4v2a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4v-2a4 4 0 0 1 4-4z" />
+                </g>
+                <g transform="translate(28 44)">
+                  <g class="knight">
+                    <g transform="scale(-0.2 0.2) translate(-50 -86)">
+                      <path d="M30 78c0-12 5-20 14-26-5 2-10 5-14 8l-8-8c3-12 10-21 20-26l4-10 6 8c14 3 22 17 20 54z" />
+                      <path d="M24 78h52a4 4 0 0 1 4 4v2a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4v-2a4 4 0 0 1 4-4z" />
+                      <circle class="eye" cx="38" cy="38" r="4" />
+                    </g>
+                  </g>
+                </g>
+              </svg>
+              <span class="sr-only">Loading…</span>
+            </p>
           </div>
-          <p class="loading" role="status"><span class="spinner"></span><span class="sr-only">Loading…</span></p>
         </div>
       </section>
       <section id="game" hidden></section>

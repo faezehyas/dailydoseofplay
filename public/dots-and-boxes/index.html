@@ -74,8 +74,16 @@
             <button class="btn primary big" type="button" disabled>Play with a friend</button>
             <button class="btn big" type="button" disabled>Play vs robot</button>
             <button class="btn learn" type="button" disabled>Learn</button>
+            <p class="loading" role="status">
+              <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+                <path class="mark teal" d="M22 12h18M22 12v24M22 36h18" />
+                <path class="mark draw-1" pathLength="1" d="M40 12v24" />
+                <circle class="dot" cx="22" cy="12" r="2.5" /><circle class="dot" cx="40" cy="12" r="2.5" /><circle class="dot" cx="58" cy="12" r="2.5" />
+                <circle class="dot" cx="22" cy="36" r="2.5" /><circle class="dot" cx="40" cy="36" r="2.5" /><circle class="dot" cx="58" cy="36" r="2.5" />
+              </svg>
+              <span class="sr-only">Loading…</span>
+            </p>
           </div>
-          <p class="loading" role="status"><span class="spinner"></span><span class="sr-only">Loading…</span></p>
         </div>
       </section>
       <section id="game" hidden></section>

@@ -384,20 +384,24 @@ any preload that is missing or extra. While they load, `#lobby` holds a static
 `.lobby-card` with the lobby home screen's own markup: the game's icon
 (`/<slug>/icon.svg`, already cached from the home tile), title, tagline (its
 `games.json` description, which `lobby.js` reads from it), How to play, the
-nickname field, the settings summary with the default chips and the Play
-buttons, all disabled. The real home screen replaces it without moving
-anything; `theme.css` keeps the header's height free above it until `shell.js`
-adds the header. A spinner shows under the buttons only after 400 ms (CSS
-`animation-delay`), and not at all under reduced motion; screen readers hear
-"Loading…" from a `role="status"` line. A `<noscript>` line under the tagline
-says the games need JavaScript. The tapped home tile's icon moves into the
-lobby's (and back) with a cross-document view transition: `@view-transition`
-in `theme.css`, off under reduced motion, and the same `view-transition-name`
-(`icon-<slug>`) on the tile's `.game-icon` (`home.js`) and the `.lobby-icon`
-(`index.html`, `lobby.js`). Browsers without it just navigate.
-`test/browser/page-loading.test.js` holds back `engine/lobby.js` and checks
-that every game shows its title, icon and disabled buttons, that they don't
-move when the lobby arrives, and that nothing animates in the first 400 ms.
+nickname field and the settings summary with the default chips, disabled. The
+button row holds the Play buttons, hidden so it keeps their height, and over
+them a piece of the game making its move (`.loading-piece`: inline SVG
+animated by CSS alone, with the home hero's shapes and keyframes where it has
+them). The piece fades in only after 400 ms (CSS `animation-delay`), so a fast
+load never flashes it; under reduced motion it shows at once and stands still.
+Screen readers hear "Loading…" from its `role="status"` line. The real home
+screen replaces the card without moving anything; `theme.css` keeps the
+header's height free above it until `shell.js` adds the header. A `<noscript>`
+line under the tagline says the games need JavaScript. The tapped home tile's
+icon moves into the lobby's (and back) with a cross-document view transition:
+`@view-transition` in `theme.css`, off under reduced motion, and the same
+`view-transition-name` (`icon-<slug>`) on the tile's `.game-icon` (`home.js`)
+and the `.lobby-icon` (`index.html`, `lobby.js`). Browsers without it just
+navigate. `test/browser/page-loading.test.js` holds back `engine/lobby.js` and
+checks that every game shows its icon, title and piece, that the title and
+button row don't move when the lobby arrives, and that nothing visible
+animates in the first 400 ms.
 
 **Who may open `/ws`.** Browsers always send an `Origin` header on a
 WebSocket handshake, and a page can't change it, so the upgrade handler

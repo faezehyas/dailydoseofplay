@@ -72,8 +72,22 @@
             <button class="btn primary big" type="button" disabled>Play with a friend</button>
             <button class="btn big" type="button" disabled>Play vs robot</button>
             <button class="btn learn" type="button" disabled>Learn</button>
+            <p class="loading" role="status">
+              <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+                <rect class="square" x="2.2" y="15" width="75.6" height="29.4" />
+                <path class="square dark" d="M14.8 15h12.6v9.8h-12.6zM40 15h12.6v9.8h-12.6zM65.2 15h12.6v9.8h-12.6zM2.2 24.8h12.6v9.8h-12.6zM27.4 24.8h12.6v9.8h-12.6zM52.6 24.8h12.6v9.8h-12.6zM14.8 34.6h12.6v9.8h-12.6zM40 34.6h12.6v9.8h-12.6zM65.2 34.6h12.6v9.8h-12.6z" />
+                <g class="rival" transform="translate(21.1 19.9) scale(0.7)"><ellipse class="checker-side" cy="2" rx="7" ry="5" /><ellipse class="checker-top" rx="7" ry="5" /></g>
+                <g class="rival" transform="translate(46.3 19.9) scale(0.7)"><ellipse class="checker-side" cy="2" rx="7" ry="5" /><ellipse class="checker-top" rx="7" ry="5" /></g>
+                <g class="rival" transform="translate(71.5 19.9) scale(0.7)"><ellipse class="checker-side" cy="2" rx="7" ry="5" /><ellipse class="checker-top" rx="7" ry="5" /></g>
+                <g transform="translate(46.3 39.5) scale(0.7)"><ellipse class="checker-side" cy="2" rx="7" ry="5" /><ellipse class="checker-top" rx="7" ry="5" /></g>
+                <g transform="translate(71.5 39.5) scale(0.7)"><ellipse class="checker-side" cy="2" rx="7" ry="5" /><ellipse class="checker-top" rx="7" ry="5" /></g>
+                <g transform="translate(21.1 39.5) scale(0.7)">
+                  <g class="checker"><ellipse class="checker-side" cy="2" rx="7" ry="5" /><ellipse class="checker-top" rx="7" ry="5" /></g>
+                </g>
+              </svg>
+              <span class="sr-only">Loading…</span>
+            </p>
           </div>
-          <p class="loading" role="status"><span class="spinner"></span><span class="sr-only">Loading…</span></p>
         </div>
       </section>
       <section id="game" hidden></section>
