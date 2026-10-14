@@ -149,10 +149,19 @@ test("four friends play Hearts in four browsers: a secret pass, a whole hand aud
   await Promise.all(pages.map(autoplay));
   await wait(host, () => window.ddp.match.state.tricks >= 2 || window.ddp.match.phase !== "playing", undefined, 90_000);
   await Promise.all(pages.map(stopAutoplay));
+  // Cy leaves: their key went with them, so this hand stops, and a robot takes their seat from the next.
   await friends[1].close();
   for (const p of [host, friends[0], friends[2]]) {
+    await wait(p, () => window.ddp.match.phase === "aborted" && window.ddp.match.abortSeat === 2, undefined, 20_000);
+    await p.locator("body", { hasText: "Cy left. Every card needs every player's key" }).waitFor();
+    await p.locator(".pb-name", { hasText: "Cy (robot)" }).waitFor();
+  }
+  // The host leaves: the game is over for everyone.
+  await host.close();
+  for (const p of [friends[0], friends[2]]) {
     await p.locator("#ended").waitFor({ timeout: 20_000 });
-    assert.match(await p.locator("#hr-ended").innerText(), /game is over for all 4 of you[\s\S]*Cy: -?\d+ points? \(left\)/);
+    assert.match(await p.locator("#ended").innerText(), /Ada (left the game|.*lost)/);
+    assert.match(await p.locator("#hr-ended").innerText(), /game is over for all 4 of you[\s\S]*Ada: -?\d+ points? \(left\)/);
     assert.match(await p.locator("#hr-ended").innerText(), /The game stopped before the end, so it wasn't checked\./);
   }
   assert.deepEqual(errors, []);

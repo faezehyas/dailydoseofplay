@@ -15,7 +15,8 @@
 // Today's layout is a star: seat 0 (the hub) holds one link to each other
 // seat (a spoke) and forwards every message to everyone else, so all players
 // see other players' messages in the hub's order. A link is any two-ended
-// channel: a PeerChannel (WebRTC) or one end of localPair().
+// channel: a PeerChannel (WebRTC) or one end of localPair(). In a friend room
+// a robot on the host is a spoke too, over a localPair() (session.js).
 import { Emitter, localPair, MAX_MESSAGE_LENGTH, MESSAGE_TOO_BIG } from "./channel.js";
 
 // Wire frames: spoke -> hub { msg }; hub -> spoke { from, msg } or { left, reason? }.
@@ -23,16 +24,21 @@ export class HubGroup extends Emitter {
   constructor({ links }) {
     super();
     this.seat = 0;
-    this.links = new Map(links); // seat -> link
+    this.links = new Map(); // seat -> link
     this.offs = [];
-    for (const [seat, link] of this.links) {
-      this.offs.push(
-        link.on("message", (frame) => {
-          if (frame && typeof frame === "object" && "msg" in frame) this.#relay(seat, frame.msg);
-        }),
-        link.on("close", (reason) => this.#drop(seat, reason)),
-      );
-    }
+    this.keep = null; // keep(seat, reason): true when someone took over a seat whose link closed (session.js)
+    for (const [seat, link] of links) this.add(seat, link);
+  }
+
+  // Seats a link: at the start, or in place of one that closed.
+  add(seat, link) {
+    this.links.set(seat, link);
+    this.offs.push(
+      link.on("message", (frame) => {
+        if (this.links.get(seat) === link && frame && typeof frame === "object" && "msg" in frame) this.#relay(seat, frame.msg);
+      }),
+      link.on("close", (reason) => this.links.get(seat) === link && this.#drop(seat, reason)),
+    );
   }
 
   send(msg) {
@@ -52,6 +58,8 @@ export class HubGroup extends Emitter {
 
   #drop(seat, reason) {
     if (!this.links.delete(seat)) return;
+    // A robot took the seat over: the others never hear that it was empty.
+    if (this.keep?.(seat, reason)) return;
     const frame = reason === MESSAGE_TOO_BIG ? { left: seat, reason } : { left: seat };
     for (const link of this.links.values()) link.send(frame);
     this.emit("leave", seat, frame.reason);

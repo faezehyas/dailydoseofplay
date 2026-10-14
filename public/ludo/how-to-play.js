@@ -3,7 +3,7 @@ export const howToPlay = {
   goal: "Be the first to bring all four of your tokens home to the centre.",
   players: [
     "Two to four.",
-    "To play friends, create a room and send the invite link to up to three of them. Press **Start game** when everyone is in; a full room of four starts by itself.",
+    "To play friends, create a room and send the invite link to up to three of them. Press **Start game** when everyone is in; a full room of four starts by itself. Empty seats can go to robots (**Add robot**), at the host's robot level, and if a friend leaves mid-game a robot plays on for them.",
     "Against robots, pick how many play (**Players**, 2, 3 or 4, above **Play vs robot**) and the robots' level in the settings: Easy, Medium or Hard.",
   ],
   setup: "Each player has four tokens of one colour, waiting in their yard. Your yard is always the one at the bottom left of your screen. Every colour has its own mark too (circle, triangle, square, diamond), shown on its tokens.",

@@ -3,8 +3,10 @@
 // star over WebRTC today; a server relay or a mesh later) can change without
 // touching the lobby or any game.
 //
-//   new HostRoom({ game, name })        open() -> code (and .key); emits "players", "knocks", "guest-gone", "lost" (reason);
-//                                       accept(id) / decline(id) a knock; start() -> Session
+//   new HostRoom({ game, name, maxPlayers }) open() -> code (and .key); emits "players", "knocks", "guest-gone", "lost" (reason),
+//                                       "seat-taken" ({ name, robot }: a friend took a robot's seat);
+//                                       accept(id) / decline(id) a knock; addRobot() / removeRobot(name) with more than two seats;
+//                                       start() -> [Session, ...each robot's Session]
 //   new GuestRoom({ game, code, key, name }) join() -> Session once the host starts; emits "status"
 //   localRoom({ game, names, mode })    one Session per seat, connected in memory (robots, tests)
 import { Emitter, MESSAGE_TOO_BIG } from "./channel.js";
@@ -28,11 +30,13 @@ const LOBBY_CLOSES = new Set(["room_expired", "too_fast"]);
 const GREET_ERRORS = { version_mismatch: "version_mismatch", closed: "host_gone", [MESSAGE_TOO_BIG]: MESSAGE_TOO_BIG };
 
 export class HostRoom extends Emitter {
-  constructor({ game, name, signalingUrl }) {
+  constructor({ game, name, signalingUrl, maxPlayers = 2 }) {
     super();
     this.game = game;
     this.name = name;
     this.signalingUrl = signalingUrl;
+    this.maxPlayers = maxPlayers;
+    this.robots = []; // the robots' names ("Robot 1"), seated after the people: a game for more than two only
     this.rooms = null;
     this.code = null;
     this.key = null; // invite key: a link with it joins without asking
@@ -81,9 +85,26 @@ export class HostRoom extends Emitter {
     this.#knock(id, null);
   }
 
-  // Everyone in the room so far, host first. ready: connected and checked.
+  // Everyone in the room so far, host first, robots last. ready: connected and checked.
   get players() {
-    return [{ name: this.name, ready: true }, ...[...this.guests.values()].map(({ name, ready }) => ({ name, ready }))];
+    const robots = this.robots.map((name) => ({ name, ready: true, robot: true }));
+    return [{ name: this.name, ready: true }, ...[...this.guests.values()].map(({ name, ready }) => ({ name, ready })), ...robots];
+  }
+
+  // A robot takes a seat nobody has, numbered by the lowest number free; a
+  // friend who joins a full room takes the last robot's seat (#link).
+  addRobot() {
+    if (this.maxPlayers <= 2 || this.started || this.players.length >= this.maxPlayers) return;
+    let n = 1;
+    while (this.robots.includes(`Robot ${n}`)) n++;
+    this.robots = [...this.robots, `Robot ${n}`].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+    this.#changed();
+  }
+
+  removeRobot(name) {
+    if (this.started || !this.robots.includes(name)) return;
+    this.robots = this.robots.filter((r) => r !== name);
+    this.#changed();
   }
 
   get readyGuests() {
@@ -95,6 +116,7 @@ export class HostRoom extends Emitter {
     const link = new PeerChannel({ rooms: this.rooms, peerId: id, initiator: true });
     const guest = { name, link, ready: false };
     this.guests.set(id, guest);
+    if (this.players.length > this.maxPlayers) this.emit("seat-taken", { name, robot: this.robots.pop() });
     link.on("failed", (reason) => this.#drop(id, reason));
     link.on("close", (reason) => this.#drop(id, reason || "left"));
     link.on("open", async () => {
@@ -120,22 +142,22 @@ export class HostRoom extends Emitter {
   }
 
   #changed() {
-    const players = this.players;
-    sendRoster(this.readyGuests, players.filter((p) => p.ready).map((p) => p.name));
-    this.emit("players", players);
+    const players = this.players.filter((p) => p.ready);
+    sendRoster(this.readyGuests, players.map((p) => p.name), players.flatMap((p, i) => (p.robot ? [i] : [])));
+    this.emit("players", this.players);
   }
 
-  // Seats the connected guests in join order. Guests still connecting are dropped.
+  // Seats the connected guests in join order, then the robots. Guests still connecting are dropped.
   start() {
     const guests = this.readyGuests;
     if (this.started || guests.length === 0) throw new Error("no players to start with");
     this.started = true;
     for (const g of this.guests.values()) if (!g.ready) g.link.close();
-    const session = startHub({ name: this.name, guests, game: this.game });
+    const session = startHub({ name: this.name, guests, game: this.game, robots: this.maxPlayers > 2 ? this.robots : undefined });
     // The room is complete: free it on the server.
     this.rooms.close();
     this.rooms = null;
-    return session;
+    return [session, ...session.players.filter((p) => p.robot).map((p) => session.seatRobot(p.seat))];
   }
 
   close() {
@@ -162,7 +184,7 @@ export class GuestRoom extends Emitter {
 
   // Emits "status" with { step: "knocking" } while the host decides (no key),
   // { step: "connecting", host }, { step: "connected" },
-  // then { step: "waiting", players } while the host waits for more players.
+  // then { step: "waiting", players, robots } while the host waits for more players.
   async join() {
     const rooms = new RoomClient({ game: this.game, url: this.signalingUrl });
     this.rooms = rooms;
@@ -190,7 +212,7 @@ export class GuestRoom extends Emitter {
         greetHost(link, {
           name: this.name,
           game: this.game,
-          onRoster: (players) => this.emit("status", { step: "waiting", players }),
+          onRoster: (players, robots) => this.emit("status", { step: "waiting", players, robots }),
         }).then(
           (session) => {
             if (settled) return session.leave();

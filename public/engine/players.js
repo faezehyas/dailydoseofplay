@@ -1,5 +1,6 @@
 // The player bar every game shows above its board: a pill per player (you
-// first, then the others in seat order) with an optional badge and note, a
+// first, then the others in seat order; "(robot)" after a player a robot
+// took over from) with an optional badge and note, a
 // ring on whoever's turn it is, the wins so far (and draws, for games that
 // have them), and React (reactions.js) and Leave, always at the top right. Colours come from --seat and --seat-text: .mine and .theirs by
 // default, or a game's own class per seat (see "player bar" in theme.css).
@@ -19,8 +20,13 @@ export function playerBar(session, { onLeave, classes = () => "" }) {
     const name = seat === me ? `${session.me.name} (you)` : label(seat);
     const badge = el("span", { class: "pb-badge" });
     const note = el("small", { class: "pb-note" });
-    const node = el("span", { class: `pb-who ${cls(seat)}` }, badge, el("span", { class: "pb-label" }, el("span", { class: "pb-name", title: name }, name), note));
-    return { seat, node, badge, note };
+    const nameEl = el("span", { class: "pb-name", title: name }, name);
+    const node = el("span", { class: `pb-who ${cls(seat)}` }, badge, el("span", { class: "pb-label" }, nameEl, note));
+    return { seat, node, badge, note, nameEl };
+  });
+  session.on("takeover", (seat) => {
+    const { nameEl } = pills.find((p) => p.seat === seat);
+    nameEl.textContent = nameEl.title = `${label(seat)} (robot)`;
   });
   const box = (c, text) => {
     const dd = el("dd");

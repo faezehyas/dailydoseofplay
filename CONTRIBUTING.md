@@ -285,7 +285,7 @@ export const settings = gameSettings({
   groups: [
     // summary(value, label, config, robots): the text of this group's chip in the summary ("" leaves it out).
     { name: "moveSeconds", legend: "Time per move", options: [[10, "10 s"], [0, "No limit"]], summary: (v, l) => (v ? `${l} a move` : "No move limit") },
-    // scope: "device" tags the group "vs robot only", gives its chip a teal dot and keeps it off the waiting screen.
+    // scope: "device" tags the group "vs robot only" ("for robots" with more than two seats), gives its chip a teal dot and keeps it off the waiting screen until the host seats a robot.
     { name: "level", legend: "Robot level", scope: "device", options: [["easy", "Easy"], ["hard", "Hard"]], summary: (v, l, c, robots) => `${l} ${robots > 1 ? "robots" : "robot"}` },
     // scope: "view": this player's own view, never sent, and open to change during a game.
     { name: "hints", legend: "Legal moves", scope: "view", options: [[true, "Show"], [false, "Hide"]], summary: () => "" },
@@ -325,6 +325,21 @@ Hearts' `{ 3: "17 cards each" }`. In `onSession`, use `session.players`
 `players: session.players.length` to `TurnMatch`, and write rules whose turn
 moves to the next seat. `newState(first, players)` receives the player count.
 Don't use `winner: 2` for a draw there, since 2 is a seat.
+
+Friend rooms of such a game mix people and robots (see **Mixed rooms** in
+`ARCHITECTURE.md`): the host fills empty seats with robots, and a robot takes
+over a guest who leaves. What the game must do for that:
+
+- Use `TurnMatch` or `CardMatch`, routed by `matchRouter()`, and route
+  every message other than your own `setup` to it: a takeover arrives as
+  `{ t: "$takeover", seat }` and the router hands it to the match.
+- Start the robot's first match from `session.resume`:
+  `newMatch(session.resume?.m ?? 1, session.resume)` passing `from` to the
+  match. `startTurnRobot()`, `startCardRobot()` and `startPacedRobot()` do.
+- Build `createRobot` from the device's settings (`settings.get()`), as the
+  host's robots use the host's robot level.
+- Say in "How to play" that empty seats can go to robots and what happens
+  when a friend leaves.
 
 The view must provide:
 

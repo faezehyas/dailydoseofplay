@@ -805,7 +805,9 @@ function mountGame(session, root, shell) {
   function describeConfig(c) {
     const parts = [c.draw === "until" ? "draw until you can play" : "draw one, then pass", c.strict ? "draw only when nothing plays" : "draw any time", c.actions ? "action cards on" : "no action cards"];
     if (c.moveSeconds) parts.push(`${c.moveSeconds} s to move`);
-    if (robotGame) parts.push(`${LEVEL_NAME[c.level]} ${count > 2 ? "robots" : "robot"}`);
+    // Robot games, and friend rooms whose host seated robots (they play at the host's level).
+    const robotSeats = robotGame ? count - 1 : session.players.filter((p) => p.robot).length;
+    if (robotSeats) parts.push(`${LEVEL_NAME[c.level]} ${robotSeats > 1 ? "robots" : "robot"}`);
     return parts.join(" · ");
   }
 

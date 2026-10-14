@@ -105,11 +105,19 @@ test("four friends play Crazy Eights in four browsers, with every hand hidden an
   await Promise.all(pages.map(autoplay));
   await wait(host, () => window.ddp.match.state.moves >= 4 || window.ddp.match.phase !== "playing", undefined, 60_000);
   await Promise.all(pages.map(stopAutoplay));
+  // Cy leaves: their key went with them, so this hand stops, and a robot takes their seat from the next.
   await friends[1].close();
   for (const p of [host, friends[0], friends[2]]) {
+    await wait(p, () => window.ddp.match.phase === "aborted" && window.ddp.match.abortSeat === 2, undefined, 20_000);
+    await p.locator("body", { hasText: "Cy left. Every card needs every player's key" }).waitFor();
+    await p.locator(".pb-name", { hasText: "Cy (robot)" }).waitFor();
+  }
+  // The host leaves: the game is over for everyone.
+  await host.close();
+  for (const p of [friends[0], friends[2]]) {
     await p.locator("#ended").waitFor({ timeout: 20_000 });
-    assert.match(await p.locator("#ended").innerText(), /Cy (left the game|.*lost)/);
-    assert.match(await p.locator("#ce-ended").innerText(), /game is over for all 4 of you[\s\S]*Cy: \d+ cards? \(left\)/);
+    assert.match(await p.locator("#ended").innerText(), /Ada (left the game|.*lost)/);
+    assert.match(await p.locator("#ce-ended").innerText(), /game is over for all 4 of you[\s\S]*Ada: \d+ cards? \(left\)/);
     assert.match(await p.locator("#ce-ended").innerText(), /The game stopped before the end, so it wasn't checked\./);
   }
   await friends[0].screenshot({ path: `${ARTIFACTS}/ce-8-four-left-mobile.png` });

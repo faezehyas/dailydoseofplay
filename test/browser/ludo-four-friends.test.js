@@ -89,8 +89,9 @@ test("four friends fill a Ludo room in four browsers and play for places, then o
   await host.screenshot({ path: `${ARTIFACTS}/ld-6-four-over.png` });
   await friends[0].screenshot({ path: `${ARTIFACTS}/ld-7-four-over-mobile.png` });
 
-  // All four agree to a rematch; partway in, one player leaves. The game
-  // ends for everyone, and the screen says why and where everyone stood.
+  // All four agree to a rematch; partway in, one player leaves and a robot
+  // plays on for them. Then the host leaves: the game ends for everyone, and
+  // the screen says why and where everyone stood.
   for (const p of pages.slice(0, 3)) await p.click("#rematch");
   await friends[2].locator("#rematch-status").filter({ hasText: "Ada, Bo and Cy want a rematch!" }).waitFor();
   await host.locator("#rematch-status").filter({ hasText: "Waiting for Di" }).waitFor();
@@ -100,10 +101,12 @@ test("four friends fill a Ludo room in four browsers and play for places, then o
   await wait(host, () => window.ddp.match.state.ply >= 40, undefined, 60_000);
   await Promise.all(pages.map(stopAutoplay));
   await friends[1].close();
-  for (const p of [host, friends[0], friends[2]]) {
+  for (const p of [host, friends[0], friends[2]]) await p.locator(".pb-name", { hasText: "Cy (robot)" }).waitFor({ timeout: 20_000 });
+  await host.close();
+  for (const p of [friends[0], friends[2]]) {
     await p.locator("#ended").waitFor({ timeout: 20_000 });
-    assert.match(await p.locator("#ended").innerText(), /Cy (left the game|.*lost)/);
-    assert.match(await p.locator("#ld-ended").innerText(), /game is over for all 4 of you[\s\S]*Cy: \d\/4 home \(left\)/);
+    assert.match(await p.locator("#ended").innerText(), /Ada (left the game|.*lost)/);
+    assert.match(await p.locator("#ld-ended").innerText(), /through Ada's browser, so the game is over for all 4 of you[\s\S]*Ada: \d\/4 home \(left\)/);
   }
   await friends[0].screenshot({ path: `${ARTIFACTS}/ld-8-four-left-mobile.png` });
   assert.deepEqual(errors, []);

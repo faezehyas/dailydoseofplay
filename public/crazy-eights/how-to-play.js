@@ -3,7 +3,7 @@ export const howToPlay = {
   goal: "Be the first to empty your hand.",
   players: [
     "Two to four, with a standard 52-card deck.",
-    "To play friends, create a room and send the invite link to up to three of them, then press **Start game**.",
+    "To play friends, create a room and send the invite link to up to three of them, then press **Start game**. Empty seats can go to robots (**Add robot**), at the host's robot level. If a friend leaves mid-game, the hand stops, since every card needs their key, and a robot takes their seat from the next game.",
     "Against robots, pick how many play (**Players**, 2, 3 or 4, above **Play vs robot**) and the robots' level in the settings: Easy, Medium or Hard.",
   ],
   setup: "With two players everyone gets 7 cards; with three or four, 5 each. The next card is turned up to start the discard pile (an 8 goes to the bottom of the stock instead).",

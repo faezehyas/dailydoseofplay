@@ -129,8 +129,9 @@ test("two friends play Crazy Eights on the host's settings through the invite li
   await Promise.all([stopAutoplay(host), stopAutoplay(guest)]);
   await host.locator("#ce-verdict:not(.ok)").waitFor();
   assert.equal(await host.evaluate(() => window.ddp.match.busy), "auditing", "still waiting for Bo's key");
+  // A robot takes Bo's seat, but the game can't be verified without Bo's key.
   await guest.close();
-  await host.locator("#ended").waitFor({ timeout: 20_000 });
-  assert.match(await host.locator("#ce-ended").innerText(), /Bo left before the audit finished, so this game couldn't be verified\./);
+  await host.locator("#ce-verdict", { hasText: "Bo left before the audit finished, so this game couldn't be verified." }).waitFor({ timeout: 20_000 });
+  await host.locator(".pb-name", { hasText: "Bo (robot)" }).waitFor();
   assert.deepEqual(errors, []);
 });

@@ -3,26 +3,38 @@
 // (names, rematch votes, goodbye). It is DOM-free so games and robots can be
 // tested headless.
 //
-// Engine messages use a "$" prefix: $bye, $rematch and $react (a reaction,
-// see reactions.js) during the game, and the handshake below before it.
+// Engine messages use a "$" prefix: $bye, $rematch, $react (a reaction,
+// see reactions.js) and $robot (a robot took a seat over) during the game,
+// and the handshake below before it.
 // Everything else is a game message and is handed to session.onMessage
 // handlers as (msg, fromSeat), buffered until the game registers one.
-import { Emitter, MESSAGE_TOO_BIG } from "./channel.js";
+//
+// Friend rooms of games for more than two (robots: the robot seats, maybe
+// none) mix people and robots. The robots run on the host, each a seat of
+// its own over an in-memory link to the hub, so it gets exactly what a
+// remote player gets. A guest who leaves doesn't end the game: a robot
+// takes their seat over, and every handler gets { t: "$takeover", seat }
+// from that seat at that point in the stream (matchRouter() passes it on).
+import { Emitter, localPair, MESSAGE_TOO_BIG } from "./channel.js";
 import { HubGroup, SpokeGroup } from "./group.js";
 import { cleanName, defaultName } from "./names.js";
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 const HELLO_TIMEOUT_MS = 10_000;
 
 export class Session extends Emitter {
-  // players: names by seat; group.seat is mine.
-  constructor({ group, mode, players, game }) {
+  // players: names by seat; group.seat is mine. robots: the robot seats of a
+  // room where robots may sit (see the top of this file), else undefined.
+  constructor({ group, mode, players, game, robots }) {
     super();
     this.group = group;
     this.mode = mode; // "friend" | "robot"
     this.index = group.seat; // 0 = host (room creator)
     this.role = this.index === 0 ? "host" : "guest";
-    this.players = players.map((name, seat) => ({ seat, name }));
+    this.players = players.map((name, seat) => ({ seat, name, robot: !!robots?.includes(seat) }));
+    this.takeover = Array.isArray(robots);
+    this.resume = null; // a robot taking a seat over: the host's copy of the match it joins
+    this.byes = new Set(); // hub: guests who said goodbye, so their link closing is "left"
     this.me = this.players[this.index];
     this.others = this.players.filter((p) => p.seat !== this.index);
     this.opponent = this.others[0]; // two-player games
@@ -37,12 +49,15 @@ export class Session extends Emitter {
       // Only a spoke is ever cut off from the group: the hub went away.
       group.on("close", (why) => this.#end(why === MESSAGE_TOO_BIG ? why : "closed", 0)),
     ];
+    if (this.takeover && this.index === 0) group.keep = (seat, reason) => this.#takeover(seat, reason);
   }
 
   #onMessage(msg, from) {
     if (!msg || typeof msg.t !== "string" || from === this.index || !this.players[from]) return;
     switch (msg.t) {
       case "$bye":
+        // A guest's seat goes to a robot once their link closes (#takeover).
+        if (this.takeover && from !== 0) return void this.byes.add(from);
         return this.#end("left", from);
       case "$rematch":
         this.votes.add(from);
@@ -50,11 +65,53 @@ export class Session extends Emitter {
         return this.#maybeRematch();
       case "$react":
         return this.emit("react", from, msg.i);
+      case "$robot": {
+        const { seat } = msg;
+        if (from !== 0 || !this.takeover || !Number.isInteger(seat) || seat < 1 || seat === this.index || !this.players[seat] || this.players[seat].robot) return;
+        this.#robot(seat);
+        return this.emit("takeover", seat, ["left", MESSAGE_TOO_BIG].includes(msg.why) ? msg.why : "closed");
+      }
       default:
-        if (msg.t.startsWith("$")) return;
-        if (this.handlers.length === 0) this.buffer.push([msg, from]);
-        else for (const fn of this.handlers) fn(msg, from);
+        if (!msg.t.startsWith("$")) this.#deliver(msg, from);
     }
+  }
+
+  #deliver(msg, from) {
+    if (this.handlers.length === 0) this.buffer.push([msg, from]);
+    else for (const fn of this.handlers) fn(msg, from);
+  }
+
+  // Marks `seat` a robot and tells the game, in order with its messages.
+  // Returns the current match, as matchRouter() reports it (on the host).
+  #robot(seat) {
+    this.players[seat].robot = true;
+    const note = { t: "$takeover", seat, match: null };
+    this.#deliver(note, seat);
+    return note.match;
+  }
+
+  // Hub: a guest's link closed. A robot takes their seat over, and the
+  // others hear $robot instead of the seat leaving (group.js). why: as for "end".
+  #takeover(seat, reason) {
+    if (this.ended) return false;
+    const why = reason === MESSAGE_TOO_BIG ? reason : this.byes.has(seat) ? "left" : "closed";
+    this.group.send({ t: "$robot", seat, why });
+    const robot = this.seatRobot(seat, this.#robot(seat));
+    this.emit("takeover", seat, why, robot);
+    return true;
+  }
+
+  // Hub: a robot's Session for `seat`, over an in-memory link to the hub, so
+  // it gets exactly what a remote player would and nothing more. from: the
+  // match it takes over mid-game (TurnMatch and CardMatch take it as from).
+  seatRobot(seat, from = null) {
+    const [hubEnd, robotEnd] = localPair();
+    const robots = this.players.filter((p) => p.robot).map((p) => p.seat);
+    const robot = new Session({ group: new SpokeGroup({ seat, link: robotEnd }), mode: this.mode, players: this.players.map((p) => p.name), game: this.game, robots });
+    robot.resume = from;
+    for (const s of this.votes) robot.votes.add(s);
+    this.group.add(seat, hubEnd);
+    return robot;
   }
 
   onMessage(fn) {
@@ -91,8 +148,9 @@ export class Session extends Emitter {
     }
   }
 
-  // Any player leaving ends the session for everyone (the match can't go on
-  // without their moves and shared draws). seat: who left. reason: "left"
+  // A player leaving ends the session for everyone (the match can't go on
+  // without their moves and shared draws), unless a robot takes their seat
+  // over (see #takeover). seat: who left. reason: "left"
   // ($bye), "closed" (connection lost), MESSAGE_TOO_BIG (their browser sent
   // an oversized message) or "self".
   #end(reason, seat) {
@@ -154,20 +212,26 @@ export function admitGuest(link, { game }) {
 }
 
 // Host side: seat the admitted guests in order and start. guests: [{ link, name }].
-export function startHub({ name, guests, game, mode = "friend" }) {
-  const players = [name, ...guests.map((g) => g.name)];
+// robots: the names of the robots that sit after them, in a room that takes
+// robots (see the top of this file); their Sessions come from session.seatRobot().
+export function startHub({ name, guests, game, mode = "friend", robots }) {
+  const people = [name, ...guests.map((g) => g.name)];
+  const players = [...people, ...(robots ?? [])];
+  const seats = robots?.map((_, i) => people.length + i);
   const group = new HubGroup({ links: guests.map((g, i) => [i + 1, g.link]) });
-  const session = new Session({ group, mode, players, game });
-  guests.forEach((g, i) => g.link.send({ t: "$start", seat: i + 1, players }));
+  const session = new Session({ group, mode, players, game, robots: seats });
+  guests.forEach((g, i) => g.link.send({ t: "$start", seat: i + 1, players, robots: seats }));
   return session;
 }
 
-export function sendRoster(guests, players) {
-  for (const g of guests) g.link.send({ t: "$roster", players });
+// robots: which of `players` are robots.
+export function sendRoster(guests, players, robots = []) {
+  for (const g of guests) g.link.send({ t: "$roster", players, robots });
 }
 
 // Guest side, on a fresh link to the host: resolves to a Session when the
-// host starts. onWelcome() and onRoster(names) report progress until then.
+// host starts. onWelcome() and onRoster(names, robots) report progress until
+// then; robots counts the robots among them.
 export function greetHost(link, { name, game, mode = "friend", onWelcome, onRoster }) {
   return new Promise((resolve, reject) => {
     listen(link, (msg, { done, fail, settle }) => {
@@ -176,15 +240,16 @@ export function greetHost(link, { name, game, mode = "friend", onWelcome, onRost
           settle(); // the host may wait for more players: no timeout from here
           return onWelcome?.();
         case "$roster":
-          return Array.isArray(msg.players) && onRoster?.(msg.players.map((p) => cleanName(p, defaultName())));
+          return Array.isArray(msg.players) && onRoster?.(msg.players.map((p) => cleanName(p, defaultName())), Array.isArray(msg.robots) ? msg.robots.length : 0);
         case "$reject":
           return fail(new Error(msg.reason === "version_mismatch" ? "version_mismatch" : "rejected"));
         case "$start": {
           done();
           const players = Array.isArray(msg.players) ? msg.players.map((p) => cleanName(p, defaultName())) : [];
           if (!Number.isInteger(msg.seat) || msg.seat < 1 || msg.seat >= players.length) return reject(new Error("bad_start"));
+          const robots = Array.isArray(msg.robots) ? msg.robots.filter((s) => Number.isInteger(s) && s > 0 && s < players.length && s !== msg.seat) : undefined;
           // Built synchronously, so no group frame that follows $start is missed.
-          return resolve(new Session({ group: new SpokeGroup({ seat: msg.seat, link }), mode, players, game }));
+          return resolve(new Session({ group: new SpokeGroup({ seat: msg.seat, link }), mode, players, game, robots }));
         }
       }
     }, reject);
@@ -202,11 +267,16 @@ export async function openSession({ channel, mode, index, name, game }) {
 
 // Routes a session's game messages to the current match by match number `m`
 // and holds messages for a match that does not exist yet (rematch races).
+// A robot taking a seat over ($takeover, see the top of this file) goes to
+// the current match, and the note learns which match that is.
 export function matchRouter(session) {
   let current = null;
   let future = [];
   session.onMessage((msg, from) => {
-    if (current && msg.m === current.m) current.receive(msg, from);
+    if (msg.t === "$takeover") {
+      msg.match = current;
+      current?.takeover(msg.seat);
+    } else if (current && msg.m === current.m) current.receive(msg, from);
     else if (!current || msg.m > current.m) future.push([msg, from]);
   });
   return {

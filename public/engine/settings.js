@@ -8,8 +8,8 @@ import { el, segGroup } from "./shell.js";
 
 // groups: [{ name, legend, options: [[value, label, hint?], …], scope?, summary? }]
 // scope: "room" (the default) is the game's rules, sent to the other players;
-// "device" only applies to robot games (the robots' level; `robot: true` says
-// the same); "view" is this player's own view of the game and
+// "device" only applies to robots, in robot games and on the host of a friend
+// room (the robots' level; `robot: true` says the same); "view" is this player's own view of the game and
 // can change during a game, which the game reads with get() when it needs it.
 // summary(value, label, config, robots) is the text of the group's chip in the
 // summary (default: the label; "" leaves it out); robots is how many play
@@ -62,14 +62,17 @@ export function gameSettings({ key, prefix, groups, normalize, hint, robot, defa
     }
   }
   // The summary: a chip per choice (robot-only ones with a teal dot), with
-  // commas between them for screen readers. withRobot: false leaves out all
-  // but the room's rules.
-  function summary(withRobot = true) {
+  // commas between them for screen readers. robots, on the host's waiting
+  // screen: how many robots the room seats; it shows the room's rules, and
+  // the robots' options once there are any.
+  function summary(robots) {
+    const room = robots !== undefined;
     const parts = groups
-      .filter((g) => withRobot || scopeOf(g) === "room")
+      .filter((g) => !room || scopeOf(g) === "room" || (robots > 0 && scopeOf(g) === "device"))
       .map((g) => {
         const label = g.options.find(([value]) => value === config[g.name])?.[1] ?? "";
-        return { text: g.summary ? g.summary(config[g.name], label, config, counts.length ? seats() - 1 : undefined) : label, robot: scopeOf(g) === "device" };
+        const count = room ? robots : counts.length ? seats() - 1 : undefined;
+        return { text: g.summary ? g.summary(config[g.name], label, config, count) : label, robot: scopeOf(g) === "device" };
       })
       .filter((p) => p.text);
     return parts.flatMap(({ text, robot }, i) => [i ? el("span", { class: "sr-only" }, ", ") : "", el("span", { class: robot ? "chip robot" : "chip" }, text)]);
@@ -83,7 +86,8 @@ export function gameSettings({ key, prefix, groups, normalize, hint, robot, defa
   function form(id = prefix) {
     const note = el("p", { class: "notice", id: `${id}-locked` }, "Locked during a game: rematches keep the room's settings. Change them in the lobby for your next game.");
     const sets = groups.map((g) => {
-      const tag = scopeOf(g) === "device" && el("small", { class: "chip robot robot-only" }, "vs robot only");
+      // With more than two seats, friend rooms seat robots too.
+      const tag = scopeOf(g) === "device" && el("small", { class: "chip robot robot-only" }, counts.length ? "for robots" : "vs robot only");
       const fieldset = segGroup({ name: `${id}-${g.name}`, legend: [g.legend, tag], options: g.options, value: config[g.name], onChange: (value) => set(g.name, value) });
       fieldset.addEventListener("click", (e) => e.target.checked && pick(g.name));
       return fieldset;

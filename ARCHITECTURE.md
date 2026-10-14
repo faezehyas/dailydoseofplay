@@ -548,22 +548,22 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `signaling.js` | `RoomClient`: create, join (with or without the invite key), admit, decline, signal, leave. It uses the global `WebSocket`, so it also runs in Node 22 for the integration test. |
 | `peer.js` | `PeerChannel`: one ordered, reliable DataChannel to one other browser, pre-negotiated (`negotiated: true, id: 0`) on both sides; buffers early ICE candidates; detects ICE failure, a 20 s timeout and a 10 s disconnect grace. Refuses a message over `MAX_MESSAGE_LENGTH` before parsing it and closes with `message_too_big` (see **Message size**). |
 | `channel.js` | `Emitter` and `localPair()`, an in-memory two-ended channel with the same interface as `PeerChannel` (used for robots and tests). `MAX_MESSAGE_LENGTH` (64 K characters of JSON) and `MESSAGE_TOO_BIG`: the local pair refuses an oversized message the same way, so robot games and tests behave like WebRTC. |
-| `group.js` | The group transport every layer above talks to: `send(msg)` to all other seats, `message (msg, from)`, `leave (seat)`, `close`. `HubGroup` and `SpokeGroup` are today's star over links; `localGroup(n)` connects n seats in memory. The hub measures each frame it would forward and cuts off a guest whose frame is over the cap; `leave` and `close` carry `message_too_big` when that was the reason. |
-| `room.js` | How players get seated in a group: `HostRoom` (create, `accept()` / `decline()` knocks, admit guests over WebRTC, `start()`), `GuestRoom` (join, wait for the start) and `localRoom()` (robots). The only engine file that knows about signaling and WebRTC. |
-| `session.js` | `Session`: the seated players (`players`, `index`, `me`, `others`, `opponent`), buffering of game messages, rematch votes (`$rematch`, every seat must vote), goodbye (`$bye`), reactions (`$react`, emitted as `react` for `reactions.js`). The handshake (`$hello` with a protocol version, `$welcome`, `$roster`, `$start`) that turns links into a group. No DOM. |
-| `session.js` → `matchRouter()` | Routes game messages to the current match by match number `m`, with the sender's seat, and holds messages for a rematch that hasn't started yet |
+| `group.js` | The group transport every layer above talks to: `send(msg)` to all other seats, `message (msg, from)`, `leave (seat)`, `close`. `HubGroup` and `SpokeGroup` are today's star over links; `localGroup(n)` connects n seats in memory. `HubGroup.add(seat, link)` seats a link, and `keep(seat)` (set by the hub's `Session`) lets a robot take over a seat whose link closed, so the others never hear it was empty (see **Mixed rooms**). The hub measures each frame it would forward and cuts off a guest whose frame is over the cap; `leave` and `close` carry `message_too_big` when that was the reason. |
+| `room.js` | How players get seated in a group: `HostRoom` (create, `accept()` / `decline()` knocks, admit guests over WebRTC, `addRobot()` and `removeRobot(name)` for a game that seats more than two, a `seat-taken` event when a friend takes a robot's seat, `start()`, which returns the host's `Session` and one per robot seat), `GuestRoom` (join, wait for the start) and `localRoom()` (robots). The only engine file that knows about signaling and WebRTC. |
+| `session.js` | `Session`: the seated players (`players`, `index`, `me`, `others`, `opponent`), buffering of game messages, rematch votes (`$rematch`, every seat must vote), goodbye (`$bye`), reactions (`$react`, emitted as `react` for `reactions.js`), robot seats (`players[seat].robot`; `seatRobot()` on the hub, `$robot` and the `takeover` event when a robot takes a leaving guest's seat, see **Mixed rooms**). The handshake (`$hello` with a protocol version, `$welcome`, `$roster`, `$start`) that turns links into a group. No DOM. |
+| `session.js` → `matchRouter()` | Routes game messages to the current match by match number `m`, with the sender's seat, and holds messages for a rematch that hasn't started yet; passes a robot takeover (`$takeover`) to the current match's `takeover(seat)` |
 | `robot-pace.js` | `robotPause(ms)`: every robot's pause before it moves goes through it, so browser tests can speed robots up by setting `globalThis.ddpRobotPace` (1 for players) |
-| `turn-match.js` | `TurnMatch` and `startTurnRobot()`: a generic protocol for open-information turn games, for two or more players. Agreed coin toss for who starts, every peer validates every move with the same rules (only the seat on turn may move), and luck moves (dice) use `SharedRandom`. A rules object may set `draws`, the most shared draws one match needs (default 256). This is the default for future games. Card games use `card-match.js`; Sea Battle hides a fleet, not cards, so it has its own `match.js`. |
-| `card-match.js` | `CardMatch` and `startCardRobot()`: turn games with hidden cards and no dealer (mental poker, see **Card games**). Like `TurnMatch`, plus a deck the rules deal from (`deck.deal`, `deck.pass`, `deck.open`, `deck.shuffle`, `deck.face`), every shuffle and share checked as it arrives, a hidden card passed in secret, and an audit when the match ends. |
+| `turn-match.js` | `TurnMatch` and `startTurnRobot()`: a generic protocol for open-information turn games, for two or more players. Agreed coin toss for who starts, every peer validates every move with the same rules (only the seat on turn may move), and luck moves (dice) use `SharedRandom`. A rules object may set `draws`, the most shared draws one match needs (default 256). `takeover(seat)` and `handover(seat)` let a robot play on for a player who left (see **Mixed rooms**). This is the default for future games. Card games use `card-match.js`; Sea Battle hides a fleet, not cards, so it has its own `match.js`. |
+| `card-match.js` | `CardMatch` and `startCardRobot()`: turn games with hidden cards and no dealer (mental poker, see **Card games**). Like `TurnMatch`, plus a deck the rules deal from (`deck.deal`, `deck.pass`, `deck.open`, `deck.shuffle`, `deck.face`), every shuffle and share checked as it arrives, a hidden card passed in secret, and an audit when the match ends. `takeover(seat)` stops the match when a player leaves (see **Mixed rooms**). |
 | `seal.js` | Sealing a hidden card's shares to one player, through WebCrypto (ECDH P-256, HKDF-SHA256, AES-GCM): each player's seal key, `seal()` and `unseal()` (either side's private key opens an envelope), and `revealedKey()`, which accepts a key revealed for the audit only if it belongs to the published one. |
 | `deck-service.js` | `deckService()`: the deck cryptography as async calls, in one Web Worker per tab (`deck-worker.js`) or in-process in Node. Replaces the worker if the WebAssembly crashes. Also `DeckError` and the byte sizes. |
 | `deck-worker.js` | The worker: runs `deck-crypto.js` off the main thread |
 | `deck-crypto.js` | A synchronous layer over the vendored mental-poker WebAssembly (`vendor/mental-poker/`): keys, shuffles and their proofs, shares, opening, the audit. Bytes in, bytes out. |
 | `base64.js` | Bytes to base64 and back, strict about its input, for binary data in JSON messages |
 | `vendor/mental-poker/` | The built library, committed (see **Card games**): `cards_play_bg.wasm`, its loader `cards_play.js`, `LICENSE`, and `SOURCE` (the commit it was built from) |
-| `lobby.js` | `startGameShell()`: the game's `description` from `games.json` under its name (the lobby shows at once and the text fills in when the file arrives), a "How to play" link under it that opens the game's `howToPlay` panel (see `how-to-play.js`, put under `#game`) and moves focus to its summary, the "Play with a friend" / "Play vs robot" / join-by-code UI with a quiet line under the Play buttons that games connect browsers directly, invite link with copy and share (inside the mobile app the app's share sheet; on the web a share that fails, other than a cancelled sheet, copies the link instead and says so), the waiting room (a player list and a Start button when a game allows more than two; Accept / Decline for anyone knocking), `?room=CODE&key=KEY` auto-join, `?robot=1` (a robot game), `?friend=1` (a new room at once, as if "Play with a friend" was pressed; dropped from the address bar so a reload doesn't make another) and `?learn` (the game's tutorial, also opened by a Learn button under the Play buttons and a link at the top of "How to play"; see **Tutorials**), your record against the robot once you have one (in the robot box, else under the Play buttons), with a Reset that asks first (see **Record against the robot**), connection-failure and player-left screens, and "You're offline" when `/ws` can't be reached (see **Mobile app**). It hands the game a `shell` with `leave()` and `setInProgress(on)` (see **Leaving**). With a game's `settings` it shows them inside the home screen's card, between the nickname and the Play buttons, and their summary on the host's waiting screen, so friends see the rules before the game starts; it passes them to the settings panel and locks them while a game is on. Each new screen moves focus to its heading (not on page load); progress such as "Creating a room…" or "Bo joined" is read out from one `role="status"` line, and the connection-problem screen uses `role="alert"`. The code field takes only the server's code letters (uppercased, spaces and dashes dropped, anything else refused with a hint) and joins by itself at four; a join that fails returns to it with the code still in, the error under the field and read out from the status line. It also sets which view is on show for the page column. |
-| `fair.js` | `commit` and `verifyCommit` (SHA-256 commitments), `HashChain` and `SharedRandom` (random draws all peers agree on). SHA-256 uses WebCrypto where the page has it, else a plain-JS copy (see below). |
-| `players.js` | `playerBar(session, { onLeave, classes })`: the bar above every game (see **Player bar**). |
+| `lobby.js` | `startGameShell()`: the game's `description` from `games.json` under its name (the lobby shows at once and the text fills in when the file arrives), a "How to play" link under it that opens the game's `howToPlay` panel (see `how-to-play.js`, put under `#game`) and moves focus to its summary, the "Play with a friend" / "Play vs robot" / join-by-code UI with a quiet line under the Play buttons that games connect browsers directly, invite link with copy and share (inside the mobile app the app's share sheet; on the web a share that fails, other than a cancelled sheet, copies the link instead and says so), the waiting room (a player list and a Start button when a game allows more than two, with Add robot on each empty seat and Remove on each robot; Accept / Decline for anyone knocking), `?room=CODE&key=KEY` auto-join, `?robot=1` (a robot game), `?friend=1` (a new room at once, as if "Play with a friend" was pressed; dropped from the address bar so a reload doesn't make another) and `?learn` (the game's tutorial, also opened by a Learn button under the Play buttons and a link at the top of "How to play"; see **Tutorials**), your record against the robot once you have one (in the robot box, else under the Play buttons), with a Reset that asks first (see **Record against the robot**), connection-failure and player-left screens, and "You're offline" when `/ws` can't be reached (see **Mobile app**). It hands the game a `shell` with `leave()` and `setInProgress(on)` (see **Leaving**). With a game's `settings` it shows them inside the home screen's card, between the nickname and the Play buttons, and their summary on the host's waiting screen, so friends see the rules before the game starts; it passes them to the settings panel and locks them while a game is on. Each new screen moves focus to its heading (not on page load); progress such as "Creating a room…" or "Bo joined" is read out from one `role="status"` line, and the connection-problem screen uses `role="alert"`. The code field takes only the server's code letters (uppercased, spaces and dashes dropped, anything else refused with a hint) and joins by itself at four; a join that fails returns to it with the code still in, the error under the field and read out from the status line. It also sets which view is on show for the page column. |
+| `fair.js` | `commit` and `verifyCommit` (SHA-256 commitments), `HashChain` and `SharedRandom` (random draws all peers agree on; `drop(seat)` and `forSeat(seat)` for a seat a robot took over). SHA-256 uses WebCrypto where the page has it, else a plain-JS copy (see below). |
+| `players.js` | `playerBar(session, { onLeave, classes })`: the bar above every game (see **Player bar**), with "(robot)" after a player a robot took over from. |
 | `reactions.js` | Quick reactions in the player bar (see **Reactions**): the React tray, the bubbles with their pop, the checks on `$react`, and `robotBanter()`, which the lobby starts for every robot seat. |
 | `result.js` | `resultPanel(session, { onLeave, onShow, classes })`: the game-over panel of every game, with Rematch and Leave (see **Result panel**). It puts each finished robot match on your record (see **Record against the robot**). |
 | `robot-record.js` | `recordRobotResult(slug, outcome, players)`, `robotRecord(slug)` and `resetRobotRecord(slug)`: your record against the robots, on this device only (see **Record against the robot**). No DOM; runs in node too. |
@@ -572,7 +572,7 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `confirm.js` | `confirmDialog({ title, text, yes, no })`: a yes-or-no question in a modal `<dialog>` styled like the site. Focus moves to Cancel, Esc or Cancel says no, and focus returns to where it was (Leave). Resolves to `true` for yes. |
 | `how-to-play.js` | `howToPlayPanel(sections, top)`: the "How to play" panel (`details.rules#how-to-play`) with the same `<h3>` sections in every game, in one order: Goal, Players, Setup, On your turn, Winning, Settings and clocks, Fair play, Keyboard. A game leaves out what doesn't apply; a section is a paragraph or a list, and an unknown one throws. `top` goes first (the lobby's link to the tutorial). `startGameShell()` puts it under `#game`. |
 | `tutorial.js` | `startTutorial()`: a game's lessons on its own board, with the lesson list and its ticks, the step runner, the highlight layer (lit squares and arrows), the hint, progress and the end screen (see **Tutorials**). The lobby imports it only when a tutorial opens. |
-| `settings.js` | `gameSettings()`: a game's settings (groups of segmented options such as clocks or board size), remembered per device under the game's key. The lobby shows them folded to a summary ("Game settings" over chips such as "No clocks", "Coin toss", "Easy robot", and Change) that opens to the options; a "device" group (`scope: "device"`, or `robot: true`) is tagged "vs robot only", its chip has a teal dot, and it is left out of the waiting screen's summary, like a "view" group. `form()` is the options themselves, shown in the lobby card and in the settings panel's "This game" tab, and each copy follows changes made in the other; `lock(on, mode)`, from the lobby, disables all but the "view" options while a game is on and shows that game's config. `get()` is the current config, which the game sends to its guests (`setup`); `get("robot")` is a robot game's, from the game's `robot(config, picked)` (see **Clocks against the robot**). It remembers which groups the player picked an option in (`picked`, kept with the config under the same key). For a game that seats more than two it also keeps a robot game's player count there (`players`; see **How many play a robot game**): `offerPlayers(counts)`, `playersForm()` (the "Players" radio group, also in the panel's copy of `form()`) and `players()`. Settings saved before that kept the number of robots (`robots`), read as one more player (`savedPlayers()`). |
+| `settings.js` | `gameSettings()`: a game's settings (groups of segmented options such as clocks or board size), remembered per device under the game's key. The lobby shows them folded to a summary ("Game settings" over chips such as "No clocks", "Coin toss", "Easy robot", and Change) that opens to the options; a "device" group (`scope: "device"`, or `robot: true`) is tagged "vs robot only" ("for robots" in a game that seats more than two, whose friend rooms can seat robots), its chip has a teal dot, and it is left out of the waiting screen's summary, like a "view" group, until the host seats a robot (`summary(robots)`). `form()` is the options themselves, shown in the lobby card and in the settings panel's "This game" tab, and each copy follows changes made in the other; `lock(on, mode)`, from the lobby, disables all but the "view" options while a game is on and shows that game's config. `get()` is the current config, which the game sends to its guests (`setup`); `get("robot")` is a robot game's, from the game's `robot(config, picked)` (see **Clocks against the robot**). It remembers which groups the player picked an option in (`picked`, kept with the config under the same key). For a game that seats more than two it also keeps a robot game's player count there (`players`; see **How many play a robot game**): `offerPlayers(counts)`, `playersForm()` (the "Players" radio group, also in the panel's copy of `form()`) and `players()`. Settings saved before that kept the number of robots (`robots`), read as one more player (`savedPlayers()`). |
 | `native.js` | The mobile app's bridge: `isApp`, `share(text, url)` and `haptic(kind)` post to the channel the app adds (see **Mobile app**); on the web they do nothing |
 | `sound.js` | Every game's sounds play through it (see **Sound levels**): `defineSounds()` takes a game's list of sounds, each with a role, and returns `play(name, opts, at)`. One audio context and one output for the site, the per-device mute and volume (a master gain after the output) from `prefs.js`, and preloading of short CC0 recordings (Sea Battle, Chess, Backgammon, Ludo and the card games, see each `sounds/LICENSE.txt`) |
 | `synth.js` | Building blocks for synthesized sounds: `tone()`, `noise()` (white or brown), `decay()` and a `pentatonic()` scale |
@@ -622,7 +622,7 @@ sequenceDiagram
 2. Each friend opens `/<slug>/?room=CODE&key=KEY` → `join`, and is seated at once. A friend who types the code knocks instead and waits until the host presses Accept (see **Who may join a room**). The lobby drops `room` and `key` from the address bar.
 3. The host starts a WebRTC offer to each guest, the guest answers, and ICE goes through `signal`.
 4. Each DataChannel opens. The guest sends `$hello`; the host checks the game and protocol version and answers `$welcome` (or `$reject`), then sends every connected guest the `$roster`.
-5. The game starts when the room is full (`maxPlayers`), or when the host presses Start with at least `minPlayers`. The host sends each guest `$start {seat, players}`: seats follow join order, and guests still connecting are dropped. A two-player room is full as soon as its guest is in, so it starts at once, as before.
+5. The game starts when the room is full of people (`maxPlayers`), or when the host presses Start with at least `minPlayers`, robots counted (see **Mixed rooms**). The host sends each guest `$start {seat, players, robots}`: seats follow join order, the robots sit last, `robots` lists their seats (only in a game that seats more than two), and guests still connecting are dropped. A two-player room is full as soon as its guest is in, so it starts at once, as before.
 6. The lobby closes the signaling sockets. This frees the room (a late joiner gets "doesn't exist any more") and keeps instance load near zero.
    The host can get there first, so a guest whose channel is already open ignores `host-left`.
 7. The engine calls `onSession(session, root)` and the game takes over.
@@ -634,7 +634,7 @@ In robot mode the engine builds a `localRoom()`: one in-memory group with a
 seat for the player and one per robot, and hands each
 robot's `Session` to the game's `createRobot()`. **A robot is just another
 peer**, so robot games use exactly the same protocol and rules code as friend
-games. The lobby acts on `?room=`, `?robot` and `?friend` only after the
+games, and a friend room can seat robots the same way (see **Mixed rooms**). The lobby acts on `?room=`, `?robot` and `?friend` only after the
 game's module has finished loading, because a robot game's `onSession` runs at once and may
 use bindings the module declares after its `startGameShell()` call.
 
@@ -690,7 +690,9 @@ each message to every other seat, tagged with the sender, so every player sees
 other players' messages in the hub's order. A player's own message is applied
 when sent and is not echoed back. With two players the hub forwards nothing,
 so this is the same single DataChannel as before, plus a small frame
-(`{msg}` up, `{from, msg}` or `{left}` down).
+(`{msg}` up, `{from, msg}` or `{left}` down). A robot in a friend room is a
+spoke too, over an in-memory link in the host's tab (see **Mixed rooms**), so
+nothing above the group can tell it from a remote player.
 
 Why a star: there is no TURN server, so every extra connection is another
 chance that two networks can't reach each other. A star needs only each
@@ -704,18 +706,87 @@ change the transport later (a server relay as a fallback for blocked
 networks, or a mesh), write another group and seat players with it in
 `room.js`; sessions, matches and games don't change.
 
-**Leaving.** Any player leaving, or losing their connection, ends the session
-for everyone (`end` with the reason and the seat), because the match can't go
-on without their moves and shared draws. The reason is `left` (`$bye`),
+**Mixed rooms.** A friend room of a game that seats more than two can mix
+people and robots, so two friends can play Hearts. On the host's waiting
+screen every empty seat has Add robot and every robot Remove (for that
+robot: the others keep their names). Robots sit after the people as "Robot
+1", "Robot 2", a new one taking the lowest number free, and a friend who
+joins a full room takes the last robot's seat, which the host is told ("Bo
+takes Robot 3's seat."). The host can start once people and robots reach
+`minPlayers`; with no friend in yet, Start says "Play with robots only" and
+starts a robot game with that many robots. The line under the seats says
+what the room waits for: friends, a friend to take a robot's seat, or
+nothing ("Every seat is taken. Start when you're ready."). The settings
+chips add the robots' level once a robot sits, and every game with a level
+shows it in its settings line for everyone in the room. Guests see the count
+while they wait ("2 players and 2 robots in") and `$start` tells every seat
+which seats are robots (`session.players[seat].robot`). Two-player games
+don't change.
+
+The robots run in the host's browser, driven by the game's `createRobot()`
+at the host's robot level, like a robot game. Each is a seat of its own: a
+`Session` over a `localPair()` link plugged into the hub
+(`session.seatRobot()`), so it gets exactly the frames a remote guest gets,
+no more, and keeps its own keys, chain and match. **Hidden information
+stays hidden from it:** a card robot's `CardMatch` has its own key, reads
+only the cards dealt or passed to its seat (`face()`), and never touches the
+host's match; the host's match never reads the robot's. The known limit: a
+host who opens the browser's developer tools can read their own robots'
+cards, as they could read any page's memory. For a room of friends who chose
+to play together that is acceptable; it never shows anyone else's hand, and
+mixed rooms are friend games, so they never count toward the record against
+the robots (only robot games do) or any future leaderboard.
+
+**Leaving.** In a mixed-room game (a friend room of a game for more than
+two), a guest leaving or losing their connection doesn't end it: a robot
+takes their seat over on the host, and the game goes on.
+
+```mermaid
+sequenceDiagram
+  participant G as Guest leaving
+  participant H as Host (hub)
+  participant O as Other guests
+  G->>H: $bye (relayed, ignored by guests)
+  G-xH: link closes
+  H->>O: $robot {seat, why} instead of {left}
+  Note over H: every handler gets $takeover from that seat,<br>then a robot's Session takes the seat (keep())
+  H->>O: the robot's moves, from that seat
+```
+
+- Every seat marks the seat a robot and hands its game `{ t: "$takeover",
+  seat }` at that point in the message stream; `matchRouter()` calls the
+  current match's `takeover(seat)`, and the player bar adds "(robot)".
+- **Turn games** (`TurnMatch`: Ludo, Chutes and Ladders) play on. The
+  player's hash chain left with them, so every peer drops that seat from
+  shared draws after its last reveal (`SharedRandom.drop()`; they all saw the
+  same reveals before `$robot`, so they agree). The robot's match starts
+  from the host's (`handover()`, queued behind every message before the
+  takeover) with a copy of the shared random that checks everyone else's
+  reveals and reveals none (`forSeat()`). Moves are open information, so the
+  copy shows it nothing hidden. A player leaving before the first move stops
+  the match instead, and the robot plays from the rematch.
+- **Card games** (`CardMatch`) can't play the hand on: every card needs
+  every player's key, and theirs left with them. The match stops ("Bo left.
+  Every card needs every player's key…"), or, if it was over and their audit
+  key never came, it can't be checked. The robot sits that match out and
+  plays from the rematch, with a key of its own.
+- The robot votes for a rematch once someone else has (votes cast before it
+  took over count).
+
+If the host leaves, the game ends for everyone as before: the hub is gone.
+So does any player leaving a two-player game or a robot game: the session
+ends (`end` with the reason and the seat). The reason is `left` (`$bye`),
 `closed` (connection lost), `message_too_big` (see below) or `self`.
-Continuing without a player is a future, per-game choice.
 
 So Leave asks first, the same way in every game. Each game calls
 `shell.setInProgress(on)` from its render, on until the match is over or
 stopped; while it is on in a friend game, `shell.leave()` opens
 `confirmDialog()`: "Leave the game? Bo will be told you left." with two
-players, "Leave the game? It ends for everyone." with more. Cancel keeps
-playing. Robot games, finished matches and a game that never calls
+players, "Leave the game? A robot takes your seat and the game goes on." for
+a guest in a mixed-room game, and "Leave the game? It ends for everyone." for
+its host. Robots don't count: the host is told the one person still playing
+("Cy will be told you left."), and once robots play every other seat, Leave
+goes at once, as in a robot game. Cancel keeps playing. Robot games, finished matches and a game that never calls
 `setInProgress` leave at once, and so does a player who turned off "Ask
 before leaving" in the settings panel (`askBeforeLeaving()` in `shell.js`). The browser's Back (or a phone's back gesture) is
 Leave too: a game gets a history entry of its own when it starts, so Back
@@ -736,6 +807,8 @@ closes with `message_too_big`.
   received, so it measures the frame again before forwarding. An oversized one
   cuts off its sender, never the guests it was meant for.
 - Before the start, the host drops that guest from the waiting room. During a
+  mixed-room game a robot takes their seat (see **Leaving**), and the toast
+  says the player's browser sent something unexpected. During any other
   game, the session ends for everyone with `message_too_big` and the seat: the
   hub tells the other guests why in its `{left, reason}` frame. The lobby
   shows "A player's browser sent something unexpected." The cut-off browser
@@ -767,14 +840,16 @@ side's first message can arrive before the other side has the channel.
 Engine messages start with `$`. Everything else belongs to the game. The
 game receives messages through `session.onMessage((msg, fromSeat) => …)`,
 which buffers until a handler is attached. The handshake's protocol version is
-3; a page from before the card engine's secret pass (2), or before groups,
-gets "a different version of this page" when it connects, before any game.
+4; a page from before mixed rooms (3), the card engine's secret pass (2), or
+groups gets "a different version of this page" when it connects, before any
+game.
 
 | Engine message, during a game | Meaning |
 |---|---|
-| `$bye` | I am leaving: the session ends for everyone. |
+| `$bye` | I am leaving: the session ends for everyone, unless a guest leaves a mixed-room game (see **Leaving**). |
 | `$rematch` | My vote for a rematch. |
 | `$react {i}` | A reaction: `i` indexes the fixed list in `reactions.js`, never text. |
+| `$robot {seat, why}` | From the host: a robot took over that seat (`why`: `left`, `closed` or `message_too_big`); see **Mixed rooms**. |
 
 A page from before reactions ignores `$react`, as it ignores any `$` message
 it doesn't know, so the protocol version stays 2.
@@ -1023,7 +1098,7 @@ colour, and nothing moves. The colours stay while the panel is up; it calls
 **Record against the robot.** The lobby shows your record against the
 robots in this game once you've finished a robot game: "You vs robot: 3
 wins · 1 draw · 2 losses" under the Play buttons, or "You vs robots: …" on
-a row of its own in the robot box of a game that seats more than two, with a Reset link that asks first in the confirm
+a row of its own in the robot box of a game that seats more than two (mixed rooms are friend games and never count), with a Reset link that asks first in the confirm
 dialog. It is kept only on this device, in `ddp-robot-record` (`{ [slug]: {
 [players]: { win, draw, loss } } }`, through the safe `load()` and `store()`
 in `shell.js`), and never counts on a leaderboard. The result panel records
@@ -1335,6 +1410,14 @@ Seal keys are no different: the host could swap in its own at the hello
 that player, or relay a different envelope to each player so their verdicts
 differ. With two players the host is your only opponent, so this gives them
 nothing the game doesn't already.
+
+**Robot seats on the host.** In a mixed room (see **Mixed rooms**) each robot
+is a seat with its own `CardMatch`, key and seal key, reached only through
+the hub like a remote player: it reads only the cards dealt or passed to it,
+and the host's own match reads none of them. The robot's secrets do sit in
+the host's tab, so a host with the developer tools open can read their
+robots' hands (never a person's), and a robot can't take over a hand in
+progress, since the cards dealt need the key that left.
 
 **Writing rules.** The rules see slots, never ciphertexts, and `deck.face()`
 only returns faces every player can see, so the state is the same in every
@@ -2052,8 +2135,10 @@ queue plays faster; a hidden tab or `prefers-reduced-motion` (read live, so
 tests can switch it) applies them at once. Animations belong to a match
 generation, so a rematch drops the old queue. The result panel waits for the
 last token and lists the standings with each player's rolls and captures (or
-tokens home). If a player leaves, the engine's notice gets a line
-saying the game is over for everyone, with where each player stood.
+tokens home). If a guest leaves, a robot plays on for them (see **Leaving**);
+if the host leaves, the engine's notice gets a line saying every move went
+through their browser, so the game is over for everyone, with where each
+player stood.
 
 **Sound** (`sounds.js`, behind the header's mute toggle). The die plays
 Backgammon's CC0 dice recordings (`ludo/sounds/LICENSE.txt`); the rest is
@@ -2212,8 +2297,10 @@ depends on the suit named), knocks for a 2, a whoosh for a skip, a swoop for
 a reverse, a bell call for the last card, the turn chime, a soft pass, the
 timer's ticks, and tunes for a win and a loss.
 
-**Leaving.** Any player leaving ends the game for everyone, since every card
-needs every player's key. The engine's notice gets a line saying whether
+**Leaving.** Every card needs every player's key, so a guest leaving stops
+the hand, and a robot takes their seat from the next (see **Leaving** under
+the engine); the host leaving, or anyone leaving a two-player game, ends the
+game for everyone. The engine's notice gets a line saying whether
 the game was checked: verified before they left, left during the audit so it
 couldn't be verified, or stopped before the end. With three or more players
 it also says the game is over for everyone and lists each player's cards
