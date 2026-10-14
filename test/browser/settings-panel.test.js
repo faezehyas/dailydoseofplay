@@ -7,36 +7,23 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, noHorizontalScroll } from "./ludo.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, noHorizontalScroll } from "../helpers.js";
+
+const skip = skipWithoutPlaywright();
+
+// The gain that feeds the speakers: the master volume.
+function findMaster() {
+  const connect = AudioNode.prototype.connect;
+  AudioNode.prototype.connect = function (dest, ...rest) {
+    if (dest instanceof AudioDestinationNode) window.ddpMaster = this;
+    return connect.call(this, dest, ...rest);
+  };
+}
 
 async function setup(t) {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(opts = {}) {
-    const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true, ...opts });
-    await ctx.addInitScript(() => {
-      localStorage.setItem("ddp-name", "Ada");
-      globalThis.ddpRobotPace = 0.1;
-      // The gain that feeds the speakers: the master volume.
-      const connect = AudioNode.prototype.connect;
-      AudioNode.prototype.connect = function (dest, ...rest) {
-        if (dest instanceof AudioDestinationNode) window.ddpMaster = this;
-        return connect.call(this, dest, ...rest);
-      };
-    });
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(e.message));
-    return page;
-  }
-  return { srv, open, errors };
+  const { srv, open: openPage, assertNoErrors } = await openBrowser(t);
+  const open = (opts = {}) => openPage("player", { nickname: "Ada", viewport: { width: 360, height: 740 }, hasTouch: true, init: findMaster, ...opts });
+  return { srv, open, assertNoErrors };
 }
 
 const html = (page) => page.evaluate(() => ({ ...document.documentElement.dataset }));
@@ -44,8 +31,8 @@ const prefs = (page) => page.evaluate(() => JSON.parse(localStorage.getItem("ddp
 const focused = (page) => page.evaluate(() => document.activeElement?.id);
 const option = (name, value) => `#settings label:has(input[name="${name}"][value="${value}"])`;
 
-test("theme and volume set on the home page apply in a game", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
+test("theme and volume set on the home page apply in a game", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
   const page = await open({ colorScheme: "light" });
   await page.goto(`${srv.base}/`);
   assert.deepEqual(await html(page), {}, "follows the device: light");
@@ -80,7 +67,7 @@ test("theme and volume set on the home page apply in a game", { skip: !pw && "Pl
   assert.deepEqual(await html(page), { theme: "dark" });
   // The robot may move first, and may take any cell: tap a free one on my turn.
   await page.locator('.ttt-cell[aria-disabled="false"]').first().tap();
-  await page.waitForFunction(() => window.ddpMaster);
+  await waitForState(page, () => window.ddpMaster);
   assert.ok(Math.abs((await page.evaluate(() => window.ddpMaster.gain.value)) - 0.16) < 1e-6, "the volume reaches the game's sound");
 
   // Changed mid-game, it applies at once there too.
@@ -88,14 +75,14 @@ test("theme and volume set on the home page apply in a game", { skip: !pw && "Pl
   await page.tap(option("settings-theme", "system"));
   await page.locator("#settings-volume").fill("100");
   assert.deepEqual(await html(page), {}, "back to the device's theme");
-  await page.waitForFunction(() => window.ddpMaster.gain.value > 0.99);
+  await waitForState(page, () => window.ddpMaster.gain.value > 0.99);
   await page.keyboard.press("Escape");
   await page.locator("#settings").waitFor({ state: "detached" });
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("a room setting is locked during a game until the next one; a view setting stays open", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
+test("a room setting is locked during a game until the next one; a view setting stays open", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
   const page = await open({ viewport: { width: 1280, height: 900 }, hasTouch: false, colorScheme: "dark" });
   await page.goto(`${srv.base}/tic-tac-toe/`);
   // In the lobby the game's tab is open, and a change shows in the lobby card too.
@@ -144,11 +131,11 @@ test("a room setting is locked during a game until the next one; a view setting 
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("ddp-cl-settings")).spin), "auto");
   await page.screenshot({ path: `${ARTIFACTS}/settings-3-view-desktop-dark.png` });
   await page.keyboard.press("Escape");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("the panel works with the keyboard alone", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
+test("the panel works with the keyboard alone", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
   const page = await open({ colorScheme: "light", hasTouch: false });
   await page.goto(`${srv.base}/ludo/`);
   for (let i = 0; i < 10 && (await focused(page)) !== "settings-open"; i++) await page.keyboard.press("Tab");
@@ -195,5 +182,5 @@ test("the panel works with the keyboard alone", { skip: !pw && "Playwright not i
   await page.keyboard.press("Escape");
   await page.locator("#settings").waitFor({ state: "detached" });
   assert.equal(await focused(page), "settings-open", "Esc closes it and focus goes back to the gear");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

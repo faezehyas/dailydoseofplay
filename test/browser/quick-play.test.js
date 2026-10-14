@@ -7,60 +7,28 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, noHorizontalScroll } from "../helpers.js";
 
-const ARTIFACTS = path.resolve("test-artifacts");
-
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
-
-const noHorizontalScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+const skip = skipWithoutPlaywright();
 
 async function home(page, base) {
   await page.goto(`${base}/`);
   await page.locator(".game-card[data-slug] .quick-play").last().waitFor();
 }
 
-test("quick play links on the home page start a game straight away", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
+test("quick play links on the home page start a game straight away", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
 
   for (const [width, colorScheme] of [[1280, "light"], [1280, "dark"], [360, "light"], [360, "dark"]]) {
     const name = `${width} px ${colorScheme}`;
-    const ctx = await browser.newContext({ viewport: { width, height: 900 }, colorScheme, hasTouch: width === 360 });
-    await ctx.addInitScript(() => (globalThis.ddpRobotPace = 0.1));
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
+    const page = await open(name, { viewport: { width, height: 900 }, colorScheme, hasTouch: width === 360 });
     await home(page, srv.base);
     assert.ok(await noHorizontalScroll(page), `${name}: home page has no horizontal scroll`);
     await page.screenshot({ path: `${ARTIFACTS}/quick-play-home-${width}-${colorScheme}.png`, fullPage: true });
 
     // Play the robot: a robot game, no lobby.
     await page.getByRole("link", { name: "Play the robot at Tic Tac Toe" }).click();
-    await page.waitForFunction(() => window.ddp?.robots.length === 1 && window.ddp.match?.phase === "playing");
+    await waitForState(page, (ddp) => ddp?.robots.length === 1 && ddp.match?.phase === "playing");
     assert.ok(await page.locator("#game").isVisible(), `${name}: the game is on show`);
     assert.ok(await page.locator("#lobby").isHidden(), `${name}: the lobby is skipped`);
 
@@ -91,13 +59,11 @@ test("quick play links on the home page start a game straight away", { skip: !pw
     await page.locator('.game-card[data-slug="ludo"] p').click({ force: true });
     await page.locator("#play-friend").waitFor();
     assert.equal(new URL(page.url()).pathname, "/ludo/");
-    await ctx.close();
+    await page.context().close();
   }
 
   // Keyboard: the name, then Play friends, then Play the robot; Enter follows each.
-  const page = await browser.newPage();
-  await page.addInitScript(() => (globalThis.ddpRobotPace = 0.1));
-  page.on("pageerror", (e) => errors.push(`keyboard: ${e.message}`));
+  const page = await open("keyboard");
   await home(page, srv.base);
   await page.locator('.game-card[data-slug="chess"] h2 a').focus();
   const focused = () => page.evaluate(() => document.activeElement.getAttribute("aria-label") ?? document.activeElement.textContent);
@@ -110,7 +76,7 @@ test("quick play links on the home page start a game straight away", { skip: !pw
   await page.keyboard.press("Tab");
   assert.equal(await focused(), "Play the robot at Chess");
   await page.keyboard.press("Enter");
-  await page.waitForFunction(() => window.ddp?.robots.length === 1 && window.ddp.match?.phase === "playing");
+  await waitForState(page, (ddp) => ddp?.robots.length === 1 && ddp.match?.phase === "playing");
   assert.equal(new URL(page.url()).pathname, "/chess/");
 
   await home(page, srv.base);
@@ -126,5 +92,5 @@ test("quick play links on the home page start a game straight away", { skip: !pw
   await page.locator("#play-friend").waitFor();
   assert.equal(await page.locator("#room-code").count(), 0, "the name opens the lobby, not a room");
   await page.close();
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

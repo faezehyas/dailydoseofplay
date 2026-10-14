@@ -10,8 +10,9 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { startServer } from "../helpers.js";
-import { noHorizontalScroll, pw } from "./ludo.shared.js";
+import { skipWithoutPlaywright, openBrowser, waitForState, noHorizontalScroll } from "../helpers.js";
+
+const skip = skipWithoutPlaywright();
 
 const sq = (name) => (Number(name[1]) - 1) * 8 + "abcdefgh".indexOf(name[0]);
 const square = (page, name) => page.locator(`.tut-stage .sq[data-sq="${sq(name)}"]`);
@@ -33,26 +34,18 @@ const feedback = (page) => page.locator("#tut-feedback").textContent();
 // A step waits for the last move to play out, as long as a ladder or a spin of 6 takes in the game.
 const step = (page, text) => page.waitForSelector(`.tut-step:text-is("${text}")`, { timeout: 15_000 });
 
-test("the first Chess lesson by keyboard: a wrong move springs back, the second brings the hint, and the tick is saved", { skip: !pw && "Playwright not installed", timeout: 90_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const page = await browser.newPage({ viewport: { width: 360, height: 740 } });
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+test("the first Chess lesson by keyboard: a wrong move springs back, the second brings the hint, and the tick is saved", { skip, timeout: 90_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
   // Counts the pieces that spring back.
-  await page.addInitScript(() => {
+  const countSprings = () => {
     window.springs = 0;
     const animate = Element.prototype.animate;
     Element.prototype.animate = function (...args) {
       if (this.classList.contains("art")) window.springs++;
       return animate.apply(this, args);
     };
-  });
+  };
+  const page = await open("player", { viewport: { width: 360, height: 740 }, init: countSprings });
 
   // The lobby's Learn button opens the lesson list on a page of its own; Back returns.
   await page.goto(`${srv.base}/chess/`);
@@ -118,20 +111,12 @@ test("the first Chess lesson by keyboard: a wrong move springs back, the second 
     assert.match(await page.locator(".tut-lesson").first().textContent(), /, done$/);
     assert.equal(await page.locator("#tut-summary").textContent(), "1 of 6 done");
   }
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("Tic Tac Toe's last lesson ends with Play the robot now, which starts a robot game", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const page = await browser.newPage({ viewport: { width: 360, height: 740 } });
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  await page.addInitScript(() => (globalThis.ddpRobotPace = 0.1));
+test("Tic Tac Toe's last lesson ends with Play the robot now, which starts a robot game", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { viewport: { width: 360, height: 740 } });
   await page.goto(`${srv.base}/tic-tac-toe/`);
   // The link at the top of How to play opens the tutorial too.
   await page.click("details.rules > summary");
@@ -146,24 +131,16 @@ test("Tic Tac Toe's last lesson ends with Play the robot now, which starts a rob
   await page.waitForSelector("#tut-end");
   assert.equal(await page.locator("#tut-end").textContent(), "That was the last lesson!", "two lessons were skipped");
   await page.click("#tut-play-robot");
-  await page.waitForFunction(() => window.ddp.match?.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing");
   assert.equal(new URL(page.url()).search, "", "?learn is dropped");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
 // Opens a game's first lesson on a 360 px phone, plays it with `moves`, and
 // checks the lesson is saved as done with no errors and no sideways scroll.
 async function firstLesson(t, slug, moves) {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const page = await browser.newPage({ viewport: { width: 360, height: 740 } });
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { viewport: { width: 360, height: 740 } });
   await page.goto(`${srv.base}/${slug}/`);
   await page.click("#learn");
   await page.locator(".tut-lesson").first().click();
@@ -175,10 +152,8 @@ async function firstLesson(t, slug, moves) {
   }
   await page.waitForSelector("#tut-next");
   assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("ddp-lessons"))), { [slug]: [0] });
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 }
-
-const skip = !pw && "Playwright not installed";
 
 test("Connect 4's first lesson by keyboard: the disc drops, teal stacks on it", { skip, timeout: 60_000 }, (t) =>
   firstLesson(t, "connect-4", [

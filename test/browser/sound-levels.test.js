@@ -11,13 +11,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { pw } from "./ludo.shared.js";
+import { skipWithoutPlaywright, openBrowser } from "../helpers.js";
 
 const PUBLIC = new URL("../../public/", import.meta.url);
 const GAMES = readdirSync(PUBLIC, { withFileTypes: true })
   .filter((d) => d.isDirectory() && existsSync(new URL(`${d.name}/sounds.js`, PUBLIC)))
   .map((d) => d.name);
+const skip = skipWithoutPlaywright();
 const SOURCES = [...GAMES.map((g) => [g, `/${g}/sounds.js`]), ["engine", "/engine/chimes.js"], ["reactions", "/engine/reactions.js"]];
 
 async function measure(page, url) {
@@ -58,18 +58,11 @@ async function measure(page, url) {
   }, url);
 }
 
-test("every game's sounds play at their role's loudness", { skip: !pw && "Playwright not installed", timeout: 300_000 }, async (t) => {
+test("every game's sounds play at their role's loudness", { skip, timeout: 300_000 }, async (t) => {
   assert.ok(GAMES.length >= 7, `found the games with sounds: ${GAMES.join(" ")}`);
   const { TOLERANCE, MAX_OFFSET } = await import("../../public/engine/sound.js");
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const page = await browser.newPage();
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player");
   await page.goto(`${srv.base}/`);
 
   const off = [];
@@ -89,7 +82,7 @@ test("every game's sounds play at their role's loudness", { skip: !pw && "Playwr
     }
   }
   assert.deepEqual(off, [], `sounds off their level:\n${off.join("\n")}`);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 
   // Issue #28: Ludo's die and a token's hop do the same job, so they sound
   // about as loud, the recording and its stand-in alike.

@@ -8,47 +8,22 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll } from "./ludo.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll } from "../helpers.js";
+
+const skip = skipWithoutPlaywright();
 
 const PHONE = { viewport: { width: 360, height: 760 }, hasTouch: true, colorScheme: "light" };
 const DESKTOP = { viewport: { width: 1280, height: 900 }, colorScheme: "dark" };
 // The bubble by the nth pill (0 is you), or "" when there is none.
 const bubble = (page, n) => page.locator(".pb-who").nth(n).evaluate((p) => p.querySelector(".rx-bubble")?.textContent ?? "");
 
-async function setup(t) {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  const errors = [];
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  async function open(who, opts, nickname) {
-    const ctx = await browser.newContext(opts);
-    await ctx.addInitScript((n) => {
-      localStorage.setItem("ddp-name", n);
-      globalThis.ddpRobotPace = 0.1;
-    }, nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${who}: ${e.message}`));
-    return page;
-  }
-  return { srv, open, errors };
-}
-
-test("a reaction shows in the other browser, goes away, and mute hides it", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
-  const host = await open("host", DESKTOP, "Ada");
+test("a reaction shows in the other browser, goes away, and mute hides it", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const host = await open("host", { ...DESKTOP, nickname: "Ada" });
   await host.goto(`${srv.base}/tic-tac-toe/`);
-  await host.click("#play-friend");
-  const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
-  const guest = await open("guest", PHONE, "Bo");
-  await guest.goto(invite);
-  await guest.click("#join-room");
-  for (const page of [host, guest]) await wait(page, () => window.ddp.match?.phase === "playing");
+  const guest = await open("guest", { ...PHONE, nickname: "Bo" });
+  await joinByInvite(host, guest, srv);
+  for (const page of [host, guest]) await waitForState(page, (ddp) => ddp.match?.phase === "playing");
 
   // When a bubble comes and goes in Bo's browser.
   await guest.evaluate(() => {
@@ -73,7 +48,7 @@ test("a reaction shows in the other browser, goes away, and mute hides it", { sk
   assert.equal(await bubble(host, 0), "Nice move!", "the sender sees their own bubble");
 
   // Bo sees it by Ada's name, hears of it politely, and it goes away after about 3 s.
-  await wait(guest, () => document.querySelectorAll(".pb-who")[1].querySelector(".rx-bubble"));
+  await waitForState(guest, () => document.querySelectorAll(".pb-who")[1].querySelector(".rx-bubble"));
   assert.equal(await bubble(guest, 1), "Nice move!");
   assert.equal(await guest.locator(".player-bar [aria-live=polite]").innerText(), "Ada: Nice move!");
 
@@ -88,7 +63,7 @@ test("a reaction shows in the other browser, goes away, and mute hides it", { sk
   await host.keyboard.press("Escape");
   assert.ok(await host.locator("#reactions").isHidden(), "Esc closes the tray");
 
-  await wait(guest, () => !document.querySelector(".rx-bubble"), undefined, 10_000);
+  await waitForState(guest, () => !document.querySelector(".rx-bubble"), undefined, { timeout: 10_000 });
   const [added, removed] = await guest.evaluate(() => window.bubbleTimes);
   assert.ok(Math.abs(removed - added - 3000) < 300, `the bubble showed for about 3 s (${Math.round(removed - added)} ms)`);
 
@@ -107,36 +82,36 @@ test("a reaction shows in the other browser, goes away, and mute hides it", { sk
   await guest.waitForTimeout(500);
   assert.equal(await bubble(guest, 1), "", "muted: no bubble");
   assert.equal(await guest.locator(".player-bar [aria-live=polite]").innerText(), "Ada: Nice move!", "muted: nothing read out");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("the robot says a line at the end of a game", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
-  const page = await open("player", PHONE, "Ada");
+test("the robot says a line at the end of a game", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { ...PHONE, nickname: "Ada" });
   await page.goto(`${srv.base}/tic-tac-toe/?robot=1`);
-  await wait(page, () => window.ddp.match?.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing");
   while ((await page.evaluate(() => window.ddp.match.phase)) === "playing") {
-    await wait(page, () => window.ddp.match.canMove() || window.ddp.match.phase !== "playing");
+    await waitForState(page, (ddp) => ddp.match.canMove() || ddp.match.phase !== "playing");
     const cell = await page.evaluate(() => (window.ddp.match.phase === "playing" ? window.ddp.match.state.board.indexOf(-1) : -1));
     if (cell < 0) break;
     await page.tap(`.ttt-cell[data-i="${cell}"]`);
-    await wait(page, (i) => window.ddp.match.state.board[i] !== -1 || window.ddp.match.phase !== "playing", cell);
+    await waitForState(page, (ddp, i) => ddp.match.state.board[i] !== -1 || ddp.match.phase !== "playing", cell);
   }
-  await wait(page, () => document.querySelectorAll(".pb-who")[1].querySelector(".rx-bubble")?.textContent === "Good game!", undefined, 8_000);
+  await waitForState(page, () => document.querySelectorAll(".pb-who")[1].querySelector(".rx-bubble")?.textContent === "Good game!", undefined, { timeout: 8_000 });
   assert.equal(await page.locator(".player-bar [aria-live=polite]").innerText(), "Robot: Good game!");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("four players: the tray and bubbles fit, at 360 px and 1280 px", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
+test("four players: the tray and bubbles fit, at 360 px and 1280 px", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
   for (const [opts, name] of [
     [PHONE, "reactions-4p-360-light"],
     [DESKTOP, "reactions-4p-1280-dark"],
   ]) {
-    const page = await open(name, opts, "Ada");
+    const page = await open(name, { ...opts, nickname: "Ada" });
     await page.goto(`${srv.base}/ludo/`);
     await page.click("#play-robot");
-    await wait(page, () => window.ddp.match?.phase === "playing");
+    await waitForState(page, (ddp) => ddp.match?.phase === "playing");
     assert.equal(await page.locator(".pb-who").count(), 4);
     await page.click("#react");
     await page.click("#reactions .rx-emoji >> nth=1");
@@ -148,5 +123,5 @@ test("four players: the tray and bubbles fit, at 360 px and 1280 px", { skip: !p
     assert.ok(pill.y + pill.height <= board.y, `${name}: the bubble stays above the board`);
     await page.screenshot({ path: `${ARTIFACTS}/${name}.png`, animations: "disabled" });
   }
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

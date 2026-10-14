@@ -8,29 +8,9 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, noHorizontalScroll } from "../helpers.js";
 
-const ARTIFACTS = path.resolve("test-artifacts");
-
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
+const skip = skipWithoutPlaywright();
 
 const SCREENS = [
   { width: 360, height: 640, colorScheme: "light" },
@@ -65,17 +45,9 @@ async function checkToggle(page, id, label, where) {
 }
 
 for (const { width, height, colorScheme } of SCREENS) {
-  test(`at ${width} px the landmarks, toggles and room code read right`, { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-    mkdirSync(ARTIFACTS, { recursive: true });
-    const srv = await startServer();
-    const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-    t.after(async () => {
-      await browser.close();
-      await srv.close();
-    });
-    const errors = [];
-    const page = await browser.newPage({ viewport: { width, height }, colorScheme });
-    page.on("pageerror", (e) => errors.push(e.message));
+  test(`at ${width} px the landmarks, toggles and room code read right`, { skip, timeout: 60_000 }, async (t) => {
+    const { srv, open, assertNoErrors } = await openBrowser(t);
+    const page = await open("player", { viewport: { width, height }, colorScheme });
 
     await page.goto(`${srv.base}/`);
     await checkLandmarks(page, `home at ${width} px`);
@@ -96,7 +68,7 @@ for (const { width, height, colorScheme } of SCREENS) {
     assert.doesNotMatch(tree, new RegExp(`[-:] ${code}$`, "m"), `the code is read out once, not also as a word:\n${tree}`);
     await page.waitForTimeout(400); // let the letters settle in
     await page.screenshot({ path: `${ARTIFACTS}/screen-reader-room-code-${width}-${colorScheme}.png` });
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, "no sideways scroll");
-    assert.deepEqual(errors, []);
+    assert.equal(await noHorizontalScroll(page), true, "no sideways scroll");
+    assertNoErrors();
   });
 }

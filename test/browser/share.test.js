@@ -7,45 +7,20 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { skipWithoutPlaywright, openBrowser } from "../helpers.js";
 
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
+const skip = skipWithoutPlaywright();
 
-const pw = await loadPlaywright();
-
-test("Share copies the invite link when sharing fails, and stays quiet when cancelled", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const ctx = await browser.newContext();
-  await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: srv.base });
+test("Share copies the invite link when sharing fails, and stays quiet when cancelled", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
   // Each share rejects with the error name the test sets in window.shareError.
-  await ctx.addInitScript(() => {
+  const failingShare = () => {
     navigator.share = async () => {
       throw new DOMException("share failed", window.shareError);
     };
-  });
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+  };
+  const page = await open("player", { init: failingShare });
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: srv.base });
 
   await page.goto(`${srv.base}/ludo/`);
   await page.click("#play-friend");
@@ -63,26 +38,18 @@ test("Share copies the invite link when sharing fails, and stays quiet when canc
   await page.locator("#toast.show", { hasText: "Sharing didn't work, so the invite link was copied" }).waitFor();
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), invite);
 
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("inside the app Share hands the invite link to the app's share sheet", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const ctx = await browser.newContext();
+test("inside the app Share hands the invite link to the app's share sheet", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
   // The app's JavaScript channel (native.js); this WebView has no navigator.share.
-  await ctx.addInitScript(() => {
+  const inApp = () => {
     window.sent = [];
     window.DDPApp = { postMessage: (text) => window.sent.push(JSON.parse(text)) };
     delete Navigator.prototype.share;
-  });
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+  };
+  const page = await open("player", { init: inApp });
 
   await page.goto(`${srv.base}/tic-tac-toe/`);
   await page.click("#play-friend");
@@ -90,5 +57,5 @@ test("inside the app Share hands the invite link to the app's share sheet", { sk
   const invite = await page.locator("#invite-link").inputValue();
   await page.getByRole("button", { name: "Share", exact: true }).click();
   assert.deepEqual(await page.evaluate(() => window.sent), [{ type: "share", text: "Play Tic Tac Toe with me!", url: invite }]);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

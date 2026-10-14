@@ -6,41 +6,18 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { skipWithoutPlaywright, openBrowser, waitForState, joinByInvite } from "../helpers.js";
 
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
+const skip = skipWithoutPlaywright();
 
-const pw = await loadPlaywright();
-const wait = (page, fn, arg) => page.waitForFunction(fn, arg, { timeout: 20_000 });
-
-test("Ludo's player pills keep a long note inside them on a 360 px phone", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
+test("Ludo's player pills keep a long note inside them on a 360 px phone", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", {
+    nickname: "Tester",
+    viewport: { width: 360, height: 780 },
+    reducedMotion: "reduce",
+    init: () => localStorage.setItem("ddp-ludo-settings", JSON.stringify({ robots: 1 })),
   });
-  const errors = [];
-  const ctx = await browser.newContext({ viewport: { width: 360, height: 780 }, reducedMotion: "reduce" });
-  await ctx.addInitScript(() => localStorage.setItem("ddp-name", "Tester"));
-  await ctx.addInitScript(() => localStorage.setItem("ddp-ludo-settings", JSON.stringify({ robots: 1 })));
-  const page = await ctx.newPage();
-  page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`${srv.base}/ludo/`);
   await page.click("#play-robot");
   await page.locator(".pb-who .where").first().waitFor();
@@ -67,34 +44,22 @@ test("Ludo's player pills keep a long note inside them on a 360 px phone", { ski
       assert.ok(!cut || ellipsis, `pill ${k}: ${s} ends in an ellipsis when cut short`);
     }
   }
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("Tic Tac Toe's board stays put on a 360 px phone when a game ends in a draw", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
+test("Tic Tac Toe's board stays put on a 360 px phone when a game ends in a draw", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const viewport = { width: 360, height: 740 };
+  const host = await open("host", {
+    nickname: "Ada",
+    viewport,
+    init: () => localStorage.setItem("ddp-ttt-settings", JSON.stringify({ size: 3, moveSeconds: 0, gameSeconds: 0, first: "host" })),
   });
-  const errors = [];
-  async function open(name, nickname) {
-    const ctx = await browser.newContext({ viewport: { width: 360, height: 740 } });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    return page;
-  }
-  const host = await open("host", "Ada");
-  await host.addInitScript(() => localStorage.setItem("ddp-ttt-settings", JSON.stringify({ size: 3, moveSeconds: 0, gameSeconds: 0, first: "host" })));
   await host.goto(`${srv.base}/tic-tac-toe/`);
-  await host.click("#play-friend");
-  const invite = await host.locator("#invite-link").inputValue();
-  const guest = await open("guest", "Bo");
-  await guest.goto(invite.replace(/^https?:\/\/[^/]+/, srv.base));
-  await guest.click("#join-room");
+  const guest = await open("guest", { nickname: "Bo", viewport });
+  await joinByInvite(host, guest, srv);
   const pages = [host, guest];
-  for (const p of pages) await wait(p, () => window.ddp.match?.phase === "playing");
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match?.phase === "playing");
 
   const boardTop = (page) => page.locator("#ttt-board").evaluate((n) => n.getBoundingClientRect().top);
   const before = await Promise.all(pages.map(boardTop));
@@ -103,12 +68,12 @@ test("Tic Tac Toe's board stays put on a 360 px phone when a game ends in a draw
     const n = await host.evaluate(() => window.ddp.match.state.moves.length);
     const mover = (await Promise.all(pages.map((p) => p.evaluate(() => window.ddp.match.canMove())))).indexOf(true);
     await pages[mover].evaluate((cell) => window.ddp.match.play({ cell, ms: 0 }), cell);
-    for (const p of pages) await wait(p, (n) => window.ddp.match.state.moves.length > n, n);
+    for (const p of pages) await waitForState(p, (ddp, n) => ddp.match.state.moves.length > n, n);
   }
   for (const [k, p] of pages.entries()) {
-    await wait(p, () => window.ddp.match.phase === "over");
+    await waitForState(p, (ddp) => ddp.match.phase === "over");
     assert.match(await p.locator("#ttt-status").innerText(), /draw/);
     assert.equal(await boardTop(p), before[k], `${k ? "guest" : "host"}: the board doesn't move`);
   }
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

@@ -7,39 +7,28 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll } from "./ludo.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, noHorizontalScroll } from "../helpers.js";
 
-const PHONE = { viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "light" };
+const skip = skipWithoutPlaywright();
+const PHONE = { phone: true, colorScheme: "light" };
 const DESKTOP = { viewport: { width: 1280, height: 900 }, colorScheme: "dark" };
 
 async function setup(t) {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
+  const { srv, open: openPage, assertNoErrors } = await openBrowser(t);
   async function open(options, saved = {}) {
-    const ctx = await browser.newContext({ ...options, reducedMotion: "reduce" });
-    await ctx.addInitScript((saved) => {
-      globalThis.ddpRobotPace = 0.1;
+    const page = await openPage("player", { ...options, reducedMotion: "reduce" });
+    await page.addInitScript((saved) => {
       for (const [key, value] of Object.entries(saved)) localStorage.setItem(key, JSON.stringify(value));
     }, saved);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(e.message));
     return page;
   }
-  return { srv, open, errors };
+  return { srv, open, assertNoErrors };
 }
 
 const counts = (page) => page.locator(".players-choice input").evaluateAll((inputs) => inputs.map((i) => (i.checked ? `[${i.value}]` : i.value)).join(" "));
 
-test("Ludo offers 2, 3 or 4 players by touch and keyboard, and seats that many", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
+test("Ludo offers 2, 3 or 4 players by touch and keyboard, and seats that many", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
   for (const [options, name] of [
     [PHONE, "360-light"],
     [DESKTOP, "1280-dark"],
@@ -64,7 +53,7 @@ test("Ludo offers 2, 3 or 4 players by touch and keyboard, and seats that many",
     assert.deepEqual(await page.locator("#ld-settings .settings-line .chip.robot").allInnerTexts(), ["Easy robot"], "and the robot level");
     await page.locator('.players-choice label:has(input[value="3"])').click();
     await page.click("#play-robot");
-    await wait(page, () => window.ddp.match?.phase === "playing");
+    await waitForState(page, (ddp) => ddp.match?.phase === "playing");
     assert.equal(await page.evaluate(() => window.ddp.session.players.length), 3);
     assert.equal(await page.evaluate(() => window.ddp.robots.length), 2);
     // The settings panel has the count too, locked during the game.
@@ -83,17 +72,17 @@ test("Ludo offers 2, 3 or 4 players by touch and keyboard, and seats that many",
     await page.reload();
     assert.equal(await counts(page), "2 3 [4]", "remembered on this device");
     await page.click("#play-robot");
-    await wait(page, () => window.ddp.match?.phase === "playing");
+    await waitForState(page, (ddp) => ddp.match?.phase === "playing");
     assert.equal(await page.locator(".pb-who").count(), 4);
     assert.ok(await noHorizontalScroll(page));
     await page.screenshot({ path: `${ARTIFACTS}/players-ludo-four-${name}.png` });
     await page.context().close();
   }
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("Hearts offers only 3 and 4 and keeps an old robot count, Chutes and Ladders starts at 2, Chess offers none", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
+test("Hearts offers only 3 and 4 and keeps an old robot count, Chutes and Ladders starts at 2, Chess offers none", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
   for (const [options, name] of [
     [PHONE, "360-light"],
     [DESKTOP, "1280-dark"],
@@ -110,7 +99,7 @@ test("Hearts offers only 3 and 4 and keeps an old robot count, Chutes and Ladder
     assert.ok(await noHorizontalScroll(page));
     await page.screenshot({ path: `${ARTIFACTS}/players-hearts-lobby-${name}.png`, fullPage: true });
     await page.click("#play-robot");
-    await wait(page, () => window.ddp.match?.phase === "playing");
+    await waitForState(page, (ddp) => ddp.match?.phase === "playing");
     assert.equal(await page.evaluate(() => window.ddp.session.players.length), 3);
 
     await page.goto(`${srv.base}/chutes-and-ladders/`);
@@ -123,5 +112,5 @@ test("Hearts offers only 3 and 4 and keeps an old robot count, Chutes and Ladder
     await page.screenshot({ path: `${ARTIFACTS}/players-chess-lobby-${name}.png`, fullPage: true });
     await page.context().close();
   }
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

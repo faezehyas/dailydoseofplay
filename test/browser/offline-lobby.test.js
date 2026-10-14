@@ -7,19 +7,13 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { startServer } from "../helpers.js";
-import { pw, noHorizontalScroll } from "./ludo.shared.js";
+import { skipWithoutPlaywright, openBrowser, noHorizontalScroll } from "../helpers.js";
 
-test("the lobby shows the offline state when /ws is blocked", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const page = await browser.newPage({ viewport: { width: 360, height: 740 } });
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+const skip = skipWithoutPlaywright();
+
+test("the lobby shows the offline state when /ws is blocked", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { viewport: { width: 360, height: 740 } });
   await page.routeWebSocket(/\/ws$/, (ws) => ws.close());
 
   await page.goto(`${srv.base}/ludo/`);
@@ -41,5 +35,5 @@ test("the lobby shows the offline state when /ws is blocked", { skip: !pw && "Pl
   await page.goto(`${srv.base}/ludo/?room=ABCD&key=x`);
   await page.click("#join-room");
   await page.getByRole("heading", { name: "You're offline" }).waitFor({ timeout: 10_000 });
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
