@@ -959,12 +959,14 @@ the scene is off screen (IntersectionObserver) or the tab is hidden, and with
 `prefers-reduced-motion` the scene is still.
 
 **Tile previews.** While a ready game's home tile is hovered or has keyboard
-focus, or on a touch screen (`hover: none`) while it crosses a line that moves
-from the top of the screen to the bottom as the page scrolls (so one tile, or
-one row of tiles, plays at a time, and every tile gets a turn), it loops a
-3–5 second preview of the game: its pieces move and small player tags light
-up in turn. Each loop holds its last frame for a moment; when the
-tile loses hover, focus or the line, its icon comes back. `home.js` fetches
+focus, or on a touch screen (`hover: none`) while it crosses the middle of
+the screen once scrolling pauses (in the last half screen of the page the line
+moves down to the bottom, so one tile, or one row of tiles, plays at a time,
+and every tile gets a turn), it loops a 3–5 second preview of the game: its
+pieces move and small player tags light up in turn. Each loop holds its last
+frame for a moment; when the tile loses hover, focus or the line, or the page
+is hidden (`pagehide`: leaving through a tile fires no `mouseleave`, and Back
+may restore the page as it was), its icon comes back. `home.js` fetches
 `<slug>/preview.svg` the first time, inlines it in place of the icon (an
 `<img>` couldn't reach the page's tokens or be started) and calls `play()` on
 its animations, which start paused, again after each loop. Without the file,
