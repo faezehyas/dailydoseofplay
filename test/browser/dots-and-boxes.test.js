@@ -7,36 +7,9 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll, pick } from "../helpers.js";
 
-const ARTIFACTS = path.resolve("test-artifacts");
-
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
-const wait = (page, fn, arg, timeout = 20_000) => page.waitForFunction(fn, arg, { timeout });
-const noHorizontalScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
-// The settings fold to a summary line in the lobby card; open it first.
-async function pick(page, name, value) {
-  if (!(await page.locator("#db-settings[open]").count())) await page.click("#db-settings > summary");
-  await page.click(`#db-settings label:has(input[name="db-${name}"][value="${value}"])`);
-}
+const skip = skipWithoutPlaywright();
 const bg = (page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 const state = (page) => page.evaluate(() => window.ddp.match.state);
 // The theme token a CSS property of the first match resolves to, so screens
@@ -85,26 +58,13 @@ async function drawLine(page, { tap = false } = {}) {
   return line;
 }
 
-test("two friends play Dots and Boxes on the host's settings through the invite link, then a rematch", { skip: !pw && "Playwright not installed", timeout: 240_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(name, nickname, opts = {}) {
-    // Reduced motion plays every line out at once, so whole games fit the test.
-    const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, reducedMotion: "reduce", ...opts });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    return page;
-  }
+test("two friends play Dots and Boxes on the host's settings through the invite link, then a rematch", { skip, timeout: 240_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  // Reduced motion plays every line out at once, so whole games fit the test.
+  const reducedMotion = "reduce";
 
   // Host (desktop, light) picks a small board with clocks and starts.
-  const host = await open("host", "Ada", { colorScheme: "light" });
+  const host = await open("host", { nickname: "Ada", viewport: { width: 1200, height: 900 }, reducedMotion, colorScheme: "light" });
   await host.goto(`${srv.base}/dots-and-boxes/`);
   assert.equal(await host.locator('#db-settings input[name="db-size"]:checked').getAttribute("value"), "4", "4×4 by default");
   await pick(host, "size", 3);
@@ -119,9 +79,8 @@ test("two friends play Dots and Boxes on the host's settings through the invite 
   assert.match(invite, new RegExp(`/dots-and-boxes/\\?room=${code}&key=[\\w-]{22}$`));
 
   // The friend (360 px phone, dark) opens the link and plays by touch.
-  const guest = await open("guest", "Bo", { viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "dark" });
-  await guest.goto(invite.replace(/^https?:\/\/[^/]+/, srv.base));
-  await guest.click("#join-room");
+  const guest = await open("guest", { nickname: "Bo", phone: true, reducedMotion, colorScheme: "dark" });
+  await joinByInvite(host, guest, srv);
   await host.locator("#db-board").waitFor();
   await guest.locator("#db-board").waitFor();
   await guest.locator("#db-config").filter({ hasText: "3×3" }).waitFor();
@@ -136,8 +95,8 @@ test("two friends play Dots and Boxes on the host's settings through the invite 
   assert.notEqual(await bg(host), await bg(guest));
 
   async function startedGame(m) {
-    await wait(host, (n) => window.ddp.match.m === n && window.ddp.match.phase === "playing", m);
-    await wait(guest, (n) => window.ddp.match.m === n && window.ddp.match.phase === "playing", m);
+    await waitForState(host, (ddp, n) => ddp.match.m === n && ddp.match.phase === "playing", m);
+    await waitForState(guest, (ddp, n) => ddp.match.m === n && ddp.match.phase === "playing", m);
     assert.equal(await host.evaluate(() => window.ddp.match.state.first), 0, "the room says the host starts");
     assert.equal(await guest.evaluate(() => window.ddp.match.state.first), 0, "both browsers agree");
   }
@@ -152,7 +111,7 @@ test("two friends play Dots and Boxes on the host's settings through the invite 
         if (!(await armed(page))) continue;
         const before = await state(page);
         await drawLine(page, { tap });
-        await wait(page, (n) => window.ddp.match.state.drawn > n, before.drawn);
+        await waitForState(page, (ddp, n) => ddp.match.state.drawn > n, before.drawn);
         const after = await state(page);
         if (after.last.boxes.length && after.winner === -1) {
           assert.equal(after.turn, before.turn, "a box keeps the turn");
@@ -161,7 +120,7 @@ test("two friends play Dots and Boxes on the host's settings through the invite 
       }
       await host.waitForTimeout(20);
     }
-    await wait(guest, () => window.ddp.match.phase === "over");
+    await waitForState(guest, (ddp) => ddp.match.phase === "over");
     const [a, b] = [await state(host), await state(guest)];
     assert.deepEqual(a, b, "both browsers end on the same state");
     assert.equal(a.score[0] + a.score[1], 9);
@@ -177,7 +136,7 @@ test("two friends play Dots and Boxes on the host's settings through the invite 
   await guest.locator("#db-board .hit").first().tap();
   await guest.locator("#toast").filter({ hasText: "Wait for Ada" }).waitFor();
   const first = await drawLine(host);
-  await wait(guest, (l) => window.ddp.match.state.lines[l] === 0, first);
+  await waitForState(guest, (ddp, l) => ddp.match.state.lines[l] === 0, first);
   await guest.locator(`#db-board .line[data-l="${first}"]`).waitFor();
   for (const page of [host, guest]) {
     assert.equal(await tokenOf(page, `#db-board .line[data-l="${first}"] .ink`, "stroke"), "--accent", "the host drew first, so their line is coral on both screens");
@@ -186,7 +145,7 @@ test("two friends play Dots and Boxes on the host's settings through the invite 
   assert.equal(await tokenOf(guest, ".pb-who.p1 .swatch", "backgroundColor"), "--accent", "and on the friend's");
   assert.equal(await tokenOf(guest, ".pb-who.p0 .swatch", "backgroundColor"), "--accent-2", "the friend is teal on both screens");
   assert.equal(await tokenOf(host, ".pb-who.p1 .swatch", "backgroundColor"), "--accent-2");
-  await wait(guest, () => !!document.querySelector("#db-board.armed"));
+  await waitForState(guest, () => !!document.querySelector("#db-board.armed"));
   await guest.screenshot({ path: `${ARTIFACTS}/db-1-friend-mobile-dark.png`, fullPage: true });
   const { st: won, extra } = await finish();
   assert.ok(extra > 0, "someone closed a box and went again");
@@ -224,23 +183,12 @@ test("two friends play Dots and Boxes on the host's settings through the invite 
   await guest.close();
   await host.locator("#ended").waitFor({ timeout: 20_000 });
   assert.match(await host.locator("#ended").innerText(), /Bo (left the game|.*lost)/);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("Dots and Boxes vs the robot on a 360 px phone: touch, keyboard, pen strokes, sounds and mute", { skip: !pw && "Playwright not installed", timeout: 240_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling", "--autoplay-policy=no-user-gesture-required"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "light" });
-  await ctx.addInitScript(() => (window.ddpSounds = []));
-  await ctx.addInitScript(() => (globalThis.ddpRobotPace = 0.1));
-  const page = await ctx.newPage();
-  page.on("pageerror", (e) => errors.push(e.message));
+test("Dots and Boxes vs the robot on a 360 px phone: touch, keyboard, pen strokes, sounds and mute", { skip, timeout: 240_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { phone: true, colorScheme: "light", init: () => (window.ddpSounds = []) });
   const heard = () => page.evaluate(() => window.ddpSounds.slice());
 
   await page.goto(`${srv.base}/`);
@@ -252,7 +200,7 @@ test("Dots and Boxes vs the robot on a 360 px phone: touch, keyboard, pen stroke
   assert.ok(await noHorizontalScroll(page), "settings fit at 360 px");
   await page.screenshot({ path: `${ARTIFACTS}/db-4-settings-mobile-light.png`, fullPage: true });
   await page.click("#play-robot");
-  await wait(page, () => window.ddp.match?.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing");
   assert.match(await page.locator(".pb-players").innerText(), /Cleo[\s\S]*Robot/);
   assert.equal(await page.locator("#db-config").innerText(), "4×4 boxes · no clocks · Hard robot");
   assert.ok(await page.locator("#db-clocks").isHidden(), "no clocks, no clock row");
@@ -260,17 +208,17 @@ test("Dots and Boxes vs the robot on a 360 px phone: touch, keyboard, pen stroke
   assert.equal(await page.locator(".pb-who.p0 .swatch").innerText(), "C", "your initial");
 
   // Draw by touch: the line strokes itself in, then the robot's is replayed.
-  await wait(page, () => !!document.querySelector("#db-board.armed"));
+  await waitForState(page, () => !!document.querySelector("#db-board.armed"));
   const mine = await drawLine(page, { tap: true });
-  await wait(page, () => window.ddp.match.state.drawn >= 1);
+  await waitForState(page, (ddp) => ddp.match.state.drawn >= 1);
   assert.equal((await state(page)).lines[mine], 0);
   await page.locator("#db-status").filter({ hasText: "Robot" }).waitFor();
-  await wait(page, () => window.ddp.match.state.drawn >= 2);
+  await waitForState(page, (ddp) => ddp.match.state.drawn >= 2);
   await page.locator("#db-status").filter({ hasText: "Robot is drawing" }).waitFor();
   assert.equal(await armed(page), false, "you wait while the robot's line is replayed");
   await page.waitForTimeout(150);
   await page.screenshot({ path: `${ARTIFACTS}/db-5-robot-replay-mobile.png` });
-  await wait(page, () => !!document.querySelector("#db-board.armed"));
+  await waitForState(page, () => !!document.querySelector("#db-board.armed"));
   assert.match(await page.locator("#db-status").innerText(), /Your turn/);
   const robotLine = (await state(page)).last.line;
   assert.ok(await page.locator(`#db-board .line.p1[data-l="${robotLine}"]`).evaluate((n) => n.classList.contains("fresh")), "the robot's latest line is marked");
@@ -296,17 +244,17 @@ test("Dots and Boxes vs the robot on a 360 px phone: touch, keyboard, pen stroke
   const drawnBefore = (await state(page)).drawn;
   const mineBefore = (await state(page)).lines.filter((owner) => owner === 0).length;
   await page.keyboard.press("Enter");
-  await wait(page, (n) => window.ddp.match.state.drawn > n, drawnBefore);
+  await waitForState(page, (ddp, n) => ddp.match.state.drawn > n, drawnBefore);
   // The quick robot may have answered already: count my lines rather than read the last one.
   assert.equal((await state(page)).lines.filter((owner) => owner === 0).length, mineBefore + 1);
 
   // With the sound muted nothing more plays.
   await page.click("#sound-toggle");
   assert.equal(await page.locator("#sound-toggle").getAttribute("aria-pressed"), "true");
-  await wait(page, () => !!document.querySelector("#db-board.armed"), undefined, 30_000);
+  await waitForState(page, () => !!document.querySelector("#db-board.armed"), undefined, { timeout: 30_000 });
   const before = (await heard()).length;
   await drawLine(page, { tap: true });
-  await wait(page, () => !!document.querySelector("#db-board.armed") || window.ddp.match.phase !== "playing", undefined, 30_000);
+  await waitForState(page, (ddp) => !!document.querySelector("#db-board.armed") || ddp.match.phase !== "playing", undefined, { timeout: 30_000 });
   assert.equal((await heard()).length, before, "no sound while muted");
   await page.click("#sound-toggle");
 
@@ -332,7 +280,7 @@ test("Dots and Boxes vs the robot on a 360 px phone: touch, keyboard, pen stroke
 
   // The robot accepts a rematch; dark mode still fits the phone.
   await page.click("#rematch");
-  await wait(page, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing");
   assert.equal((await state(page)).drawn, 0);
   await page.click("#theme-toggle");
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "dark");
@@ -340,5 +288,5 @@ test("Dots and Boxes vs the robot on a 360 px phone: touch, keyboard, pen stroke
   await page.screenshot({ path: `${ARTIFACTS}/db-7-robot-dark.png`, fullPage: true });
   await page.click("#leave");
   await page.locator("#play-friend").waitFor();
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

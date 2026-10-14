@@ -8,37 +8,10 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll, pick } from "../helpers.js";
 
-const ARTIFACTS = path.resolve("test-artifacts");
-
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
-const wait = (page, fn, arg) => page.waitForFunction(fn, arg, { timeout: 20_000 });
+const skip = skipWithoutPlaywright();
 const moveCount = (page) => page.evaluate(() => window.ddp.match.state.moves.length);
-const noHorizontalScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
-// The settings fold to a summary line in the lobby card; open it first.
-async function pick(page, name, value) {
-  if (!(await page.locator("#ck-settings[open]").count())) await page.click("#ck-settings > summary");
-  await page.click(`#ck-settings label:has(input[name="ck-${name}"][value="${value}"])`);
-}
 const square = (sq) => `.ck-sq[data-sq="${sq}"]`;
 
 // The path the page's player should play now: the robot's best move at
@@ -73,27 +46,13 @@ async function playPath(page, path, how) {
   }
 }
 
-test("two friends play Checkers on the host's settings through the invite link, then a rematch lost on the clock", { skip: !pw && "Playwright not installed", timeout: 180_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(name, nickname, opts = {}) {
-    const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, ...opts });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    return page;
-  }
+test("two friends play Checkers on the host's settings through the invite link, then a rematch lost on the clock", { skip, timeout: 180_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
 
   // Host (desktop, light) picks 1 min a move, 5 min each and to start, then
   // creates a room. The friend (360 px phone, dark) has other settings saved,
   // and a clock we can move forward later.
-  const host = await open("host", "Ada", { colorScheme: "light" });
+  const host = await open("host", { nickname: "Ada", viewport: { width: 1200, height: 900 }, colorScheme: "light" });
   await host.goto(`${srv.base}/checkers/`);
   await pick(host, "moveSeconds", 60);
   await pick(host, "gameSeconds", 300);
@@ -105,13 +64,16 @@ test("two friends play Checkers on the host's settings through the invite link, 
   const code = (await host.locator("#room-code").innerText()).trim();
   assert.match(invite, new RegExp(`/checkers/\\?room=${code}&key=[\\w-]{22}$`));
 
-  const guest = await open("guest", "Bo", { viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "dark" });
-  await guest.addInitScript(() => localStorage.setItem("ddp-checkers-settings", JSON.stringify({ moveSeconds: 30, gameSeconds: 0, first: "guest", level: "hard" })));
-  await guest.clock.install();
-  await guest.goto(invite.replace(/^https?:\/\/[^/]+/, srv.base));
-  await guest.click("#join-room");
-  await wait(host, () => window.ddp.match?.phase === "playing");
-  await wait(guest, () => window.ddp.match?.phase === "playing");
+  const guest = await open("guest", {
+    nickname: "Bo",
+    phone: true,
+    colorScheme: "dark",
+    clock: true,
+    init: () => localStorage.setItem("ddp-checkers-settings", JSON.stringify({ moveSeconds: 30, gameSeconds: 0, first: "guest", level: "hard" })),
+  });
+  await joinByInvite(host, guest, srv);
+  await waitForState(host, (ddp) => ddp.match?.phase === "playing");
+  await waitForState(guest, (ddp) => ddp.match?.phase === "playing");
   assert.equal(await guest.locator("#ck-config").innerText(), "8 × 8 checkers · 1 min a move · 5 min each", "the host's settings reach the friend");
   assert.equal(await host.locator("#ck-config").innerText(), await guest.locator("#ck-config").innerText());
   const guestState = await guest.evaluate(() => window.ddp.match.state);
@@ -145,7 +107,7 @@ test("two friends play Checkers on the host's settings through the invite link, 
     if ((await host.evaluate(() => window.ddp.match.phase)) !== "playing") break;
     const hostTurn = (await host.evaluate(() => window.ddp.match.state.turn)) === 0;
     const page = hostTurn ? host : guest;
-    await wait(page, () => window.ddp.match.canMove());
+    await waitForState(page, (ddp) => ddp.match.canMove());
     const n = await moveCount(page);
     if (!hostTurn && !triedWrongPiece) {
       const wrong = await guest.evaluate(async () => {
@@ -171,12 +133,12 @@ test("two friends play Checkers on the host's settings through the invite link, 
       assert.equal(await host.locator(".ck-sq.picked").count(), 0);
       await playPath(host, pathNow, "keyboard");
     } else await playPath(page, pathNow, hostTurn ? "click" : "tap");
-    await wait(host, (m) => window.ddp.match.state.moves.length === m, n + 1);
-    await wait(guest, (m) => window.ddp.match.state.moves.length === m, n + 1);
+    await waitForState(host, (ddp, m) => ddp.match.state.moves.length === m, n + 1);
+    await waitForState(guest, (ddp, m) => ddp.match.state.moves.length === m, n + 1);
     assert.ok(k < 200, "the game ends");
   }
-  await wait(host, () => window.ddp.match.phase === "over");
-  await wait(guest, () => window.ddp.match.phase === "over");
+  await waitForState(host, (ddp) => ddp.match.phase === "over");
+  await waitForState(guest, (ddp) => ddp.match.phase === "over");
   assert.ok(triedWrongPiece, "a forced capture came up");
   const final = await host.evaluate(() => window.ddp.match.state);
   assert.deepEqual(await guest.evaluate(() => window.ddp.match.state), final, "both browsers agree on every move");
@@ -196,22 +158,22 @@ test("two friends play Checkers on the host's settings through the invite link, 
   await host.locator("#rematch-status").filter({ hasText: "Waiting for Bo" }).waitFor();
   await guest.locator("#rematch-status").filter({ hasText: "wants a rematch" }).waitFor();
   await guest.tap("#rematch");
-  await wait(host, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing");
-  await wait(guest, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing");
+  await waitForState(host, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing");
+  await waitForState(guest, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing");
   assert.equal(await guest.locator(".ck-sq .piece:not(.ghost)").count(), 24, "a fresh board");
   assert.deepEqual(await guest.evaluate(() => window.ddp.match.state.clocks), [300_000, 300_000]);
 
   // Game 2: the host moves, then the friend's 1-minute move clock runs out.
-  await wait(host, () => window.ddp.match.canMove());
+  await waitForState(host, (ddp) => ddp.match.canMove());
   await playPath(host, await nextPath(host, "hard"), "click");
-  await wait(guest, () => window.ddp.match.canMove());
+  await waitForState(guest, (ddp) => ddp.match.canMove());
   await guest.tap(square((await nextPath(guest, "first"))[0]));
   assert.equal(await guest.locator(".ck-sq.picked").count(), 1);
   assert.ok(await noHorizontalScroll(guest));
   await guest.screenshot({ path: `${ARTIFACTS}/checkers-3-rematch-picked-mobile-dark.png`, fullPage: true });
   await guest.clock.fastForward("01:01");
-  await wait(host, () => window.ddp.match.phase === "over");
-  await wait(guest, () => window.ddp.match.phase === "over");
+  await waitForState(host, (ddp) => ddp.match.phase === "over");
+  await waitForState(guest, (ddp) => ddp.match.phase === "over");
   const timedOut = await host.evaluate(() => window.ddp.match.state);
   assert.deepEqual(await guest.evaluate(() => window.ddp.match.state), timedOut);
   assert.equal(timedOut.reason, "timeout");
@@ -226,21 +188,12 @@ test("two friends play Checkers on the host's settings through the invite link, 
   await guest.close();
   await host.locator("#ended").waitFor({ timeout: 20_000 });
   assert.match(await host.locator("#ended").innerText(), /Bo (left the game|.*lost)/);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("Checkers vs the robot on a 360 px phone: a full game by touch, then a rematch in dark mode", { skip: !pw && "Playwright not installed", timeout: 180_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  const page = await (await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "light" })).newPage();
-  page.on("pageerror", (e) => errors.push(e.message));
-  await page.addInitScript(() => (globalThis.ddpRobotPace = 0.1));
+test("Checkers vs the robot on a 360 px phone: a full game by touch, then a rematch in dark mode", { skip, timeout: 180_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { phone: true, colorScheme: "light", seed: "checkers" });
 
   await page.goto(`${srv.base}/`);
   await page.click('.game-card[data-slug="checkers"]');
@@ -249,17 +202,11 @@ test("Checkers vs the robot on a 360 px phone: a full game by touch, then a rema
   await pick(page, "first", "host");
   assert.ok(await noHorizontalScroll(page), "settings fit at 360 px");
   await page.screenshot({ path: `${ARTIFACTS}/checkers-5-lobby-mobile-light.png`, fullPage: true });
-  // The robot keeps the Math.random it starts with: a seeded one makes its
-  // random moves, and so this game, the same every run. Unseeded, about one
-  // game in 100 ends in a draw on the 40-turn rule.
-  await page.evaluate(async () => {
-    const { rngFromSeed } = await import("/engine/rng.js");
-    const random = Math.random;
-    Math.random = rngFromSeed("checkers");
-    document.querySelector("#play-robot").click();
-    Math.random = random;
-  });
-  await wait(page, () => window.ddp.match?.phase === "playing");
+  // The seeded robot (seed "checkers") makes its random moves, and so this
+  // game, the same every run. Unseeded, about one game in 100 ends in a draw
+  // on the 40-turn rule.
+  await page.click("#play-robot");
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing");
   assert.match(await page.locator(".pb-players").innerText(), /Cleo[\s\S]*Robot/);
   assert.equal(await page.locator("#ck-config").innerText(), "8 × 8 checkers · no move limit · no game clock · Easy robot");
   assert.ok(await page.locator("#ck-clocks").isHidden(), "no clocks by default");
@@ -268,14 +215,14 @@ test("Checkers vs the robot on a 360 px phone: a full game by touch, then a rema
 
   // Tap out strong moves until the game ends; the robot answers each one.
   while ((await page.evaluate(() => window.ddp.match.phase)) === "playing") {
-    await wait(page, () => window.ddp.match.canMove() || window.ddp.match.phase !== "playing");
+    await waitForState(page, (ddp) => ddp.match.canMove() || ddp.match.phase !== "playing");
     if ((await page.evaluate(() => window.ddp.match.phase)) !== "playing") break;
     const n = await moveCount(page);
     await playPath(page, await nextPath(page, "hard"), "tap");
-    await wait(page, (k) => window.ddp.match.state.moves.length > k, n);
+    await waitForState(page, (ddp, k) => ddp.match.state.moves.length > k, n);
     if (n === 20) await page.screenshot({ path: `${ARTIFACTS}/checkers-6-robot-midgame-light.png`, fullPage: true });
   }
-  await wait(page, () => window.ddp.match.phase === "over");
+  await waitForState(page, (ddp) => ddp.match.phase === "over");
   const st = await page.evaluate(() => window.ddp.match.state);
   assert.equal(st.winner, 0, `beating the Easy robot (${st.reason})`);
   assert.equal(await page.locator("#result").innerText(), "You won");
@@ -285,21 +232,21 @@ test("Checkers vs the robot on a 360 px phone: a full game by touch, then a rema
 
   // The robot accepts a rematch; switch to dark mode and play a couple of moves.
   await page.tap("#rematch");
-  await wait(page, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing");
   await page.click("#theme-toggle");
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "dark");
   for (let k = 0; k < 2; k++) {
-    await wait(page, () => window.ddp.match.canMove());
+    await waitForState(page, (ddp) => ddp.match.canMove());
     const n = await moveCount(page);
     await playPath(page, await nextPath(page, "hard"), "tap");
-    await wait(page, (m) => window.ddp.match.state.moves.length >= m + 2, n);
+    await waitForState(page, (ddp, m) => ddp.match.state.moves.length >= m + 2, n);
   }
   assert.ok(await noHorizontalScroll(page));
   await page.waitForTimeout(700);
   await page.screenshot({ path: `${ARTIFACTS}/checkers-8-robot-dark.png`, fullPage: true });
 
   // A double jump, set up on both sides' boards: 56 over 49 to 42, over 35 to 28.
-  await wait(page, () => window.ddp.match.canMove());
+  await waitForState(page, (ddp) => ddp.match.canMove());
   await page.evaluate(() => {
     const board = Array(64).fill(-1);
     Object.assign(board, { 56: 0, 62: 0, 49: 1, 35: 1, 8: 1 });
@@ -323,79 +270,67 @@ test("Checkers vs the robot on a 360 px phone: a full game by touch, then a rema
   await page.screenshot({ path: `${ARTIFACTS}/checkers-10-jump-end-marked-dark.png`, fullPage: true });
   const n = await moveCount(page);
   await page.tap(square(28)); // the last landing square plays the whole jump
-  await wait(page, (k) => window.ddp.match.state.moves.length > k, n);
+  await waitForState(page, (ddp, k) => ddp.match.state.moves.length > k, n);
   // The quick robot may have answered already: read the jump by its place.
   assert.deepEqual(await page.evaluate((k) => window.ddp.match.state.moves[k], n), [56, 42, 28]);
   // Its answer reaches both boards before they're compared.
-  await wait(page, (k) => [window.ddp.match, window.ddp.robot.match].every((m) => m.state.moves.length === k + 2), n);
+  await waitForState(page, (ddp, k) => [ddp.match, ddp.robot.match].every((m) => m.state.moves.length === k + 2), n);
   assert.deepEqual(await page.evaluate(() => window.ddp.match.state.board), await page.evaluate(() => window.ddp.robot.match.state.board));
   await page.click("#leave");
   await page.locator("#play-friend").waitFor();
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("the robot moves first on a plain-http page without WebCrypto (http://0.0.0.0, a LAN IP)", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const ctx = await browser.newContext();
+test("the robot moves first on a plain-http page without WebCrypto (http://0.0.0.0, a LAN IP)", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
   // Browsers only give secure origins (https, localhost) crypto.subtle.
-  await ctx.addInitScript(() => {
-    Object.defineProperty(Crypto.prototype, "subtle", { get: () => undefined });
-    localStorage.setItem("ddp-checkers-settings", JSON.stringify({ moveSeconds: 0, gameSeconds: 0, first: "guest", level: "hard" }));
+  const page = await open("player", {
+    init: () => {
+      Object.defineProperty(Crypto.prototype, "subtle", { get: () => undefined });
+      localStorage.setItem("ddp-checkers-settings", JSON.stringify({ moveSeconds: 0, gameSeconds: 0, first: "guest", level: "hard" }));
+    },
   });
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`${srv.base}/checkers/`);
   assert.equal(await page.evaluate(() => crypto.subtle), undefined);
   await page.click("#play-robot");
-  await wait(page, () => window.ddp.match?.state?.moves.length === 1);
+  await waitForState(page, (ddp) => ddp.match?.state?.moves.length === 1);
   assert.equal(await page.evaluate(() => window.ddp.match.state.first), 1, "the robot started");
   assert.equal(await page.locator("#ck-status").innerText(), "Your turn.");
   await playPath(page, await nextPath(page, "first"), "click");
-  await wait(page, () => window.ddp.match.state.moves.length === 3);
-  assert.deepEqual(errors, []);
+  await waitForState(page, (ddp) => ddp.match.state.moves.length === 3);
+  assertNoErrors();
 });
 
-test("moves play a wooden clack, and the mute button silences them", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
+test("moves play a wooden clack, and the mute button silences them", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  // Count the oscillators started (one per clack) and remember the context
+  // state. At a player's pace, so my clacks are counted before the robot answers.
+  const page = await open("player", {
+    robotPace: 1,
+    init: () => {
+      window.soundLog = { clacks: 0, state: null };
+      const proto = BaseAudioContext.prototype;
+      const create = proto.createOscillator;
+      proto.createOscillator = function (...args) {
+        window.soundLog.clacks++;
+        window.soundLog.state = this.state;
+        return create.apply(this, args);
+      };
+      localStorage.setItem("ddp-checkers-settings", JSON.stringify({ moveSeconds: 0, gameSeconds: 0, first: "host", level: "easy" }));
+    },
   });
-  const ctx = await browser.newContext();
-  // Count the oscillators started (one per clack) and remember the context state.
-  await ctx.addInitScript(() => {
-    window.soundLog = { clacks: 0, state: null };
-    const proto = BaseAudioContext.prototype;
-    const create = proto.createOscillator;
-    proto.createOscillator = function (...args) {
-      window.soundLog.clacks++;
-      window.soundLog.state = this.state;
-      return create.apply(this, args);
-    };
-    localStorage.setItem("ddp-checkers-settings", JSON.stringify({ moveSeconds: 0, gameSeconds: 0, first: "host", level: "easy" }));
-  });
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`${srv.base}/checkers/`);
   await page.click("#play-robot");
-  await wait(page, () => window.ddp.match?.canMove());
+  await waitForState(page, (ddp) => ddp.match?.canMove());
   const clacks = () => page.evaluate(() => window.soundLog.clacks);
   assert.equal(await clacks(), 0, "nothing plays before a move");
 
   // My move, then the robot's: each lands with a clack.
   await playPath(page, await nextPath(page, "first"), "click");
-  await wait(page, () => window.soundLog.clacks >= 1);
+  await waitForState(page, () => window.soundLog.clacks >= 1);
   assert.equal(await page.evaluate(() => window.soundLog.state), "running");
   const afterMine = await clacks();
-  await wait(page, () => window.ddp.match.canMove());
+  await waitForState(page, (ddp) => ddp.match.canMove());
   assert.ok((await clacks()) > afterMine, "the robot's move sounds too");
 
   // Muted from the header: moves are silent.
@@ -404,26 +339,17 @@ test("moves play a wooden clack, and the mute button silences them", { skip: !pw
   const muted = await clacks();
   const n = await moveCount(page);
   await playPath(page, await nextPath(page, "first"), "click");
-  await wait(page, (k) => window.ddp.match.state.moves.length >= k + 2 && window.ddp.match.canMove(), n);
+  await waitForState(page, (ddp, k) => ddp.match.state.moves.length >= k + 2 && ddp.match.canMove(), n);
   assert.equal(await clacks(), muted, "no sound while muted");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("a move dot stays centred on a square where a piece was just captured", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const ctx = await browser.newContext();
-  await ctx.addInitScript(() => localStorage.setItem("ddp-checkers-settings", JSON.stringify({ moveSeconds: 0, gameSeconds: 0, first: "host", level: "easy" })));
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+test("a move dot stays centred on a square where a piece was just captured", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { init: () => localStorage.setItem("ddp-checkers-settings", JSON.stringify({ moveSeconds: 0, gameSeconds: 0, first: "host", level: "easy" })) });
   await page.goto(`${srv.base}/checkers/`);
   await page.click("#play-robot");
-  await wait(page, () => window.ddp.match?.canMove());
+  await waitForState(page, (ddp) => ddp.match?.canMove());
   // The robot just jumped 19 -> 33 over my man on 26; my man on 40 can now jump to 26.
   await page.evaluate(() => {
     const board = Array(64).fill(-1);
@@ -451,5 +377,5 @@ test("a move dot stays centred on a square where a piece was just captured", { s
   assert.equal(layout.rows, 1, "the ghost and the dot share one grid cell");
   assert.match(layout.dotArea, /^1 \/ 1/);
   assert.deepEqual(layout.ghost, layout.cell, "and both sit in the middle of the square");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
