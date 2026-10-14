@@ -94,25 +94,36 @@ function watchPreview(tile, img, slug) {
   tile.addEventListener("mouseleave", () => set("hover", false));
   tile.addEventListener("focusin", (e) => set("focus", e.target.matches(":focus-visible")));
   tile.addEventListener("focusout", (e) => tile.contains(e.relatedTarget) || set("focus", false));
-  if (!canHover) touchTiles.set(tile, set);
+  tiles.set(tile, set);
 }
 
-// On a touch screen only the tile (or row of tiles) crossing a line plays. The
-// line moves down the screen as the page scrolls, from the top at the start to
-// the bottom at the end, so the first and last tiles get their turn too.
-const touchTiles = new Map(); // tile -> its set()
-let frame = 0;
+// Leaving the page through a tile fires no mouseleave, and Back may restore
+// the page as it was, so every tile stops when the page is hidden.
+const tiles = new Map(); // tile -> its set()
+addEventListener("pagehide", () => {
+  for (const set of tiles.values()) {
+    set("hover", false);
+    set("focus", false);
+  }
+});
+
+// On a touch screen only the tile (or row of tiles) crossing a line plays,
+// once scrolling has paused. The line is across the middle of the screen; in
+// the last half screen of the page it moves down to the bottom, so the last
+// tiles get their turn too.
+const SETTLE_MS = 250;
+let settle = 0;
 function followScroll() {
-  frame = 0;
   const end = document.documentElement.scrollHeight - innerHeight;
-  const line = end > 0 ? (scrollY / end) * innerHeight : innerHeight / 2;
-  for (const [tile, set] of touchTiles) {
+  const line = Math.max(innerHeight / 2, innerHeight - (end - scrollY));
+  for (const [tile, set] of tiles) {
     const box = tile.getBoundingClientRect();
     set("view", box.top <= line && line < box.bottom);
   }
 }
 if (!canHover) {
-  for (const type of ["scroll", "resize"]) addEventListener(type, () => (frame ||= requestAnimationFrame(followScroll)), { passive: true });
+  const later = () => (clearTimeout(settle), (settle = setTimeout(followScroll, SETTLE_MS)));
+  for (const type of ["scroll", "resize", "pageshow"]) addEventListener(type, later, { passive: true });
 }
 
 const list = $("#games");
@@ -128,7 +139,7 @@ async function load(retrying = false) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const { games } = await res.json();
     list.replaceChildren(...games.map(card));
-    followScroll();
+    if (!canHover) followScroll();
   } catch {
     list.replaceChildren(
       el(
