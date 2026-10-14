@@ -395,10 +395,12 @@ screen replaces the card without moving anything; `theme.css` keeps the
 header's height free above it until `shell.js` adds the header. A `<noscript>`
 line under the tagline says the games need JavaScript. The tapped home tile's
 icon moves into the lobby's (and back) with a cross-document view transition:
-`@view-transition` in `theme.css`, off under reduced motion, and the same
-`view-transition-name` (`icon-<slug>`) on the tile's `.game-icon` (`home.js`)
-and the `.lobby-icon` (`index.html`, `lobby.js`). Browsers without it just
-navigate. `test/browser/page-loading.test.js` holds back `engine/lobby.js` and
+the same `view-transition-name` (`icon-<slug>`) on the tile's `.game-icon`
+(`home.js`) and the `.lobby-icon` (`index.html`, `lobby.js`). Every page opts
+in with an inline `<style>` in its head (`@view-transition`, off under reduced
+motion): when one page opts in and the next hasn't yet when it first shows,
+as with a rule in `theme.css` in Chromium's headless shell, Chrome reports an
+uncaught error. Browsers without them just navigate. `test/browser/page-loading.test.js` holds back `engine/lobby.js` and
 checks that every game shows its icon, title and piece, that the title and
 button row don't move when the lobby arrives, and that nothing visible
 animates in the first 400 ms.

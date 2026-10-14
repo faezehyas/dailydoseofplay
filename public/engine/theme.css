@@ -531,7 +531,13 @@ input::placeholder {
   text-align: left;
 }
 
-/* The game's icon over its name on the lobby's home screen. */
+/* The game's icon over its name on the lobby's home screen. The tapped home
+   tile's icon moves into it, and back: the tile's .game-icon and the
+   .lobby-icon share a view-transition-name (icon-<slug>, set inline by
+   home.js, index.html and lobby.js). Every page opts in to cross-document
+   view transitions with an inline <style> in its head, not here: a page must
+   opt in by the time it first shows, or Chrome reports an error. Browsers
+   without them just navigate. */
 .lobby-icon {
   width: 112px;
   aspect-ratio: 16 / 10;
@@ -560,15 +566,15 @@ input::placeholder {
 
 /* The button row holds the home screen's buttons, hidden, so it is as tall as
    the real one, and over them a piece of the game making its move. */
-.lobby-actions:has(> .loading) > :not(.loading) {
-  visibility: hidden;
-}
-
-.lobby-actions:has(> .loading) {
+.loading-row {
   position: relative;
 }
 
-.lobby-actions > .loading {
+.loading-row > :not(.loading) {
+  visibility: hidden;
+}
+
+.loading-row > .loading {
   position: absolute;
   inset: 0;
   display: grid;
@@ -577,18 +583,8 @@ input::placeholder {
 }
 
 @media (scripting: none) {
-  .lobby-actions > .loading {
+  .loading-row > .loading {
     display: none;
-  }
-}
-
-/* The tapped home tile's icon moves into the lobby, and back: the tile's
-   .game-icon and the lobby's .lobby-icon share a view-transition-name
-   (icon-<slug>, set inline by home.js, index.html and lobby.js). Browsers
-   without cross-document view transitions just navigate. */
-@media (prefers-reduced-motion: no-preference) {
-  @view-transition {
-    navigation: auto;
   }
 }
 

@@ -4,7 +4,7 @@
 // so they can't go stale: dynamic import()s load later and aren't preloaded.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { IMPORT } from "./helpers.js";
@@ -49,3 +49,12 @@ for (const { slug, name, description } of GAMES) {
     assert.match(html, /<noscript>/, `public/${slug}/index.html says the games need JavaScript`);
   });
 }
+
+// A page that hasn't opted in to view transitions when it first shows, after
+// one that has, makes Chrome report an error; an inline rule is there in time.
+test("every page opts in to view transitions in its head", () => {
+  const OPT_IN = "<style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>";
+  const pages = readdirSync(PUBLIC, { recursive: true }).filter((f) => f.endsWith(".html"));
+  assert.ok(pages.length > GAMES.length);
+  for (const page of pages) assert.ok(readFileSync(path.join(PUBLIC, page), "utf8").includes(OPT_IN), `public/${page} has ${OPT_IN} in its head`);
+});

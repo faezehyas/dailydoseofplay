@@ -109,15 +109,24 @@ test("nothing shows moving in the first 400 ms, and nothing animates under reduc
   }
 });
 
-test("the home tile's icon and the lobby's share a view-transition name", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
+test("the home tile's icon moves into the lobby, and pages move between each other without errors", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
   const { srv, open } = await setup(t);
   const { page, errors } = await open();
+  const transitions = [];
+  page.on("console", (m) => m.text().startsWith("reveal ") && transitions.push(m.text()));
+  await page.addInitScript(() => addEventListener("pagereveal", (e) => console.log(`reveal ${location.pathname} ${!!e.viewTransition}`)));
   await page.goto(`${srv.base}/`);
   const name = (sel) => page.locator(sel).evaluate((e) => getComputedStyle(e).viewTransitionName);
   assert.equal(await name('.game-card[data-slug="tic-tac-toe"] .game-icon'), "icon-tic-tac-toe");
-  await page.goto(`${srv.base}/tic-tac-toe/`);
+  await page.click('.game-card[data-slug="tic-tac-toe"] h2 a');
   await page.locator("#play-friend").waitFor();
   assert.equal(await name(".lobby-icon"), "icon-tic-tac-toe");
+  await page.goBack();
+  await page.locator('.game-card[data-slug="tic-tac-toe"]').waitFor();
+  await page.click('footer a[href^="/privacy"]');
+  await page.waitForURL("**/privacy/");
+  await page.locator("footer").waitFor();
+  assert.deepEqual(transitions, ["reveal / false", "reveal /tic-tac-toe/ true", "reveal / true", "reveal /privacy/ true"]);
   assert.deepEqual(errors, []);
 });
 

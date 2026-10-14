@@ -80,7 +80,7 @@ your protocol:
 
 ```
 public/<slug>/
-├── index.html       page shell: copy public/sea-battle/index.html, change title, description, the loading card and its piece, and the modulepreload links; keep the icon, manifest and theme-color tags
+├── index.html       page shell: copy public/sea-battle/index.html, change title, description, the loading card and its piece, and the modulepreload links; keep the icon, manifest, theme-color and view-transition tags
 ├── style.css        game-specific styles; only var(--…) tokens from /engine/theme.css, light and dark
 ├── main.js          startGameShell(...) and the view
 ├── rules.js         pure rules
@@ -106,7 +106,8 @@ disable the field and buttons, mark How to play and the settings `inert` and
 leave out the settings' options. It starts with the icon
 (`<div class="lobby-icon" style="view-transition-name: icon-<slug>">`), the
 game's name as in `games.json` and its description as the tagline, then the
-`<noscript>` line. Last in the button row goes the `role="status"` line with
+`<noscript>` line. The button row gets the class `loading-row`, which hides
+its buttons, and last in it goes the `role="status"` line with
 a piece of your game and "Loading…" for screen readers: an inline
 `<svg class="loading-piece" viewBox="0 0 80 48">` from the shapes and
 animation classes under `.loading-piece` in `theme.css`; copy the closest
