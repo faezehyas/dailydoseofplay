@@ -8,31 +8,13 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import { mkdirSync, readFileSync } from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { readFileSync } from "node:fs";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState } from "../helpers.js";
 
-const ARTIFACTS = path.resolve("test-artifacts");
 const { games } = JSON.parse(readFileSync("public/games.json", "utf8"));
 const ready = games.filter((g) => g.status === "ready");
 
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
+const skip = skipWithoutPlaywright();
 
 // The tile's preview, if it has been swapped in: its animations' play states
 // and when the last one ends.
@@ -55,28 +37,19 @@ const started = (shown) => shown.states.includes("running") && !shown.states.inc
 
 const tileSize = (page, slug) => page.locator(`.game-card[data-slug="${slug}"]`).evaluate((e) => [e.offsetWidth, e.offsetHeight]);
 
-async function openHome(browser, srv, errors, options = {}) {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, ...options });
-  page.on("pageerror", (e) => errors.push(e.message));
-  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+async function openHome(open, srv, name, options = {}) {
+  const page = await open(name, { viewport: { width: 1280, height: 900 }, ...options });
   await page.goto(`${srv.base}/`);
   await page.locator(".game-card[data-slug]").nth(games.length - 1).waitFor();
   return page;
 }
 
-test("a tile loops its game's preview while hovered or focused, then shows its icon again", { skip: !pw && "Playwright not installed", timeout: 90_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
+test("a tile loops its game's preview while hovered or focused, then shows its icon again", { skip, timeout: 90_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
 
   for (const colorScheme of ["light", "dark"]) {
     for (const width of [1280, 360]) {
-      const page = await openHome(browser, srv, errors, { viewport: { width, height: 900 }, colorScheme });
+      const page = await openHome(open, srv, `home-${width}-${colorScheme}`, { viewport: { width, height: 900 }, colorScheme });
       const fetched = [];
       page.on("request", (r) => r.url().endsWith("/preview.svg") && fetched.push(r.url()));
       assert.equal(await page.locator("svg.tile-preview").count(), 0, "no preview before a hover");
@@ -111,11 +84,7 @@ test("a tile loops its game's preview while hovered or focused, then shows its i
       await page.evaluate((slug) => {
         for (const a of document.querySelector(`.game-card[data-slug="${slug}"] svg.tile-preview`).getAnimations({ subtree: true })) a.finish();
       }, one);
-      await page.waitForFunction(
-        (slug) => document.querySelector(`.game-card[data-slug="${slug}"] svg.tile-preview`).getAnimations({ subtree: true }).some((a) => a.playState === "running"),
-        one,
-        { timeout: 5000 },
-      );
+      await waitForState(page, (_, slug) => document.querySelector(`.game-card[data-slug="${slug}"] svg.tile-preview`).getAnimations({ subtree: true }).some((a) => a.playState === "running"), one, { timeout: 5000 });
       await page.screenshot({ path: `${ARTIFACTS}/home-previews-${width}-${colorScheme}.png` });
       await page.locator(`.game-card[data-slug="${two}"]`).hover();
       await page.locator(`.game-card[data-slug="${one}"] .game-icon img`).waitFor();
@@ -127,7 +96,7 @@ test("a tile loops its game's preview while hovered or focused, then shows its i
 
   // Keyboard: tabbing into a tile plays its preview; tabbing on to the next
   // tile puts the first one's icon back.
-  const page = await openHome(browser, srv, errors);
+  const page = await openHome(open, srv, "keyboard");
   const [first, second] = await page.locator(".game-card[data-slug]").evaluateAll((els) => els.slice(0, 2).map((e) => e.dataset.slug));
   const focusedTile = () => page.evaluate(() => document.activeElement.closest(".game-card")?.dataset.slug);
   for (let i = 0; i < 20 && (await focusedTile()) !== first; i++) await page.keyboard.press("Tab");
@@ -148,20 +117,14 @@ test("a tile loops its game's preview while hovered or focused, then shows its i
   await page.locator(`.game-card[data-slug="${first}"] .game-icon img`).waitFor();
   assert.equal(await preview(page, first), null, "the icon is back once the pointer leaves");
   await page.close();
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("previews loop in view on a touch screen and never play with reduced motion", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
+test("previews loop in view on a touch screen and never play with reduced motion", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, errors } = await openBrowser(t);
 
   // Touch: one tile plays at a time, and scrolling down the page gives each one its turn.
-  const phone = await openHome(browser, srv, errors, { viewport: { width: 360, height: 740 }, hasTouch: true, isMobile: true });
+  const phone = await openHome(open, srv, "phone", { viewport: { width: 360, height: 740 }, hasTouch: true, isMobile: true });
   const last = ready.at(-1).slug;
   assert.equal(await preview(phone, last), null, "a tile below the screen waits");
   const played = new Set();
@@ -181,7 +144,7 @@ test("previews loop in view on a touch screen and never play with reduced motion
   await phone.close();
 
   // Reduced motion: hovering and focusing leave the icons alone.
-  const still = await openHome(browser, srv, errors, { reducedMotion: "reduce" });
+  const still = await openHome(open, srv, "still", { reducedMotion: "reduce" });
   for (const { slug } of ready.slice(0, 3)) await still.locator(`.game-card[data-slug="${slug}"]`).hover();
   await still.locator(".game-card[data-slug] h2 a").first().focus();
   await still.waitForTimeout(300);
@@ -190,7 +153,7 @@ test("previews loop in view on a touch screen and never play with reduced motion
   await still.close();
 
   // A missing preview: the icon stays.
-  const missing = await openHome(browser, srv, errors);
+  const missing = await openHome(open, srv, "missing");
   await missing.route("**/preview.svg", (route) => route.fulfill({ status: 404, body: "" }));
   const tile = missing.locator(`.game-card[data-slug="${ready[0].slug}"]`);
   await tile.hover();

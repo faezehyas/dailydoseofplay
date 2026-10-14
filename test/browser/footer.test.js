@@ -7,31 +7,13 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import { mkdirSync, readFileSync } from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { readFileSync } from "node:fs";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser } from "../helpers.js";
 
-const ARTIFACTS = path.resolve("test-artifacts");
 const { games } = JSON.parse(readFileSync("public/games.json", "utf8"));
 const REPO = "https://github.com/Faezehyas/dailydoseofplay";
 
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
+const skip = skipWithoutPlaywright();
 
 const SCREENS = [
   { width: 360, height: 640, colorScheme: "light" },
@@ -40,19 +22,12 @@ const SCREENS = [
 const PAGES = [{ name: "home", url: "/" }, ...games.map((g) => ({ name: g.slug, url: `/${g.slug}/` })), { name: "privacy", url: "/privacy/" }, { name: "404", url: "/no-such-page/" }];
 
 for (const { width, height, colorScheme } of SCREENS) {
-  test(`at ${width} px every page ends with the footer and its links`, { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-    mkdirSync(ARTIFACTS, { recursive: true });
-    const srv = await startServer();
-    const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-    t.after(async () => {
-      await browser.close();
-      await srv.close();
-    });
-    const errors = [];
-    const page = await browser.newPage({ viewport: { width, height }, colorScheme });
-    page.on("pageerror", (e) => errors.push(`${page.url()}: ${e.message}`));
+  test(`at ${width} px every page ends with the footer and its links`, { skip, timeout: 120_000 }, async (t) => {
+    const { srv, open, errors, assertNoErrors } = await openBrowser(t);
+    const page = await open("page", { viewport: { width, height }, colorScheme });
 
     for (const { name, url } of PAGES) {
+      const seen = errors.length;
       await page.goto(`${srv.base}${url}`);
       const footer = page.locator("body > footer.site-footer");
       await footer.waitFor();
@@ -70,7 +45,12 @@ for (const { width, height, colorScheme } of SCREENS) {
       assert.ok(layout.footerTop >= layout.mainBottom, `${name}: the footer (top ${layout.footerTop}) sits below <main> (bottom ${layout.mainBottom})`);
       assert.equal(layout.sideways, false, `${name}: no sideways scroll`);
       await page.screenshot({ path: `${ARTIFACTS}/footer-${name}-${width}-${colorScheme}.png`, fullPage: true });
+      // The 404 page's own status is logged as a console error: expected there, and only there.
+      if (name === "404") {
+        const i = errors.findIndex((e, k) => k >= seen && e.endsWith("status of 404 (Not Found)"));
+        if (i >= 0) errors.splice(i, 1);
+      }
     }
-    assert.deepEqual(errors, []);
+    assertNoErrors();
   });
 }

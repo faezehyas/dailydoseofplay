@@ -5,28 +5,18 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { startServer } from "../helpers.js";
-import { pw, noHorizontalScroll } from "./ludo.shared.js";
+import { skipWithoutPlaywright, openBrowser, joinByInvite, noHorizontalScroll } from "../helpers.js";
+
+const skip = skipWithoutPlaywright();
 
 async function setup(t) {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open() {
-    const page = await (await browser.newContext({ viewport: { width: 360, height: 740 } })).newPage();
-    page.on("pageerror", (e) => errors.push(e.message));
-    return page;
-  }
-  return { srv, open, errors };
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  return { srv, assertNoErrors, open: (name) => open(name, { viewport: { width: 360, height: 740 } }) };
 }
 
-test("the code field cleans what you type, joins at four characters and keeps a bad code", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
-  const page = await open();
+test("the code field cleans what you type, joins at four characters and keeps a bad code", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
+  const page = await open("page");
   await page.goto(`${srv.base}/chess/`);
   const field = page.locator("#join-code");
   assert.equal(await field.getAttribute("enterkeyhint"), "go");
@@ -56,25 +46,23 @@ test("the code field cleans what you type, joins at four characters and keeps a 
   await page.locator("#join-error", { hasText: "doesn't exist any more" }).waitFor();
   await page.keyboard.press("Backspace");
   assert.equal(await page.locator("#join-error").isHidden(), true);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("an invite link to a closed room shows the error with the code filled in", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
-  const host = await open();
+test("an invite link to a closed room shows the error with the code filled in", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
+  const host = await open("host");
   await host.goto(`${srv.base}/chess/`);
-  await host.click("#play-friend");
-  await host.locator("#room-code").waitFor();
-  const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
+  const { invite } = await joinByInvite(host, [], srv);
   const code = new URL(invite).searchParams.get("room");
   await host.getByRole("button", { name: "Cancel" }).click();
   await host.locator("#play-friend").waitFor();
 
-  const friend = await open();
+  const friend = await open("friend");
   await friend.goto(invite);
   await friend.click("#join-room");
   await friend.locator("#join-error", { hasText: "doesn't exist any more" }).waitFor();
   assert.equal(await friend.locator("#join-code").inputValue(), code);
   assert.equal(new URL(friend.url()).search, "", "the invite is gone from the address bar");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
