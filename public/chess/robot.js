@@ -5,7 +5,7 @@
 import { randInt } from "../engine/rng.js";
 import { TurnMatch } from "../engine/turn-match.js";
 import { matchRouter } from "../engine/session.js";
-import { robotPause } from "../engine/robot-pace.js";
+import { robotPause, robotRng } from "../engine/robot-pace.js";
 import {
   genMoves,
   makeMove,
@@ -381,7 +381,7 @@ export function thinkTime(state, me, rng = Math.random) {
 
 // Drive the robot's side of a session: the engine's startTurnRobot, but with a
 // pause that varies like a person's. Its clock pays for the pause and the search.
-export function startRobot(session, { rules, level = "easy", rng = Math.random, think = thinkTime, timeMs = Infinity }) {
+export function startRobot(session, { rules, level = "easy", rng = robotRng(session.index), think = thinkTime, timeMs = Infinity }) {
   const router = matchRouter(session);
   let match = null;
   let timer = null;

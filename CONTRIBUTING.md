@@ -520,7 +520,10 @@ no change.
 - **Sounds:** nothing to add. `test/browser/sound-levels.test.js` finds every `sounds.js` and checks each sound's loudness.
 - **Message size:** add the game to `GAMES` in `test/message-size.test.js` (its biggest board and most players). It plays a full match and fails if a message is over 4 K characters; a browser cuts off a player whose message is over 64 K (see **Message size** in `ARCHITECTURE.md`). Send moves, not whole states.
 - **Browser (recommended):** add `test/browser/<slug>.test.js` modelled on `test/browser/friend-match.test.js`. Host clicks `#play-friend`, the guest opens `#invite-link`, both play through `window.ddp.match`, then a rematch.
-  - Don't wait in real time. In a robot game, set `globalThis.ddpRobotPace = 0.1` with `addInitScript` so the robot answers in a tenth of its usual pause (leave it at 1 only where the test checks the robot's pace). To let a clock run out, call `page.clock.install()` before the page loads and `page.clock.fastForward()` past the limit.
+  - Use the helpers in `test/helpers.js`: `skipWithoutPlaywright()` for the test's `skip`, `openBrowser(t)` for the server, the browser and `open(name, options)` (a page with its own nickname, `phone` size, colour scheme, fake `clock` and init scripts; `assertNoErrors()` checks no page threw or logged an error), `joinByInvite()`, `waitForState()`, `waitForPhase()`, `waitForSameState()`, `pick()` for a setting and `noHorizontalScroll()`.
+  - Don't wait in real time. `open()` runs robots at a tenth of their usual pause (pass `robotPace: 1` only where the test checks the robot's pace). To let a clock run out, pass `clock: true` and call `page.clock.fastForward()` past the limit.
+  - Seed robots with `open(name, { seed })` when the test needs the same robot game every run.
+  - Never assert right after an action on something a robot or the network can change: wait for the state with `waitForState()` first, or record what happened with `recordEvents()` and check `eventsSince()`. No `waitForTimeout()` before a positive assert; a negative check ("nothing happened in 500 ms") may wait.
   - Files run in parallel, but the tests in one file run one after another. Give a long test its own file, and share the game's helpers through `test/browser/<slug>.shared.js` (see Ludo's).
 
 Run `npm test` and `npm run test:browser`. All tests must pass. Never skip or
@@ -592,7 +595,7 @@ The [PR template](.github/pull_request_template.md) repeats these lines, shorten
 | `public/engine/card-match.js` | `CardMatch` and `startCardRobot()` for turn games with hidden cards; the deck runs in `deck-service.js` / `deck-worker.js` / `deck-crypto.js`, and a passed card is sealed with `seal.js` |
 | `public/engine/cards/` | The card games' shared table: faces and art, the table's pieces and motion, card sounds, paced robots, the leaving notice |
 | `vendor/`, `scripts/build-mental-poker.sh` | The mental-poker library (submodule), our patches and lock file, and the script that builds it into `public/engine/vendor/mental-poker/` |
-| `public/engine/robot-pace.js` | `robotPause()`: robots' pauses, which browser tests shorten |
+| `public/engine/robot-pace.js` | `robotPause()` and `robotRng()`: robots' pauses and random choices, which browser tests shorten and seed |
 | `public/engine/fair.js` | Commitments and `SharedRandom` |
 | `public/engine/shell.js` | Header, footer, theme and sound toggles, the settings panel, nickname, `el()`, `toast()` |
 | `public/engine/prefs.js` | The general settings (theme, sound, volume, asking before leaving) in `ddp-settings` |

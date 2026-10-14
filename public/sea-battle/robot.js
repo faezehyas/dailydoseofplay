@@ -12,7 +12,7 @@
 import { randomFleet, remainingShips, shipCells, orthoNeighbors, aimedCells, patternCells, other, idx, CELLS, SIZE, UNKNOWN, HIT, MISS, CLEAR, rowOf, colOf } from "./rules.js";
 import { SeaBattleMatch } from "./match.js";
 import { matchRouter } from "../engine/session.js";
-import { robotPause } from "../engine/robot-pace.js";
+import { robotPause, robotRng } from "../engine/robot-pace.js";
 
 export function analyze(board) {
   const sunkCells = new Set(board.sunk.flatMap((s) => s.cells));
@@ -124,7 +124,7 @@ export function chooseMove(state, me, rng = Math.random) {
 // Drive the robot's side of a session. Returns { destroy }. config: the
 // room's time limits; the robot reports no time spent, so only the human's
 // clock runs.
-export function startRobot(session, { delay = 650, rng = Math.random, config = null } = {}) {
+export function startRobot(session, { delay = 650, rng = robotRng(session.index), config = null } = {}) {
   let match = null;
   let timer = null;
   let destroyed = false;

@@ -32,7 +32,7 @@
 import { Emitter } from "./channel.js";
 import { SharedRandom, FairPlayError } from "./fair.js";
 import { matchRouter } from "./session.js";
-import { robotPause } from "./robot-pace.js";
+import { robotPause, robotRng } from "./robot-pace.js";
 import { RuleError } from "./turn-match.js";
 import { deckService, DeckError, MAX_DECK, HELLO_BYTES, SECRET_BYTES, SHARE_BYTES } from "./deck-service.js";
 import { toBase64, fromBase64 } from "./base64.js";
@@ -790,7 +790,7 @@ export class CardMatch extends Emitter {
 // Drive a robot over a session for a CardMatch game. choose(state, me, rng,
 // face) returns a legal move; face(slot) is what this seat knows. A robot
 // taking a seat over mid-game (session.resume) plays from the next match.
-export function startCardRobot(session, { rules, choose, delay = 600, rng = Math.random }) {
+export function startCardRobot(session, { rules, choose, delay = 600, rng = robotRng(session.index) }) {
   const router = matchRouter(session);
   let match = null;
   let timer = null;

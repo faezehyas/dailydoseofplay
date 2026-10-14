@@ -5,7 +5,7 @@
 // hardly wait in a hidden tab and wait less with reduced motion. Every pause
 // goes through robotPause(), so tests can run a whole game at the deck's speed.
 import { matchRouter } from "../session.js";
-import { robotPause } from "../robot-pace.js";
+import { robotPause, robotRng } from "../robot-pace.js";
 import { CardMatch } from "../card-match.js";
 
 // A robot's pause in a view: -1 while busy() (the screen is still replaying),
@@ -18,7 +18,7 @@ export function humanPause(busy, think) {
 }
 
 // delay() returns ms or -1 (wait for the screen); key(state) names a decision; fallback() replaces a refused move.
-export function startPacedRobot(session, { rules, choose, delay, key, fallback, rng = Math.random }) {
+export function startPacedRobot(session, { rules, choose, delay, key, fallback, rng = robotRng(session.index) }) {
   const router = matchRouter(session);
   let match = null;
   let timer = null;

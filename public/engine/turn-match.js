@@ -19,7 +19,7 @@
 import { Emitter } from "./channel.js";
 import { SharedRandom, FairPlayError } from "./fair.js";
 import { matchRouter } from "./session.js";
-import { robotPause } from "./robot-pace.js";
+import { robotPause, robotRng } from "./robot-pace.js";
 
 export class RuleError extends Error {
   name = "RuleError";
@@ -180,7 +180,7 @@ export class TurnMatch extends Emitter {
 // Drive a robot over a session for a TurnMatch game.
 // choose(state, me, rng) returns a legal move.
 // A robot taking a seat over mid-game starts from session.resume.
-export function startTurnRobot(session, { rules, choose, delay = 600, rng = Math.random }) {
+export function startTurnRobot(session, { rules, choose, delay = 600, rng = robotRng(session.index) }) {
   const router = matchRouter(session);
   let match = null;
   let timer = null;

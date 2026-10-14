@@ -6,7 +6,7 @@
 // sees and how often it plays a random move instead.
 import { randInt } from "../engine/rng.js";
 import { matchRouter } from "../engine/session.js";
-import { robotPause } from "../engine/robot-pace.js";
+import { robotPause, robotRng } from "../engine/robot-pace.js";
 import { TurnMatch } from "../engine/turn-match.js";
 import { legalMoves, square, YARD, HOME, LAST_LOOP, LOOP, SAFE, STARTS, DIE } from "./rules.js";
 
@@ -153,7 +153,7 @@ export function chooseMove(state, me, rng = Math.random, { level = "medium" } = 
 // Drives a robot seat, like the engine's startTurnRobot, except that the
 // pause before each move is asked for each time (delay(state, me)), so the
 // view can hold robots while it replays and hurry them once you are home.
-export function startRobot(session, { rules, choose, delay, rng = Math.random }) {
+export function startRobot(session, { rules, choose, delay, rng = robotRng(session.index) }) {
   const router = matchRouter(session);
   let match = null;
   let timer = null;
