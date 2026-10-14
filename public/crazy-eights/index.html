@@ -53,9 +53,45 @@
     <main class="page">
       <section id="lobby">
         <div class="card lobby-card">
+          <div class="lobby-icon" style="view-transition-name: icon-crazy-eights"><img src="/crazy-eights/icon.svg" alt="" /></div>
           <h1>Crazy Eights</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="tagline">Match the suit or the rank, play an 8 to change it, and empty your hand first. Nobody deals, nobody peeks.</p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
+          <p class="how-to-play" inert><a href="#how-to-play">How to play</a></p>
+          <label class="field">
+            <span>Nickname</span>
+            <input type="text" maxlength="20" placeholder="Your nickname (optional)" disabled />
+            <small>Saved on this device only.</small>
+          </label>
+          <details class="settings" inert>
+            <summary>
+              <span class="settings-title">Game settings</span>
+              <span class="settings-change">Change</span>
+              <span class="settings-line">
+                <span class="chip">Coin toss</span>
+                <span class="sr-only">, </span>
+                <span class="chip">No move limit</span>
+                <span class="sr-only">, </span>
+                <span class="chip robot">Easy robots</span>
+              </span>
+            </summary>
+          </details>
+          <div class="lobby-actions">
+            <button class="btn primary big" type="button" disabled>Play with friends</button>
+            <div class="robot-play">
+              <fieldset class="settings-group players-choice" disabled>
+                <legend>Players (you + robots)</legend>
+                <div class="seg-options">
+                  <label class="seg-opt"><input type="radio" /><span>2</span></label>
+                  <label class="seg-opt"><input type="radio" /><span>3</span></label>
+                  <label class="seg-opt"><input type="radio" checked /><span>4</span></label>
+                </div>
+              </fieldset>
+              <button class="btn big" type="button" disabled>Play vs 3 robots</button>
+            </div>
+            <button class="btn learn" type="button" disabled>Learn</button>
+          </div>
+          <p class="loading" role="status"><span class="spinner"></span><span class="sr-only">Loading…</span></p>
         </div>
       </section>
       <section id="game" hidden></section>

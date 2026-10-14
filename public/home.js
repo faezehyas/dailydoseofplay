@@ -5,7 +5,8 @@ initShell();
 
 function card(game) {
   const ready = game.status === "ready";
-  const icon = el("div", { class: "game-icon" });
+  // Its view-transition-name matches the lobby's icon, which it moves into (theme.css).
+  const icon = el("div", { class: "game-icon", style: ready && `view-transition-name: icon-${game.slug}` });
   const img = ready && el("img", { src: `/${game.slug}/icon.svg`, alt: "", loading: "lazy" });
   if (ready) icon.append(img);
   else {

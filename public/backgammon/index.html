@@ -45,9 +45,35 @@
     <main class="page">
       <section id="lobby">
         <div class="card lobby-card">
+          <div class="lobby-icon" style="view-transition-name: icon-backgammon"><img src="/backgammon/icon.svg" alt="" /></div>
           <h1>Backgammon</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="tagline">Roll, run and hit. Bring all fifteen checkers home and off the board first.</p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
+          <p class="how-to-play" inert><a href="#how-to-play">How to play</a></p>
+          <label class="field">
+            <span>Nickname</span>
+            <input type="text" maxlength="20" placeholder="Your nickname (optional)" disabled />
+            <small>Saved on this device only.</small>
+          </label>
+          <details class="settings" inert>
+            <summary>
+              <span class="settings-title">Game settings</span>
+              <span class="settings-change">Change</span>
+              <span class="settings-line">
+                <span class="chip">No clocks</span>
+                <span class="sr-only">, </span>
+                <span class="chip">Coin toss</span>
+                <span class="sr-only">, </span>
+                <span class="chip robot">Easy robot</span>
+              </span>
+            </summary>
+          </details>
+          <div class="lobby-actions">
+            <button class="btn primary big" type="button" disabled>Play with a friend</button>
+            <button class="btn big" type="button" disabled>Play vs robot</button>
+            <button class="btn learn" type="button" disabled>Learn</button>
+          </div>
+          <p class="loading" role="status"><span class="spinner"></span><span class="sr-only">Loading…</span></p>
         </div>
       </section>
       <section id="game" hidden></section>

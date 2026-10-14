@@ -35,18 +35,12 @@ test("the lobby tagline is the game's description in games.json", { skip: !pw &&
   assert.deepEqual(errors, []);
 });
 
-test("the lobby shows before games.json arrives", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
+test("the lobby doesn't wait for games.json", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
   const { srv, page, errors } = await setup(t);
-  let release;
-  const held = new Promise((resolve) => (release = resolve));
-  await page.route("**/games.json", async (route) => (await held, route.continue()));
+  // The page carries the tagline, so a games.json that never arrives changes nothing.
+  await page.route("**/games.json", () => {});
   await page.goto(`${srv.base}/tic-tac-toe/`);
-  await page.locator("#play-friend").waitFor();
-  assert.equal(await page.locator(".lobby-card .tagline").isVisible(), false, "no empty line while it loads");
-
-  release();
-  const tagline = page.locator(".lobby-card .tagline");
-  await tagline.waitFor();
-  assert.equal(await tagline.textContent(), GAMES.find((g) => g.slug === "tic-tac-toe").description);
+  await page.locator("#play-friend:not([disabled])").waitFor();
+  assert.equal(await page.locator(".lobby-card .tagline").textContent(), GAMES.find((g) => g.slug === "tic-tac-toe").description);
   assert.deepEqual(errors, []);
 });
