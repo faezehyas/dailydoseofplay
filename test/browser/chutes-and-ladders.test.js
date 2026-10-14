@@ -6,28 +6,15 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll, pick, bg, state, settled, spinUntilOver, skipAutoSpinBeats } from "./chutes-and-ladders.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll, pick } from "../helpers.js";
+import { bg, state, settled, spinUntilOver, skipAutoSpinBeats } from "./chutes-and-ladders.shared.js";
 
-test("two friends play Chutes and Ladders on the host's settings through the invite link, then a rematch", { skip: !pw && "Playwright not installed", timeout: 240_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(name, nickname, opts = {}) {
-    // Reduced motion plays every spin out at once, so whole games fit the test.
-    const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, reducedMotion: "reduce", ...opts });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    await page.clock.install();
-    return page;
-  }
+const skip = skipWithoutPlaywright();
+
+test("two friends play Chutes and Ladders on the host's settings through the invite link, then a rematch", { skip, timeout: 240_000 }, async (t) => {
+  const { srv, open: openPage, assertNoErrors } = await openBrowser(t);
+  // Reduced motion plays every spin out at once, so whole games fit the test.
+  const open = (name, nickname, opts = {}) => openPage(name, { nickname, viewport: { width: 1200, height: 900 }, reducedMotion: "reduce", clock: true, ...opts });
 
   // Host (desktop, light) picks the house rules and lets the spinner go by itself.
   const host = await open("host", "Ada", { colorScheme: "light" });
@@ -41,15 +28,13 @@ test("two friends play Chutes and Ladders on the host's settings through the inv
   await host.click("#play-friend");
   assert.ok(await host.locator("#cl-settings").isHidden(), "settings are only on the home screen");
   await host.locator("#room-code").waitFor();
-  const invite = await host.locator("#invite-link").inputValue();
-  const code = (await host.locator("#room-code").innerText()).trim();
+  const { code, invite } = await joinByInvite(host, [], srv);
   assert.match(invite, new RegExp(`/chutes-and-ladders/\\?room=${code}&key=[\\w-]{22}$`));
 
   // The friend (360 px phone, dark) opens the link and spins by tapping.
   // The room takes up to four, so the host starts it once Bo is in.
   const guest = await open("guest", "Bo", { viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "dark" });
-  await guest.goto(invite.replace(/^https?:\/\/[^/]+/, srv.base));
-  await guest.click("#join-room");
+  await joinByInvite(host, guest, srv);
   await host.locator("#roster li.ready", { hasText: "Bo" }).waitFor();
   await host.click("#start-game");
   await host.locator("#cl-board").waitFor();
@@ -66,15 +51,15 @@ test("two friends play Chutes and Ladders on the host's settings through the inv
   assert.equal(await host.locator(".cl-board .chute").count(), 10);
 
   async function startedGame(m) {
-    await wait(host, (n) => window.ddp.match.m === n && window.ddp.match.phase !== "starting", m);
-    await wait(guest, (n) => window.ddp.match.m === n && window.ddp.match.phase !== "starting", m);
+    await waitForState(host, (ddp, n) => ddp.match.m === n && ddp.match.phase !== "starting", m);
+    await waitForState(guest, (ddp, n) => ddp.match.m === n && ddp.match.phase !== "starting", m);
     assert.equal(await host.evaluate(() => window.ddp.match.state.first), 0, "the room says the host starts");
     assert.equal(await guest.evaluate(() => window.ddp.match.state.first), 0, "both browsers agree");
   }
   async function finish() {
     // The host's spinner goes by itself.
     await Promise.all([spinUntilOver(guest, { tap: true }), skipAutoSpinBeats(host)]);
-    await wait(host, () => window.ddp.match.phase === "over", undefined, 60_000);
+    await waitForState(host, (ddp) => ddp.match.phase === "over", undefined, { timeout: 60_000 });
     const [a, b] = [await state(host), await state(guest)];
     assert.deepEqual(a, b, "both browsers end on the same state");
     assert.equal(a.pos[a.winner], 100);
@@ -84,9 +69,9 @@ test("two friends play Chutes and Ladders on the host's settings through the inv
 
   // Game 1: the host's spinner spins by itself; the friend must tap.
   await startedGame(1);
-  await wait(host, () => window.ddp.match.state.ply >= 1);
+  await waitForState(host, (ddp) => ddp.match.state.ply >= 1);
   assert.equal(await host.evaluate(() => window.ddp.match.state.last.player), 0, "the host's first spin happened by itself");
-  await wait(guest, () => window.ddp.match.state.turn === 1);
+  await waitForState(guest, (ddp) => ddp.match.state.turn === 1);
   await settled(guest);
   assert.match(await guest.locator("#cl-status").innerText(), /Your turn\. Spin!/);
   assert.ok(await guest.locator("#cl-spin").isEnabled());
@@ -120,5 +105,5 @@ test("two friends play Chutes and Ladders on the host's settings through the inv
   await host.locator("#toast", { hasText: /Bo left|connection to Bo was lost/ }).waitFor({ state: "attached", timeout: 20_000 });
   await host.locator(".pb-name", { hasText: "Bo (robot)" }).waitFor();
   assert.equal(await host.locator("#ended").count(), 0);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

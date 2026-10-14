@@ -1,33 +1,7 @@
-// Shared by the Chutes and Ladders browser tests: loads Playwright and the page helpers.
-import { execSync } from "node:child_process";
-import path from "node:path";
-import { createRequire } from "node:module";
+// Shared by the Chutes and Ladders browser tests: the page helpers.
+import { waitForState } from "../helpers.js";
 
-export const ARTIFACTS = path.resolve("test-artifacts");
-
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-export const pw = await loadPlaywright();
 export const AUTO_SPIN_DELAY = 700; // as in main.js
-export const wait = (page, fn, arg, timeout = 20_000) => page.waitForFunction(fn, arg, { timeout });
-export const noHorizontalScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
-// The settings fold to a summary line in the lobby card; open it first.
-export async function pick(page, name, value) {
-  if (!(await page.locator("#cl-settings[open]").count())) await page.click("#cl-settings > summary");
-  await page.click(`#cl-settings label:has(input[name="cl-${name}"][value="${value}"])`);
-}
 export const bg = (page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 export const state = (page) => page.evaluate(() => window.ddp.match.state);
 // Each player's colour on this screen, by name, as the theme token their pill
@@ -55,7 +29,7 @@ export const colours = (page) =>
   });
 
 // The board has settled: no spin is being played out on screen.
-export const settled = (page) => wait(page, () => !document.querySelector("#cl-status")?.textContent.match(/Spinning|spinning|moving|Hop|ladder|chute/i));
+export const settled = (page) => waitForState(page, () => !document.querySelector("#cl-status")?.textContent.match(/Spinning|spinning|moving|Hop|ladder|chute/i));
 
 // Presses Spin whenever this page may, until the game ends.
 export async function spinUntilOver(page, { tap = false, timeout = 120_000 } = {}) {

@@ -5,26 +5,15 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll, pick, state, yardCorner, resultInView, autoplay, stopAutoplay } from "./ludo.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, noHorizontalScroll, pick } from "../helpers.js";
+import { state, yardCorner, resultInView, autoplay, stopAutoplay } from "./ludo.shared.js";
 
-test("Ludo against three robots on a 360 px phone: die, hops, sounds, mute, keyboard and the move timer", { skip: !pw && "Playwright not installed", timeout: 360_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling", "--autoplay-policy=no-user-gesture-required"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "light" });
-  await ctx.addInitScript(() => (window.ddpSounds = []));
-  await ctx.addInitScript(() => (globalThis.ddpRobotPace = 0.1));
-  const page = await ctx.newPage();
-  page.on("pageerror", (e) => errors.push(e.message));
+const skip = skipWithoutPlaywright();
+
+test("Ludo against three robots on a 360 px phone: die, hops, sounds, mute, keyboard and the move timer", { skip, timeout: 360_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { phone: true, colorScheme: "light", clock: true, init: () => (window.ddpSounds = []) });
   const heard = () => page.evaluate(() => window.ddpSounds.slice());
-  await page.clock.install();
 
   await page.goto(`${srv.base}/`);
   await page.click('.game-card[data-slug="ludo"]');
@@ -35,7 +24,7 @@ test("Ludo against three robots on a 360 px phone: die, hops, sounds, mute, keyb
   assert.ok(await noHorizontalScroll(page), "settings fit at 360 px");
   await page.screenshot({ path: `${ARTIFACTS}/ld-9-settings-mobile.png`, fullPage: true });
   await page.click("#play-robot");
-  await wait(page, () => window.ddp.match?.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing");
   assert.match(await page.locator(".pb-players").innerText(), /Cleo[\s\S]*Robot 1[\s\S]*Robot 2[\s\S]*Robot 3/);
   assert.equal(await page.locator("#ld-config").innerText(), "three 6s lose the turn · no blocks · no capture bonus · play for places · 10 s to move · Hard robots");
   assert.equal(await yardCorner(page, "red"), "bottom left");
@@ -46,9 +35,9 @@ test("Ludo against three robots on a 360 px phone: die, hops, sounds, mute, keyb
   await page.tap("#ld-roll");
   assert.ok(await page.locator("#ld-die.tumbling").count(), "the die tumbles");
   await page.screenshot({ path: `${ARTIFACTS}/ld-10-robot-rolling.png` });
-  await wait(page, () => window.ddp.match.state.ply >= 1);
+  await waitForState(page, (ddp) => ddp.match.state.ply >= 1);
   const first = (await state(page)).last;
-  await wait(page, (v) => document.querySelector("#ld-die .face").dataset.value === String(v), first.value);
+  await waitForState(page, (_, v) => document.querySelector("#ld-die .face").dataset.value === String(v), first.value);
   assert.ok((await heard()).includes("dice"), "the die rattles");
 
   // Keep rolling by touch until a token is out and moves square by square.
@@ -73,7 +62,7 @@ test("Ludo against three robots on a 360 px phone: die, hops, sounds, mute, keyb
       if (roll && !roll.disabled && document.querySelectorAll(".pawn.movable").length === 0) roll.click();
     }, 60);
   });
-  await wait(page, () => new Set([...document.querySelectorAll(".hit-dest")].map((d) => d.getAttribute("cx") + d.getAttribute("cy"))).size > 1, undefined, 180_000);
+  await waitForState(page, () => new Set([...document.querySelectorAll(".hit-dest")].map((d) => d.getAttribute("cx") + d.getAttribute("cy"))).size > 1, undefined, { timeout: 180_000 });
   await stopAutoplay(page);
   assert.ok((await page.locator(".pawn.movable").count()) >= 2);
   assert.ok((await page.locator(".dest").count()) >= 2, "each choice shows where it lands");
@@ -85,19 +74,19 @@ test("Ludo against three robots on a 360 px phone: die, hops, sounds, mute, keyb
   assert.equal(typeof chosen, "number", "the arrow key moved focus to another token");
   const ply = (await state(page)).ply;
   await page.keyboard.press("Enter");
-  await wait(page, (n) => window.ddp.match.state.ply > n, ply);
+  await waitForState(page, (ddp, n) => ddp.match.state.ply > n, ply);
   const played = (await state(page)).last;
   assert.deepEqual([played.type, played.player, played.token], ["move", 0, chosen], "Enter moved the focused token");
 
   // Muted: nothing more plays. Roll with the keyboard.
-  await wait(page, () => !document.querySelector("#ld-roll").disabled || window.ddp.match.state.turn !== 0, undefined, 60_000);
+  await waitForState(page, (ddp) => !document.querySelector("#ld-roll").disabled || ddp.match.state.turn !== 0, undefined, { timeout: 60_000 });
   await page.click("#sound-toggle");
   assert.equal(await page.locator("#sound-toggle").getAttribute("aria-pressed"), "true");
   const before = (await heard()).length;
-  await wait(page, () => !document.querySelector("#ld-roll").disabled, undefined, 60_000);
+  await waitForState(page, () => !document.querySelector("#ld-roll").disabled, undefined, { timeout: 60_000 });
   await page.locator("#ld-roll").focus();
   await page.keyboard.press("Enter");
-  await wait(page, () => window.ddp.match.state.turn !== 0 || window.ddp.match.state.rolled, undefined, 30_000);
+  await waitForState(page, (ddp) => ddp.match.state.turn !== 0 || ddp.match.state.rolled, undefined, { timeout: 30_000 });
   await page.waitForTimeout(1500);
   assert.equal((await heard()).length, before, "no sound while muted");
   await page.click("#sound-toggle");
@@ -113,17 +102,17 @@ test("Ludo against three robots on a 360 px phone: die, hops, sounds, mute, keyb
     window.plays = [];
     window.stopPlays = m.on("events", () => window.plays.push({ ply: m.state.ply, last: structuredClone(m.state.last) }));
   });
-  await wait(page, () => !document.querySelector("#ld-roll").disabled, undefined, 90_000);
+  await waitForState(page, () => !document.querySelector("#ld-roll").disabled, undefined, { timeout: 90_000 });
   const waited = (await state(page)).ply;
   await page.clock.fastForward("00:11");
-  const auto = await (await wait(page, (n) => window.plays.find((p) => p.ply === n + 1)?.last, waited, 15_000)).jsonValue();
+  const auto = await waitForState(page, (_, n) => window.plays.find((p) => p.ply === n + 1)?.last, waited, { timeout: 15_000 });
   await page.evaluate(() => window.stopPlays());
   assert.equal(auto.player, 0, "your roll was made for you");
   assert.equal(auto.type, "roll");
 
   // The rest at speed.
   await autoplay(page);
-  await wait(page, () => window.ddp.match.phase === "over", undefined, 300_000);
+  await waitForState(page, (ddp) => ddp.match.phase === "over", undefined, { timeout: 300_000 });
   await stopAutoplay(page);
   const st = await state(page);
   assert.equal(st.players, 4);
@@ -136,7 +125,7 @@ test("Ludo against three robots on a 360 px phone: die, hops, sounds, mute, keyb
 
   // The robots accept a rematch; dark mode still fits the phone.
   await page.click("#rematch");
-  await wait(page, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing");
   assert.deepEqual((await state(page)).tokens.flat(), Array(16).fill(-1));
   await page.click("#theme-toggle");
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "dark");
@@ -144,5 +133,5 @@ test("Ludo against three robots on a 360 px phone: die, hops, sounds, mute, keyb
   await page.screenshot({ path: `${ARTIFACTS}/ld-14-robot-dark.png`, fullPage: true });
   await page.click("#leave");
   await page.locator("#play-friend").waitFor();
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
