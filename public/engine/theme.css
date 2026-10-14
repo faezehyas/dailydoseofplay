@@ -2359,6 +2359,16 @@ input::placeholder {
   transform-origin: center;
 }
 
+/* The other player's pieces. */
+.loading-piece .rival,
+.loading-piece .rival .checker-top {
+  fill: var(--accent-2);
+}
+
+.loading-piece .rival .checker-side {
+  fill: var(--accent-2-text);
+}
+
 /* The knight squashes on its base, like the hero's pawn. */
 .loading-piece .knight {
   transform-box: fill-box;
@@ -2397,8 +2407,8 @@ input::placeholder {
     animation-duration: 1.6s;
   }
   .loading-piece .knight {
-    animation-name: scene-pawn;
-    animation-duration: 1.4s;
+    animation-name: loading-knight;
+    animation-duration: 2.4s;
   }
   .loading-piece .draw-1,
   .loading-piece .draw-2,
@@ -2511,6 +2521,33 @@ input::placeholder {
   }
   to {
     opacity: 0;
+  }
+}
+
+/* The knight jumps its L (one square across, two up) and back, squashing on
+   each landing like the hero's pawn. */
+@keyframes loading-knight {
+  8% {
+    transform: scale(1.12, 0.84);
+  }
+  22% {
+    transform: translate(6px, -26px);
+  }
+  34% {
+    transform: translate(12px, -20px) scale(1.1, 0.88);
+  }
+  40%,
+  58% {
+    transform: translate(12px, -20px);
+  }
+  72% {
+    transform: translate(6px, -26px);
+  }
+  84% {
+    transform: scale(1.08, 0.9);
+  }
+  92% {
+    transform: none;
   }
 }
 
