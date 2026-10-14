@@ -114,7 +114,13 @@ test("four friends play Hearts in four browsers: a secret pass, a whole hand aud
   }
   // The cards passed to you are marked (the 2 of clubs may already have gone to the first trick).
   for (const p of pages) await wait(p, () => document.querySelectorAll(".hr-hcard.received").length === window.ddp.match.state.received[window.ddp.match.me].length, undefined, 20_000);
-  assert.equal(await host.evaluate(() => window.ddp.match.state.received.flat().length) >= 11, true);
+  // A seat's only legal card plays by itself (the 2 of clubs, then a lone club), and may be a passed one: count them all at one moment.
+  const [kept, unplayed] = await host.evaluate(() => {
+    const st = window.ddp.match.state;
+    const played = [...st.trick.map((x) => x.slot), ...st.won.flat()];
+    return [st.received.flat().length, st.picks.flat().filter((s) => !played.includes(s)).length];
+  });
+  assert.equal(kept, unplayed, "every passed card not yet played is still marked as passed");
 
   await Promise.all(pages.map(autoplay));
   await wait(host, () => window.ddp.match.state.tricks >= 4 || window.ddp.match.phase !== "playing", undefined, 120_000);

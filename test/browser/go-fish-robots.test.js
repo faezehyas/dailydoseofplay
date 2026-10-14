@@ -109,6 +109,8 @@ test("Go Fish against three robots on a 360 px phone: deal, sounds, mute, keyboa
   await autoplay(page);
   await wait(page, () => window.ddp.match.phase === "over", undefined, 300_000);
   await stopAutoplay(page);
+  // The last move reaches each robot's table after mine: wait for theirs to end too.
+  await wait(page, () => window.ddp.robots.every((r) => r.match.phase === "over"));
   const st = await state(page);
   for (let k = 0; k < 3; k++) assert.deepEqual(await page.evaluate((i) => window.ddp.robots[i].match.state, k), st, `robot ${k + 1} agrees`);
   assert.deepEqual(await leaks(page), []);

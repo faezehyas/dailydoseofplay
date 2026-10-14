@@ -65,7 +65,9 @@ test("two friends play Crazy Eights on the host's settings through the invite li
   // Two players get 7 cards (the host, first, may already have drawn).
   const dealt = (st, p) => st.hands[p].length - st.draws[p] + st.plays[p];
   assert.equal(dealt(await state(host), 0), 7, "two players get 7 cards");
-  assert.equal(await guest.locator(".ce-seat .count").innerText(), "7");
+  // The friend's screen shows the host's hand as it is now, which adds up to the same 7.
+  await wait(guest, () => document.querySelector(".ce-seat .count").textContent === String(window.ddp.match.state.hands[0].length));
+  assert.equal(dealt(await state(guest), 0), 7, "the friend sees the host's 7 cards");
   // The friend's four-colour deck is theirs alone.
   assert.equal(await guest.locator(".crazy-eights.four-colour").count(), 1);
   assert.equal(await host.locator(".crazy-eights.four-colour").count(), 0);
