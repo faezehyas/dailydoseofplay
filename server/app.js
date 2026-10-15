@@ -8,9 +8,16 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { createSignaling } from "./signaling.js";
+
+// Text files go out gzipped when the browser accepts it: the CSS a page needs
+// before it can paint, and its modules, are 3 to 5 times smaller. ws loads
+// node:zlib itself, so it is on EdgeJS; if gzipping fails, files go out as
+// they are.
+const COMPRESSIBLE = new Set([".html", ".js", ".mjs", ".css", ".json", ".svg", ".webmanifest", ".txt"]);
 
 export const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 
@@ -184,20 +191,42 @@ export async function createApp({
       const security = path.relative(publicDir, file) === DECK_WORKER
         ? { ...SECURITY_HEADERS, "Content-Security-Policy": DECK_WORKER_CSP }
         : SECURITY_HEADERS;
-      const etag = etagOf(data);
-      if (etagMatches(req.headers["if-none-match"], etag)) {
-        res.writeHead(304, { ...security, ETag: etag, "Cache-Control": "no-cache" });
+      const plainTag = etagOf(data);
+      const body = gzipped(req, file, data, plainTag);
+      // Each encoding has its own tag; either one still names this content.
+      const etag = body === data ? plainTag : plainTag.replace(/"$/, '-gz"');
+      const vary = COMPRESSIBLE.has(path.extname(file)) ? { Vary: "Accept-Encoding" } : {};
+      if (etagMatches(req.headers["if-none-match"], plainTag) || etagMatches(req.headers["if-none-match"], etag)) {
+        res.writeHead(304, { ...security, ...vary, ETag: etag, "Cache-Control": "no-cache" });
         return res.end();
       }
       res.writeHead(200, {
         ...security,
+        ...vary,
+        ...(body === data ? {} : { "Content-Encoding": "gzip" }),
         "Content-Type": MIME[path.extname(file)] || "application/octet-stream",
-        "Content-Length": data.length,
+        "Content-Length": body.length,
         "Cache-Control": "no-cache",
         ETag: etag,
       });
-      res.end(req.method === "HEAD" ? undefined : data);
+      res.end(req.method === "HEAD" ? undefined : body);
     });
+  }
+
+  // Compressed once per version of a file, keyed by its tag.
+  const gzipCache = new Map();
+  function gzipped(req, file, data, tag) {
+    if (data.length < 1024 || !COMPRESSIBLE.has(path.extname(file))) return data;
+    if (!/\bgzip\b/.test(String(req.headers["accept-encoding"] || ""))) return data;
+    const key = `${file} ${tag}`;
+    if (!gzipCache.has(key)) {
+      try {
+        gzipCache.set(key, zlib.gzipSync(data));
+      } catch {
+        return data;
+      }
+    }
+    return gzipCache.get(key);
   }
 
   function notFound(req, res) {
