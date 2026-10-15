@@ -1151,7 +1151,7 @@ one move.
 flowchart LR
   lessons["lessons.js<br>data: text, position,<br>highlight, arrows,<br>expect, reply"] --> runner
   subgraph engine ["engine/tutorial.js"]
-    runner["step runner"] --> layer["highlight layer:<br>lit squares, arrows,<br>hint, result, check mark"]
+    runner["step runner"] --> layer["highlight layer:<br>lit squares, arrows,<br>hint, right move, result"]
   end
   runner -- "load(position)<br>play(state, move)" --> adapter
   adapter["the game's tutorial.js<br>(adapter)"] -- "applyMove()" --> rules["rules.js"]
@@ -1184,18 +1184,18 @@ flowchart LR
 - **Highlights never fill a square**, so its piece stays as the game draws
   it, and each has a shape besides its colour: what a step is about gets a
   soft teal ring (`.tut-lit`), the hint a dashed one (`.tut-hint`), and a
-  result (a finished line, a capture, a scored box or book) a solid green
-  outline and glow (`--ok`, the check mark's colour), lit up one after
-  another like the winning pieces at the result moment (`.tut-result` with
-  `celebrate()`'s `.celebrate-lit`). With reduced motion
-  they appear without moving.
+  right move and its result (a finished line, a capture, a scored box or
+  book) a solid green outline and glow (`--ok`), lit up one after another
+  like the winning pieces at the result moment (`.tut-result` with
+  `celebrate()`'s `.celebrate-lit`). With reduced motion they appear without
+  moving.
 - **It plays like the game.** The board takes moves the way the game does
   (taps, drags, keys and buttons) and shows them with the game's own motion
   and sounds, from the same code in the game's folder (`art.js`, `sounds.js`).
   `render` gets `played`, the events of the move that just landed (the
   learner's or the reply), animates them as the game would and returns a
-  promise that settles once they have landed; the check mark, the chime and
-  the next step wait for it. Without `played` it draws the position as it
+  promise that settles once they have landed; the green, the chime and the
+  next step wait for it. Without `played` it draws the position as it
   stands.
 - **Every move is checked by the game's `rules.js`**, so a lesson can't teach
   a wrong rule, and `lessons.test.js` plays every step's expected moves and
@@ -1203,9 +1203,10 @@ flowchart LR
   the step's, springs back (`reject`), and the line under the board says why
   in the rules' own words ("That piece can't move there."). After the second
   wrong try the squares of the right move light up (`.tut-hint`). A right
-  move gets a check mark on its square, what it achieved (`result`) and
-  `right-<flavour>`, the win chime's last two notes at the `ui` level; then
-  the reply, whose result lights up too, then the next step.
+  move lights up green: what it achieved (`result`), or else the square it
+  landed on. Its step's dot turns green, and `right-<flavour>` plays, the
+  win chime's last two notes at the `ui` level; then the reply, whose result
+  lights up too, then the next step.
 - **Entry points:** a Learn button in the lobby under the Play buttons, a
   link at the top of "How to play" (hidden while a game or the tutorial is on
   show), and `/<slug>/?learn`, which can be shared. Opening it from the page
@@ -1228,8 +1229,8 @@ flowchart LR
   out, and why a move was wrong in a polite live line. Opening a lesson moves
   focus to its title, and a finished lesson to Next lesson. The boards take
   taps and the keyboard as in the games (arrow keys, Enter or Space). With
-  `prefers-reduced-motion` the arrows, the check mark and the hint don't
-  move and wrong moves don't spring back.
+  `prefers-reduced-motion` the arrows, the highlights and the step dots
+  don't move and wrong moves don't spring back.
 
 Tic Tac Toe (placing a mark, three in a row, blocking), Chess (the
 pieces, capture, check and checkmate, castling, en passant and promotion),

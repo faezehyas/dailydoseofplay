@@ -1,10 +1,10 @@
 // Interactive tutorials: a game's short lessons, played on its own board.
 // Each step says what to do, lights up squares (with arrows where they
 // help) and waits for the learner's move, which the game's rules.js checks.
-// A right move gets a check mark and a soft chime, and what it achieved (a
-// finished line, a capture, a scored box) lights up as at the game's result
-// moment; a wrong one springs back, and after the second wrong try the
-// squares of the right move light up.
+// A right move lights up green with a soft chime, and so does what it
+// achieved (a finished line, a capture, a scored box), as at the game's
+// result moment; its step's dot turns green. A wrong one springs back, and
+// after the second wrong try the squares of the right move light up.
 // No server, no timer, no score. Finished lessons get a tick, kept on this
 // device only.
 //
@@ -28,8 +28,8 @@
 //   board()                  the game's board view: { node, render(state, played), onMove(fn), cell(c), reject(move) }
 //                            render gets `played`, what play returned, for the move that just
 //                            landed (the learner's or the reply), and may animate it as the game
-//                            does, returning a promise that settles once it has landed; the check
-//                            mark, the chime and the next step wait for it. cell(c) is the element
+//                            does, returning a promise that settles once it has landed; the green
+//                            light, the chime and the next step wait for it. cell(c) is the element
 //                            of cell c; reject(move) springs a wrong move back.
 // highlight is a list of cells, arrows a list of [from, to] cells.
 import { el } from "./shell.js";
@@ -38,7 +38,7 @@ import { sounds, chime } from "./chimes.js";
 import { celebrate, calm } from "./celebrate.js";
 
 const KEY = "ddp-lessons";
-const RIGHT_MS = 650; // the check mark shows before the reply or the next step
+const RIGHT_MS = 650; // the right move shows before the reply or the next step
 const REPLY_MS = 550;
 const NS = "http://www.w3.org/2000/svg";
 const NUMBERS = ["", "One", "Two", "Three", "Four", "Five", "Six"];
@@ -103,9 +103,7 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
   const arrows = document.createElementNS(NS, "svg");
   arrows.setAttribute("class", "tut-arrows");
   arrows.setAttribute("aria-hidden", "true");
-  const check = el("span", { class: "tut-check", "aria-hidden": "true", hidden: true });
-  check.innerHTML = '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="19"/><path d="M11 21l6 6 12-13"/></svg>';
-  const stage = el("div", { class: "tut-stage" }, view.node, arrows, check);
+  const stage = el("div", { class: "tut-stage" }, view.node, arrows);
   const feedback = el("p", { class: "tut-feedback", id: "tut-feedback", "aria-live": "polite" });
   const next = el("div", { class: "tut-next", hidden: true });
   const lessonView = el(
@@ -194,7 +192,6 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
     text.textContent = step.text;
     feedback.textContent = "";
     feedback.className = "tut-feedback";
-    check.hidden = true;
     next.hidden = true;
   }
 
@@ -232,11 +229,10 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
     feedback.textContent = "Right!";
     feedback.className = "tut-feedback right";
     landed(view.render(state, played), () => {
-      showResult(played);
-      showCheck(tutorial.cells(move).at(-1));
+      if (!showResult(played)) light([tutorial.cells(move).at(-1)], "tut-result");
+      dots.children[stepIndex].className = "done right";
       sounds.play(chime("right", flavour));
       later(() => {
-        check.hidden = true;
         if (!step.reply) return advance();
         const replied = tutorial.play(state, step.reply, step);
         landed(view.render(state, replied), () => (showResult(replied), later(advance, REPLY_MS)));
@@ -285,7 +281,8 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
 
   // ---------- highlight layer ----------
   // kind: "tut-lit" (what the step is about), "tut-hint" (the right move) or
-  // "tut-result", which lights up one after another like celebrate()'s win.
+  // "tut-result" (a right move and what it achieved), which lights up one
+  // after another like celebrate()'s win.
   let lit = [];
   function light(list, kind) {
     for (const node of lit) node.classList.remove("tut-lit", "tut-hint", "tut-result", "celebrate-lit");
@@ -299,10 +296,11 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
   }
 
   // A move's result stays lit until the next step; a reply that achieves
-  // nothing leaves the learner's lit.
+  // nothing leaves the learner's lit. Says whether anything lit up.
   function showResult(played) {
     const list = tutorial.result?.(state, played) ?? [];
     if (list.length) light(list, "tut-result");
+    return list.length > 0;
   }
 
   // Where a cell sits in the stage, in pixels.
@@ -332,12 +330,6 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
         return g;
       }),
     );
-  }
-
-  function showCheck(c) {
-    const { x, y, size } = box(c);
-    Object.assign(check.style, { left: `${x}px`, top: `${y}px`, width: `${Math.max(28, size * 0.5)}px` });
-    check.hidden = false;
   }
 
   showList();

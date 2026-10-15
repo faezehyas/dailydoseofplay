@@ -1,11 +1,12 @@
 // Headless-browser test for the tutorials (engine/tutorial.js): the first
 // Chess lesson played by keyboard on a 360 px phone, with a wrong move that
-// springs back, a second one that brings the hint, and a tick saved for the
-// finished lesson; the Learn button and Back; Tic Tac Toe's last lesson,
-// whose end screen starts a robot game; how a highlight looks, in light and
-// dark, with and without motion; and the first lesson of Connect 4
-// (by keyboard), Gomoku, Checkers, Dots and Boxes, Backgammon, Sea Battle,
-// Chutes and Ladders, Ludo, Crazy Eights, Go Fish, Gin Rummy and Hearts.
+// springs back, a second one that brings the hint, a right one that lights
+// up green, and a tick saved for the finished lesson; the Learn button and
+// Back; Tic Tac Toe's last lesson, whose end screen starts a robot game;
+// how a highlight looks, in light and dark, with and without motion; and the
+// first lesson of Connect 4 (by keyboard), Gomoku, Checkers, Dots and Boxes,
+// Backgammon, Sea Battle, Chutes and Ladders, Ludo, Crazy Eights, Go Fish,
+// Gin Rummy and Hearts.
 // Skips if Playwright is missing.
 //
 //   npm run test:browser
@@ -89,10 +90,11 @@ test("the first Chess lesson by keyboard: a wrong move springs back, the second 
   );
   assert.ok(await noHorizontalScroll(page), "no sideways scroll at 360 px");
 
-  // The right moves: a check mark, then the next step.
+  // The right moves: the square lights up green and the step's dot turns green, then the next step.
   await move(page, "d4", "a4");
   assert.equal(await feedback(page), "Right!");
-  await page.waitForSelector(".tut-check:not([hidden])", { timeout: 2000 }); // a check mark once the rook lands
+  await page.waitForSelector(`.tut-stage .sq[data-sq="${sq("a4")}"].tut-result`, { timeout: 2000 }); // once the rook lands
+  assert.equal(await page.locator(".tut-dots span").first().getAttribute("class"), "done right");
   assert.equal(await square(page, "a4").getAttribute("data-p"), ROOK);
   await step(page, "Step 2 of 3");
   await move(page, "c1", "h6");
