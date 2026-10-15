@@ -317,7 +317,7 @@
 }
 
 /* The tutorial's lit lines and hint: a soft band under the line, edged
-   (dashed for the hint); a box the learner closed gets an edge of ink. */
+   (dashed for the hint); a box the learner closed gets a green edge. */
 .db-board .band {
   fill: transparent;
 }
@@ -340,7 +340,7 @@
 }
 
 .db-board .box.tut-result .tint {
-  stroke: var(--text);
+  stroke: var(--ok);
   stroke-width: 3;
 }
 

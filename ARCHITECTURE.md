@@ -1184,9 +1184,10 @@ flowchart LR
 - **Highlights never fill a square**, so its piece stays as the game draws
   it, and each has a shape besides its colour: what a step is about gets a
   soft teal ring (`.tut-lit`), the hint a dashed one (`.tut-hint`), and a
-  result (a finished line, a capture, a scored box or book) a solid outline,
-  lit up one after another like the winning pieces at the result moment
-  (`.tut-result` with `celebrate()`'s `.celebrate-lit`). With reduced motion
+  result (a finished line, a capture, a scored box or book) a solid green
+  outline and glow (`--ok`, the check mark's colour), lit up one after
+  another like the winning pieces at the result moment (`.tut-result` with
+  `celebrate()`'s `.celebrate-lit`). With reduced motion
   they appear without moving.
 - **It plays like the game.** The board takes moves the way the game does
   (taps, drags, keys and buttons) and shows them with the game's own motion

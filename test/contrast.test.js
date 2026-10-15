@@ -51,6 +51,8 @@ const PAIRS = [
   ["control-border", "bg", 3], // an input's own fill
   ["accent-2", "surface", 3], // a tutorial highlight's ring
   ["accent-2", "surface-2", 3],
+  ["ok", "surface", 3], // a tutorial result's outline
+  ["ok", "surface-2", 3],
 ];
 
 test("the contrast formula matches WCAG's reference values", () => {
