@@ -5,6 +5,7 @@ import { openSession, matchRouter } from "../engine/session.js";
 import { rngFromSeed } from "../engine/rng.js";
 import { SeaBattleMatch } from "./match.js";
 import { randomFleet, shipCells, occupancy, CELLS, UNKNOWN, answerShots, RuleError } from "./rules.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
@@ -52,7 +53,7 @@ async function playOut(matches, fleets, { skipRain = false, waterFirst = [false,
   }
 }
 
-test("two honest peers play a full match and agree on everything", async () => {
+test("two honest peers play a full match and agree on everything", () => withSeededRandom("sea-battle 1", async () => {
   const [host, guest] = await sessions();
   const fleets = [randomFleet(rngFromSeed("h1")), randomFleet(rngFromSeed("g1"))];
   const [a, b] = pair(host, guest, fleets);
@@ -72,9 +73,9 @@ test("two honest peers play a full match and agree on everything", async () => {
   assert.deepEqual(b.verdict, { ok: true });
   assert.ok(gifts.length > 0, "gifts popped during the match");
   assert.ok(a.sr.k > 1, "several shared draws happened");
-});
+}));
 
-test("nobody learns the other fleet before game over", async () => {
+test("nobody learns the other fleet before game over", () => withSeededRandom("sea-battle 2", async () => {
   const [host, guest] = await sessions();
   const fleets = [randomFleet(rngFromSeed("h2")), randomFleet(rngFromSeed("g2"))];
   const seen = [];
@@ -102,10 +103,10 @@ test("nobody learns the other fleet before game over", async () => {
   assert.ok(seen.slice(0, firstReveal).every((m) => m.t !== "reveal"));
   // Only sunk ships were described before the reveal, and only after all their squares were hit.
   assert.ok(seen.slice(0, firstReveal).every((m) => m.t !== "result" || m.sunk.every((s) => s.cells.length === s.len)));
-});
+}));
 
 for (const variant of ["reveals the fleet it answered with", "reveals the fleet it committed to"]) {
-  test(`a defender who swaps its fleet after Ready is caught when it ${variant}`, async () => {
+  test(`a defender who swaps its fleet after Ready is caught when it ${variant}`, () => withSeededRandom(`sea-battle ${variant}`, async () => {
     const [host, guest] = await sessions();
     const committed = randomFleet(rngFromSeed("g3"));
     const swapped = randomFleet(rngFromSeed("g3-swap"));
@@ -126,10 +127,10 @@ for (const variant of ["reveals the fleet it answered with", "reveals the fleet 
     assert.equal(a.verdict.ok, false, JSON.stringify(a.verdict));
     assert.equal(a.state.winner, 0, "the host sank the (swapped) fleet");
     assert.deepEqual(b.verdict, { ok: true }, "the honest side passes the audit");
-  });
+  }));
 }
 
-test("an impossible answer aborts the match on the spot", async () => {
+test("an impossible answer aborts the match on the spot", () => withSeededRandom("sea-battle 4", async () => {
   const [host, guest] = await sessions();
   const fleets = [randomFleet(rngFromSeed("h4")), randomFleet(rngFromSeed("g4"))];
   const [a, b] = pair(host, guest, fleets);
@@ -151,9 +152,9 @@ test("an impossible answer aborts the match on the spot", async () => {
   await a.fire("shot", 0);
   const { reason } = await aborted;
   assert.match(reason, /broke the rules/);
-});
+}));
 
-test("rematch messages wait for the next match", async () => {
+test("rematch messages wait for the next match", () => withSeededRandom("sea-battle 5", async () => {
   const [host, guest] = await sessions();
   const routerB = matchRouter(guest);
   const b1 = new SeaBattleMatch({ send: (msg) => guest.send(msg), me: 1, fleet: randomFleet(rngFromSeed("x")), m: 1 });
@@ -168,7 +169,7 @@ test("rematch messages wait for the next match", async () => {
   routerB.start(b2);
   await b2.ready();
   await until(() => a2.phase === "playing" && b2.phase === "playing", "match 2 starts");
-});
+}));
 
 test("defender answers never depend on anything but its own fleet", () => {
   const fleet = randomFleet(rngFromSeed("q"));
@@ -179,7 +180,7 @@ test("defender answers never depend on anything but its own fleet", () => {
   assert.deepEqual(hits, all.map((i) => (grid[i] === -1 ? 0 : 1)));
 });
 
-test("the fleet locks the instant Ready is pressed, so the commitment always matches", async () => {
+test("the fleet locks the instant Ready is pressed, so the commitment always matches", () => withSeededRandom("sea-battle 6", async () => {
   const [host, guest] = await sessions();
   const fleets = [randomFleet(rngFromSeed("h5")), randomFleet(rngFromSeed("g5"))];
   const [a, b] = pair(host, guest, fleets);
@@ -193,9 +194,9 @@ test("the fleet locks the instant Ready is pressed, so the commitment always mat
   await playOut([a, b], [a.fleet, b.fleet], { skipRain: true });
   await until(() => a.verdict && b.verdict, "verdicts");
   assert.deepEqual(b.verdict, { ok: true }, "the host's answers match its commitment");
-});
+}));
 
-test("an abort reaches a peer that is waiting on a shared draw", async () => {
+test("an abort reaches a peer that is waiting on a shared draw", () => withSeededRandom("sea-battle 7", async () => {
   const [host, guest] = await sessions();
   const fleets = [randomFleet(rngFromSeed("h6")), randomFleet(rngFromSeed("g6"))];
   const [a, b] = pair(host, guest, fleets);
@@ -209,9 +210,9 @@ test("an abort reaches a peer that is waiting on a shared draw", async () => {
   realSend({ t: "abort", reason: "gave up" });
   assert.match((await aborted).reason, /gave up/);
   assert.equal(a.phase, "aborted");
-});
+}));
 
-test("room clocks: shot times reach both peers, and a player whose clock runs out loses", async () => {
+test("room clocks: shot times reach both peers, and a player whose clock runs out loses", () => withSeededRandom("sea-battle 8", async () => {
   const [host, guest] = await sessions();
   const fleets = [randomFleet(rngFromSeed("h-clock")), randomFleet(rngFromSeed("g-clock"))];
   const config = { shotSeconds: 10, gameSeconds: 180 };
@@ -243,9 +244,9 @@ test("room clocks: shot times reach both peers, and a player whose clock runs ou
   }
   assert.deepEqual(a.verdict, { ok: true });
   assert.deepEqual(b.verdict, { ok: true });
-});
+}));
 
-test("a carpet bomb's direction crosses the wire and both peers bomb the same column", async () => {
+test("a carpet bomb's direction crosses the wire and both peers bomb the same column", () => withSeededRandom("sea-battle 9", async () => {
   const [host, guest] = await sessions();
   const fleets = [randomFleet(rngFromSeed("h-carpet")), randomFleet(rngFromSeed("g-carpet"))];
   const [a, b] = pair(host, guest, fleets);
@@ -263,4 +264,4 @@ test("a carpet bomb's direction crosses the wire and both peers bomb the same co
   assert.deepEqual(fired.map((f) => f.cells), [column, column]);
   assert.deepEqual(fired.map((f) => f.dir), ["col", "col"]);
   assert.deepEqual(JSON.parse(JSON.stringify(a.state)), JSON.parse(JSON.stringify(b.state)));
-});
+}));

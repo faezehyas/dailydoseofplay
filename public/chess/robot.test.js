@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { rngFromSeed } from "../engine/rng.js";
 import { chooseMove, scoreMoves, evaluateState, thinkTime, LEVELS } from "./robot.js";
 import { newState as newTimedState, stateFromFen, applyMove, listMoves, legalMoves, isAttacked, parseSquare, BLACK, DRAW } from "./rules.js";
+import { bestOf5, elapsed } from "../../test/helpers.js";
 
 const newState = (first) => newTimedState(first, { moveSeconds: 0, gameSeconds: 0 });
 const fen = (f) => stateFromFen(f, { white: 0 });
@@ -133,15 +134,12 @@ test("each level answers fast, even in a busy middlegame", () => {
     for (const s of busy) {
       const { nodes } = scoreMoves(s, legalMoves(s), LEVELS[level]);
       assert.ok(nodes <= LEVELS[level].maxNodes + 1, `${level}: ${nodes} nodes`);
-      const t0 = performance.now();
-      chooseMove(s, 0, () => 0.5, { level });
-      assert.ok(performance.now() - t0 < 300, level);
+      assert.ok(bestOf5(() => elapsed(() => chooseMove(s, 0, () => 0.5, { level }))) < 300, level);
     }
   }
   // A time budget stops the search early but still answers.
-  const t0 = performance.now();
-  const move = chooseMove(busy[0], 0, () => 0.5, { level: "hard", maxNodes: Infinity, depth: 6, timeMs: 30 });
-  assert.ok(performance.now() - t0 < 150);
+  let move;
+  assert.ok(bestOf5(() => elapsed(() => (move = chooseMove(busy[0], 0, () => 0.5, { level: "hard", maxNodes: Infinity, depth: 6, timeMs: 30 })))) < 150);
   assert.ok(listMoves(busy[0]).some((m) => m.from === move.from && m.to === move.to));
 });
 

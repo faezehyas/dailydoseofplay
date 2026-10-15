@@ -6,6 +6,7 @@ import { TurnMatch, startTurnRobot } from "../engine/turn-match.js";
 import { rngFromSeed } from "../engine/rng.js";
 import { makeRules, legalMoves, DRAW } from "./rules.js";
 import { chooseMove } from "./robot.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const rules = makeRules({ moveSeconds: 0, gameSeconds: 0 });
 const tick = () => new Promise((r) => setTimeout(r, 1));
@@ -35,7 +36,7 @@ async function pair(r = rules) {
   return [a, b];
 }
 
-test("two peers agree on the coin toss and every move, through a full game", async () => {
+test("two peers agree on the coin toss and every move, through a full game", () => withSeededRandom("checkers 1", async () => {
   for (let g = 0; g < 3; g++) {
     const [a, b] = await pair();
     assert.equal(a.state.first, b.state.first, "both agree who starts");
@@ -54,9 +55,9 @@ test("two peers agree on the coin toss and every move, through a full game", asy
     assert.deepEqual(a.state, b.state);
     assert.ok([0, 1, DRAW].includes(a.state.winner));
   }
-});
+}));
 
-test("an illegal move is refused locally; a forged move from the peer aborts", async () => {
+test("an illegal move is refused locally; a forged move from the peer aborts", () => withSeededRandom("checkers 2", async () => {
   const [a, b] = await pair();
   const mover = a.canMove() ? a : b;
   const other = mover === a ? b : a;
@@ -69,9 +70,9 @@ test("an illegal move is refused locally; a forged move from the peer aborts", a
   const aborted = new Promise((r) => other.on("abort", r));
   mover.send({ t: "move", move: { path: backwards } });
   assert.match((await aborted).reason, /broke the rules: That piece can't move there/);
-});
+}));
 
-test("a forced capture is enforced on both sides", async () => {
+test("a forced capture is enforced on both sides", () => withSeededRandom("checkers 3", async () => {
   const [a, b] = await pair(makeRules({ first: "host" }));
   // The host steps to 35, the guest steps next to it on 28: the host must now jump to 21.
   await a.play({ path: [42, 35] });
@@ -85,9 +86,9 @@ test("a forced capture is enforced on both sides", async () => {
   await a.play({ path: [35, 21] });
   await until(() => b.state.moves.length === 3);
   assert.deepEqual(a.state, b.state);
-});
+}));
 
-test("the robot plays whole games over startTurnRobot and accepts a rematch", async () => {
+test("the robot plays whole games over startTurnRobot and accepts a rematch", () => withSeededRandom("checkers 4", async () => {
   const [human, bot] = await sessions();
   bot.on("rematch", (v) => v.them && !v.me && bot.requestRematch());
   const robot = startTurnRobot(bot, { rules, choose: (s, me, rng) => chooseMove(s, me, rng, { level: "medium" }), delay: 0, rng: rngFromSeed("bot") });
@@ -110,9 +111,9 @@ test("the robot plays whole games over startTurnRobot and accepts a rematch", as
     }
   }
   robot.destroy();
-});
+}));
 
-test("timed games: move times spend the same clocks on both sides, and a timeout ends the round", async () => {
+test("timed games: move times spend the same clocks on both sides, and a timeout ends the round", () => withSeededRandom("checkers 5", async () => {
   const timed = makeRules({ moveSeconds: 30, gameSeconds: 180, first: "guest" });
   const [a, b] = await pair(timed);
   assert.equal(a.state.turn, 1, "the room says the guest starts, whatever the coin");
@@ -134,4 +135,4 @@ test("timed games: move times spend the same clocks on both sides, and a timeout
   assert.equal(a.state.winner, 0);
   assert.equal(a.state.reason, "timeout");
   assert.deepEqual(a.state, b.state);
-});
+}));

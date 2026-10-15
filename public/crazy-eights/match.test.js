@@ -9,6 +9,7 @@ import { matchRouter } from "../engine/session.js";
 import { rngFromSeed } from "../engine/rng.js";
 import { makeRules, playable, canDraw } from "./rules.js";
 import { chooseMove, startRobot } from "./robot.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const tick = () => new Promise((r) => setTimeout(r, 1));
 async function until(fn, ms = 280_000) {
@@ -48,7 +49,7 @@ async function play({ players, config = {}, choose = () => (st, me, rng, face) =
 }
 
 for (const players of [2, 4]) {
-  test(`${players} seats: a full game, the same state everywhere, a passing audit and no seat ever knowing another's hidden card`, { timeout: 300_000 }, async () => {
+  test(`${players} seats: a full game, the same state everywhere, a passing audit and no seat ever knowing another's hidden card`, { timeout: 300_000 }, () => withSeededRandom(`crazy-eights ${players}`, async () => {
     const { matches, checks } = await play({ players, config: { actions: players === 4 } });
     for (const m of matches) {
       assert.equal(m.phase, "over", m.abortReason);
@@ -64,10 +65,10 @@ for (const players of [2, 4]) {
     assert.ok(st.plays.every((n) => n > 0), "everyone played");
     // After the audit every seat can show every hand, for the standings.
     for (const m of matches) for (const hand of st.hands) for (const slot of hand) assert.notEqual(m.face(slot), null);
-  });
+  }));
 }
 
-test("a seat out of turn can't move: refused at home, and stops the match if sent anyway", { timeout: 60_000 }, async () => {
+test("a seat out of turn can't move: refused at home, and stops the match if sent anyway", { timeout: 60_000 }, () => withSeededRandom("crazy-eights 2", async () => {
   const sessions = localRoom({ game: "crazy-eights", names: ["A", "B", "C"], mode: "friend" });
   const rules = makeRules({ first: "host" });
   const matches = sessions.map((s) => {
@@ -87,7 +88,7 @@ test("a seat out of turn can't move: refused at home, and stops the match if sen
     assert.ok(m.abortSeat === 2 || m.abortAbout === 2);
     assert.match(m.abortReason, /moved out of turn/);
   }
-});
+}));
 
 // Draws whenever it can, even holding a card that plays, as long as no other
 // browser can see that card (a face-up 8 from the stock's bottom would give
@@ -105,7 +106,7 @@ function cheater(match) {
   return { choose, cheats: () => n };
 }
 
-test("drawing while holding a card that plays goes unseen in play and is caught by the audit", { timeout: 300_000 }, async () => {
+test("drawing while holding a card that plays goes unseen in play and is caught by the audit", { timeout: 300_000 }, () => withSeededRandom("crazy-eights 3", async () => {
   let cheat;
   const { matches } = await play({ players: 2, choose: (i, match) => (i === 1 ? (cheat = cheater(match)).choose : (st, me, rng, face) => chooseMove(st, me, rng, face, { level: "easy" })) });
   assert.ok(cheat.cheats() > 0);
@@ -115,16 +116,16 @@ test("drawing while holding a card that plays goes unseen in play and is caught 
     assert.equal(m.verdict.seat, 1);
     assert.match(m.verdict.reason, /drew while holding a card that plays/);
   }
-});
+}));
 
-test("with the rule off, the same draws are fair play", { timeout: 300_000 }, async () => {
+test("with the rule off, the same draws are fair play", { timeout: 300_000 }, () => withSeededRandom("crazy-eights 4", async () => {
   let cheat;
   const { matches } = await play({ players: 2, config: { strict: false }, choose: (i, match) => (i === 1 ? (cheat = cheater(match)).choose : (st, me, rng, face) => chooseMove(st, me, rng, face, { level: "easy" })) });
   assert.ok(cheat.cheats() > 0);
   for (const m of matches) assert.deepEqual(m.verdict, { ok: true });
-});
+}));
 
-test("a robot whose move is refused plays the timer's move instead of trying it again", { timeout: 300_000 }, async () => {
+test("a robot whose move is refused plays the timer's move instead of trying it again", { timeout: 300_000 }, () => withSeededRandom("crazy-eights 5", async () => {
   let refusals = 0;
   // Seat 1 always tries to pass first, which is only rarely allowed.
   const { matches } = await play({
@@ -139,4 +140,4 @@ test("a robot whose move is refused plays the timer's move instead of trying it 
   });
   assert.ok(refusals > 0);
   for (const m of matches) assert.deepEqual(m.verdict, { ok: true }, "the game finished");
-});
+}));

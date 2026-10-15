@@ -26,11 +26,13 @@ export async function playTurnByHand(page, { tap = false } = {}) {
   await waitForState(page, (ddp, n) => ddp.match.state.ply > n, start);
 }
 
-// Robot games only: puts the same position on both sides before the first
-// roll, to reach a race or a forced turn quickly. Points use each side's own
-// numbering; "bar" is the bar, and missing checkers are borne off.
-export function setPosition(page, mine, theirs) {
-  return page.evaluate(([mine, theirs]) => {
+// Robot games only: match m starts from the same position on both sides, to
+// reach a race or a forced turn quickly. Call it before the match starts:
+// each side's match takes the position as it starts, so the first roll can't
+// come before it. Points use each side's own numbering; "bar" is the bar,
+// and missing checkers are borne off.
+export function setPosition(page, m, mine, theirs) {
+  return page.evaluate(async ([m, mine, theirs]) => {
     const side = (spec) => {
       const s = Array(26).fill(0);
       for (const [k, v] of Object.entries(spec)) s[k === "bar" ? 25 : Number(k)] = v;
@@ -38,10 +40,13 @@ export function setPosition(page, mine, theirs) {
       return s;
     };
     const pos = [side(mine), side(theirs)];
-    window.ddp.match.state.pos = structuredClone(pos);
-    window.ddp.robot.match.state.pos = structuredClone(pos);
-    window.ddp.match.emit("update");
-  }, [mine, theirs]);
+    const { TurnMatch } = await import("/engine/turn-match.js");
+    const emit = TurnMatch.prototype.emit;
+    TurnMatch.prototype.emit = function (type, ...args) {
+      if (type === "start" && this.m === m) this.state.pos = structuredClone(pos);
+      return emit.call(this, type, ...args);
+    };
+  }, [m, mine, theirs]);
 }
 
 // Plays this page's side by the robot's choices, at once, until the game ends.

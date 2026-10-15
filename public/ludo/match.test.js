@@ -6,6 +6,7 @@ import { TurnMatch } from "../engine/turn-match.js";
 import { rngFromSeed } from "../engine/rng.js";
 import { makeRules, HOME } from "./rules.js";
 import { chooseMove, startRobot } from "./robot.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const tick = () => new Promise((r) => setTimeout(r, 1));
 async function until(fn, ms = 30_000) {
@@ -24,7 +25,7 @@ function seat(sessions, rules, m = 1) {
   });
 }
 
-test("four seats agree on every roll and move through a full game, and a seat out of turn can't move", async () => {
+test("four seats agree on every roll and move through a full game, and a seat out of turn can't move", () => withSeededRandom("ludo 1", async () => {
   const sessions = localRoom({ game: "ludo", names: ["A", "B", "C", "D"], mode: "friend" });
   const rules = makeRules({ blocks: true, captureBonus: true });
   const matches = seat(sessions, rules);
@@ -57,13 +58,13 @@ test("four seats agree on every roll and move through a full game, and a seat ou
   next[3].send({ t: "move", move: { type: "roll" } });
   await until(() => next[0].phase === "aborted");
   assert.match(next[0].abortReason, /out of turn/);
-});
+}));
 
-test("three robot seats play a full game with a person over startRobot", async () => {
+test("three robot seats play a full game with a person over startRobot", () => withSeededRandom("ludo 2", async () => {
   const sessions = localRoom({ game: "ludo", names: ["You", "Robot 1", "Robot 2", "Robot 3"], mode: "robot" });
   const rules = makeRules({ first: "guest" });
   const robots = sessions.slice(1).map((s, i) =>
-    startRobot(s, { rules, delay: () => 0, choose: (st, me, rng) => chooseMove(st, me, rng, { level: ["easy", "medium", "hard"][i] }) }),
+    startRobot(s, { rules, delay: () => 0, rng: rngFromSeed(`robot ${i}`), choose: (st, me, rng) => chooseMove(st, me, rng, { level: ["easy", "medium", "hard"][i] }) }),
   );
   const match = new TurnMatch({ send: (msg) => sessions[0].send(msg), me: 0, players: 4, rules });
   matchRouter(sessions[0]).start(match);
@@ -80,4 +81,4 @@ test("three robot seats play a full game with a person over startRobot", async (
     assert.deepEqual(robot.match.state, match.state);
     robot.destroy();
   }
-});
+}));
