@@ -9,6 +9,7 @@ import { matchRouter } from "../engine/session.js";
 import { rngFromSeed } from "../engine/rng.js";
 import { makeRules, forcedMove, ranksIn, askable, rankOf, bookIn } from "./rules.js";
 import { chooseMove, startRobot } from "./robot.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const tick = () => new Promise((r) => setTimeout(r, 1));
 async function until(fn, ms = 280_000) {
@@ -51,7 +52,7 @@ async function play({ players, config = {}, choose = () => honest() }) {
 
 // Classic rules, then the others: the whole stock taken, pairs, and a lucky fish that passes.
 for (const [players, config] of [[2, {}], [4, {}], [3, { empty: "out", books: 2 }], [4, { lucky: "pass", hand: 7 }]]) {
-  test(`${players} seats, ${JSON.stringify(config)}: a full game, the same state everywhere, a passing audit and no seat ever knowing another's hidden card`, { timeout: 300_000 }, async () => {
+  test(`${players} seats, ${JSON.stringify(config)}: a full game, the same state everywhere, a passing audit and no seat ever knowing another's hidden card`, { timeout: 300_000 }, () => withSeededRandom(`go-fish ${players} ${JSON.stringify(config)}`, async () => {
     const { matches, checks } = await play({ players, config });
     for (const m of matches) {
       assert.equal(m.phase, "over", m.abortReason);
@@ -64,10 +65,10 @@ for (const [players, config] of [[2, {}], [4, {}], [3, { empty: "out", books: 2 
     assert.ok(st.log.some((e) => e.t === "give") && st.log.some((e) => e.t === "fish"), "cards changed hands, and someone went fishing");
     // Every card ended face up in a book, the same everywhere.
     for (const m of matches) for (const b of st.books.flat()) for (const slot of b.slots) assert.equal(rankOf(m.face(slot)), b.rank);
-  });
+  }));
 }
 
-test("a seat out of turn can't move: refused at home, and stops the match if sent anyway", { timeout: 60_000 }, async () => {
+test("a seat out of turn can't move: refused at home, and stops the match if sent anyway", { timeout: 60_000 }, () => withSeededRandom("go-fish 2", async () => {
   const sessions = localRoom({ game: "go-fish", names: ["A", "B", "C"], mode: "friend" });
   const rules = makeRules({ first: "host" });
   const matches = sessions.map((s) => {
@@ -87,7 +88,7 @@ test("a seat out of turn can't move: refused at home, and stops the match if sen
     assert.ok(m.abortSeat === 2 || m.abortAbout === 2);
     assert.match(m.abortReason, /moved out of turn/);
   }
-});
+}));
 
 // A cheating seat: lies once, the first time `when` finds a lie nobody can
 // see during play (every card it hides is still face down), then plays honestly.
@@ -162,7 +163,7 @@ const LIES = [
 ];
 
 for (const lie of LIES) {
-  test(`${lie.name} goes unseen in play and is caught by the audit, which names the liar`, { timeout: 300_000 }, async () => {
+  test(`${lie.name} goes unseen in play and is caught by the audit, which names the liar`, { timeout: 300_000 }, () => withSeededRandom(`go-fish ${lie.name}`, async () => {
     // Up to 20 games: the chance to lie comes up in half of them or more, and the test needs one.
     for (let attempt = 0; attempt < 20; attempt++) {
       const cheat = liar(1, lie.when);
@@ -177,5 +178,5 @@ for (const lie of LIES) {
       return;
     }
     assert.fail("no chance to lie came up");
-  });
+  }));
 }

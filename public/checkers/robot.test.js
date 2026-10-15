@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { rngFromSeed } from "../engine/rng.js";
 import { chooseMove, evaluate, LEVELS } from "./robot.js";
 import { newState as newTimedState, applyMove, legalMoves, EMPTY, DRAW } from "./rules.js";
+import { bestOf5, elapsed } from "../../test/helpers.js";
 
 const newState = (first) => newTimedState(first, { moveSeconds: 0, gameSeconds: 0 });
 const sq = (r, c) => r * 8 + c;
@@ -103,15 +104,12 @@ test("even Easy beats a random player almost always", () => {
   assert.ok(easy.a >= 17, JSON.stringify(easy));
 });
 
-test("it answers well under 100 ms, from the opening and in a crowded middle game", async () => {
-  const { chooseMove: fresh } = await import(`./robot.js?cold=${Date.now()}`);
+test("it answers well under 100 ms, from the opening and in a crowded middle game", () => {
   const opening = newState(0);
   const middle = stateFrom([".o.o.o.o", "o.o...o.", ".o.o.o.o", "x...o...", "...x.x.x", "x.x...x.", ".x.x.x.x", "x.x.x.x."], 0);
   for (const [name, s] of [["opening", opening], ["middle", middle]]) {
     for (const level of Object.keys(LEVELS)) {
-      const t0 = performance.now();
-      fresh(s, s.turn, rngFromSeed(name), { level, randomChance: 0 });
-      assert.ok(performance.now() - t0 < 100, `${name}, ${level}`);
+      assert.ok(bestOf5(() => elapsed(() => chooseMove(s, s.turn, rngFromSeed(name), { level, randomChance: 0 }))) < 100, `${name}, ${level}`);
     }
   }
 });

@@ -10,6 +10,7 @@ import { matchRouter } from "../engine/session.js";
 import { rngFromSeed } from "../engine/rng.js";
 import { makeRules, bestKnock } from "./rules.js";
 import { chooseMove, startRobot } from "./robot.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const tick = () => new Promise((r) => setTimeout(r, 1));
 async function until(fn, ms = 280_000) {
@@ -50,7 +51,7 @@ async function play({ config = {}, levels = ["hard", "medium"] }) {
 }
 
 for (const config of [{ target: 0 }, { target: 100, knock: "oklahoma", bigGin: true }]) {
-  test(`${JSON.stringify(config)}: a full game, the same state in both seats, a passing audit and no seat ever knowing a hidden card`, { timeout: 300_000 }, async () => {
+  test(`${JSON.stringify(config)}: a full game, the same state in both seats, a passing audit and no seat ever knowing a hidden card`, { timeout: 300_000 }, () => withSeededRandom(`gin-rummy ${JSON.stringify(config)}`, async () => {
     const { matches, checks, knocks } = await play({ config });
     for (const m of matches) {
       assert.equal(m.phase, "over", m.abortReason);
@@ -67,10 +68,10 @@ for (const config of [{ target: 0 }, { target: 100, knock: "oklahoma", bigGin: t
     }
     // Once the audit has passed, each seat sees every card: the deck was one full deck each hand.
     for (const m of matches) assert.deepEqual(st.cards.map((s) => m.face(s)).sort((a, b) => a - b), [...Array(52).keys()]);
-  });
+  }));
 }
 
-test("a seat out of turn can't move: refused at home, and stops the match if sent anyway", { timeout: 60_000 }, async () => {
+test("a seat out of turn can't move: refused at home, and stops the match if sent anyway", { timeout: 60_000 }, () => withSeededRandom("gin-rummy 2", async () => {
   const sessions = localRoom({ game: "gin-rummy", names: ["A", "B"], mode: "friend" });
   const rules = makeRules({ dealer: "host" });
   const matches = sessions.map((s) => {
@@ -88,9 +89,9 @@ test("a seat out of turn can't move: refused at home, and stops the match if sen
   await until(() => matches[1].phase === "aborted");
   assert.ok(matches[1].abortSeat === 0 || matches[1].abortAbout === 0);
   assert.match(matches[1].abortReason, /moved out of turn/);
-});
+}));
 
-test("a knock over the limit is refused at home, and a card from the other hand can't be shown", { timeout: 60_000 }, async () => {
+test("a knock over the limit is refused at home, and a card from the other hand can't be shown", { timeout: 60_000 }, () => withSeededRandom("gin-rummy 3", async () => {
   const sessions = localRoom({ game: "gin-rummy", names: ["A", "B"], mode: "friend" });
   const rules = makeRules({ dealer: "host" });
   const matches = sessions.map((s) => {
@@ -113,4 +114,4 @@ test("a knock over the limit is refused at home, and a card from the other hand 
   await b.play({ discard: matches[0].state.hands[0][0] });
   assert.match(invalid.at(-1), /only show cards from your own hand/);
   assert.deepEqual([b.state.phase, matches[0].state.phase, matches[0].phase], ["discard", "discard", "playing"], "nothing reached the other seat");
-});
+}));

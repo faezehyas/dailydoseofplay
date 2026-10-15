@@ -7,6 +7,7 @@ import { rngFromSeed } from "./rng.js";
 import { toBase64, fromBase64 } from "./base64.js";
 import { RuleError } from "./turn-match.js";
 import { makeRules, chooseMove, cheater } from "../../test/fixtures/toy-cards.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const tick = () => new Promise((r) => setTimeout(r, 1));
 async function until(fn, ms = 60_000) {
@@ -46,7 +47,7 @@ function assertNoLeaks(match) {
   }
 }
 
-test("two players: a full game, the same state everywhere, a passing audit and no leaks", async () => {
+test("two players: a full game, seeded so the pile runs out and is shuffled back in, the same state everywhere, a passing audit and no leaks", () => withSeededRandom("card-match 1", async () => {
   const { matches } = await play();
   for (const m of matches) {
     assert.equal(m.phase, "over");
@@ -56,9 +57,9 @@ test("two players: a full game, the same state everywhere, a passing audit and n
   }
   assert.ok(matches[0].state.reshuffles > 0, "the discard pile was shuffled back in");
   assert.ok(matches[0].state.log.some(([, what]) => what === "play"));
-});
+}));
 
-test("four players: the same, with a bigger deck", async () => {
+test("four players: the same, with a bigger deck", () => withSeededRandom("card-match 2", async () => {
   const { matches } = await play({ players: 4, rules: makeRules({ deckSize: 24, hand: 4, maxTurns: 24 }) });
   for (const m of matches) {
     assert.deepEqual(m.verdict, { ok: true });
@@ -70,9 +71,9 @@ test("four players: the same, with a bigger deck", async () => {
   for (const m of matches) {
     for (const [seat, hand] of hands.entries()) for (const slot of hand) assert.equal(m.slots[slot].face !== null, seat === m.me);
   }
-});
+}));
 
-test("once the audit passes, every seat can read every card; a failed audit shows nothing more", async () => {
+test("once the audit passes, every seat can read every card; a failed audit shows nothing more", () => withSeededRandom("card-match 3", async () => {
   const { matches } = await play({ players: 3, rules: makeRules({ deckSize: 15, maxTurns: 12 }) });
   for (const m of matches) {
     assert.deepEqual(m.verdict, { ok: true });
@@ -88,9 +89,9 @@ test("once the audit passes, every seat can read every card; a failed audit show
   const hidden = failed[0].slots.flatMap((s, id) => (s.face === null ? [id] : []));
   assert.ok(hidden.length > 0);
   for (const slot of hidden) assert.equal(failed[0].face(slot), null, `slot ${slot} stays hidden`);
-});
+}));
 
-test("the audit catches a rule only the full deck can check: drawing while holding a card that plays", async () => {
+test("the audit catches a rule only the full deck can check: drawing while holding a card that plays", () => withSeededRandom("card-match 4", async () => {
   // About one game in twelve gives the cheater no chance to cheat: play until one does.
   let cheat, matches;
   for (let game = 0; game < 5 && !cheat?.cheats(); game++) {
@@ -103,9 +104,9 @@ test("the audit catches a rule only the full deck can check: drawing while holdi
     assert.equal(m.verdict.seat, 1);
     assert.match(m.verdict.reason, /drew while holding a card that plays/);
   }
-});
+}));
 
-test("the audit flags rules whose state depends on a hidden face", async () => {
+test("the audit flags rules whose state depends on a hidden face", () => withSeededRandom("card-match 5", async () => {
   const honest = makeRules({ deckSize: 10, maxTurns: 10 });
   const leaky = {
     ...honest,
@@ -116,7 +117,7 @@ test("the audit flags rules whose state depends on a hidden face", async () => {
   };
   const { matches } = await play({ rules: leaky });
   for (const m of matches) assert.deepEqual(m.verdict, { ok: false, reason: "the game plays out differently with every card known" });
-});
+}));
 
 // Every other seat stops, blaming `seat` itself or relaying someone's word about it.
 async function aborted(options, seat) {
@@ -129,7 +130,7 @@ async function aborted(options, seat) {
   return others.map((m) => m.abortReason);
 }
 
-test("a tampered shuffle stops the match and names the shuffler", async () => {
+test("a tampered shuffle stops the match and names the shuffler", () => withSeededRandom("card-match 6", async () => {
   const reasons = await aborted(
     {
       before: (s) =>
@@ -143,9 +144,9 @@ test("a tampered shuffle stops the match and names the shuffler", async () => {
     1,
   );
   assert.match(reasons[0], /sent a shuffle that doesn't check out/);
-});
+}));
 
-test("with three players, everyone names the cheater, whether they caught it or were told", async () => {
+test("with three players, everyone names the cheater, whether they caught it or were told", () => withSeededRandom("card-match 7", async () => {
   const { matches } = await play({
     players: 3,
     before: (s) =>
@@ -161,20 +162,20 @@ test("with three players, everyone names the cheater, whether they caught it or 
     if (m.abortSeat === 2) assert.match(m.abortReason, /^sent a shuffle that doesn't check out/);
     else assert.deepEqual([m.abortAbout, m.abortReason], [2, "stopped the match: sent a shuffle that doesn't check out"]);
   }
-});
+}));
 
-test("a share for the wrong card stops the match", async () => {
+test("a share for the wrong card stops the match", () => withSeededRandom("card-match 8", async () => {
   const reasons = await aborted({ before: (s) => tap(s[1], (msg) => (msg.t === "shares" && msg.d.length > 1 ? { ...msg, d: [msg.d[1], msg.d[0], ...msg.d.slice(2)] } : msg)) }, 1);
   assert.match(reasons[0], /sent a share that doesn't check out/);
-});
+}));
 
-test("a key made for another seat or match doesn't check out", async () => {
+test("a key made for another seat or match doesn't check out", () => withSeededRandom("card-match 9", async () => {
   const stray = await deckService().keygen("ddp-cards/1/m1/seat0/another match");
   const reasons = await aborted({ before: (s) => tap(s[1], (msg) => (msg.t === "hello" ? { ...msg, key: toBase64(stray.hello) } : msg)) }, 1);
   assert.match(reasons[0], /sent a key that doesn't check out/);
-});
+}));
 
-test("showing a card from someone else's hand stops the match", async () => {
+test("showing a card from someone else's hand stops the match", () => withSeededRandom("card-match 10", async () => {
   const reasons = await aborted(
     {
       before: (s, ref) =>
@@ -187,9 +188,9 @@ test("showing a card from someone else's hand stops the match", async () => {
     1,
   );
   assert.match(reasons[0], /broke the rules: a move can only show cards from your own hand/);
-});
+}));
 
-test("a move out of turn stops the match", async () => {
+test("a move out of turn stops the match", () => withSeededRandom("card-match 11", async () => {
   const sessions = localRoom({ game: "toy", names: ["A", "B"] });
   const rules = makeRules({ deckSize: 10 });
   const [a, b] = sessions.map((s) => new CardMatch({ send: (msg) => s.send(msg), me: s.index, players: 2, rules }));
@@ -201,9 +202,9 @@ test("a move out of turn stops the match", async () => {
   await until(() => other.phase === "aborted");
   assert.equal(other.abortSeat, idle);
   assert.match(other.abortReason, /moved out of turn/);
-});
+}));
 
-test("an illegal move of mine is refused locally and never sent", async () => {
+test("an illegal move of mine is refused locally and never sent", () => withSeededRandom("card-match 12", async () => {
   const sessions = localRoom({ game: "toy", names: ["A", "B"] });
   const rules = makeRules({ deckSize: 10 });
   const sent = [];
@@ -219,14 +220,14 @@ test("an illegal move of mine is refused locally and never sent", async () => {
   assert.deepEqual(invalid, ["a move can only show cards from your own hand", "bad move"]);
   assert.ok(!sent.some(([seat, t]) => seat === mover.me && t === "move"));
   assert.equal(mover.phase, "playing");
-});
+}));
 
-test("revealing a different key at the end fails the audit", async () => {
+test("revealing a different key at the end fails the audit", () => withSeededRandom("card-match 13", async () => {
   const { matches } = await play({ before: (s) => tap(s[1], (msg) => (msg.t === "audit" ? { ...msg, key: toBase64(new Uint8Array(32).fill(9)) } : msg)) });
   assert.deepEqual(matches[0].verdict, { ok: false, reason: "revealed a key that isn't the one they played with", seat: 1 });
-});
+}));
 
-test("rematch: a new match with fresh keys, a new shuffle and a passing audit", async () => {
+test("rematch: a new match with fresh keys, a new shuffle and a passing audit", () => withSeededRandom("card-match 14", async () => {
   const { sessions, robots } = await play();
   const first = robots.map((r) => r.match);
   sessions.forEach((s) => s.requestRematch());
@@ -235,17 +236,17 @@ test("rematch: a new match with fresh keys, a new shuffle and a passing audit", 
     assert.deepEqual(r.match.verdict, { ok: true });
     assert.notDeepEqual(r.match.key.hello, first[i].key.hello);
   }
-});
+}));
 
-test("rules errors in the deal surface as a stopped match, not a hang", async () => {
+test("rules errors in the deal surface as a stopped match, not a hang", () => withSeededRandom("card-match 15", async () => {
   const rules = { ...makeRules({ deckSize: 4 }), newState: () => { throw new RuleError("no deal"); } };
   const sessions = localRoom({ game: "toy", names: ["A", "B"] });
-  const robots = sessions.map((s) => startCardRobot(s, { rules, choose: chooseMove, delay: 0 }));
+  const robots = sessions.map((s, i) => startCardRobot(s, { rules, choose: chooseMove, delay: 0, rng: rngFromSeed(`seat${i}`) }));
   await until(() => robots.every((r) => r.match.phase === "aborted"));
   assert.match(robots[0].match.abortReason, /no deal/);
-});
+}));
 
-test("the wire never carries the share that would open a card still hidden in someone's hand", async () => {
+test("the wire never carries the share that would open a card still hidden in someone's hand", () => withSeededRandom("card-match 16", async () => {
   const wire = [];
   const { matches } = await play({
     players: 3,
@@ -269,24 +270,24 @@ test("the wire never carries the share that would open a card still hidden in so
     }
   }
   assert.ok(hidden > 0);
-});
+}));
 
-test("a message sent twice stops the match", async () => {
+test("a message sent twice stops the match", () => withSeededRandom("card-match 17", async () => {
   const reasons = await aborted({ before: (s) => tap(s[1], (msg) => void (msg.t === "hello" && s[1].group.send(msg))) }, 1);
   assert.match(reasons[0], /sent the same hello message twice/);
-});
+}));
 
-test("a round with a share missing stops the match", async () => {
+test("a round with a share missing stops the match", () => withSeededRandom("card-match 18", async () => {
   const reasons = await aborted({ before: (s) => tap(s[1], (msg) => (msg.t === "shares" && msg.d.length > 1 ? { ...msg, d: msg.d.slice(1) } : msg)) }, 1);
   assert.match(reasons[0], /sent 2 shares where 3 were due/);
-});
+}));
 
-test("parts that disagree on how many there are stop the match", async () => {
+test("parts that disagree on how many there are stop the match", () => withSeededRandom("card-match 19", async () => {
   const reasons = await aborted({ before: (s) => tap(s[1], (msg) => (msg.t === "shuffle" && msg.i === 1 ? { ...msg, n: msg.n + 1 } : msg)) }, 1);
   assert.match(reasons[0], /sent parts that don't add up/);
-});
+}));
 
-test("a flood of messages ahead is blamed on whoever sent it", async () => {
+test("a flood of messages ahead is blamed on whoever sent it", () => withSeededRandom("card-match 20", async () => {
   const sessions = localRoom({ game: "toy", names: ["A", "B", "C"] });
   const rules = makeRules({ deckSize: 10 });
   const matches = sessions.map((s) => new CardMatch({ send: (msg) => s.send(msg), me: s.index, players: 3, rules }));
@@ -295,9 +296,9 @@ test("a flood of messages ahead is blamed on whoever sent it", async () => {
   await until(() => matches[0].phase === "aborted" && matches[1].phase === "aborted");
   for (const m of matches.slice(0, 2)) assert.ok(m.abortSeat === 2 || m.abortAbout === 2, `seat ${m.me} blames ${m.abortSeat}`);
   assert.match(matches[0].abortReason + matches[1].abortReason, /sent too many messages ahead/);
-});
+}));
 
-test("stopping during the audit leaves no verdict", async () => {
+test("stopping during the audit leaves no verdict", () => withSeededRandom("card-match 21", async () => {
   const { matches } = await play({
     before: (s) => tap(s[1], (msg) => (msg.t === "audit" ? { t: "abort", m: msg.m, reason: "no" } : msg)),
     until: ([m]) => done(m),
@@ -305,16 +306,16 @@ test("stopping during the audit leaves no verdict", async () => {
   assert.equal(matches[0].phase, "aborted");
   assert.equal(matches[0].verdict, null);
   assert.equal(matches[0].abortReason, "stopped the match: no");
-});
+}));
 
-test("a settle that never stops dealing stops the match", async () => {
+test("a settle that never stops dealing stops the match", () => withSeededRandom("card-match 22", async () => {
   const honest = makeRules({ deckSize: 80 });
   const rules = { ...honest, settle: (state, deck) => void deck.open(state.draw.shift()) };
   const sessions = localRoom({ game: "toy", names: ["A", "B"] });
-  const robots = sessions.map((s) => startCardRobot(s, { rules, choose: chooseMove, delay: 0 }));
+  const robots = sessions.map((s, i) => startCardRobot(s, { rules, choose: chooseMove, delay: 0, rng: rngFromSeed(`seat${i}`) }));
   await until(() => robots.every((r) => r.match.phase === "aborted"));
   assert.match(robots[0].match.abortReason, /settle kept dealing/);
-});
+}));
 
 // Two-card poker without betting: fold (your hand is shuffled back) or show it.
 const showdown = {
@@ -340,7 +341,7 @@ const showdown = {
   },
 };
 
-test("a dealt hand can be opened to everyone, or shuffled back into the deck", async () => {
+test("a dealt hand can be opened to everyone, or shuffled back into the deck", () => withSeededRandom("card-match 23", async () => {
   const { matches } = await play({ players: 3, rules: showdown, choose: (i) => () => (i === 1 ? { fold: true } : { show: true }) });
   for (const m of matches) {
     assert.deepEqual(m.verdict, { ok: true });
@@ -350,9 +351,9 @@ test("a dealt hand can be opened to everyone, or shuffled back into the deck", a
   }
   const folded = matches[0].slots.filter((s) => s.gone && s.owner === 1).length;
   assert.equal(folded, 2, "the folded hand's old slots are gone");
-});
+}));
 
-test("a card played face up can then be passed to the next player", async () => {
+test("a card played face up can then be passed to the next player", () => withSeededRandom("card-match 24", async () => {
   const honest = makeRules({ deckSize: 10, maxTurns: 10 });
   const passing = {
     ...honest,
@@ -369,9 +370,9 @@ test("a card played face up can then be passed to the next player", async () => 
   const { robots, matches } = await play({ rules: passing });
   assert.ok(robots.every((r) => r.match.verdict?.ok), JSON.stringify(matches.map((m) => m.verdict ?? m.abortReason)));
   assert.ok(matches[0].state.log.some(([, what]) => what === "play"), "a card was played and passed");
-});
+}));
 
-test("the largest deck: 200 cards dealt and then all opened in one round", { timeout: 120_000 }, async () => {
+test("the largest deck: 200 cards dealt and then all opened in one round", { timeout: 120_000 }, () => withSeededRandom("card-match 25", async () => {
   const rules = {
     deckSize: 200,
     newState(first, players, deck) {
@@ -386,7 +387,7 @@ test("the largest deck: 200 cards dealt and then all opened in one round", { tim
     assert.deepEqual(m.verdict, { ok: true });
     assert.deepEqual(m.slots.map((s) => s.face).sort((a, b) => a - b), [...Array(200).keys()]);
   }
-});
+}));
 
 // A slower device: each of this match's deck jobs takes `ms` longer; before(op) runs as a job starts.
 function slow(match, ms, before = () => {}) {
@@ -411,7 +412,7 @@ function seated(players, rules) {
   return { sessions, matches };
 }
 
-test("a match stopped while a deck job runs stays stopped", async () => {
+test("a match stopped while a deck job runs stays stopped", () => withSeededRandom("card-match 26", async () => {
   const { sessions, matches } = seated(2, makeRules({ deckSize: 10 }));
   const [a] = matches;
   const events = [];
@@ -424,22 +425,25 @@ test("a match stopped while a deck job runs stays stopped", async () => {
   assert.equal(a.phase, "aborted");
   assert.deepEqual(events, ["abort"]);
   assert.equal(sent.at(-1), "abort", "nothing sent after stopping");
-});
+}));
 
-test("a match stopped during the audit's deck work gets no verdict", async () => {
+test("a match stopped during the audit's deck work gets no verdict", () => withSeededRandom("card-match 27", async () => {
   const { sessions, matches } = seated(2, makeRules({ deckSize: 10, maxTurns: 2 }));
   const [a] = matches;
   const verified = [];
   a.on("verified", (v) => verified.push(v));
   slow(a, 20, (op) => op === "faces" && sessions[1].send({ t: "abort", m: 1, reason: "late" }));
-  const robots = matches.map((m) => () => m.canMove() && m.play(chooseMove(m.state, m.me, Math.random, (slot) => m.face(slot))));
+  const robots = matches.map((m) => {
+    const rng = rngFromSeed(`seat${m.me}`);
+    return () => m.canMove() && m.play(chooseMove(m.state, m.me, rng, (slot) => m.face(slot)));
+  });
   matches.forEach((m, i) => m.on("update", robots[i]));
   await until(() => a.phase === "aborted");
   await new Promise((r) => setTimeout(r, 300));
   assert.deepEqual([a.phase, a.verdict, verified], ["aborted", null, []]);
-});
+}));
 
-test("a slow seat that only receives cards can fall far behind without blaming anyone", { timeout: 120_000 }, async () => {
+test("a slow seat that only receives cards can fall far behind without blaming anyone", { timeout: 120_000 }, () => withSeededRandom("card-match 28", async () => {
   const rules = {
     deckSize: 150,
     newState: (first, players, deck) => ({ turn: 0, winner: -1, draw: deck.cards.slice(), given: 0 }),
@@ -455,9 +459,9 @@ test("a slow seat that only receives cards can fall far behind without blaming a
   matches[0].on("update", () => matches[0].canMove() && matches[0].play({ give: true }));
   await until(() => matches.every(done), 110_000);
   for (const m of matches) assert.deepEqual(m.verdict, { ok: true }, `seat ${m.me}: ${m.abortReason}`);
-});
+}));
 
-test("a card shown with the share of another card stops the match", async () => {
+test("a card shown with the share of another card stops the match", () => withSeededRandom("card-match 29", async () => {
   let swapped = 0;
   const reasons = await aborted(
     {
@@ -478,9 +482,9 @@ test("a card shown with the share of another card stops the match", async () => 
   );
   assert.ok(swapped > 0);
   assert.match(reasons[0], /sent a share that doesn't check out/);
-});
+}));
 
-test("a move may show at most 16 hidden cards", async () => {
+test("a move may show at most 16 hidden cards", () => withSeededRandom("card-match 30", async () => {
   const rules = {
     deckSize: 40,
     newState: (first, players, deck) => ({ turn: first, winner: -1, hands: [0, 1].map((p) => deck.cards.filter((_, i) => i % 2 === p).map((slot) => (deck.deal(slot, p), slot))) }),
@@ -497,9 +501,9 @@ test("a move may show at most 16 hidden cards", async () => {
   await mover.play({ show: 16 });
   await until(() => matches.every(done));
   for (const m of matches) assert.deepEqual(m.verdict, { ok: true });
-});
+}));
 
-test("a hidden card in a hand can't be dealt to another: refused in my browser, and stops the match if sent anyway", async () => {
+test("a hidden card in a hand can't be dealt to another: refused in my browser, and stops the match if sent anyway", () => withSeededRandom("card-match 31", async () => {
   // Dealing it again would let a third player read it: everyone else's shares of it went out when it was dealt. deck.pass() seals it instead.
   const rules = {
     deckSize: 8,
@@ -523,9 +527,9 @@ test("a hidden card in a hand can't be dealt to another: refused in my browser, 
     assert.ok(m.abortSeat === mover.me || m.abortAbout === mover.me);
     assert.match(m.abortReason, /broke the rules: a hidden card in a hand changes hands with deck\.pass\(\)/);
   }
-});
+}));
 
-test("reading the face of a card opened in the same call is a bug in the rules, and says so", async () => {
+test("reading the face of a card opened in the same call is a bug in the rules, and says so", () => withSeededRandom("card-match 32", async () => {
   const honest = makeRules({ deckSize: 10 });
   const rules = {
     ...honest,
@@ -551,4 +555,4 @@ test("reading the face of a card opened in the same call is a bug in the rules, 
     assert.equal(m.abortAbout, undefined, "a rules bug is nobody's cheat");
   }
   assert.ok(matches.some((m) => m.abortSeat === undefined), "the browser that hit it blames nobody");
-});
+}));

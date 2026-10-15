@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { localPair } from "./channel.js";
 import { openSession, matchRouter } from "./session.js";
 import { TurnMatch, RuleError, startTurnRobot } from "./turn-match.js";
+import { rngFromSeed } from "./rng.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 // A tiny game to exercise the protocol: players take turns adding 1 or 2 to
 // a counter, or "roll" a shared die (1-3). Whoever reaches 10 wins.
@@ -41,7 +43,7 @@ async function sessions() {
   ]);
 }
 
-test("two peers agree on the first player, moves and shared dice", async () => {
+test("two peers agree on the first player, moves and shared dice", () => withSeededRandom("turn-match 1", async () => {
   const [ha, hb] = await sessions();
   const a = new TurnMatch({ send: (m) => ha.send(m), me: 0, rules: race });
   const b = new TurnMatch({ send: (m) => hb.send(m), me: 1, rules: race });
@@ -62,9 +64,9 @@ test("two peers agree on the first player, moves and shared dice", async () => {
   await until(() => b.phase === "over");
   assert.deepEqual(a.state, b.state);
   assert.ok(a.state.log.some(([, n]) => n >= 1));
-});
+}));
 
-test("illegal local moves are refused without sending; illegal peer moves abort", async () => {
+test("illegal local moves are refused without sending; illegal peer moves abort", () => withSeededRandom("turn-match 2", async () => {
   const [ha, hb] = await sessions();
   const a = new TurnMatch({ send: (m) => ha.send(m), me: 0, rules: race });
   const b = new TurnMatch({ send: (m) => hb.send(m), me: 1, rules: race });
@@ -80,12 +82,12 @@ test("illegal local moves are refused without sending; illegal peer moves abort"
   const aborted = new Promise((r) => mover.on("abort", r));
   other.send({ t: "move", move: { type: "add", n: 1 } });
   assert.match((await aborted).reason, /broke the rules: move out of turn/);
-});
+}));
 
-test("startTurnRobot plays a whole game and accepts rematches", async () => {
+test("startTurnRobot plays a whole game and accepts rematches", () => withSeededRandom("turn-match 3", async () => {
   const [human, bot] = await sessions();
   bot.on("rematch", (v) => v.them && !v.me && bot.requestRematch());
-  const robot = startTurnRobot(bot, { rules: race, choose: () => ({ type: "add", n: 2 }), delay: 0 });
+  const robot = startTurnRobot(bot, { rules: race, choose: () => ({ type: "add", n: 2 }), delay: 0, rng: rngFromSeed("bot") });
   const router = matchRouter(human);
   let me = new TurnMatch({ send: (m) => human.send(m), me: 0, rules: race, m: 1 });
   router.start(me);
@@ -101,9 +103,9 @@ test("startTurnRobot plays a whole game and accepts rematches", async () => {
   router.start(me);
   await until(() => me.phase === "playing" && robot.match.m === 2);
   robot.destroy();
-});
+}));
 
-test("an abort reaches a peer that is waiting on the coin toss", async () => {
+test("an abort reaches a peer that is waiting on the coin toss", () => withSeededRandom("turn-match 4", async () => {
   const [ha, hb] = await sessions();
   const a = new TurnMatch({ send: (m) => ha.send(m), me: 0, rules: race });
   matchRouter(ha).start(a);
@@ -115,9 +117,9 @@ test("an abort reaches a peer that is waiting on the coin toss", async () => {
   const aborted = new Promise((r) => a.on("abort", r));
   hb.send({ t: "abort", reason: "bye", m: 1 });
   assert.match((await aborted).reason, /bye/);
-});
+}));
 
-test("rules.draws lengthens the shared random chain for games with many rolls", async () => {
+test("rules.draws lengthens the shared random chain for games with many rolls", () => withSeededRandom("turn-match 5", async () => {
   // Every move is a roll; the 300th roll wins. The default chain has 256 draws.
   const rolls = (draws) => ({
     draws,
@@ -146,9 +148,9 @@ test("rules.draws lengthens the shared random chain for games with many rolls", 
     if (end === "aborted") assert.match(a.abortReason + b.abortReason, /hash chain exhausted/);
     else assert.equal(a.state.rolls, 300);
   }
-});
+}));
 
-test("three players: one coin toss among all seats, moves only from the seat on turn, same state everywhere", async () => {
+test("three players: one coin toss among all seats, moves only from the seat on turn, same state everywhere", () => withSeededRandom("turn-match 6", async () => {
   const { localRoom } = await import("./room.js");
   const race3 = {
     ...race,
@@ -198,4 +200,4 @@ test("three players: one coin toss among all seats, moves only from the seat on 
   assert.deepEqual(next[1].state, next[0].state);
   assert.deepEqual(next[2].state, next[0].state);
   assert.deepEqual(new Set(next[0].state.log.map(([p]) => p)), new Set([0, 1, 2]));
-});
+}));

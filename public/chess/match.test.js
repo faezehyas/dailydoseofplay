@@ -6,6 +6,7 @@ import { TurnMatch } from "../engine/turn-match.js";
 import { rngFromSeed } from "../engine/rng.js";
 import { makeRules, parseSquare, colorOfPlayer, WHITE, DRAW } from "./rules.js";
 import { chooseMove, startRobot } from "./robot.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const rules = makeRules({ moveSeconds: 0, gameSeconds: 0 });
 const fast = (state, me, rng) => chooseMove(state, me, rng, { level: "easy", maxNodes: 1500 });
@@ -43,7 +44,7 @@ async function playLine(a, b, lans) {
   }
 }
 
-test("two peers agree on who has White and on every move, through full games", async () => {
+test("two peers agree on who has White and on every move, through full games", () => withSeededRandom("chess 1", async () => {
   for (let g = 0; g < 3; g++) {
     const { a, b } = await pair();
     assert.equal(a.state.white, b.state.white, "both agree who has White");
@@ -64,9 +65,9 @@ test("two peers agree on who has White and on every move, through full games", a
     assert.deepEqual(a.state, b.state);
     assert.ok([0, 1, DRAW].includes(a.state.winner));
   }
-});
+}));
 
-test("an illegal move is refused locally; a forged one from the peer aborts", async () => {
+test("an illegal move is refused locally; a forged one from the peer aborts", () => withSeededRandom("chess 2", async () => {
   const { a, b } = await pair(makeRules({ first: "host" }));
   assert.equal(a.state.white, 0);
   const invalid = new Promise((r) => a.on("invalid", r));
@@ -78,9 +79,9 @@ test("an illegal move is refused locally; a forged one from the peer aborts", as
   const aborted = new Promise((r) => a.on("abort", r));
   b.send({ t: "move", move: mv("d2d4") });
   assert.match((await aborted).reason, /broke the rules: Pick one of your own pieces/);
-});
+}));
 
-test("promotion and resigning go over the wire", async () => {
+test("promotion and resigning go over the wire", () => withSeededRandom("chess 3", async () => {
   const { a, b } = await pair(makeRules({ first: "guest" }));
   assert.equal(b.state.white, 1);
   await playLine(a, b, ["e2e4", "d7d5", "e4d5", "c7c6", "d5c6", "g8f6", "c6b7", "b8d7"]);
@@ -98,9 +99,9 @@ test("promotion and resigning go over the wire", async () => {
   assert.equal(b.state.winner, 1);
   assert.equal(b.state.reason, "resign");
   assert.deepEqual(a.state, b.state);
-});
+}));
 
-test("the robot plays whole games over startRobot and accepts a rematch", async () => {
+test("the robot plays whole games over startRobot and accepts a rematch", () => withSeededRandom("chess 4", async () => {
   const [x, y] = localPair();
   const [human, bot] = await Promise.all([
     openSession({ channel: x, mode: "robot", index: 0, name: "Me", game: "chess" }),
@@ -127,9 +128,9 @@ test("the robot plays whole games over startRobot and accepts a rematch", async 
     }
   }
   robot.destroy();
-});
+}));
 
-test("timed games: move times spend the same clocks on both sides, and a timeout ends the game", async () => {
+test("timed games: move times spend the same clocks on both sides, and a timeout ends the game", () => withSeededRandom("chess 5", async () => {
   const timed = makeRules({ moveSeconds: 30, gameSeconds: 180, first: "host" });
   const { a, b } = await pair(timed);
   const lans = ["e2e4", "e7e5", "g1f3", "b8c6"];
@@ -149,22 +150,28 @@ test("timed games: move times spend the same clocks on both sides, and a timeout
   assert.equal(b.state.winner, 1);
   assert.equal(b.state.reason, "timeout");
   assert.deepEqual(a.state, b.state);
-});
+}));
 
-test("the robot's clock pays for its pause and its search", async () => {
+test("the robot's clock pays for its pause and its search", { timeout: 30_000 }, (t) => withSeededRandom("chess 6", async () => {
   const timed = makeRules({ moveSeconds: 30, gameSeconds: 180, first: "host" });
   const [x, y] = localPair();
   const [human, bot] = await Promise.all([
     openSession({ channel: x, mode: "robot", index: 0, name: "Me", game: "chess" }),
     openSession({ channel: y, mode: "robot", index: 1, name: "Robot", game: "chess" }),
   ]);
-  const robot = startRobot(bot, { rules: timed, think: () => 120 });
+  const robot = startRobot(bot, { rules: timed, think: () => 120, rng: rngFromSeed("bot") });
   const me = new TurnMatch({ send: (msg) => human.send(msg), me: 0, rules: timed });
   matchRouter(human).start(me);
   await until(() => me.canMove());
+  // The robot's pause runs on a fake clock, 1 ms a step, so a busy machine can't stretch it.
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+  t.mock.method(performance, "now", () => Date.now());
   await me.play({ ...mv("e2e4"), ms: 1000 });
-  await until(() => me.state.moves.length === 2);
+  while (me.state.moves.length < 2) {
+    t.mock.timers.tick(1);
+    await new Promise(setImmediate);
+  }
   const spent = 180_000 - me.state.clocks[1];
   assert.ok(spent >= 120 && spent < 2000, `robot spent ${spent} ms`);
   robot.destroy();
-});
+}));

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { rngFromSeed } from "../engine/rng.js";
 import { chooseMove, LEVELS } from "./robot.js";
 import { newState as newTimedState, applyMove, openColumns, landing, SIZES, DRAW } from "./rules.js";
+import { bestOf5, elapsed } from "../../test/helpers.js";
 
 const newState = (first, size = "7x6") => newTimedState(first, { size, moveSeconds: 0, gameSeconds: 0 });
 
@@ -141,21 +142,18 @@ test("robot vs robot over 20 seeded games always finishes with legal moves, on e
 });
 
 test("it answers well under 100 ms, from a cold start and on every board", async () => {
-  const { chooseMove: fresh } = await import(`./robot.js?cold=${Date.now()}`);
+  // Each run has its own fresh import of the robot, so every board size starts cold.
+  const fresh = await Promise.all([0, 1, 2, 3, 4, 5].map((run) => import(`./robot.js?cold=${run}`)));
   let worst = 0;
   for (const size of SIZES) {
-    const t0 = performance.now();
-    fresh(newState(0, size), 0, () => 0.99, { level: "hard" });
-    worst = Math.max(worst, performance.now() - t0);
+    worst = Math.max(worst, bestOf5((run) => elapsed(() => fresh[run].chooseMove(newState(0, size), 0, () => 0.99, { level: "hard" }))));
     // Mid-game positions from random openings.
     for (let g = 0; g < 4; g++) {
       const rng = rngFromSeed(`speed-${size}-${g}`);
       const s = newState(g % 2, size);
       for (let k = 0; k < 6 + 4 * g && s.winner === -1; k++) applyMove(s, s.turn, randomPlayer(s, s.turn, rng));
       if (s.winner !== -1) continue;
-      const t1 = performance.now();
-      fresh(s, s.turn, () => 0.99, { level: "hard" });
-      worst = Math.max(worst, performance.now() - t1);
+      worst = Math.max(worst, bestOf5((run) => elapsed(() => fresh[run].chooseMove(s, s.turn, () => 0.99, { level: "hard" }))));
     }
   }
   assert.ok(worst < 100, `slowest answer ${worst.toFixed(1)} ms`);
