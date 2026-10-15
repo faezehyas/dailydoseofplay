@@ -8,7 +8,8 @@
 // or a list of Teal's moves in order. Everything else is made for whoever
 // must, as in the game: your answers, books, lucky fish and the end of a turn,
 // and Teal's. Cells are a card in your hand, a rank of yours ("7s", "Kings"),
-// "ask", "pond", "teal", "books" and "teal-books".
+// "ask", "pond", "teal", "books", "teal-books" and a book you laid
+// ("book:<slot>", its first card).
 import { card, cards } from "../engine/cards/lesson-deck.js";
 import { rankOf } from "./rules.js";
 

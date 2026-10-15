@@ -628,28 +628,28 @@ button.pc-stock:disabled {
   box-shadow: 0 0 0 3px var(--focus), 0 0 0 6px #fff, 0 6px 14px var(--pc-shadow);
 }
 
-/* A tutorial's lit cards and spots (engine/tutorial.js): a ring round them,
-   since the cards cover their inside; in the hand, round the card itself. */
-.pc-game .tut-lit {
+/* A tutorial's highlights (engine/tutorial.js) go round cards and spots,
+   past a gap of the page's colour, since the cards cover their inside; in
+   the hand, round the card itself. */
+.pc-game :is(.tut-lit, .tut-hint, .tut-result) {
   border-radius: 8px;
-  box-shadow: 0 0 0 3px var(--surface), 0 0 0 6px var(--accent-2);
-}
-
-.pc-game .tut-hint {
-  border-radius: 8px;
-  box-shadow: 0 0 0 3px var(--surface), 0 0 0 6px var(--accent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px var(--surface);
 }
 
 .pc-game .pc-hcard:is(.tut-lit, .tut-hint) {
+  outline: none;
   box-shadow: none;
 }
 
-.pc-hcard.tut-lit .pc-card .front {
-  box-shadow: 0 0 0 3px var(--surface), 0 0 0 6px var(--accent-2), 0 6px 14px var(--pc-shadow);
+.pc-hcard:is(.tut-lit, .tut-hint) .pc-card .front {
+  outline: 3px solid var(--accent-2);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px var(--surface), 0 6px 14px var(--pc-shadow);
 }
 
 .pc-hcard.tut-hint .pc-card .front {
-  box-shadow: 0 0 0 3px var(--surface), 0 0 0 6px var(--accent), 0 6px 14px var(--pc-shadow);
+  outline-style: dashed;
 }
 
 /* A hand shown in groups: a mark under each meld. */

@@ -599,7 +599,7 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `chimes.js` | The result chimes: the site's jingle for each outcome in each game's timbre, through `sound.js` (see **Result moment**), and a tutorial's right move (`right-<flavour>`, see **Tutorials**). No DOM. |
 | `confirm.js` | `confirmDialog({ title, text, yes, no })`: a yes-or-no question in a modal `<dialog>` styled like the site. Focus moves to Cancel, Esc or Cancel says no, and focus returns to where it was (Leave). Resolves to `true` for yes. |
 | `how-to-play.js` | `howToPlayPanel(sections, top)`: the "How to play" panel (`details.rules#how-to-play`) with the same `<h3>` sections in every game, in one order: Goal, Players, Setup, On your turn, Winning, Settings and clocks, Fair play, Keyboard. A game leaves out what doesn't apply; a section is a paragraph or a list, and an unknown one throws. `top` goes first (the lobby's link to the tutorial). `startGameShell()` puts it under `#game`. |
-| `tutorial.js` | `startTutorial()`: a game's lessons on its own board, with the lesson list and its ticks, the step runner, the highlight layer (lit squares and arrows), the hint, progress and the end screen (see **Tutorials**). The lobby imports it only when a tutorial opens. |
+| `tutorial.js` | `startTutorial()`: a game's lessons on its own board, with the lesson list and its ticks, the step runner, the highlight layer (lit squares, arrows and results), the hint, progress and the end screen (see **Tutorials**). The lobby imports it only when a tutorial opens. |
 | `settings.js` | `gameSettings()`: a game's settings (groups of segmented options such as clocks or board size), remembered per device under the game's key. The lobby shows them folded to a summary ("Game settings" over chips such as "No clocks", "Coin toss", "Easy robot", and Change) that opens to the options; a "device" group (`scope: "device"`, or `robot: true`) is tagged "vs robot only" ("for robots" in a game that seats more than two, whose friend rooms can seat robots), its chip has a teal dot, and it is left out of the waiting screen's summary, like a "view" group, until the host seats a robot (`summary(robots)`). `form()` is the options themselves, shown in the lobby card and in the settings panel's "This game" tab, and each copy follows changes made in the other; `lock(on, mode)`, from the lobby, disables all but the "view" options while a game is on and shows that game's config. `get()` is the current config, which the game sends to its guests (`setup`); `get("robot")` is a robot game's, from the game's `robot(config, picked)` (see **Clocks against the robot**). It remembers which groups the player picked an option in (`picked`, kept with the config under the same key). For a game that seats more than two it also keeps a robot game's player count there (`players`; see **How many play a robot game**): `offerPlayers(counts)`, `playersForm()` (the "Players" radio group, also in the panel's copy of `form()`) and `players()`. Settings saved before that kept the number of robots (`robots`), read as one more player (`savedPlayers()`). |
 | `native.js` | The mobile app's bridge: `isApp`, `share(text, url)` and `haptic(kind)` post to the channel the app adds (see **Mobile app**); on the web they do nothing |
 | `sound.js` | Every game's sounds play through it (see **Sound levels**): `defineSounds()` takes a game's list of sounds, each with a role, and returns `play(name, opts, at)`. One audio context and one output for the site, the per-device mute and volume (a master gain after the output) from `prefs.js`, and preloading of short CC0 recordings (Sea Battle, Chess, Backgammon, Ludo and the card games, see each `sounds/LICENSE.txt`) |
@@ -1151,7 +1151,7 @@ one move.
 flowchart LR
   lessons["lessons.js<br>data: text, position,<br>highlight, arrows,<br>expect, reply"] --> runner
   subgraph engine ["engine/tutorial.js"]
-    runner["step runner"] --> layer["highlight layer:<br>lit squares, arrows,<br>hint, check mark"]
+    runner["step runner"] --> layer["highlight layer:<br>lit squares, arrows,<br>hint, result, check mark"]
   end
   runner -- "load(position)<br>play(state, move)" --> adapter
   adapter["the game's tutorial.js<br>(adapter)"] -- "applyMove()" --> rules["rules.js"]
@@ -1174,11 +1174,20 @@ flowchart LR
 - **The adapter** (`public/<slug>/tutorial.js`) exports the lessons, the
   chime's `flavour`, `load(position)` (a rules state whose side to move is
   the learner), `play(state, move, step)` (`applyMove` for the side to move,
-  returning its events), `cells(move)` and `board()`: the game's own markup,
+  returning its events), `cells(move)`, optionally `result(state, played)`
+  (the cells a move that just landed achieved for the learner) and
+  `board()`: the game's own markup,
   classes and art, with `render(state, played)`, `onMove(fn)`, `cell(c)` and
   `reject(move)`. The board only hands over cells, so the engine draws the
-  lit squares, arrows and hint the same way in every game. It reports any
-  move the learner makes, legal or not.
+  lit squares, arrows, hint and result the same way in every game. It
+  reports any move the learner makes, legal or not.
+- **Highlights never fill a square**, so its piece stays as the game draws
+  it, and each has a shape besides its colour: what a step is about gets a
+  soft teal ring (`.tut-lit`), the hint a dashed one (`.tut-hint`), and a
+  result (a finished line, a capture, a scored box or book) a solid outline,
+  lit up one after another like the winning pieces at the result moment
+  (`.tut-result` with `celebrate()`'s `.celebrate-lit`). With reduced motion
+  they appear without moving.
 - **It plays like the game.** The board takes moves the way the game does
   (taps, drags, keys and buttons) and shows them with the game's own motion
   and sounds, from the same code in the game's folder (`art.js`, `sounds.js`).
@@ -1193,9 +1202,9 @@ flowchart LR
   the step's, springs back (`reject`), and the line under the board says why
   in the rules' own words ("That piece can't move there."). After the second
   wrong try the squares of the right move light up (`.tut-hint`). A right
-  move gets a check mark on its square and `right-<flavour>`, the win
-  chime's last two notes at the `ui` level; then the reply, then the next
-  step.
+  move gets a check mark on its square, what it achieved (`result`) and
+  `right-<flavour>`, the win chime's last two notes at the `ui` level; then
+  the reply, whose result lights up too, then the next step.
 - **Entry points:** a Learn button in the lobby under the Play buttons, a
   link at the top of "How to play" (hidden while a game or the tutorial is on
   show), and `/<slug>/?learn`, which can be shared. Opening it from the page

@@ -271,9 +271,8 @@
   --disc-fill: color-mix(in srgb, var(--disc) 65%, var(--sunk));
 }
 
-/* The tutorial's lit squares and hint ring the hole. */
-.c4-cell.tut-lit,
-.c4-cell.tut-hint {
+/* The tutorial's highlights ring the hole. */
+.c4-cell:is(.tut-lit, .tut-hint, .tut-result) {
   border-radius: 50%;
 }
 

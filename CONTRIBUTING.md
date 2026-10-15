@@ -472,6 +472,9 @@ export const flavour = "paper"; // the chime's timbre, as for celebrate()
 export const load = (position) => /* a rules state whose side to move is the learner */;
 export const play = (state, move) => applyMove(state, state.turn, move); // returns its events; throws RuleError when illegal
 export const cells = (move) => [move.cell]; // the cells a move uses, lit up by the hint
+// optional: the cells a move achieved for the learner (a line, a capture, a scored box), lit up as
+// your celebrate() highlight; played is what play returned, for the learner's move or the reply
+export const result = (state, played) => (state.winner === 0 ? state.line : []);
 export function board() {
   // render(state, played) draws it; with played (the events play returned) it shows that move
   // as the game does and returns a promise that settles once it has landed.
@@ -490,8 +493,11 @@ gets the step as its third argument and can hand `applyMove` an `rng` that
 rolls it (Chutes and Ladders' `spin`). When the dice come before a choice,
 put the roll in the position instead and roll it in `load`, so the board
 shows the dice before the move (Backgammon, Ludo). The engine lights a cell
-with a box shadow; on a board drawn in SVG, make `cell(c)` return a shape of
-your own with the class `tut-ring` (Ludo, Chutes and Ladders). A card game
+with an outline, never a fill, so don't style `.tut-lit`, `.tut-hint` or
+`.tut-result` yourself beyond their shape (a round hole, a card's corners);
+on a board drawn in SVG, make `cell(c)` return a shape of your own with the
+class `tut-ring` (Ludo, Chutes and Ladders). `cell(c)` also takes whatever
+`result` names, such as a box or a book. A card game
 deals its lessons from `engine/cards/lesson-deck.js`: fixed hands, `card("10H")`
 for a card (a slot is its face) and `lessonMove()` as `play`, so no shuffle
 runs; when the other seats move more than once before your turn, the

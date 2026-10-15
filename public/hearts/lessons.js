@@ -12,7 +12,7 @@
 // pointless ones nobody holds). Moves are the game's own: { pass: [three
 // cards in hand order] } and { play: card }. A reply is a list of moves, each
 // by whoever is to move then. Cells are a card in your hand, "trick" (where
-// your card lands) and "pass" (the Pass button).
+// your card lands), "pass" (the Pass button) and "won" (your won tricks).
 import { card } from "../engine/cards/lesson-deck.js";
 
 const play = (name) => ({ play: card(name) });

@@ -24,6 +24,11 @@ export function load({ mine, theirs, roll }) {
 }
 export const play = (state, move) => applyMove(state, state.turn, move);
 export const cells = (move) => move.steps.flatMap(([from, die]) => [from, Math.max(from - die, OFF)]);
+// A blot hit or a checker borne off lights where it happened, as at the game's win.
+export function result(state, played = []) {
+  const ev = played.find((e) => e.type === "play" && e.player === 0);
+  return ev ? [...new Set(ev.steps.filter((s) => s.hit || s.to === OFF).map((s) => s.to))] : [];
+}
 
 // As in the game: tap a checker, then where it goes (the tray to bear off),
 // or drag it there. Each step flies and sounds as in the game; Undo takes

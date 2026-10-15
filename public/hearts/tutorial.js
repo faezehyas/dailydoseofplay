@@ -51,6 +51,8 @@ export function play(state, move) {
   return lessonMove(rules, state, move);
 }
 export const cells = (move) => (move.pass ? [...move.pass, "pass"] : [move.play, "trick"]);
+// A trick the learner took lights their pile of won tricks, as at the game's win.
+export const result = (state, played = []) => (played.some((e) => e.type === "trick" && e.winner === 0) ? ["won"] : []);
 
 // As in the game: tap three cards and Pass (or P; Esc puts them back), tap a
 // card to play it, or the arrow keys and Enter. Every card flies and sounds
@@ -143,7 +145,7 @@ export function board() {
 
   return {
     node,
-    cell: (c) => (c === "trick" ? parts.trick.spots.get(0) : c === "pass" ? (parts.passBtn.hidden ? parts.actionBar : parts.passBtn) : (handCards.get(c) ?? table.hand)),
+    cell: (c) => (c === "trick" ? parts.trick.spots.get(0) : c === "won" ? parts.myWon.node : c === "pass" ? (parts.passBtn.hidden ? parts.actionBar : parts.passBtn) : (handCards.get(c) ?? table.hand)),
     onMove: (fn) => (moveFn = fn),
     async render(st, played) {
       if (st !== state) picked = [];

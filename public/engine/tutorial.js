@@ -1,8 +1,10 @@
 // Interactive tutorials: a game's short lessons, played on its own board.
 // Each step says what to do, lights up squares (with arrows where they
 // help) and waits for the learner's move, which the game's rules.js checks.
-// A right move gets a check mark and a soft chime; a wrong one springs back,
-// and after the second wrong try the squares of the right move light up.
+// A right move gets a check mark and a soft chime, and what it achieved (a
+// finished line, a capture, a scored box) lights up as at the game's result
+// moment; a wrong one springs back, and after the second wrong try the
+// squares of the right move light up.
 // No server, no timer, no score. Finished lessons get a tick, kept on this
 // device only.
 //
@@ -21,6 +23,8 @@
 //   play(state, move, step)  applies a move for the side to move with rules.js, or throws RuleError;
 //                            what it returns (the rules' events) goes to render
 //   cells(move)              the cells a move uses, lit up by the hint
+//   result(state, played)    optional: the cells the move that just landed (the learner's or the
+//                            reply) achieved for the learner, lit up as the game's result moment does
 //   board()                  the game's board view: { node, render(state, played), onMove(fn), cell(c), reject(move) }
 //                            render gets `played`, what play returned, for the move that just
 //                            landed (the learner's or the reply), and may animate it as the game
@@ -228,13 +232,14 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
     feedback.textContent = "Right!";
     feedback.className = "tut-feedback right";
     landed(view.render(state, played), () => {
+      showResult(played);
       showCheck(tutorial.cells(move).at(-1));
       sounds.play(chime("right", flavour));
       later(() => {
         check.hidden = true;
         if (!step.reply) return advance();
         const replied = tutorial.play(state, step.reply, step);
-        landed(view.render(state, replied), () => later(advance, REPLY_MS));
+        landed(view.render(state, replied), () => (showResult(replied), later(advance, REPLY_MS)));
       }, RIGHT_MS);
     });
   }
@@ -279,11 +284,25 @@ export function startTutorial({ root, slug, title, tutorial, onPlayRobot, onClos
   }
 
   // ---------- highlight layer ----------
+  // kind: "tut-lit" (what the step is about), "tut-hint" (the right move) or
+  // "tut-result", which lights up one after another like celebrate()'s win.
   let lit = [];
   function light(list, kind) {
-    for (const node of lit) node.classList.remove("tut-lit", "tut-hint");
+    for (const node of lit) node.classList.remove("tut-lit", "tut-hint", "tut-result", "celebrate-lit");
     lit = list.map((c) => view.cell(c));
-    for (const node of lit) node.classList.add(kind);
+    lit.forEach((node, i) => {
+      node.classList.add(kind);
+      if (kind !== "tut-result") return;
+      node.style.setProperty("--i", i);
+      node.classList.add("celebrate-lit");
+    });
+  }
+
+  // A move's result stays lit until the next step; a reply that achieves
+  // nothing leaves the learner's lit.
+  function showResult(played) {
+    const list = tutorial.result?.(state, played) ?? [];
+    if (list.length) light(list, "tut-result");
   }
 
   // Where a cell sits in the stage, in pixels.

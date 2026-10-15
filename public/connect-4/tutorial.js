@@ -28,6 +28,8 @@ export function load(position) {
 export const play = (state, move) => applyMove(state, state.turn, move);
 // A column's squares from the bottom up: the hint lights the whole column.
 export const cells = ({ col }) => Array.from({ length: ROWS }, (_, k) => (ROWS - 1 - k) * COLS + col);
+// The line the learner finished lights up, as at the game's win.
+export const result = (state) => (state.winner === 0 ? state.line : []);
 
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -64,7 +66,6 @@ export function board() {
     onMove: (fn) => (moveFn = fn),
     render(st) {
       state = st;
-      const line = new Set(st.line || []);
       const lastCol = st.moves.at(-1);
       const lastCell = lastCol === undefined ? -1 : (ROWS - st.heights[lastCol]) * COLS + lastCol;
       squares.forEach((cell, i) => {
@@ -79,7 +80,6 @@ export function board() {
             cell.replaceChildren(disc);
           } else cell.replaceChildren();
         }
-        cell.classList.toggle("win", line.has(i));
         cell.classList.toggle("last", i === lastCell);
       });
       columns.forEach((column, col) => {

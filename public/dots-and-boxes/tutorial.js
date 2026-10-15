@@ -33,6 +33,11 @@ export function load(rows) {
 }
 export const play = (state, move) => applyMove(state, state.turn, move);
 export const cells = (move) => [move.line];
+// The boxes the learner closed ("b<box>") light up, as at the game's win.
+export function result(state, played = []) {
+  const ev = played.find((e) => e.type === "line" && e.player === 0);
+  return ev ? ev.boxes.map((b) => `b${b}`) : [];
+}
 
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const fast = () => reducedMotion() || document.hidden;
@@ -170,7 +175,7 @@ export function board() {
 
   return {
     node,
-    cell: (l) => bands[l],
+    cell: (c) => (typeof c === "string" ? art.boxes.querySelector(`[data-box="${c.slice(1)}"]`) : bands[c]),
     onMove: (fn) => (moveFn = fn),
     // Without `played` a still board for a step; with it, the line just drawn plays out.
     render(st, played) {

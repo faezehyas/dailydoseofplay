@@ -7,8 +7,8 @@
 // Moves are the game's own: { draw: "stock" | "pile" }, { discard },
 // { discard, knock: true }, and teal's { melds, layoffs } after a knock;
 // laying down your own hand is made for you, as in the game. Cells are a
-// card in your hand, "stock", "pile", "knock" (the Knock button) and
-// "deadwood" (its count).
+// card in your hand, "stock", "pile", "knock" (the Knock button),
+// "deadwood" (its count) and a card you laid down ("spread:<slot>").
 import { card, cards } from "../engine/cards/lesson-deck.js";
 
 const discard = (name) => ({ discard: card(name) });

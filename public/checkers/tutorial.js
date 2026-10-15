@@ -23,6 +23,11 @@ export function load(position) {
 }
 export const play = (state, move) => applyMove(state, state.turn, move);
 export const cells = (move) => move.path;
+// A capture lights the squares jumped and where it ended, as at the game's win.
+export function result(state, played = []) {
+  const moved = played.find((e) => e.type === "moved" && e.player === 0 && e.captured.length);
+  return moved ? [...moved.captured, moved.path.at(-1)] : [];
+}
 
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const squareName = (sq) => `Row ${(sq >> 3) + 1}, column ${(sq & 7) + 1}`;

@@ -15,6 +15,13 @@ export const flavour = "wood";
 export const load = (fen) => stateFromFen(fen);
 export const play = (state, move) => applyMove(state, state.turn, move);
 export const cells = (move) => [move.from, move.to];
+// A capture lights where it was made (and the pawn taken en passant), and
+// checkmate the king, as at the game's win.
+export function result(state, played = []) {
+  if (state.reason === "checkmate" && state.winner === 0) return [state.kings[state.side]];
+  const moved = played.find((e) => e.type === "moved" && e.player === 0 && e.captured);
+  return moved ? [...new Set([moved.capturedAt, moved.to])] : [];
+}
 
 // White at the bottom. Tap or press Enter on a piece, then on its square,
 // or drag it there. The board takes moves only while a step waits for one.
