@@ -10,6 +10,7 @@
     <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#12151c" media="(prefers-color-scheme: dark)" />
     <link rel="preload" href="/engine/fonts/fredoka.woff2" as="font" type="font/woff2" crossorigin />
+    <style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>
     <link rel="stylesheet" href="/engine/theme.css" />
     <link rel="stylesheet" href="./style.css" />
     <link rel="modulepreload" href="/engine/lobby.js" />
@@ -45,9 +46,50 @@
     <main class="page">
       <section id="lobby">
         <div class="card lobby-card">
+          <div class="lobby-icon" style="view-transition-name: icon-connect-4"><img src="/connect-4/icon.svg" alt="" /></div>
           <h1>Connect 4</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="tagline">Drop, stack and line up four before your rival does.</p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
+          <p class="how-to-play" inert><a href="#how-to-play">How to play</a></p>
+          <label class="field">
+            <span>Nickname</span>
+            <input type="text" maxlength="20" placeholder="Your nickname (optional)" disabled />
+            <small>Saved on this device only.</small>
+          </label>
+          <details class="settings" inert>
+            <summary>
+              <span class="settings-title">Game settings</span>
+              <span class="settings-change">Change</span>
+              <span class="settings-line">
+                <span class="chip">7 × 6</span>
+                <span class="sr-only">, </span>
+                <span class="chip">40 s a move</span>
+                <span class="sr-only">, </span>
+                <span class="chip">4 min each</span>
+                <span class="sr-only">, </span>
+                <span class="chip">Coin toss</span>
+                <span class="sr-only">, </span>
+                <span class="chip robot">Medium robot</span>
+              </span>
+            </summary>
+          </details>
+          <div class="lobby-actions loading-row">
+            <button class="btn primary big" type="button" disabled>Play with a friend</button>
+            <button class="btn big" type="button" disabled>Play vs robot</button>
+            <button class="btn learn" type="button" disabled>Learn</button>
+            <p class="loading" role="status">
+              <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+                <g transform="translate(-236 -29)">
+                  <circle class="disc" cx="262" cy="68" r="5" />
+                  <circle class="disc" cx="276" cy="55" r="5" />
+                  <circle class="disc teal" cx="276" cy="68" r="5" />
+                  <circle class="disc teal drop" cx="290" cy="68" r="5" />
+                  <path class="rack" fill-rule="evenodd" d="M256 47h40a4 4 0 0 1 4 4v21a4 4 0 0 1-4 4h-40a4 4 0 0 1-4-4v-21a4 4 0 0 1 4-4zM257 55a5 5 0 0 0 10 0a5 5 0 0 0-10 0zM271 55a5 5 0 0 0 10 0a5 5 0 0 0-10 0zM285 55a5 5 0 0 0 10 0a5 5 0 0 0-10 0zM257 68a5 5 0 0 0 10 0a5 5 0 0 0-10 0zM271 68a5 5 0 0 0 10 0a5 5 0 0 0-10 0zM285 68a5 5 0 0 0 10 0a5 5 0 0 0-10 0z" />
+                </g>
+              </svg>
+              <span class="sr-only">Loading…</span>
+            </p>
+          </div>
         </div>
       </section>
       <section id="game" hidden></section>

@@ -10,6 +10,7 @@
     <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#12151c" media="(prefers-color-scheme: dark)" />
     <link rel="preload" href="/engine/fonts/fredoka.woff2" as="font" type="font/woff2" crossorigin />
+    <style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>
     <link rel="stylesheet" href="/engine/theme.css" />
     <link rel="stylesheet" href="./style.css" />
     <link rel="modulepreload" href="/engine/lobby.js" />
@@ -45,9 +46,62 @@
     <main class="page">
       <section id="lobby">
         <div class="card lobby-card">
+          <div class="lobby-icon" style="view-transition-name: icon-ludo"><img src="/ludo/icon.svg" alt="" /></div>
           <h1>Ludo</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="tagline">Roll a 6 to come out, knock rivals back to their yard, and race all four tokens home.</p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
+          <p class="how-to-play" inert><a href="#how-to-play">How to play</a></p>
+          <label class="field">
+            <span>Nickname</span>
+            <input type="text" maxlength="20" placeholder="Your nickname (optional)" disabled />
+            <small>Saved on this device only.</small>
+          </label>
+          <details class="settings" inert>
+            <summary>
+              <span class="settings-title">Game settings</span>
+              <span class="settings-change">Change</span>
+              <span class="settings-line">
+                <span class="chip">Play for places</span>
+                <span class="sr-only">, </span>
+                <span class="chip">Coin toss</span>
+                <span class="sr-only">, </span>
+                <span class="chip">No move limit</span>
+                <span class="sr-only">, </span>
+                <span class="chip robot">Easy robots</span>
+              </span>
+            </summary>
+          </details>
+          <div class="lobby-actions loading-row">
+            <button class="btn primary big" type="button" disabled>Play with friends</button>
+            <div class="robot-play">
+              <fieldset class="settings-group players-choice" disabled>
+                <legend>Players (you + robots)</legend>
+                <div class="seg-options">
+                  <label class="seg-opt"><input type="radio" /><span>2</span></label>
+                  <label class="seg-opt"><input type="radio" /><span>3</span></label>
+                  <label class="seg-opt"><input type="radio" checked /><span>4</span></label>
+                </div>
+              </fieldset>
+              <button class="btn big" type="button" disabled>Play vs 3 robots</button>
+            </div>
+            <button class="btn learn" type="button" disabled>Learn</button>
+            <p class="loading" role="status">
+              <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+                <ellipse class="shade" cx="40" cy="44" rx="9" ry="2.5" />
+                <g transform="translate(31 24)">
+                  <g class="die">
+                    <rect class="die-face" width="18" height="18" rx="4" />
+                    <path class="pip" d="M5 3.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4zM9 7.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4zM13 11.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4z" />
+                    <g class="die-b">
+                      <rect class="die-face" x="1" y="1" width="16" height="16" rx="3" />
+                      <path class="pip" d="M5 3.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4zM13 3.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4zM9 7.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4zM5 11.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4zM13 11.3a1.7 1.7 0 1 0 0 3.4a1.7 1.7 0 1 0 0-3.4z" />
+                    </g>
+                  </g>
+                </g>
+              </svg>
+              <span class="sr-only">Loading…</span>
+            </p>
+          </div>
         </div>
       </section>
       <section id="game" hidden></section>

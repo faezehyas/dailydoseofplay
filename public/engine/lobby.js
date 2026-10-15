@@ -19,8 +19,9 @@
 // Otherwise a robot game is full.
 // robots, optional, overrides how many robot seats there are (a number, or a
 // function read when a robot game starts); older games passed it.
-// The lobby tagline is the game's description in games.json; `tagline`
-// overrides it (older games passed their own).
+// The lobby tagline is the game's description in games.json, which the page's
+// loading card in index.html carries; `tagline` overrides it (older games
+// passed their own).
 // layout is the page column while the game is on show: "narrow", "medium" or
 // "wide" (the default); the lobby is always narrow. Sizes live in theme.css.
 // settings is the game's gameSettings() (settings.js): the home screen shows
@@ -108,17 +109,12 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   lobbyRoot.append(progress);
   let firstView = true;
 
-  // The lobby shows at once; the description fills in when games.json arrives.
+  // The game's icon and description, as the page's loading card (index.html)
+  // shows them, so nothing moves when the home screen replaces it. The icon
+  // shares its view-transition-name with the home page's tile.
+  tagline ||= $(".lobby-card .tagline", lobbyRoot)?.textContent ?? "";
   const taglineEl = el("p", { class: "tagline", hidden: !tagline }, tagline);
-  if (!tagline) {
-    fetch("/games.json", { cache: "no-cache" })
-      .then((res) => res.json())
-      .then(({ games }) => {
-        taglineEl.textContent = games.find((g) => g.slug === slug)?.description ?? "";
-        taglineEl.hidden = !taglineEl.textContent;
-      })
-      .catch(() => {});
-  }
+  const icon = el("div", { class: "lobby-icon", style: `view-transition-name: icon-${slug}` }, el("img", { src: `/${slug}/icon.svg`, alt: "" }));
 
   // A new view takes focus to its heading, except on page load. The first
   // replaces the page's loading placeholder (index.html).
@@ -196,6 +192,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
       el("button", { class: "btn", type: "submit" }, "Join"),
     );
     view(
+      icon,
       el("h1", {}, title),
       taglineEl,
       howToPlayLink(),
@@ -694,6 +691,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     lobbyRoot.hidden = true;
     gameRoot.hidden = false;
     gameRoot.replaceChildren();
+    // The game starts at the top, however far down the lobby's Play button was.
+    scrollTo(0, 0);
     // The game has a history entry of its own, so Back leaves it as Leave does.
     if (learning) history.replaceState({ game: slug }, "");
     else history.pushState({ game: slug }, "");
