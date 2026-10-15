@@ -438,8 +438,9 @@ A tutorial teaches the rules on your real board: 3 to 6 short lessons of 1 to
 and wait for one move, which your `rules.js` checks (see **Tutorials** in
 `ARCHITECTURE.md`). The engine does the rest: the lesson list and its ticks,
 hints, the check mark and its chime, the end screen, a Learn button in the
-lobby, a link at the top of "How to play" and `/<slug>/?learn`. Tic Tac Toe's
-is the shortest to copy, and Chess shows a promotion picker.
+lobby and on the waiting screen, a link at the top of "How to play" and
+`/<slug>/?learn`. Tic Tac Toe's is the shortest to copy, and Chess shows a
+promotion picker.
 
 `lessons.js` is data, in your game's own move format:
 
