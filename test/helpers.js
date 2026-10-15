@@ -153,11 +153,11 @@ export async function waitForSameState(pages, pick = (m) => m.state, { timeout =
   throw new Error(`the pages never agreed on ${pick} within ${timeout} ms:\n  ${seen.map((s) => s.slice(0, 300)).join("\n  ")}`);
 }
 
-// The host opens a friend room (unless it has one) and each guest joins
-// from the invite link.
+// The host opens a friend room (unless it has one, maybe under a tutorial)
+// and each guest joins from the invite link.
 export async function joinByInvite(host, guests, srv) {
-  if (!(await host.locator("#room-code").isVisible())) await host.click("#play-friend");
-  await host.locator("#room-code").waitFor();
+  if (!(await host.locator("#room-code").count())) await host.click("#play-friend");
+  await host.locator("#room-code").waitFor({ state: "attached" });
   const code = (await host.locator("#room-code").innerText()).trim();
   const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
   for (const guest of [guests].flat()) {
