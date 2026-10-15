@@ -7,13 +7,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, waitForPhase, noHorizontalScroll, pick } from "../helpers.js";
+import { rngFromSeed, sfc32 } from "../../public/engine/rng.js";
 import { START, ply, playTurnByHand, setPosition, autoplay } from "./backgammon.shared.js";
 
 const skip = skipWithoutPlaywright();
 
+// The robot game plays the same every run: open's seed fixes the robot's
+// choices, and seedDice each side's share of the dice, drawn with
+// crypto.getRandomValues (engine/fair.js). With this seed every turn played
+// by hand below has a choice in it, so the game never plays one for you.
+const SEED = 6;
+const seedDice = (seed) => `(() => {\n${sfc32}\n${rngFromSeed}\nconst rng = rngFromSeed("${seed}");\ncrypto.getRandomValues = (a) => (a.forEach((_, i) => (a[i] = rng() * 256)), a);\n})();`;
+
 test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and drag, a race played for you, then a loss on the clock", { skip, timeout: 180_000 }, async (t) => {
   const { srv, open, assertNoErrors } = await openBrowser(t);
-  const page = await open("player", { phone: true, colorScheme: "light", clock: true, robotPace: 1 });
+  const page = await open("player", { phone: true, colorScheme: "light", clock: true, robotPace: 1, seed: SEED, init: seedDice(SEED) });
   const sounds = new Map();
   page.on("response", (r) => r.url().includes("/backgammon/sounds/") && sounds.set(r.url().split("/").pop(), r.status()));
 
@@ -38,9 +46,14 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
   assert.ok(await noHorizontalScroll(page));
 
   // Turn 1 by touch.
+  // A flight is short, so the page notes the robot's first one for the check below.
+  await page.evaluate(() => {
+    const seen = new MutationObserver(() => document.querySelector(".checker.theirs.ghost") && ((window.__robotFlew = true), seen.disconnect()));
+    seen.observe(document.body, { childList: true, subtree: true });
+  });
   await playTurnByHand(page, { tap: true });
   // The robot answers: its checkers fly one at a time, then all of them land.
-  await page.locator(".checker.ghost").first().waitFor({ timeout: 10_000 });
+  await waitForState(page, () => window.__robotFlew, undefined, { timeout: 10_000 });
   await waitForState(page, (ddp) => ddp.match.state.turn === 0 && ddp.match.state.ply >= 4);
   await waitForState(page, () => !document.querySelector(".checker.ghost, .pending"));
   assert.notDeepEqual(await page.evaluate(() => window.ddp.match.state.pos[1]), START, "the robot moved");
@@ -114,9 +127,9 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
 
   // Rematch: a race home. The test puts the same race position on both sides
   // before the first roll; the game then offers to move for you.
+  await setPosition(page, 2, { 6: 2, 5: 2, 4: 2, 3: 2, 2: 2, 1: 2 }, { 6: 3, 5: 3, 4: 3, 3: 3, 2: 3 });
   await page.click("#rematch");
   await waitForState(page, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing");
-  await setPosition(page, { 6: 2, 5: 2, 4: 2, 3: 2, 2: 2, 1: 2 }, { 6: 3, 5: 3, 4: 3, 3: 3, 2: 3 });
   await page.locator("#bg-offer").waitFor();
   assert.match(await page.locator("#bg-offer").innerText(), /race/);
   await page.screenshot({ path: `${ARTIFACTS}/bg-7-race-offer-light.png`, fullPage: true });
@@ -150,9 +163,9 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
 
   // Another rematch: your last checker on your 1 point, so whatever you roll
   // there is only one way to play it. The game plays it and ends your turn.
+  await setPosition(page, 3, { 1: 1 }, { 6: 15 });
   await page.locator("#rematch").click();
   await waitForState(page, (ddp) => ddp.match.m === 3 && ddp.match.phase === "playing");
-  await setPosition(page, { 1: 1 }, { 6: 15 });
   await page.locator("#bg-status").filter({ hasText: "only one way to play it" }).waitFor();
   assert.ok(await page.locator("#bg-offer").isHidden(), "no race offer for a forced turn");
   assert.equal(await page.locator("#bg-undo").isEnabled(), false);
