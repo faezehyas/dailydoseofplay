@@ -74,6 +74,8 @@ test("nothing shows moving in the first 400 ms, and nothing animates under reduc
     await holdLobby(page);
     await page.goto(`${srv.base}/${game.slug}/`, { waitUntil: "commit" });
     await page.locator("#lobby .loading-piece").waitFor({ state: "attached" });
+    // Nothing animates until the stylesheets load, so wait for them before reading the animations.
+    await waitForState(page, () => [...document.querySelectorAll('link[rel="stylesheet"]')].every((link) => link.sheet));
     // The piece's own moves may start at once, but it shows only when its fade-in, 400 ms on, ends; nothing else moves before then.
     const early = await page.evaluate(() =>
       document.getAnimations().filter((a) => !a.effect.target.closest(".loading-piece") || a.effect.target.matches(".loading-piece")).map((a) => a.effect.getTiming().delay),
