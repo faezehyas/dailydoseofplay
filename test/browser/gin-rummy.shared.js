@@ -1,11 +1,6 @@
-// Shared by the Gin Rummy browser tests: Playwright and the page helpers.
-export { ARTIFACTS, pw, wait, noHorizontalScroll, bg, resultInView } from "./ludo.shared.js";
+// Shared by the Gin Rummy browser tests: the page helpers.
+export { bg, resultInView } from "./ludo.shared.js";
 
-// The settings fold to a summary line in the lobby card; open it first.
-export async function pick(page, name, value) {
-  if (!(await page.locator("#gr-settings[open]").count())) await page.click("#gr-settings > summary");
-  await page.click(`#gr-settings label:has(input[name="gr-${name}"][value="${value}"])`);
-}
 export const state = (page) => page.evaluate(() => window.ddp.match.state);
 
 // Plays this page's choices through the page's own controls: what the Medium

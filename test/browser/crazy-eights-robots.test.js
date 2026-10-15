@@ -6,9 +6,10 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll, pick, state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./crazy-eights.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, waitForPhase, recordEvents, eventsSince, noHorizontalScroll, pick } from "../helpers.js";
+import { state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./crazy-eights.shared.js";
+
+const skip = skipWithoutPlaywright();
 
 // Plays my turns, keeping 8s back: stops when an 8 is all that plays, so the test can name a suit.
 const playButEights = (page) =>
@@ -26,23 +27,10 @@ const onlyEightPlays = (page) =>
     return cards.length > 0 && cards.every((c) => Number(c.firstChild.dataset.face) % 13 === 7);
   });
 
-test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, keyboard, suit picker, timer and a verified game", { skip: !pw && "Playwright not installed", timeout: 480_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling", "--autoplay-policy=no-user-gesture-required"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "light" });
-  await ctx.addInitScript(() => (window.ddpSounds = []));
-  await ctx.addInitScript(() => (globalThis.ddpRobotPace = 0.1));
-  const page = await ctx.newPage();
-  page.on("pageerror", (e) => errors.push(e.message));
-  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, keyboard, suit picker, timer and a verified game", { skip, timeout: 480_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("page", { phone: true, colorScheme: "light", clock: true, init: () => (window.ddpSounds = []) });
   const heard = () => page.evaluate(() => window.ddpSounds.slice());
-  await page.clock.install();
 
   await page.goto(`${srv.base}/`);
   await page.click('.game-card[data-slug="crazy-eights"] h2 a, .game-card[data-slug="crazy-eights"]');
@@ -58,21 +46,21 @@ test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, k
   // The deck is shuffled by every seat with proofs; the table says so while it works.
   await page.locator("#ce-busy:not([hidden])").waitFor();
   await page.screenshot({ path: `${ARTIFACTS}/ce-10-robot-shuffling.png` });
-  await wait(page, () => window.ddp.match?.phase === "playing", undefined, 60_000);
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing", undefined, { timeout: 60_000 });
   assert.match(await page.locator(".pb-players").innerText(), /Cleo[\s\S]*Robot 1[\s\S]*Robot 2[\s\S]*Robot 3/);
   assert.equal(await page.locator("#ce-config").innerText(), "draw until you can play · draw only when nothing plays · no action cards · 15 s to move · Hard robots");
   assert.equal(await page.locator(".crazy-eights.four-colour").count(), 1, "the four-colour deck is on");
   assert.ok(await noHorizontalScroll(page));
-  await wait(page, () => document.querySelectorAll(".ce-hcard").length === 5 && !document.querySelector(".ce-fly .ce-card"), undefined, 30_000);
+  await waitForState(page, () => document.querySelectorAll(".ce-hcard").length === 5 && !document.querySelector(".ce-fly .ce-card"), undefined, { timeout: 30_000 });
   // The starter snaps onto the discard pile once the deal has landed.
-  await wait(page, () => window.ddpSounds.includes("play"), undefined, 30_000);
+  await waitForState(page, () => window.ddpSounds.includes("play"), undefined, { timeout: 30_000 });
   const sounds = await heard();
   for (const name of ["shuffle", "deal", "play"]) assert.ok(sounds.includes(name), `played ${name}: ${sounds.join(" ")}`);
   assert.ok(sounds.filter((s) => s === "deal").length >= 20, "a flick per card dealt");
   await page.screenshot({ path: `${ARTIFACTS}/ce-11-robot-dealt.png` });
 
   // My turn first: by keyboard, a card that plays, or the draw made for me.
-  await wait(page, () => window.ddp.match.state.turn === 0 && !document.querySelector("#ce-status").textContent.startsWith("Dealing"), undefined, 30_000);
+  await waitForState(page, (ddp) => ddp.match.state.turn === 0 && !document.querySelector("#ce-status").textContent.startsWith("Dealing"), undefined, { timeout: 30_000 });
   const before = (await state(page)).moves;
   if (await page.locator(".ce-hcard.playable").count()) {
     await page.locator(".ce-hcard[tabindex='0']").focus();
@@ -89,12 +77,12 @@ test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, k
       await page.locator("#ce-picker:not([hidden])").waitFor();
       await page.keyboard.press("Enter");
     }
-    await wait(page, (n) => window.ddp.match.state.moves > n, before);
+    await waitForState(page, (ddp, n) => ddp.match.state.moves > n, before);
     assert.deepEqual((await state(page)).history.find((h) => h.p === 0 && h.t === "play")?.face, face, "Enter played the focused card");
-    await wait(page, () => !document.querySelector(".ce-fly .ce-card"), undefined, 10_000);
+    await waitForState(page, () => !document.querySelector(".ce-fly .ce-card"), undefined, { timeout: 10_000 });
     assert.ok(await page.evaluate(() => document.activeElement.classList.contains("ce-hcard")), "focus stays in the hand");
   } else {
-    await wait(page, (n) => window.ddp.match.state.moves > n, before, 20_000);
+    await waitForState(page, (ddp, n) => ddp.match.state.moves > n, before);
     assert.ok((await state(page)).history.some((h) => h.p === 0 && h.t === "draw"), "with nothing to play, the draw was made for me");
   }
   await page.screenshot({ path: `${ARTIFACTS}/ce-12-robot-played.png` });
@@ -109,7 +97,7 @@ test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, k
     if ((await state(page)).winner !== -1) {
       await page.locator("#rematch").waitFor();
       await page.click("#rematch");
-      await wait(page, () => window.ddp.match.phase === "playing", undefined, 60_000);
+      await waitForState(page, (ddp) => ddp.match.phase === "playing", undefined, { timeout: 60_000 });
     }
     await page.waitForTimeout(80);
   }
@@ -134,29 +122,28 @@ test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, k
   }));
   await page.keyboard.press("ArrowRight");
   // Record the table as my 8 lands: the next robot can play on before the test looks.
+  const atEight = await recordEvents(page);
   await page.evaluate(() => {
-    const m = window.ddp.match;
     const badge = document.querySelector("#ce-suit");
     window.eight = { sounds: window.ddpSounds.length, badge: [] };
-    window.eight.stop = m.on("events", ({ player }) => player === 0 && (window.eight.state ??= structuredClone(m.state)));
     window.eight.watch = new MutationObserver(() => window.eight.badge.push(badge.className));
     window.eight.watch.observe(badge, { attributeFilter: ["class"] });
   });
   await page.keyboard.press("Enter");
-  await wait(page, () => window.eight.state);
-  const named = await page.evaluate(() => window.eight.state);
+  await waitForState(page, (_, n) => window.ddpEvents.slice(n).some((e) => e.player === 0), atEight);
+  const named = (await eventsSince(page, atEight)).find((e) => e.player === 0).state;
   assert.deepEqual([named.suit, named.named], [chosen, true], "the 8 named the suit picked");
   if (named.hands[0].length) assert.ok(await page.evaluate(() => document.activeElement.classList.contains("ce-hcard")), "focus goes back to the hand");
-  await wait(page, () => window.ddpSounds.slice(window.eight.sounds).includes("eight"), undefined, 10_000);
-  await wait(page, () => window.eight.badge.some((c) => c.split(" ").includes("named")));
-  await page.evaluate(() => (window.eight.stop(), window.eight.watch.disconnect()));
+  await waitForState(page, () => window.ddpSounds.slice(window.eight.sounds).includes("eight"), undefined, { timeout: 10_000 });
+  await waitForState(page, () => window.eight.badge.some((c) => c.split(" ").includes("named")));
+  await page.evaluate(() => window.eight.watch.disconnect());
 
   // Muted: nothing more plays.
   await page.click("#sound-toggle");
   assert.equal(await page.locator("#sound-toggle").getAttribute("aria-pressed"), "true");
   const quiet = (await heard()).length;
   await autoplay(page);
-  await wait(page, (n) => window.ddp.match.state.moves > n + 6 || window.ddp.match.phase !== "playing", named.moves, 60_000);
+  await waitForState(page, (ddp, n) => ddp.match.state.moves > n + 6 || ddp.match.phase !== "playing", named.moves, { timeout: 60_000 });
   await stopAutoplay(page);
   assert.equal((await heard()).length, quiet, "no sound while muted");
   await page.click("#sound-toggle");
@@ -164,17 +151,13 @@ test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, k
   if ((await state(page)).winner !== -1) {
     const m = await page.evaluate(() => window.ddp.match.m);
     await page.locator("#rematch").click();
-    await wait(page, (n) => window.ddp.match.m === n + 1 && window.ddp.match.phase === "playing", m, 60_000);
+    await waitForState(page, (ddp, n) => ddp.match.m === n + 1 && ddp.match.phase === "playing", m, { timeout: 60_000 });
   }
 
   // The move timer: leave a turn alone and a move is made for you.
   if ((await state(page)).winner === -1) {
-    await page.evaluate(() => {
-      const m = window.ddp.match;
-      window.mine = [];
-      window.stopMine = m.on("events", ({ player }) => player === 0 && window.mine.push(m.state.moves));
-    });
-    await wait(page, () => window.ddp.match.phase !== "playing" || (window.ddp.match.state.turn === 0 && document.querySelectorAll(".ce-hcard.playable").length > 0), undefined, 90_000);
+    const atTimer = await recordEvents(page);
+    await waitForState(page, (ddp) => ddp.match.phase !== "playing" || (ddp.match.state.turn === 0 && document.querySelectorAll(".ce-hcard.playable").length > 0), undefined, { timeout: 90_000 });
     if ((await state(page)).winner === -1) {
       await page.locator("#ce-timer:not([hidden])").waitFor();
       // The timer's move: the first card in my hand (in the state's order) that plays.
@@ -185,19 +168,18 @@ test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, k
         return { from: st.history.length, face: st.hands[0].map((slot) => m.face(slot)).find(follows) };
       });
       await page.clock.fastForward("00:16");
-      await wait(page, () => window.mine.length > 0, undefined, 15_000);
+      await waitForState(page, (_, n) => window.ddpEvents.slice(n).some((e) => e.player === 0), atTimer, { timeout: 15_000 });
       const mine = (await state(page)).history.slice(from).find((h) => h.p === 0);
       assert.deepEqual([mine.t, mine.face], ["play", face], "time ran out: the first card that plays was played for me");
     }
-    await page.evaluate(() => window.stopMine());
   }
 
   // The rest at speed.
   await autoplay(page);
-  await wait(page, () => window.ddp.match.phase === "over", undefined, 300_000);
+  await waitForState(page, (ddp) => ddp.match.phase === "over", undefined, { timeout: 300_000 });
   await stopAutoplay(page);
   // The last move reaches each robot's table after mine: wait for theirs to end too.
-  await wait(page, () => window.ddp.robots.every((r) => r.match.phase === "over"));
+  await waitForPhase(page);
   const st = await state(page);
   for (let k = 0; k < 3; k++) assert.deepEqual(await page.evaluate((i) => window.ddp.robots[i].match.state, k), st, `robot ${k + 1} agrees`);
   assert.deepEqual(await leaks(page), []);
@@ -213,12 +195,12 @@ test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, k
   // The robots accept a rematch; dark mode still fits the phone.
   const m = await page.evaluate(() => window.ddp.match.m);
   await page.click("#rematch");
-  await wait(page, (n) => window.ddp.match.m === n + 1 && window.ddp.match.phase === "playing", m, 60_000);
+  await waitForState(page, (ddp, n) => ddp.match.m === n + 1 && ddp.match.phase === "playing", m, { timeout: 60_000 });
   await page.click("#theme-toggle");
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "dark");
   assert.ok(await noHorizontalScroll(page));
   await page.screenshot({ path: `${ARTIFACTS}/ce-15-robot-dark.png`, fullPage: true });
   await page.click("#leave");
   await page.locator("#play-friend").waitFor();
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

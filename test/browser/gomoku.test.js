@@ -6,38 +6,11 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll, pick } from "../helpers.js";
 
-const ARTIFACTS = path.resolve("test-artifacts");
-
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
+const skip = skipWithoutPlaywright();
 const at = (r, c) => r * 15 + c;
-const wait = (page, fn, arg, timeout = 20_000) => page.waitForFunction(fn, arg, { timeout });
 const moveCount = (page) => page.evaluate(() => window.ddp.match.state.moves.length);
-const noHorizontalScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
-// The settings fold to a summary line in the lobby card; open it first.
-async function pick(page, name, value) {
-  if (!(await page.locator("#gmk-settings[open]").count())) await page.click("#gmk-settings > summary");
-  await page.click(`#gmk-settings label:has(input[name="gmk-${name}"][value="${value}"])`);
-}
 const point = (i) => `.gmk-cell[data-i="${i}"]`;
 // Let the last stone finish growing and any toast fade before a screenshot.
 async function settle(page) {
@@ -45,27 +18,12 @@ async function settle(page) {
   await page.locator("#toast.show").waitFor({ state: "detached", timeout: 5000 });
 }
 
-test("two friends play Gomoku on the host's settings through the invite link, with a rematch and a stalled clock", { skip: !pw && "Playwright not installed", timeout: 150_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(name, nickname, opts = {}) {
-    const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, ...opts });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    await page.clock.install();
-    return page;
-  }
+test("two friends play Gomoku on the host's settings through the invite link, with a rematch and a stalled clock", { skip, timeout: 150_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
 
   // Host (desktop, light) picks 20 s a move, 3 min each and to start, then
   // creates a room; the friend (360 px phone, dark) opens the link.
-  const host = await open("host", "Ada", { colorScheme: "light" });
+  const host = await open("host", { nickname: "Ada", viewport: { width: 1200, height: 900 }, colorScheme: "light", clock: true });
   await host.goto(`${srv.base}/gomoku/`);
   await pick(host, "moveSeconds", 20);
   await pick(host, "gameSeconds", 180);
@@ -79,10 +37,9 @@ test("two friends play Gomoku on the host's settings through the invite link, wi
   const code = (await host.locator("#room-code").innerText()).trim();
   assert.match(invite, new RegExp(`/gomoku/\\?room=${code}&key=[\\w-]{22}$`));
 
-  const guest = await open("guest", "Bo", { viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "dark" });
-  await guest.goto(invite.replace(/^https?:\/\/[^/]+/, srv.base));
-  await guest.click("#join-room");
-  for (const page of [host, guest]) await wait(page, () => window.ddp.match?.phase === "playing");
+  const guest = await open("guest", { nickname: "Bo", phone: true, colorScheme: "dark", clock: true });
+  await joinByInvite(host, guest, srv);
+  for (const page of [host, guest]) await waitForState(page, (ddp) => ddp.match?.phase === "playing");
   assert.equal(await guest.locator(".gmk-cell").count(), 225);
   assert.equal(await guest.locator("#gmk-config").innerText(), "15 × 15, five in a row · 20 s a move · 3 min each", "the host's settings reach the friend");
   assert.equal(await host.locator("#gmk-config").innerText(), await guest.locator("#gmk-config").innerText());
@@ -100,8 +57,8 @@ test("two friends play Gomoku on the host's settings through the invite link, wi
 
   // Both browsers agree who starts (the host, by the room's setting).
   async function startedGame(m) {
-    await wait(host, (n) => window.ddp.match.m === n && window.ddp.match.phase === "playing", m);
-    await wait(guest, (n) => window.ddp.match.m === n && window.ddp.match.phase === "playing", m);
+    await waitForState(host, (ddp, n) => ddp.match.m === n && ddp.match.phase === "playing", m);
+    await waitForState(guest, (ddp, n) => ddp.match.m === n && ddp.match.phase === "playing", m);
     const first = await host.evaluate(() => window.ddp.match.state.first);
     assert.equal(await guest.evaluate(() => window.ddp.match.state.first), first, "both browsers agree who starts");
     assert.equal(first, 0);
@@ -114,7 +71,7 @@ test("two friends play Gomoku on the host's settings through the invite link, wi
     const base = await moveCount(host);
     for (let k = 0; k < cells.length; k++) {
       const page = k % 2 ? guest : host;
-      await wait(page, () => window.ddp.match.canMove());
+      await waitForState(page, (ddp) => ddp.match.canMove());
       if (k === keyboardAt) {
         // Arrow in from the point to the left, then Enter.
         await page.locator(point(cells[k] - 1)).focus();
@@ -126,11 +83,11 @@ test("two friends play Gomoku on the host's settings through the invite link, wi
       } else {
         await host.click(point(cells[k]));
       }
-      await wait(host, (n) => window.ddp.match.state.moves.length === n, base + k + 1);
-      await wait(guest, (n) => window.ddp.match.state.moves.length === n, base + k + 1);
+      await waitForState(host, (ddp, n) => ddp.match.state.moves.length === n, base + k + 1);
+      await waitForState(guest, (ddp, n) => ddp.match.state.moves.length === n, base + k + 1);
     }
-    await wait(host, () => window.ddp.match.phase === "over");
-    await wait(guest, () => window.ddp.match.phase === "over");
+    await waitForState(host, (ddp) => ddp.match.phase === "over");
+    await waitForState(guest, (ddp) => ddp.match.phase === "over");
     assert.deepEqual(await host.evaluate(() => window.ddp.match.state), await guest.evaluate(() => window.ddp.match.state));
   }
 
@@ -140,12 +97,12 @@ test("two friends play Gomoku on the host's settings through the invite link, wi
   assert.ok(await host.locator("#gmk-clocks").isVisible());
   assert.match(await host.locator("#gmk-clocks").innerText(), /\d:\d\d[\s\S]*\d+ s[\s\S]*\d:\d\d/);
   await host.click(point(at(7, 3)));
-  await wait(guest, () => window.ddp.match.canMove());
+  await waitForState(guest, (ddp) => ddp.match.canMove());
   await guest.tap(point(at(7, 3)), { force: true }); // aria-disabled, but a tap still lands
   await guest.locator("#toast.show").filter({ hasText: "taken" }).waitFor();
   assert.equal(await moveCount(guest), 1, "a taken point is refused locally");
   await guest.tap(point(at(9, 3)));
-  await wait(host, () => window.ddp.match.state.moves.length === 2);
+  await waitForState(host, (ddp) => ddp.match.state.moves.length === 2);
   await playOut([at(7, 4), at(9, 4), at(7, 5), at(9, 5), at(7, 6), at(9, 6), at(7, 7)], { keyboardAt: 2 });
   assert.deepEqual(await host.evaluate(() => window.ddp.match.state.line), [at(7, 3), at(7, 4), at(7, 5), at(7, 6), at(7, 7)]);
   assert.equal(await host.locator(".gmk-cell.win").count(), 5);
@@ -187,36 +144,26 @@ test("two friends play Gomoku on the host's settings through the invite link, wi
   await guest.tap("#rematch");
   await startedGame(3);
   await host.click(point(at(7, 7)));
-  await wait(guest, () => window.ddp.match.canMove());
+  await waitForState(guest, (ddp) => ddp.match.canMove());
   await guest.evaluate(() => (window.ddp.match.play = () => {}));
   await guest.clock.fastForward("00:21");
   await host.clock.fastForward("00:26");
-  await wait(host, () => window.ddp.match.phase === "aborted");
+  await waitForState(host, (ddp) => ddp.match.phase === "aborted");
   assert.equal(await host.locator("#result").innerText(), "Match stopped");
   assert.equal(await host.locator("#result-reason").innerText(), "Bo's clock ran out and their browser stopped answering.");
-  await wait(guest, () => window.ddp.match.phase === "aborted");
+  await waitForState(guest, (ddp) => ddp.match.phase === "aborted");
   assert.match(await guest.locator("#result-reason").innerText(), /your clock ran out/);
 
   // The friend closes the tab: the host is told.
   await guest.close();
   await host.locator("#ended").waitFor({ timeout: 20_000 });
   assert.match(await host.locator("#ended").innerText(), /Bo (left the game|.*lost)/);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("Gomoku vs the robot on a 360 px phone: a full game, then a loss on the move clock", { skip: !pw && "Playwright not installed", timeout: 90_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  const page = await (await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "light" })).newPage();
-  page.on("pageerror", (e) => errors.push(e.message));
-  await page.addInitScript(() => (globalThis.ddpRobotPace = 0.1));
-  await page.clock.install();
+test("Gomoku vs the robot on a 360 px phone: a full game, then a loss on the move clock", { skip, timeout: 90_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { phone: true, colorScheme: "light", clock: true });
 
   await page.goto(`${srv.base}/`);
   await page.click('.game-card[data-slug="gomoku"]');
@@ -227,7 +174,7 @@ test("Gomoku vs the robot on a 360 px phone: a full game, then a loss on the mov
   assert.ok(await noHorizontalScroll(page), "settings fit at 360 px");
   await page.screenshot({ path: `${ARTIFACTS}/gomoku-4-lobby-mobile.png`, fullPage: true });
   await page.click("#play-robot");
-  await wait(page, () => window.ddp.match?.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing");
   assert.match(await page.locator(".pb-players").innerText(), /Cleo[\s\S]*Robot/);
   // On a phone the names use the full width, from the scoreboard's left edge.
   const left = (sel) => page.locator(sel).evaluate((n) => n.getBoundingClientRect().left);
@@ -240,7 +187,7 @@ test("Gomoku vs the robot on a 360 px phone: a full game, then a loss on the mov
   // Take a winning point if there is one, block the robot's if it has one,
   // else grow a line from the centre.
   while ((await page.evaluate(() => window.ddp.match.phase)) === "playing") {
-    await wait(page, () => window.ddp.match.canMove() || window.ddp.match.phase !== "playing");
+    await waitForState(page, (ddp) => ddp.match.canMove() || ddp.match.phase !== "playing");
     const cell = await page.evaluate(() => {
       const { phase, me, state } = window.ddp.match;
       if (phase !== "playing") return -1;
@@ -264,9 +211,9 @@ test("Gomoku vs the robot on a 360 px phone: a full game, then a loss on the mov
     if (cell < 0) break;
     const n = await moveCount(page);
     await page.tap(point(cell));
-    await wait(page, (k) => window.ddp.match.state.moves.length > k, n);
+    await waitForState(page, (ddp, k) => ddp.match.state.moves.length > k, n);
   }
-  await wait(page, () => window.ddp.match.phase === "over");
+  await waitForState(page, (ddp) => ddp.match.phase === "over");
   const st = await page.evaluate(() => window.ddp.match.state);
   const counts = [0, 1].map((p) => st.board.filter((v) => v === p).length);
   assert.ok(counts[0] - counts[1] === 0 || counts[0] - counts[1] === 1, "the robot made one legal move per turn");
@@ -278,19 +225,19 @@ test("Gomoku vs the robot on a 360 px phone: a full game, then a loss on the mov
 
   // The robot accepts a rematch. This time let the 10 s move clock run out.
   await page.click("#rematch");
-  await wait(page, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing");
   await page.click("#theme-toggle");
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "dark");
   assert.ok(await noHorizontalScroll(page));
   await page.clock.fastForward(7000);
   await page.screenshot({ path: `${ARTIFACTS}/gomoku-6-robot-dark-clock.png`, fullPage: true });
   await page.clock.fastForward(4000);
-  await wait(page, () => window.ddp.match.phase === "over");
+  await waitForState(page, (ddp) => ddp.match.phase === "over");
   assert.equal(await page.evaluate(() => window.ddp.match.state.reason), "timeout");
   assert.equal(await page.locator("#result").innerText(), "You lost");
   assert.equal(await page.locator("#result-reason").innerText(), "Your clock ran out.");
   assert.match(await page.locator("#score").innerText(), /Robot\s+[1-2]/);
   await page.click("#leave");
   await page.locator("#play-friend").waitFor();
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

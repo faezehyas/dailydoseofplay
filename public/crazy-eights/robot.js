@@ -154,6 +154,6 @@ export function timeoutMove(state, me, face) {
 }
 
 // A robot seat that pauses as the view asks: delay() returns ms, or -1 to wait for the screen.
-export function startRobot(session, { rules, choose, delay, rng = Math.random }) {
+export function startRobot(session, { rules, choose, delay, rng }) {
   return startPacedRobot(session, { rules, choose, delay, rng, key: (st) => `${st.moves}:${st.drew}`, fallback: timeoutMove });
 }

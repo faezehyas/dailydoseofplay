@@ -5,24 +5,14 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll, pick, state, settled, spinUntilOver } from "./chutes-and-ladders.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, waitForPhase, waitForSameState, noHorizontalScroll, pick } from "../helpers.js";
+import { state, settled, spinUntilOver } from "./chutes-and-ladders.shared.js";
 
-test("Chutes and Ladders vs the robot on a 360 px phone: spinner, hops, sounds, mute and keyboard", { skip: !pw && "Playwright not installed", timeout: 240_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling", "--autoplay-policy=no-user-gesture-required"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "light" });
-  await ctx.addInitScript(() => (window.ddpSounds = []));
-  await ctx.addInitScript(() => (globalThis.ddpRobotPace = 0.1));
-  const page = await ctx.newPage();
-  page.on("pageerror", (e) => errors.push(e.message));
+const skip = skipWithoutPlaywright();
+
+test("Chutes and Ladders vs the robot on a 360 px phone: spinner, hops, sounds, mute and keyboard", { skip, timeout: 240_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { phone: true, colorScheme: "light", init: () => (window.ddpSounds = []) });
   const heard = () => page.evaluate(() => window.ddpSounds.slice());
 
   await page.goto(`${srv.base}/`);
@@ -32,7 +22,7 @@ test("Chutes and Ladders vs the robot on a 360 px phone: spinner, hops, sounds, 
   assert.ok(await noHorizontalScroll(page), "settings fit at 360 px");
   await page.screenshot({ path: `${ARTIFACTS}/cl-3-settings-mobile-light.png`, fullPage: true });
   await page.click("#play-robot");
-  await wait(page, () => window.ddp.match?.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing");
   assert.match(await page.locator(".pb-players").innerText(), /Cleo[\s\S]*Robot/);
   assert.equal(await page.locator("#cl-config").innerText(), "exact spin to finish · one spin a turn");
   assert.ok(await noHorizontalScroll(page));
@@ -42,10 +32,10 @@ test("Chutes and Ladders vs the robot on a 360 px phone: spinner, hops, sounds, 
   await page.tap("#cl-spin");
   await page.locator("#cl-status").filter({ hasText: "Spinning" }).waitFor();
   assert.ok(await page.locator("#cl-spin").isDisabled(), "one spin at a time");
-  await wait(page, () => window.ddp.match.state.ply >= 1);
+  await waitForState(page, (ddp) => ddp.match.state.ply >= 1);
   const first = (await state(page)).last;
-  await wait(page, (n) => document.querySelector("#cl-spin-value").textContent === String(n), first.spin);
-  await wait(page, () => window.ddp.match.state.turn === 0 && window.ddp.match.state.ply >= 2, undefined, 30_000);
+  await waitForState(page, (_, n) => document.querySelector("#cl-spin-value").textContent === String(n), first.spin);
+  await waitForState(page, (ddp) => ddp.match.state.turn === 0 && ddp.match.state.ply >= 2, undefined, { timeout: 30_000 });
   await settled(page);
   await page.screenshot({ path: `${ARTIFACTS}/cl-4-robot-mobile-light.png`, fullPage: true });
   const sounds = await heard();
@@ -61,8 +51,8 @@ test("Chutes and Ladders vs the robot on a 360 px phone: spinner, hops, sounds, 
   const before = (await heard()).length;
   await page.locator("#cl-spin").focus();
   await page.keyboard.press("Enter");
-  await wait(page, () => window.ddp.match.state.ply >= 3);
-  await wait(page, () => window.ddp.match.state.turn === 0 || window.ddp.match.phase !== "playing", undefined, 30_000);
+  await waitForState(page, (ddp) => ddp.match.state.ply >= 3);
+  await waitForState(page, (ddp) => ddp.match.state.turn === 0 || ddp.match.phase !== "playing", undefined, { timeout: 30_000 });
   await settled(page);
   assert.equal((await heard()).length, before, "no sound while muted");
   await page.click("#sound-toggle");
@@ -70,6 +60,8 @@ test("Chutes and Ladders vs the robot on a 360 px phone: spinner, hops, sounds, 
   // The rest of the game at speed: reduced motion plays each spin out at once.
   await page.emulateMedia({ reducedMotion: "reduce" });
   await spinUntilOver(page, { tap: true });
+  // The last spin reaches the robot's table after mine: wait for its match to end too.
+  await waitForPhase(page);
   const st = await state(page);
   assert.equal(st.pos[st.winner], 100);
   assert.equal(await page.evaluate(() => window.ddp.robot.match.state.ply), st.ply, "the robot saw every spin");
@@ -81,7 +73,7 @@ test("Chutes and Ladders vs the robot on a 360 px phone: spinner, hops, sounds, 
 
   // The robot accepts a rematch; dark mode still fits the phone.
   await page.click("#rematch");
-  await wait(page, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing");
   assert.deepEqual((await state(page)).pos, [0, 0]);
   await page.click("#theme-toggle");
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "dark");
@@ -89,32 +81,25 @@ test("Chutes and Ladders vs the robot on a 360 px phone: spinner, hops, sounds, 
   await page.screenshot({ path: `${ARTIFACTS}/cl-6-robot-dark.png`, fullPage: true });
   await page.click("#leave");
   await page.locator("#play-friend").waitFor();
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("Chutes and Ladders against three robots", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  const page = await (await browser.newContext({ viewport: { width: 360, height: 740 }, reducedMotion: "reduce" })).newPage();
-  page.on("pageerror", (e) => errors.push(e.message));
-  await page.addInitScript(() => (globalThis.ddpRobotPace = 0.1));
+test("Chutes and Ladders against three robots", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { viewport: { width: 360, height: 740 }, reducedMotion: "reduce" });
   await page.goto(`${srv.base}/chutes-and-ladders/`);
   await page.click('label:has(input[name="cl-players"][value="4"])');
   await page.click("#play-robot");
-  await wait(page, () => window.ddp.match?.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing");
   assert.match(await page.locator(".pb-players").innerText(), /Robot 1[\s\S]*Robot 2[\s\S]*Robot 3/);
   assert.ok(await noHorizontalScroll(page));
   await spinUntilOver(page);
-  const st = await state(page);
+  // The last spin reaches the robots' tables after mine: wait until they agree.
+  const st = await waitForSameState(page);
   assert.equal(st.players, 4);
   assert.equal(st.pos[st.winner], 100);
   for (let k = 0; k < 3; k++) assert.deepEqual(await page.evaluate((k) => window.ddp.robots[k].match.state, k), st, `robot ${k + 1} agrees`);
   await page.locator("#result").waitFor();
   await page.screenshot({ path: `${ARTIFACTS}/cl-9-three-robots.png`, fullPage: true });
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

@@ -6,29 +6,9 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser } from "../helpers.js";
 
-const ARTIFACTS = path.resolve("test-artifacts");
-
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
+const skip = skipWithoutPlaywright();
 const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
 const SCREENS = [
@@ -41,18 +21,10 @@ const GAMES = [
 ];
 
 for (const { width, height, colorScheme } of SCREENS) {
-  test(`at ${width} px a toast sits below the header, clear of its buttons and the board`, { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-    mkdirSync(ARTIFACTS, { recursive: true });
-    const srv = await startServer();
-    const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-    t.after(async () => {
-      await browser.close();
-      await srv.close();
-    });
-    const errors = [];
+  test(`at ${width} px a toast sits below the header, clear of its buttons and the board`, { skip, timeout: 60_000 }, async (t) => {
+    const { srv, open, assertNoErrors } = await openBrowser(t);
     for (const game of GAMES) {
-      const page = await browser.newPage({ viewport: { width, height }, colorScheme });
-      page.on("pageerror", (e) => errors.push(`${game.slug}: ${e.message}`));
+      const page = await open(game.slug, { viewport: { width, height }, colorScheme });
       await page.goto(`${srv.base}/${game.slug}/`);
       await page.click("#play-robot");
       await page.locator("#toast.show").waitFor();
@@ -72,18 +44,13 @@ for (const { width, height, colorScheme } of SCREENS) {
       await page.screenshot({ path: `${ARTIFACTS}/toast-${game.slug}-${width}-${colorScheme}.png` });
       await page.close();
     }
-    assert.deepEqual(errors, []);
+    assertNoErrors();
   });
 }
 
-test("a repeated toast empties and fills again, so it is announced again", { skip: !pw && "Playwright not installed", timeout: 30_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const page = await browser.newPage({ viewport: { width: 360, height: 640 } });
+test("a repeated toast empties and fills again, so it is announced again", { skip, timeout: 30_000 }, async (t) => {
+  const { srv, open } = await openBrowser(t);
+  const page = await open("player", { viewport: { width: 360, height: 640 } });
   await page.goto(`${srv.base}/`);
   const texts = await page.evaluate(async () => {
     const { toast } = await import("/engine/shell.js");

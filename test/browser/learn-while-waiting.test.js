@@ -7,32 +7,19 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { startServer } from "../helpers.js";
-import { pw, wait, noHorizontalScroll } from "./ludo.shared.js";
+import { skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll } from "../helpers.js";
+
+const skip = skipWithoutPlaywright();
 
 async function setup(t) {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(nickname, opts = {}) {
-    const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true, reducedMotion: "reduce", ...opts });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${nickname}: ${e.message}`));
-    page.on("console", (m) => m.type() === "error" && errors.push(`${nickname}: ${m.text()}`));
-    return page;
-  }
-  return { srv, open, errors };
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  return { srv, assertNoErrors, open: (nickname, opts = {}) => open(nickname, { nickname, phone: true, reducedMotion: "reduce", ...opts }) };
 }
 
 const focused = (page) => page.evaluate(() => document.activeElement.id || document.activeElement.textContent);
 
-test("a friend joining closes the host's tutorial with a note; starting the game closes the friend's", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
+test("a friend joining closes the host's tutorial with a note; starting the game closes the friend's", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
   const host = await open("Ada");
   await host.goto(`${srv.base}/ludo/`);
   await host.click("#play-friend");
@@ -47,10 +34,8 @@ test("a friend joining closes the host's tutorial with a note; starting the game
   await host.locator(".tut-step").waitFor();
   assert.ok(await noHorizontalScroll(host));
 
-  const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
   const bo = await open("Bo", { viewport: { width: 1280, height: 900 }, hasTouch: false, colorScheme: "dark" });
-  await bo.goto(invite);
-  await bo.click("#join-room");
+  await joinByInvite(host, bo, srv);
   await host.locator("#toast", { hasText: "Bo joined" }).waitFor({ state: "attached" });
   await host.locator("#lobby").waitFor();
   assert.equal(await host.locator(".tut-stage").count(), 0, "the tutorial closed");
@@ -64,15 +49,15 @@ test("a friend joining closes the host's tutorial with a note; starting the game
   await bo.keyboard.press("Enter");
   await bo.locator("#tut-lessons-list").waitFor();
   await host.click("#start-game");
-  for (const p of [host, bo]) await wait(p, () => window.ddp.match?.phase === "playing");
+  for (const p of [host, bo]) await waitForState(p, (ddp) => ddp.match?.phase === "playing");
   assert.equal(await bo.locator("#tut-lessons-list").count(), 0, "the friend's tutorial closed");
   assert.equal(await bo.evaluate(() => window.ddp.tutorial), null);
   assert.deepEqual(await bo.evaluate(() => history.state), { game: "ludo" }, "the game took the tutorial's history entry");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("leaving the tutorial, by its button or Back, keeps the room code and seats", { skip: !pw && "Playwright not installed", timeout: 90_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
+test("leaving the tutorial, by its button or Back, keeps the room code and seats", { skip, timeout: 90_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
   const host = await open("Ada", { viewport: { width: 1280, height: 900 }, hasTouch: false, colorScheme: "dark" });
   await host.goto(`${srv.base}/ludo/`);
   await host.click("#play-friend");
@@ -97,5 +82,5 @@ test("leaving the tutorial, by its button or Back, keeps the room code and seats
   assert.deepEqual(await room(), before);
   assert.equal(await focused(host), "learn-wait");
   assert.equal(await host.evaluate(() => window.ddp.room?.code), before.code, "the room stays open");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

@@ -6,27 +6,16 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll, pick, bg, state, yardCorner, resultInView, autoplay, stopAutoplay } from "./ludo.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll, pick } from "../helpers.js";
+import { bg, state, yardCorner, resultInView, autoplay, stopAutoplay } from "./ludo.shared.js";
 
-test("two friends play Ludo on the host's house rules through the invite link, then a rematch", { skip: !pw && "Playwright not installed", timeout: 300_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(name, nickname, opts = {}) {
-    // Reduced motion applies every move at once, so whole games fit the test.
-    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, reducedMotion: "reduce", ...opts });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    return page;
-  }
+const skip = skipWithoutPlaywright();
+const laptop = { width: 1366, height: 900 };
+
+test("two friends play Ludo on the host's house rules through the invite link, then a rematch", { skip, timeout: 300_000 }, async (t) => {
+  const { srv, open: openPage, assertNoErrors } = await openBrowser(t);
+  // Reduced motion applies every move at once, so whole games fit the test.
+  const open = (name, nickname, opts = {}) => openPage(name, { nickname, viewport: laptop, reducedMotion: "reduce", ...opts });
 
   // Host (laptop, light) turns on blocks and the capture bonus, and starts.
   const host = await open("host", "Ada", { colorScheme: "light" });
@@ -46,13 +35,12 @@ test("two friends play Ludo on the host's house rules through the invite link, t
     ["Blocks", "A capture rolls again", "Play for places", "You go first", "No move limit"],
     "the waiting screen leaves out what only applies to robots",
   );
-  const invite = await host.locator("#invite-link").inputValue();
+  const { invite } = await joinByInvite(host, [], srv);
   assert.match(invite, /\/ludo\/\?room=[A-Z0-9]{4}&key=[\w-]{22}$/);
 
   // The friend (360 px phone, dark) opens the link; the host presses Start with two in.
   const guest = await open("guest", "Bo", { viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "dark" });
-  await guest.goto(invite.replace(/^https?:\/\/[^/]+/, srv.base));
-  await guest.click("#join-room");
+  await joinByInvite(host, guest, srv);
   await host.locator("#roster li.ready", { hasText: "Bo" }).waitFor();
   assert.match(await host.locator("#start-game").innerText(), /2 players/);
   await host.click("#start-game");
@@ -76,13 +64,13 @@ test("two friends play Ludo on the host's house rules through the invite link, t
   assert.notEqual(await bg(host), await bg(guest));
 
   async function startedGame(m) {
-    for (const p of [host, guest]) await wait(p, (n) => window.ddp.match.m === n && window.ddp.match.phase === "playing", m);
+    for (const p of [host, guest]) await waitForState(p, (ddp, n) => ddp.match.m === n && ddp.match.phase === "playing", m);
     assert.equal((await state(host)).first, 0, "the room says the host rolls first");
     assert.equal((await state(guest)).first, 0);
   }
   async function finish() {
     await Promise.all([autoplay(host), autoplay(guest)]);
-    for (const p of [host, guest]) await wait(p, () => window.ddp.match.phase === "over", undefined, 120_000);
+    for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match.phase === "over", undefined, { timeout: 120_000 });
     await Promise.all([stopAutoplay(host), stopAutoplay(guest)]);
     const [a, b] = [await state(host), await state(guest)];
     assert.deepEqual(a, b, "both browsers end on the same state");
@@ -129,35 +117,19 @@ test("two friends play Ludo on the host's house rules through the invite link, t
   await host.locator("#toast", { hasText: /Bo left|connection to Bo was lost/ }).waitFor({ state: "attached", timeout: 20_000 });
   await host.locator(".pb-name", { hasText: "Bo (robot)" }).waitFor();
   assert.equal(await host.locator("#ended").count(), 0);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("a four-seat Ludo room: two friends join by the invite key, a third types the code and is let in from the player list", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(nickname) {
-    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, reducedMotion: "reduce" });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${nickname}: ${e.message}`));
-    return page;
-  }
+test("a four-seat Ludo room: two friends join by the invite key, a third types the code and is let in from the player list", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open: openPage, assertNoErrors } = await openBrowser(t);
+  const open = (nickname) => openPage(nickname, { nickname, viewport: laptop, reducedMotion: "reduce" });
   const host = await open("Ada");
   await host.goto(`${srv.base}/ludo/`);
-  await host.click("#play-friend");
-  await host.locator("#room-code").waitFor();
-  const code = (await host.locator("#room-code").innerText()).trim();
-  const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
+  const { code } = await joinByInvite(host, [], srv);
   const friends = [];
   for (const name of ["Bo", "Cy"]) {
     const page = await open(name);
-    await page.goto(invite);
-    await page.click("#join-room");
+    await joinByInvite(host, page, srv);
     await host.locator("#roster li.ready", { hasText: name }).waitFor();
     friends.push(page);
   }
@@ -175,7 +147,7 @@ test("a four-seat Ludo room: two friends join by the invite key, a third types t
 
   // Di fills the room, so the game starts by itself.
   const pages = [host, ...friends, di];
-  for (const p of pages) await wait(p, () => window.ddp.match?.phase === "playing");
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match?.phase === "playing");
   assert.deepEqual(await Promise.all(pages.map((p) => p.evaluate(() => window.ddp.session.index))), [0, 1, 2, 3]);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

@@ -6,34 +6,30 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { startServer } from "../helpers.js";
-import { pw, wait, state, autoplay, stopAutoplay } from "./go-fish.shared.js";
+import { skipWithoutPlaywright, openBrowser, waitForState } from "../helpers.js";
+import { state, autoplay, stopAutoplay } from "./go-fish.shared.js";
 
-test("Go Fish with animations off and robots at full speed: a whole game is only the deck's own work", { skip: !pw && "Playwright not installed", timeout: 180_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
+const skip = skipWithoutPlaywright();
+
+test("Go Fish with animations off and robots at full speed: a whole game is only the deck's own work", { skip, timeout: 180_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("page", {
+    viewport: { width: 1366, height: 900 },
+    reducedMotion: "reduce",
+    robotPace: 0.001,
+    init: () => {
+      localStorage.setItem("ddp-go-fish-settings", JSON.stringify({ robots: 3, level: "hard" }));
+      // Count every scripted animation and every card that would fly.
+      window.animations = 0;
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (...args) {
+        window.animations++;
+        return animate.apply(this, args);
+      };
+    },
   });
-  const errors = [];
-  const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, reducedMotion: "reduce" });
-  await ctx.addInitScript(() => {
-    globalThis.ddpRobotPace = 0.001;
-    localStorage.setItem("ddp-go-fish-settings", JSON.stringify({ robots: 3, level: "hard" }));
-    // Count every scripted animation and every card that would fly.
-    window.animations = 0;
-    const animate = Element.prototype.animate;
-    Element.prototype.animate = function (...args) {
-      window.animations++;
-      return animate.apply(this, args);
-    };
-  });
-  const page = await ctx.newPage();
-  page.on("pageerror", (e) => errors.push(e.message));
-  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   await page.goto(`${srv.base}/go-fish/?robot=1`);
-  await wait(page, () => window.ddp.match?.phase === "playing", undefined, 60_000);
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing", undefined, { timeout: 60_000 });
   await page.evaluate(() => {
     window.flown = 0;
     new MutationObserver((list) => list.forEach((r) => (window.flown += r.addedNodes.length))).observe(document.querySelector(".gf-fly"), { childList: true });
@@ -60,10 +56,10 @@ test("Go Fish with animations off and robots at full speed: a whole game is only
   });
   const t0 = Date.now();
   await autoplay(page);
-  await wait(page, () => window.ddp.match.phase === "over", undefined, 150_000);
+  await waitForState(page, (ddp) => ddp.match.phase === "over", undefined, { timeout: 150_000 });
   await stopAutoplay(page);
   const played = Date.now() - t0;
-  await wait(page, () => window.ddp.match.verdict, undefined, 60_000);
+  await waitForState(page, (ddp) => ddp.match.verdict, undefined, { timeout: 60_000 });
   assert.deepEqual(await page.evaluate(() => window.ddp.match.verdict), { ok: true });
   const st = await state(page);
   const { animations, flown, turns } = await page.evaluate(() => ({ animations: window.animations, flown: window.flown, turns: window.turns }));
@@ -74,5 +70,5 @@ test("Go Fish with animations off and robots at full speed: a whole game is only
   const slowest = Math.max(...idle);
   t.diagnostic(`${st.moves} moves in ${played} ms (${Math.round(played / st.moves)} ms a move); slowest turn outside the deck's work ${Math.round(slowest)} ms`);
   assert.ok(slowest < 400, `a turn waited ${Math.round(slowest)} ms for something other than the deck`);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

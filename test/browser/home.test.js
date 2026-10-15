@@ -9,44 +9,18 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import { mkdirSync, readFileSync } from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { readFileSync } from "node:fs";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState } from "../helpers.js";
 
-const ARTIFACTS = path.resolve("test-artifacts");
 const { games } = JSON.parse(readFileSync("public/games.json", "utf8"));
 
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
+const skip = skipWithoutPlaywright();
 
-const pw = await loadPlaywright();
-
-test("home page tiles are all the same size", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
+test("home page tiles are all the same size", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
 
   for (const width of [1280, 768, 560, 360]) {
-    const page = await browser.newPage({ viewport: { width, height: 900 } });
-    page.on("pageerror", (e) => errors.push(`${width}: ${e.message}`));
+    const page = await open(`${width}`, { viewport: { width, height: 900 } });
     await page.goto(`${srv.base}/`);
     await page.locator(".game-card[data-slug]").nth(games.length - 1).waitFor();
     const cards = await page.locator(".game-card[data-slug]").evaluateAll((els) =>
@@ -93,7 +67,7 @@ test("home page tiles are all the same size", { skip: !pw && "Playwright not ins
     await page.screenshot({ path: `${ARTIFACTS}/home-${width}.png`, fullPage: true });
     await page.close();
   }
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
 // Holds every games.json request until release() is called (or fails it),
@@ -118,21 +92,13 @@ function tileHeights(page, selector) {
   return page.locator(selector).evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
 }
 
-test("home page shows placeholders while loading and a Retry button on failure", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
+test("home page shows placeholders while loading and a Retry button on failure", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, errors } = await openBrowser(t);
 
   // A wide font stands in for the fallback fonts on Linux and Windows, where a
   // long game name could otherwise wrap and make its tile taller.
   for (const [width, font] of [[1280], [360], [768, "monospace"]]) {
-    const page = await browser.newPage({ viewport: { width, height: 900 } });
-    page.on("pageerror", (e) => errors.push(`${width}: ${e.message}`));
+    const page = await open(`${width}`, { viewport: { width, height: 900 } });
 
     // Slow list: placeholders first, then real tiles in the same places.
     let release = await holdGames(page);
@@ -173,24 +139,18 @@ test("home page shows placeholders while loading and a Retry button on failure",
   }
 
   // Reduced motion: the placeholders hold still.
-  const page = await browser.newPage({ reducedMotion: "reduce" });
+  const page = await open("reduced motion", { reducedMotion: "reduce" });
   const release = await holdGames(page);
   await page.goto(`${srv.base}/`);
   assert.equal(await page.locator(".game-card.placeholder .game-icon").first().evaluate((e) => getComputedStyle(e).animationName), "none");
   release();
   await page.close();
-  assert.deepEqual(errors, []);
+  // The failed games.json the test serves on purpose is logged as a console error.
+  assert.deepEqual(errors.filter((e) => !e.endsWith("status of 500 (Internal Server Error)")), []);
 });
 
-test("the hero scene loops, plays a move on hover and pauses when unseen", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
+test("the hero scene loops, plays a move on hover and pauses when unseen", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
   const states = (page) => page.evaluate(() => [...new Set(document.querySelector(".hero-scene").getAnimations({ subtree: true }).map((a) => a.playState))]);
   const setHidden = (page, hidden) =>
     page.evaluate((hidden) => {
@@ -198,8 +158,7 @@ test("the hero scene loops, plays a move on hover and pauses when unseen", { ski
       document.dispatchEvent(new Event("visibilitychange"));
     }, hidden);
 
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  page.on("pageerror", (e) => errors.push(e.message));
+  const page = await open("page", { viewport: { width: 1280, height: 800 } });
   await page.goto(`${srv.base}/`);
   const scene = page.locator(".hero-scene");
   assert.equal(await scene.getAttribute("aria-hidden"), "true");
@@ -211,10 +170,10 @@ test("the hero scene loops, plays a move on hover and pauses when unseen", { ski
   await page.mouse.move(0, 0);
 
   await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
-  await page.waitForFunction(() => document.querySelector(".hero-scene").classList.contains("paused"));
+  await waitForState(page, () => document.querySelector(".hero-scene").classList.contains("paused"));
   assert.deepEqual(await states(page), ["paused"], "off screen");
   await page.evaluate(() => scrollTo(0, 0));
-  await page.waitForFunction(() => !document.querySelector(".hero-scene").classList.contains("paused"));
+  await waitForState(page, () => !document.querySelector(".hero-scene").classList.contains("paused"));
   await setHidden(page, true);
   assert.deepEqual(await states(page), ["paused"], "hidden tab");
   await setHidden(page, false);
@@ -224,8 +183,7 @@ test("the hero scene loops, plays a move on hover and pauses when unseen", { ski
   // Reduced motion: a still scene, at each size and theme.
   for (const colorScheme of ["light", "dark"]) {
     for (const width of [360, 1280]) {
-      const still = await browser.newPage({ viewport: { width, height: 800 }, colorScheme, reducedMotion: "reduce" });
-      still.on("pageerror", (e) => errors.push(e.message));
+      const still = await open(`still ${width} ${colorScheme}`, { viewport: { width, height: 800 }, colorScheme, reducedMotion: "reduce" });
       await still.goto(`${srv.base}/`);
       await still.locator(".hero-scene .piece").nth(2).hover();
       assert.equal(await still.locator(".hero-scene").evaluate((e) => e.getAnimations({ subtree: true }).length), 0, `${width} px ${colorScheme}: no animations`);
@@ -233,5 +191,5 @@ test("the hero scene loops, plays a move on hover and pauses when unseen", { ski
       await still.close();
     }
   }
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

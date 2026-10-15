@@ -7,22 +7,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { noHorizontalScroll, pw } from "./ludo.shared.js";
+import { skipWithoutPlaywright, openBrowser, noHorizontalScroll } from "../helpers.js";
 
 const GAMES = JSON.parse(readFileSync(new URL("../../public/games.json", import.meta.url), "utf8")).games.filter((g) => g.status === "ready");
 const SECTIONS = ["Goal", "Players", "Setup", "On your turn", "Winning", "Settings and clocks", "Fair play", "Keyboard"];
+const skip = skipWithoutPlaywright();
 
-test("every game's How to play has the same sections, and the lobby link opens it", { skip: !pw && "Playwright not installed", timeout: 90_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const page = await browser.newPage({ viewport: { width: 360, height: 740 } });
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+test("every game's How to play has the same sections, and the lobby link opens it", { skip, timeout: 90_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("page", { viewport: { width: 360, height: 740 } });
   for (const game of GAMES) {
     await page.goto(`${srv.base}/${game.slug}/`);
     const headings = await page.locator("details.rules > h3").allTextContents();
@@ -50,5 +43,5 @@ test("every game's How to play has the same sections, and the lobby link opens i
   await page.keyboard.press("Enter");
   assert.equal(await page.locator("details.rules").evaluate((d) => d.open), true, "Enter opens the panel");
   assert.equal(await page.evaluate(() => document.activeElement.textContent), "How to play");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

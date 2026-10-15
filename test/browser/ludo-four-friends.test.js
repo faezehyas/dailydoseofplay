@@ -4,37 +4,21 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll, state, yardCorner, resultInView, autoplay, stopAutoplay } from "./ludo.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll } from "../helpers.js";
+import { state, yardCorner, resultInView, autoplay, stopAutoplay } from "./ludo.shared.js";
 
-test("four friends fill a Ludo room in four browsers and play for places, then one leaves", { skip: !pw && "Playwright not installed", timeout: 360_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(nickname, opts = {}) {
-    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, reducedMotion: "reduce", ...opts });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${nickname}: ${e.message}`));
-    return page;
-  }
+const skip = skipWithoutPlaywright();
+
+test("four friends fill a Ludo room in four browsers and play for places, then one leaves", { skip, timeout: 360_000 }, async (t) => {
+  const { srv, open: openPage, assertNoErrors } = await openBrowser(t);
+  const open = (nickname, opts = {}) => openPage(nickname, { nickname, viewport: { width: 1366, height: 900 }, reducedMotion: "reduce", ...opts });
   const host = await open("Ada");
   await host.goto(`${srv.base}/ludo/`);
   assert.equal(await host.locator("#play-friend").innerText(), "Play with friends");
-  await host.click("#play-friend");
-  await host.locator("#room-code").waitFor();
-  const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
   const friends = [];
   for (const [name, opts] of [["Bo", { viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "dark" }], ["Cy", {}], ["Di", {}]]) {
     const page = await open(name, opts);
-    await page.goto(invite);
-    await page.click("#join-room");
+    await joinByInvite(host, page, srv);
     friends.push(page);
     if (friends.length === 2) {
       // Three in: the host could start now.
@@ -45,7 +29,7 @@ test("four friends fill a Ludo room in four browsers and play for places, then o
   }
   // The fourth player fills the room, so the game starts by itself.
   const pages = [host, ...friends];
-  for (const p of pages) await wait(p, () => window.ddp.match?.phase === "playing");
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match?.phase === "playing");
   assert.deepEqual(await Promise.all(pages.map((p) => p.evaluate(() => window.ddp.session.index))), [0, 1, 2, 3]);
   const colors = ["red", "green", "yellow", "blue"];
   for (const [seat, p] of pages.entries()) {
@@ -62,18 +46,18 @@ test("four friends fill a Ludo room in four browsers and play for places, then o
 
   await Promise.all(pages.map(autoplay));
   // Mid-game, on the phone.
-  await wait(friends[0], () => window.ddp.match.state.tokens.flat().filter((r) => r >= 0).length >= 6, undefined, 120_000);
+  await waitForState(friends[0], (ddp) => ddp.match.state.tokens.flat().filter((r) => r >= 0).length >= 6, undefined, { timeout: 120_000 });
   // Bo only rolls now, until a token waits to be picked.
   await friends[0].evaluate(() => {
     clearInterval(window.__autoplay);
     window.__autoplay = setInterval(() => document.querySelector("#ld-roll:not(:disabled)")?.click(), 30);
   });
-  await wait(friends[0], () => document.querySelectorAll(".hit-token").length > 1 || window.ddp.match.phase !== "playing", undefined, 120_000);
+  await waitForState(friends[0], (ddp) => document.querySelectorAll(".hit-token").length > 1 || ddp.match.phase !== "playing", undefined, { timeout: 120_000 });
   await stopAutoplay(friends[0]);
   await friends[0].waitForTimeout(300);
   await friends[0].screenshot({ path: `${ARTIFACTS}/ld-5-four-mobile-midgame.png`, fullPage: true });
   await autoplay(friends[0]);
-  for (const p of pages) await wait(p, () => window.ddp.match.phase === "over", undefined, 240_000);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match.phase === "over", undefined, { timeout: 240_000 });
   await Promise.all(pages.map(stopAutoplay));
   const states = await Promise.all(pages.map(state));
   for (const st of states.slice(1)) assert.deepEqual(st, states[0], "all four browsers end on the same state");
@@ -96,9 +80,9 @@ test("four friends fill a Ludo room in four browsers and play for places, then o
   await friends[2].locator("#rematch-status").filter({ hasText: "Ada, Bo and Cy want a rematch!" }).waitFor();
   await host.locator("#rematch-status").filter({ hasText: "Waiting for Di" }).waitFor();
   await friends[2].click("#rematch");
-  for (const p of pages) await wait(p, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing");
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing");
   await Promise.all(pages.map(autoplay));
-  await wait(host, () => window.ddp.match.state.ply >= 40, undefined, 60_000);
+  await waitForState(host, (ddp) => ddp.match.state.ply >= 40, undefined, { timeout: 60_000 });
   await Promise.all(pages.map(stopAutoplay));
   await friends[1].close();
   for (const p of [host, friends[0], friends[2]]) await p.locator(".pb-name", { hasText: "Cy (robot)" }).waitFor({ timeout: 20_000 });
@@ -109,5 +93,5 @@ test("four friends fill a Ludo room in four browsers and play for places, then o
     assert.match(await p.locator("#ld-ended").innerText(), /through Ada's browser, so the game is over for all 4 of you[\s\S]*Ada: \d\/4 home \(left\)/);
   }
   await friends[0].screenshot({ path: `${ARTIFACTS}/ld-8-four-left-mobile.png` });
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

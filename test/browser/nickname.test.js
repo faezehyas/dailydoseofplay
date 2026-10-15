@@ -5,41 +5,14 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll } from "../helpers.js";
 
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
+const skip = skipWithoutPlaywright();
+const desk = { width: 1280, height: 900 };
 const names = (page) => page.evaluate(() => window.ddp.session.players.map((p) => p.name));
 
-test("the lobby explains a blocked nickname, and a friend game shows friendly default names instead", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(name, opts = {}) {
-    const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 }, ...opts })).newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    return page;
-  }
+test("the lobby explains a blocked nickname, and a friend game shows friendly default names instead", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
 
   // On a phone: each kind of problem gets its own line under the field, and a good name clears it.
   const host = await open("host", { viewport: { width: 360, height: 760 }, hasTouch: true });
@@ -52,50 +25,32 @@ test("the lobby explains a blocked nickname, and a friend game shows friendly de
   }
   await host.fill("#nickname", "Ada");
   assert.equal(await problem.isVisible(), false);
-  assert.equal(await host.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, "no sideways scroll");
+  assert.equal(await noHorizontalScroll(host), true, "no sideways scroll");
 
   // A blocked name is never stored, and the host plays under a default name.
   await host.fill("#nickname", "f.u.c.k");
   await host.locator("#nickname").blur();
   assert.equal(await host.evaluate(() => localStorage.getItem("ddp-name")), null);
-  await host.click("#play-friend");
-  const invite = await host.locator("#invite-link").inputValue();
 
   // A name stored before this rule existed is not used either.
-  const guest = await open("guest");
-  await guest.addInitScript(() => localStorage.setItem("ddp-name", "BigAss"));
-  await guest.goto(invite.replace(/^https?:\/\/[^/]+/, srv.base));
-  await guest.click("#join-room");
-  await guest.waitForFunction(() => window.ddp.session, null, { timeout: 20_000 });
-  await host.waitForFunction(() => window.ddp.session, null, { timeout: 20_000 });
+  const guest = await open("guest", { nickname: "BigAss", viewport: desk });
+  await joinByInvite(host, guest, srv);
+  await waitForState(guest, (ddp) => ddp.session);
+  await waitForState(host, (ddp) => ddp.session);
   const [hostName, guestName] = await names(host);
   assert.deepEqual(await names(guest), [hostName, guestName]);
   for (const name of [hostName, guestName]) assert.match(name, /^[A-Z][a-z]+ [A-Z][a-z]+$/);
   for (const page of [host, guest]) assert.doesNotMatch(await page.locator("body").innerText(), /f\.u\.c\.k|BigAss/);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("a friend opening an invite link picks a nickname before joining", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(name, nickname) {
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-    if (nickname) await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    return page;
-  }
+test("a friend opening an invite link picks a nickname before joining", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open: openPage, assertNoErrors } = await openBrowser(t);
+  const open = (name, nickname) => openPage(name, { nickname, viewport: desk });
 
   const host = await open("host", "Ada");
   await host.goto(`${srv.base}/tic-tac-toe/`);
-  await host.click("#play-friend");
-  const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
-  const code = (await host.locator("#room-code").innerText()).trim();
+  const { code, invite } = await joinByInvite(host, [], srv);
 
   // A returning friend sees their saved name, ready to change.
   const returning = await open("returning", "Cy");
@@ -114,40 +69,25 @@ test("a friend opening an invite link picks a nickname before joining", { skip: 
 
   await guest.fill("#nickname", "Bo");
   await guest.press("#nickname", "Enter");
-  await guest.waitForFunction(() => window.ddp.session, null, { timeout: 20_000 });
-  await host.waitForFunction(() => window.ddp.session, null, { timeout: 20_000 });
+  await waitForState(guest, (ddp) => ddp.session);
+  await waitForState(host, (ddp) => ddp.session);
   assert.deepEqual(await names(host), ["Ada", "Bo"]);
   assert.deepEqual(await names(guest), ["Ada", "Bo"]);
   assert.equal(await guest.evaluate(() => localStorage.getItem("ddp-name")), "Bo", "the name is kept for next time");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("a toast with a 20-letter nickname stays on a 360px screen", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(name, nickname) {
-    const ctx = await browser.newContext({ viewport: { width: 360, height: 780 }, hasTouch: true });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    return page;
-  }
+test("a toast with a 20-letter nickname stays on a 360px screen", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open: openPage, assertNoErrors } = await openBrowser(t);
+  const open = (name, nickname) => openPage(name, { nickname, viewport: { width: 360, height: 780 }, hasTouch: true });
 
   // W is the widest letter, so this is the longest a one-word name gets.
   const long = "W".repeat(20);
   const host = await open("host", long);
   await host.goto(`${srv.base}/tic-tac-toe/`);
-  await host.click("#play-friend");
-  const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
   const guest = await open("guest", long);
-  await guest.goto(invite);
-  await guest.click("#join-room");
-  for (const page of [host, guest]) await page.waitForFunction(() => window.ddp.match?.phase === "playing", null, { timeout: 20_000 });
+  await joinByInvite(host, guest, srv);
+  for (const page of [host, guest]) await waitForState(page, (ddp) => ddp.match?.phase === "playing");
 
   // Whoever waits taps a square and is told to wait for the other long name.
   const waiting = (await host.evaluate(() => window.ddp.match.canMove())) ? guest : host;
@@ -166,5 +106,5 @@ test("a toast with a 20-letter nickname stays on a 360px screen", { skip: !pw &&
     assert.ok(r.top >= 0 && r.bottom <= 780, `toast ${what} spans ${r.top}..${r.bottom} vertically`);
   }
   assert.ok(text.left >= box.left && text.right <= box.right, "the words stay inside the pill");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

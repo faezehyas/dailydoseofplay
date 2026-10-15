@@ -6,7 +6,7 @@
 // be hit, every level plays its best move.
 import { randInt } from "../engine/rng.js";
 import { matchRouter } from "../engine/session.js";
-import { robotPause } from "../engine/robot-pace.js";
+import { robotPause, robotRng } from "../engine/robot-pace.js";
 import { TurnMatch } from "../engine/turn-match.js";
 import { BAR, OFF, CHECKERS, legalPlays, pipCount } from "./rules.js";
 
@@ -169,7 +169,7 @@ export function chooseMove(state, me, rng = Math.random, { level = "medium", ran
 // Drives the robot's side of a session, like the engine's startTurnRobot,
 // except that the pause before each move is asked for each time, so it can
 // change during a game. choose(state, me, rng, ms) also gets that pause.
-export function startRobot(session, { rules, choose, delay, rng = Math.random }) {
+export function startRobot(session, { rules, choose, delay, rng = robotRng(session.index) }) {
   const router = matchRouter(session);
   let match = null;
   let timer = null;

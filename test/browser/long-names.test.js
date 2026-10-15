@@ -8,27 +8,10 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { skipWithoutPlaywright, openBrowser, waitForState, joinByInvite } from "../helpers.js";
 import { NAME_MAX } from "../../public/engine/names.js";
 
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
+const skip = skipWithoutPlaywright();
 const LONG = "W".repeat(NAME_MAX);
 
 // Where the text of `selector` lies on screen, and whether it is cut short with an ellipsis.
@@ -45,32 +28,16 @@ async function assertOnScreen(page, selector) {
   assert.ok(t.left >= 0 && t.right <= t.width, `${selector} "${t.text}" spans ${Math.round(t.left)}..${Math.round(t.right)} on a ${t.width} px screen`);
 }
 
-test("a 20-letter nickname stays on a 360 px screen in the status, note and rematch lines", { skip: !pw && "Playwright not installed", timeout: 90_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(name) {
-    const ctx = await browser.newContext({ viewport: { width: 360, height: 780 }, hasTouch: true });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), LONG);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    return page;
-  }
-  const wait = (page, fn, arg) => page.waitForFunction(fn, arg, { timeout: 20_000 });
+test("a 20-letter nickname stays on a 360 px screen in the status, note and rematch lines", { skip, timeout: 90_000 }, async (t) => {
+  const { srv, open: openPage, assertNoErrors } = await openBrowser(t);
+  const open = (name) => openPage(name, { nickname: LONG, viewport: { width: 360, height: 780 }, hasTouch: true });
 
   const host = await open("host");
   await host.goto(`${srv.base}/tic-tac-toe/`);
-  await host.click("#play-friend");
-  const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
   const guest = await open("guest");
-  await guest.goto(invite);
-  await guest.click("#join-room");
+  await joinByInvite(host, guest, srv);
   const pages = [host, guest];
-  for (const page of pages) await wait(page, () => window.ddp.match?.phase === "playing");
+  for (const page of pages) await waitForState(page, (ddp) => ddp.match?.phase === "playing");
 
   // The player waiting sees "<name> is thinking…", and the coin toss names whoever starts.
   const first = await host.evaluate(() => window.ddp.match.state.turn);
@@ -92,11 +59,11 @@ test("a 20-letter nickname stays on a 360 px screen in the status, note and rema
   const cells = [0, 3, 1, 4, 2];
   for (let k = 0; k < cells.length; k++) {
     const page = k % 2 === 0 ? mover : waiter;
-    await wait(page, () => window.ddp.match.canMove());
+    await waitForState(page, (ddp) => ddp.match.canMove());
     await page.tap(`.ttt-cell[data-i="${cells[k]}"]`);
-    await wait(page, (n) => window.ddp.match.state.moves.length === n, k + 1);
+    await waitForState(page, (ddp, n) => ddp.match.state.moves.length === n, k + 1);
   }
-  for (const page of pages) await wait(page, () => window.ddp.match.phase === "over");
+  for (const page of pages) await waitForState(page, (ddp) => ddp.match.phase === "over");
   assert.match(await waiter.locator("#ttt-status").innerText(), new RegExp(`^${LONG} wins`));
   await assertOnScreen(waiter, "#ttt-status");
 
@@ -105,5 +72,5 @@ test("a 20-letter nickname stays on a 360 px screen in the status, note and rema
   await waiter.locator("#rematch-status").filter({ hasText: "wants a rematch" }).waitFor();
   await assertOnScreen(waiter, "#rematch-status");
   await assertOnScreen(mover, "#rematch-status");
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

@@ -8,30 +8,13 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { skipWithoutPlaywright, openBrowser, waitForState, joinByInvite } from "../helpers.js";
 import { PUBLIC_DIR } from "../../server/app.js";
 
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
-const wait = (page, fn, arg) => page.waitForFunction(fn, arg, { timeout: 20_000 });
+const skip = skipWithoutPlaywright();
 
 function partySite() {
   const dir = mkdtempSync(path.join(os.tmpdir(), "ddp-party-"));
@@ -47,22 +30,9 @@ function partySite() {
 
 async function setup(t) {
   const dir = partySite();
-  const srv = await startServer({ publicDir: dir });
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-    rmSync(dir, { recursive: true, force: true });
-  });
-  const errors = [];
-  async function open(nickname) {
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${nickname}: ${e.message}`));
-    return page;
-  }
-  return { srv, open, errors };
+  const { srv, open, assertNoErrors } = await openBrowser(t, { server: { publicDir: dir } });
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  return { srv, assertNoErrors, open: (nickname, opts = {}) => open(nickname, { nickname, viewport: { width: 390, height: 844 }, ...opts }) };
 }
 
 // Everyone rolls in turn until the match is over; returns the final states.
@@ -79,35 +49,31 @@ async function playOut(pages) {
     }
     const before = await pages[k].evaluate(() => window.ddp.match.state.log.length);
     await pages[k].click("#move");
-    for (const p of pages) await wait(p, (n) => window.ddp.match.state.log.length > n, before);
+    for (const p of pages) await waitForState(p, (ddp, n) => ddp.match.state.log.length > n, before);
   }
   return Promise.all(pages.map((p) => p.evaluate(() => window.ddp.match.state)));
 }
 
-test("three friends fill a room through the invite link, play on shared dice, rematch, and see a player leave", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
+test("three friends fill a room through the invite link, play on shared dice, rematch, and see a player leave", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
   const host = await open("Ada");
   await host.goto(`${srv.base}/party/`);
   assert.equal(await host.locator("#play-friend").innerText(), "Play with friends");
-  await host.click("#play-friend");
-  await host.locator("#room-code").waitFor();
-  const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
+  const { invite } = await joinByInvite(host, [], srv);
   assert.match(await host.locator("#roster").innerText(), /Ada\s+host/);
   assert.equal(await host.locator("#start-game").isDisabled(), true, "can't start alone");
 
   const bo = await open("Bo");
-  await bo.goto(invite);
-  await bo.click("#join-room");
+  await joinByInvite(host, bo, srv);
   await host.locator("#roster li.ready", { hasText: "Bo" }).waitFor();
   assert.equal(await host.locator("#start-game").innerText(), "Start game (2 players)");
   await bo.locator("#lobby-status", { hasText: "Waiting for Ada to start (2 players in)" }).waitFor();
 
   // The third player fills the room, so the game starts by itself.
   const cy = await open("Cy");
-  await cy.goto(invite);
-  await cy.click("#join-room");
+  await joinByInvite(host, cy, srv);
   const pages = [host, bo, cy];
-  for (const p of pages) await wait(p, () => window.ddp.match?.phase === "playing");
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match?.phase === "playing");
   assert.deepEqual(await Promise.all(pages.map((p) => p.evaluate(() => window.ddp.session.index))), [0, 1, 2]);
   assert.equal(await cy.locator("#party-players").innerText(), "Ada, Bo, Cy (you)");
   assert.equal(await host.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, "no horizontal scroll");
@@ -129,32 +95,28 @@ test("three friends fill a room through the invite link, play on shared dice, re
   await cy.locator("#party-status", { hasText: "Rematch votes: 2" }).waitFor();
   assert.equal(await host.evaluate(() => window.ddp.match.m), 1);
   await cy.click("#rematch");
-  for (const p of pages) await wait(p, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing");
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing");
   const [a2, b2, c2] = await playOut(pages);
   assert.deepEqual([b2, c2], [a2, a2]);
 
   // A guest leaving: a robot plays on for them, and the others are told.
   await cy.close();
   for (const p of [host, bo]) await p.locator("#toast", { hasText: /Cy left|connection to Cy was lost/ }).waitFor({ state: "attached", timeout: 20_000 });
-  await wait(host, () => window.ddp.session.players[2].robot && window.ddp.robots.length === 1);
+  await waitForState(host, (ddp) => ddp.session.players[2].robot && ddp.robots.length === 1);
   // The host leaving ends the game for the others, who are told who left.
   await host.close();
   await bo.locator("#ended").waitFor({ timeout: 20_000 });
   assert.match(await bo.locator("#ended").innerText(), /Ada (left the game|.*lost)/);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("the host can start before the room is full; a guest who leaves the waiting room drops off the list", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
+test("the host can start before the room is full; a guest who leaves the waiting room drops off the list", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
   const host = await open("Ada");
   await host.goto(`${srv.base}/party/`);
-  await host.click("#play-friend");
-  await host.locator("#room-code").waitFor();
-  const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
 
   const quitter = await open("Quinn");
-  await quitter.goto(invite);
-  await quitter.click("#join-room");
+  await joinByInvite(host, quitter, srv);
   await host.locator("#roster li.ready", { hasText: "Quinn" }).waitFor();
   await quitter.close();
   await host.locator("#toast", { hasText: "Quinn left. The invite link still works." }).waitFor();
@@ -162,11 +124,10 @@ test("the host can start before the room is full; a guest who leaves the waiting
   assert.equal(await host.locator("#start-game").isDisabled(), true);
 
   const bo = await open("Bo");
-  await bo.goto(invite);
-  await bo.click("#join-room");
+  await joinByInvite(host, bo, srv);
   await host.locator("#roster li.ready", { hasText: "Bo" }).waitFor();
   await host.click("#start-game");
-  for (const p of [host, bo]) await wait(p, () => window.ddp.match?.phase === "playing");
+  for (const p of [host, bo]) await waitForState(p, (ddp) => ddp.match?.phase === "playing");
   assert.equal(await bo.evaluate(() => window.ddp.session.players.length), 2);
   const [a, b] = await playOut([host, bo]);
   assert.deepEqual(b, a);
@@ -174,71 +135,65 @@ test("the host can start before the room is full; a guest who leaves the waiting
   // The host leaving ends it for the guest.
   await host.click("#leave");
   await bo.locator("#ended", { hasText: "Ada left the game." }).waitFor({ timeout: 20_000 });
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("against robots (straight from a ?robot link), every robot seat plays", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
+test("against robots (straight from a ?robot link), every robot seat plays", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
   const page = await open("Ada");
   await page.goto(`${srv.base}/party/?robot`);
-  await wait(page, () => window.ddp.match?.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing");
   assert.equal(await page.locator("#party-players").innerText(), "Ada (you), Robot 1, Robot 2");
   const [state] = await playOut([page]);
   assert.equal(state.players, 3);
   assert.equal(await page.evaluate(() => window.ddp.robots.length), 2);
   for (const k of [0, 1]) assert.deepEqual(await page.evaluate((k) => window.ddp.robots[k].match.state, k), state, `robot ${k + 1} agrees`);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("a browser that sends an oversized message is cut off, and the others are told why", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const { srv, open, errors } = await setup(t);
+test("a browser that sends an oversized message is cut off, and the others are told why", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
   const UNEXPECTED = "A player's browser sent something unexpected.";
   const huge = () => window.ddp.session.send({ t: "spam", pad: "x".repeat(70_000) });
   async function room(host) {
     await host.goto(`${srv.base}/party/`);
-    await host.click("#play-friend");
-    await host.locator("#room-code").waitFor();
-    return (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
+    await joinByInvite(host, [], srv);
   }
 
   // A guest sends it during the game: the host refuses it unread, cuts them off and a robot takes their seat.
   const ada = await open("Ada");
-  const invite = await room(ada);
+  await room(ada);
   const bo = await open("Bo");
-  await bo.goto(invite);
-  await bo.click("#join-room");
+  await joinByInvite(ada, bo, srv);
   await ada.locator("#roster li.ready", { hasText: "Bo" }).waitFor();
   const cy = await open("Cy");
-  await cy.goto(invite);
-  await cy.click("#join-room");
-  for (const p of [ada, bo, cy]) await wait(p, () => window.ddp.match?.phase === "playing");
+  await joinByInvite(ada, cy, srv);
+  for (const p of [ada, bo, cy]) await waitForState(p, (ddp) => ddp.match?.phase === "playing");
   await cy.evaluate(huge);
   for (const p of [ada, bo]) await p.locator("#toast", { hasText: `${UNEXPECTED} A robot plays their seat.` }).waitFor({ state: "attached", timeout: 20_000 });
   await cy.locator("#ended", { hasText: "The connection to Ada was lost." }).waitFor({ timeout: 20_000 });
 
   // A guest sends it in the waiting room (its first message, padded with spaces, is still valid JSON).
   const host = await open("Dee");
-  const invite2 = await room(host);
-  const odd = await open("Mo");
-  await odd.context().addInitScript(() => {
+  await room(host);
+  const padded = () => {
     const send = RTCDataChannel.prototype.send;
     RTCDataChannel.prototype.send = function (data) {
       return send.call(this, " ".repeat(70_000) + data);
     };
-  });
-  await odd.goto(invite2);
-  await odd.click("#join-room");
+  };
+  const odd = await open("Mo", { init: padded });
+  await joinByInvite(host, odd, srv);
   await host.locator("#toast", { hasText: `${UNEXPECTED} The invite link still works.` }).waitFor({ timeout: 20_000 });
   assert.doesNotMatch(await host.locator("#roster").innerText(), /Mo/);
 
   // The host sends it: the guest refuses it.
   const eve = await open("Eve");
-  await eve.goto(invite2);
-  await eve.click("#join-room");
+  await joinByInvite(host, eve, srv);
   await host.locator("#roster li.ready", { hasText: "Eve" }).waitFor();
   await host.click("#start-game");
-  for (const p of [host, eve]) await wait(p, () => window.ddp.match?.phase === "playing");
+  for (const p of [host, eve]) await waitForState(p, (ddp) => ddp.match?.phase === "playing");
   await host.evaluate(huge);
   await eve.locator("#ended", { hasText: UNEXPECTED }).waitFor({ timeout: 20_000 });
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

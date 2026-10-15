@@ -7,50 +7,16 @@
 //   PLAYWRIGHT_MODULE=/path/to/playwright/index.js npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, pick } from "../helpers.js";
 
-const ARTIFACTS = path.resolve("test-artifacts");
+const skip = skipWithoutPlaywright();
 
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
-
-test("two friends play a full match in real browsers", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(name, nickname, opts = {}) {
-    const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, ...opts });
-    if (nickname) await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
-    return page;
-  }
-  const wait = (page, fn, arg) => page.waitForFunction(fn, arg, { timeout: 20_000 });
+test("two friends play a full match in real browsers", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const wide = { width: 1200, height: 900 };
 
   // Host creates a room and gets an invite link.
-  const host = await open("host", "Ada");
+  const host = await open("host", { nickname: "Ada", viewport: wide });
   await host.goto(`${srv.base}/sea-battle/`);
   await host.click("#play-friend");
   await host.locator("#room-code").waitFor();
@@ -64,9 +30,8 @@ test("two friends play a full match in real browsers", { skip: !pw && "Playwrigh
     window.__sawKnock = false;
     new MutationObserver(() => (window.__sawKnock ||= !!document.querySelector("li.knock"))).observe(document.body, { subtree: true, childList: true });
   });
-  const guest = await open("guest", "Bo", { viewport: { width: 390, height: 844 }, hasTouch: true });
-  await guest.goto(invite.replace(/^https?:\/\/[^/]+/, srv.base));
-  await guest.click("#join-room");
+  const guest = await open("guest", { nickname: "Bo", viewport: { width: 390, height: 844 }, hasTouch: true });
+  await joinByInvite(host, guest, srv);
   await host.locator("#ready").waitFor();
   assert.equal(await host.evaluate(() => window.__sawKnock), false, "an invite link needs no Accept");
   assert.equal(await guest.evaluate(() => location.search), "", "the key leaves the address bar");
@@ -82,8 +47,8 @@ test("two friends play a full match in real browsers", { skip: !pw && "Playwrigh
   await host.keyboard.press("r");
   await host.click("#ready");
   await guest.click("#ready");
-  await wait(host, () => window.ddp.match.phase === "playing");
-  await wait(guest, () => window.ddp.match.phase === "playing");
+  await waitForState(host, (ddp) => ddp.match.phase === "playing");
+  await waitForState(guest, (ddp) => ddp.match.phase === "playing");
   assert.equal(
     await host.evaluate(() => window.ddp.match.state.turn),
     await guest.evaluate(() => window.ddp.match.state.turn),
@@ -127,10 +92,10 @@ test("two friends play a full match in real browsers", { skip: !pw && "Playwrigh
     }
     const before = await page.evaluate(() => window.ddp.match.state.moves);
     await page.click(`.enemy .cell[data-i="${target}"]`);
-    await wait(page, (n) => window.ddp.match.state.moves > n || window.ddp.match.phase !== "playing", before);
+    await waitForState(page, (ddp, n) => ddp.match.state.moves > n || ddp.match.phase !== "playing", before);
   }
-  await wait(host, () => window.ddp.match.verdict);
-  await wait(guest, () => window.ddp.match.verdict);
+  await waitForState(host, (ddp) => ddp.match.verdict);
+  await waitForState(guest, (ddp) => ddp.match.verdict);
   for (const p of pages) assert.doesNotMatch(await p.locator("#result-panel").innerText(), /false|undefined/);
   assert.match(await host.locator("#verdict").innerText(), /Fair play verified/);
   assert.match(await guest.locator("#verdict").innerText(), /Fair play verified/);
@@ -159,11 +124,11 @@ test("two friends play a full match in real browsers", { skip: !pw && "Playwrigh
   await host.click("#rematch");
   await guest.locator("#rematch-status").filter({ hasText: "wants a rematch" }).waitFor();
   await guest.click("#rematch");
-  await wait(host, () => window.ddp.match.m === 2 && window.ddp.match.phase === "placing");
-  await wait(guest, () => window.ddp.match.m === 2 && window.ddp.match.phase === "placing");
+  await waitForState(host, (ddp) => ddp.match.m === 2 && ddp.match.phase === "placing");
+  await waitForState(guest, (ddp) => ddp.match.m === 2 && ddp.match.phase === "placing");
   await host.click("#ready");
   await guest.click("#ready");
-  await wait(host, () => window.ddp.match.phase === "playing");
+  await waitForState(host, (ddp) => ddp.match.phase === "playing");
 
   // Leaving a live friend game asks first; Cancel keeps the game.
   await host.click("#leave");
@@ -175,25 +140,19 @@ test("two friends play a full match in real browsers", { skip: !pw && "Playwrigh
   await guest.close();
   await host.locator("#ended").waitFor({ timeout: 20_000 });
   assert.match(await host.locator("#ended").innerText(), /Bo (left the game|.*lost)/);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("a blocked peer connection shows the no-TURN explanation", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const host = await (await browser.newContext()).newPage();
+test("a blocked peer connection shows the no-TURN explanation", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open } = await openBrowser(t);
+  const host = await open("host");
   await host.goto(`${srv.base}/sea-battle/`);
   await host.click("#play-friend");
   await host.locator("#room-code").waitFor();
   const code = (await host.locator("#room-code").innerText()).trim();
   // Simulate a network that blocks direct connections: relay-only ICE with
   // no relay gathers no candidates, and ICE reports failure.
-  const ctx = await browser.newContext();
-  await ctx.addInitScript(() => {
+  const blocked = () => {
     const Real = window.RTCPeerConnection;
     window.RTCPeerConnection = class extends Real {
       constructor(cfg) {
@@ -204,8 +163,8 @@ test("a blocked peer connection shows the no-TURN explanation", { skip: !pw && "
         }, 300);
       }
     };
-  });
-  const guest = await ctx.newPage();
+  };
+  const guest = await open("guest", { init: blocked });
   await guest.goto(`${srv.base}/sea-battle/`);
   await guest.fill("#join-code", code.toLowerCase());
   await host.locator("#roster li.knock", { hasText: "wants to join" }).getByRole("button", { name: "Accept" }).click();
@@ -218,29 +177,15 @@ test("a blocked peer connection shows the no-TURN explanation", { skip: !pw && "
   // The failed guest left the room; the host's invite must still work for someone else.
   await host.locator("#lobby-status").filter({ hasText: "Waiting for your friend" }).waitFor({ timeout: 10_000 });
   assert.equal((await host.locator("#room-code").innerText()).trim(), code);
-  const invite = await host.locator("#invite-link").inputValue();
-  const friend = await (await browser.newContext()).newPage();
-  await friend.goto(invite.replace(/^https?:\/\/[^/]+/, srv.base));
-  await friend.click("#join-room");
+  const friend = await open("friend");
+  await joinByInvite(host, friend, srv);
   await friend.locator("#ready").waitFor({ timeout: 20_000 });
   await host.locator("#ready").waitFor();
 });
 
-test("a typed room code waits for the host: Decline turns a stranger away, Accept lets a friend in to play", { skip: !pw && "Playwright not installed", timeout: 90_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(nickname) {
-    const ctx = await browser.newContext();
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${nickname}: ${e.message}`));
-    return page;
-  }
+test("a typed room code waits for the host: Decline turns a stranger away, Accept lets a friend in to play", { skip, timeout: 90_000 }, async (t) => {
+  const { srv, open: openPage, assertNoErrors } = await openBrowser(t);
+  const open = (nickname) => openPage(nickname, { nickname });
   const typeCode = async (page, code) => {
     await page.goto(`${srv.base}/sea-battle/`);
     await page.fill("#join-code", code);
@@ -270,24 +215,17 @@ test("a typed room code waits for the host: Decline turns a stranger away, Accep
   await friend.locator("#ready").waitFor({ timeout: 20_000 });
   assert.match(await host.locator(".pb-players").innerText(), /Bo/);
   // The guest's match exists once the host's settings arrive.
-  for (const p of [host, friend]) await p.waitForFunction(() => window.ddp.match?.phase === "placing", null, { timeout: 20_000 });
+  for (const p of [host, friend]) await waitForState(p, (ddp) => ddp.match?.phase === "placing");
   await host.click("#ready");
   await friend.click("#ready");
-  const playing = (p) => p.waitForFunction(() => window.ddp.match?.phase === "playing", null, { timeout: 20_000 });
+  const playing = (p) => waitForState(p, (ddp) => ddp.match?.phase === "playing");
   await Promise.all([playing(host), playing(friend)]);
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("home page, theme toggle, drag-to-move and a robot game on a phone", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  const page = await (await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true })).newPage();
-  page.on("pageerror", (e) => errors.push(e.message));
+test("home page, theme toggle, drag-to-move and a robot game on a phone", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { viewport: { width: 390, height: 844 }, hasTouch: true });
 
   await page.goto(`${srv.base}/`);
   await page.locator('.game-card[data-slug="sea-battle"]').waitFor();
@@ -385,14 +323,14 @@ test("home page, theme toggle, drag-to-move and a robot game on a phone", { skip
   );
 
   await page.click("#ready");
-  await page.waitForFunction(() => window.ddp.match.phase === "playing", null, { timeout: 10_000 });
+  await waitForState(page, (ddp) => ddp.match.phase === "playing", undefined, { timeout: 10_000 });
   for (let shots = 0; shots < 3; ) {
-    await page.waitForFunction(() => window.ddp.match.canFire() || window.ddp.match.phase !== "playing", null, { timeout: 15_000 });
+    await waitForState(page, (ddp) => ddp.match.canFire() || ddp.match.phase !== "playing", undefined, { timeout: 15_000 });
     if (await page.evaluate(() => window.ddp.match.phase !== "playing")) break;
     const i = await page.evaluate(() => window.ddp.match.state.boards[1].cells.findIndex((v) => v === 0));
     const moves = await page.evaluate(() => window.ddp.match.state.moves);
     await page.click(`.enemy .cell[data-i="${i}"]`);
-    await page.waitForFunction((n) => window.ddp.match.state.moves > n, moves);
+    await waitForState(page, (ddp, n) => ddp.match.state.moves > n, moves);
     // The log line waits for the shell to land; hits fire again without waiting.
     const name = await page.evaluate(async (i) => (await import("/sea-battle/rules.js")).cellName(i), i);
     await page.locator("#sb-log li.mine", { hasText: `You fired at ${name}:` }).waitFor();
@@ -404,7 +342,7 @@ test("home page, theme toggle, drag-to-move and a robot game on a phone", { skip
 
   // Missile rain isn't aimed: a tap on the board must not launch it (it could
   // miss the gift you tapped); it fires from its own button.
-  await page.waitForFunction(() => window.ddp.match.canFire() || window.ddp.match.phase !== "playing", null, { timeout: 15_000 });
+  await waitForState(page, (ddp) => ddp.match.canFire() || ddp.match.phase !== "playing", undefined, { timeout: 15_000 });
   if (await page.evaluate(() => window.ddp.match.phase === "playing")) {
     const giveRain = (n) => page.evaluate((n) => {
       const m = window.ddp.match;
@@ -456,21 +394,12 @@ test("home page, theme toggle, drag-to-move and a robot game on a phone", { skip
   assert.equal(await page.locator("#sound-toggle").getAttribute("aria-pressed"), "true");
   await page.click("#leave");
   await page.locator("#play-friend").waitFor();
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-test("a robot game on a 360 px phone with the longest nickname has no sideways scroll", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  const ctx = await browser.newContext({ viewport: { width: 360, height: 780 }, hasTouch: true });
-  await ctx.addInitScript(() => localStorage.setItem("ddp-name", "W".repeat(20)));
-  const page = await ctx.newPage();
-  page.on("pageerror", (e) => errors.push(e.message));
+test("a robot game on a 360 px phone with the longest nickname has no sideways scroll", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { nickname: "W".repeat(20), viewport: { width: 360, height: 780 }, hasTouch: true });
   const noSideScroll = async (when) =>
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 360, `no horizontal scroll ${when}`);
 
@@ -485,8 +414,8 @@ test("a robot game on a 360 px phone with the longest nickname has no sideways s
   }
 
   await page.click("#ready");
-  await page.waitForFunction(() => window.ddp.match.phase === "playing", null, { timeout: 10_000 });
-  await page.waitForFunction(() => window.ddp.match.canFire(), null, { timeout: 15_000 });
+  await waitForState(page, (ddp) => ddp.match.phase === "playing", undefined, { timeout: 10_000 });
+  await waitForState(page, (ddp) => ddp.match.canFire(), undefined, { timeout: 15_000 });
   // Every weapon in stock (local only, never fired) and the carpet bomb's row/column button showing.
   await page.evaluate(() => {
     const m = window.ddp.match;
@@ -499,40 +428,22 @@ test("a robot game on a 360 px phone with the longest nickname has no sideways s
   for (const box of await page.locator(".sb-weapons button").evaluateAll((bs) => bs.map((b) => b.getBoundingClientRect().toJSON()))) {
     assert.ok(box.left >= 0 && box.right <= 360 && box.height >= 44, "each weapon is on screen and big enough to tap");
   }
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });
 
-// The settings fold to a summary line in the lobby card; open it first.
-async function pick(page, name, value) {
-  if (!(await page.locator("#sb-settings[open]").count())) await page.click("#sb-settings > summary");
-  await page.click(`#sb-settings label:has(input[name="sb-${name}"][value="${value}"])`);
-}
-
-test("the host's time settings apply to both friends; a shot's time running out fires a random shot", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const host = await (await browser.newContext()).newPage();
-  await host.clock.install();
+test("the host's time settings apply to both friends; a shot's time running out fires a random shot", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open } = await openBrowser(t);
+  const host = await open("host", { clock: true });
   await host.goto(`${srv.base}/sea-battle/`);
   await pick(host, "shotSeconds", 10);
   await pick(host, "gameSeconds", 180);
-  await host.click("#play-friend");
-  const invite = await host.locator("#invite-link").inputValue();
   // The guest's own (different) settings must not matter.
-  const guestCtx = await browser.newContext();
-  await guestCtx.addInitScript(() => localStorage.setItem("ddp-sb-settings", JSON.stringify({ shotSeconds: 40, gameSeconds: 0 })));
-  const guest = await guestCtx.newPage();
-  await guest.clock.install();
-  await guest.goto(invite.replace(/^https?:\/\/[^/]+/, srv.base));
-  await guest.click("#join-room");
+  const guest = await open("guest", { clock: true, init: () => localStorage.setItem("ddp-sb-settings", JSON.stringify({ shotSeconds: 40, gameSeconds: 0 })) });
+  await joinByInvite(host, guest, srv);
   for (const p of [host, guest]) assert.equal(await p.locator("#sb-config").innerText(), "10 s a shot · 3 min each");
   await host.click("#ready");
   await guest.click("#ready");
-  for (const p of [host, guest]) await p.waitForFunction(() => window.ddp.match.phase === "playing", null, { timeout: 20_000 });
+  for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match.phase === "playing");
   const shooter = (await host.evaluate(() => window.ddp.match.canFire())) ? host : guest;
   const watcher = shooter === host ? guest : host;
   assert.match(await shooter.locator("#sb-clock").innerText(), /Your shot: \d+s/);
@@ -543,40 +454,32 @@ test("the host's time settings apply to both friends; a shot's time running out 
   }
   // Nobody clicks: after 10 s the shooter's browser fires on its own.
   await shooter.clock.fastForward("00:11");
-  await shooter.waitForFunction(() => window.ddp.match.state.moves >= 1, null, { timeout: 15_000 });
-  await watcher.waitForFunction(() => window.ddp.match.state.moves >= 1, null, { timeout: 15_000 });
+  await waitForState(shooter, (ddp) => ddp.match.state.moves >= 1, undefined, { timeout: 15_000 });
+  await waitForState(watcher, (ddp) => ddp.match.state.moves >= 1, undefined, { timeout: 15_000 });
   assert.match(await shooter.locator("#toast").innerText(), /Time's up/);
   const clocks = await Promise.all([host, guest].map((p) => p.evaluate(() => window.ddp.match.state.clocks)));
   assert.deepEqual(clocks[0], clocks[1], "both browsers deducted the same time");
   assert.ok(Math.min(...clocks[0]) === 170_000, `the shooter spent its whole 10 s: ${clocks[0]}`);
 });
 
-test("against the robot, running out of your own clock loses the game", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const page = await (await browser.newContext()).newPage();
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  await page.clock.install();
+test("against the robot, running out of your own clock loses the game", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { clock: true });
   await page.goto(`${srv.base}/sea-battle/`);
   await pick(page, "shotSeconds", 0);
   await pick(page, "gameSeconds", 180);
   await page.click("#play-robot");
   await page.click("#ready");
-  await page.waitForFunction(() => window.ddp.match.phase === "playing", null, { timeout: 10_000 });
+  await waitForState(page, (ddp) => ddp.match.phase === "playing", undefined, { timeout: 10_000 });
   assert.equal(await page.locator("#sb-config").innerText(), "no shot limit · 3 min each");
   assert.equal(await page.locator("#sb-clock").isVisible(), false, "no shot clock");
-  await page.waitForFunction(() => window.ddp.match.canFire(), null, { timeout: 15_000 });
+  await waitForState(page, (ddp) => ddp.match.canFire(), undefined, { timeout: 15_000 });
   await page.clock.fastForward("03:01");
-  await page.waitForFunction(() => window.ddp.match.phase === "over", null, { timeout: 10_000 });
+  await waitForState(page, (ddp) => ddp.match.phase === "over", undefined, { timeout: 10_000 });
   assert.equal(await page.evaluate(() => window.ddp.match.state.reason), "timeout");
   assert.equal(await page.evaluate(() => window.ddp.match.state.winner), 1);
   assert.equal(await page.locator("#sb-status").innerText(), "You ran out of time.");
   assert.equal(await page.locator("#result-reason").innerText(), "Your clock ran out.");
   await page.locator("#verdict.ok").waitFor({ timeout: 10_000 });
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

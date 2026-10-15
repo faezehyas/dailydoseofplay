@@ -6,42 +6,26 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, pw, wait, noHorizontalScroll, pick, state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./hearts.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll, pick } from "../helpers.js";
+import { state, resultInView, autoplay, stopAutoplay, leaks, domLeaks } from "./hearts.shared.js";
+
+const skip = skipWithoutPlaywright();
 
 // A card in a fanned hand shows only its left edge: tap there.
 const EDGE = { x: 6, y: 40 };
 
-test("four friends play Hearts in four browsers: a secret pass, a whole hand audited, a rematch, then one leaves", { skip: !pw && "Playwright not installed", timeout: 420_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  async function open(nickname, opts = {}) {
-    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, reducedMotion: "reduce", ...opts });
-    await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
-    const page = await ctx.newPage();
-    page.on("pageerror", (e) => errors.push(`${nickname}: ${e.message}`));
-    page.on("console", (m) => m.type() === "error" && errors.push(`${nickname}: ${m.text()}`));
-    return page;
-  }
+test("four friends play Hearts in four browsers: a secret pass, a whole hand audited, a rematch, then one leaves", { skip, timeout: 420_000 }, async (t) => {
+  const { srv, open: openPage, assertNoErrors } = await openBrowser(t);
+  // A laptop unless it's a phone.
+  const open = (nickname, opts = {}) => openPage(nickname, { ...(!opts.phone && { viewport: { width: 1366, height: 900 } }), reducedMotion: "reduce", nickname, ...opts });
   // The host picks one hand a game, so a whole game is one hand.
   const host = await open("Ada");
   await host.goto(`${srv.base}/hearts/`);
   await pick(host, "target", 0);
-  await host.click("#play-friend");
-  await host.locator("#room-code").waitFor();
-  const invite = (await host.locator("#invite-link").inputValue()).replace(/^https?:\/\/[^/]+/, srv.base);
   const friends = [];
-  for (const [name, opts] of [["Bo", { viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "dark" }], ["Cy", {}], ["Di", {}]]) {
+  for (const [name, opts] of [["Bo", { phone: true, colorScheme: "dark" }], ["Cy", {}], ["Di", {}]]) {
     const page = await open(name, opts);
-    await page.goto(invite);
-    await page.click("#join-room");
+    await joinByInvite(host, page, srv);
     friends.push(page);
     if (friends.length === 1) {
       await host.locator("#roster li.ready", { hasText: "Bo" }).waitFor();
@@ -56,7 +40,7 @@ test("four friends play Hearts in four browsers: a secret pass, a whole hand aud
   }
   // The fourth fills the room, which starts by itself.
   const pages = [host, ...friends];
-  for (const p of pages) await wait(p, () => window.ddp.match?.phase === "playing", undefined, 60_000);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match?.phase === "playing", undefined, { timeout: 60_000 });
   assert.deepEqual(await Promise.all(pages.map((p) => p.evaluate(() => window.ddp.session.index))), [0, 1, 2, 3]);
   for (const [seat, p] of pages.entries()) {
     // The next player sits on your left, then across, then on your right; colours follow the seat everywhere.
@@ -64,7 +48,7 @@ test("four friends play Hearts in four browsers: a secret pass, a whole hand aud
     assert.deepEqual(shown, [[(seat + 1) % 4, "pos-left"], [(seat + 2) % 4, "pos-top"], [(seat + 3) % 4, "pos-right"]]);
     assert.equal(await p.locator(".pc-trick-spot.pos-bottom.p-" + seat).count(), 1, "your card lands in front of you");
     assert.equal(await p.locator(".pc-seat.p-1, .pc-me.p-1").count(), 1);
-    await wait(p, () => document.querySelectorAll(".hr-hcard").length === 13);
+    await waitForState(p, () => document.querySelectorAll(".hr-hcard").length === 13);
   }
   assert.match(await host.locator("#hr-config").innerText(), /^One hand a game · pass three/);
   assert.ok(await noHorizontalScroll(friends[0]), "four players fit a 360 px phone");
@@ -76,30 +60,30 @@ test("four friends play Hearts in four browsers: a secret pass, a whole hand aud
   const picks = [];
   for (const seat of order.slice(0, 3)) {
     const p = pages[seat];
-    await wait(p, () => document.querySelectorAll(".hr-hcard.pickable").length === 13);
+    await waitForState(p, () => document.querySelectorAll(".hr-hcard.pickable").length === 13);
     const slots = (await p.locator(".hr-hcard").evaluateAll((els) => els.map((e) => Number(e.dataset.slot)))).slice(0, 3);
     for (const s of slots) await p.locator(`.hr-hcard[data-slot="${s}"]`).click({ position: EDGE });
     assert.match(await p.locator("#hr-pass").innerText(), /Pass left/);
     await p.click("#hr-pass");
     picks[seat] = slots;
-    await wait(p, (n) => window.ddp.match.state.picks.filter(Boolean).length >= n, picks.filter(Boolean).length);
+    await waitForState(p, (ddp, n) => ddp.match.state.picks.filter(Boolean).length >= n, picks.filter(Boolean).length);
   }
   for (const p of pages) assert.deepEqual((await state(p)).received.flat(), [], "nobody has received yet");
   // The last picker uses the keyboard: Enter on three cards, then P.
   const last = pages[order[3]];
-  await wait(last, () => document.querySelectorAll(".hr-hcard.pickable").length === 13);
+  await waitForState(last, () => document.querySelectorAll(".hr-hcard.pickable").length === 13);
   await last.locator(".hr-hcard").first().focus();
   for (let k = 0; k < 3; k++) {
     await last.keyboard.press("Enter");
-    await wait(last, (n) => document.querySelectorAll(".hr-hcard.picked").length === n, k + 1, 5_000);
+    await waitForState(last, (_, n) => document.querySelectorAll(".hr-hcard.picked").length === n, k + 1, { timeout: 5_000 });
     await last.keyboard.press("ArrowRight");
   }
   assert.equal(await last.locator(".hr-hcard.picked").count(), 3);
   await host.screenshot({ path: `${ARTIFACTS}/hr-1-four-pass.png` });
   await last.keyboard.press("p");
-  for (const p of pages) await wait(p, () => window.ddp.match.state.phase !== "pass", undefined, 30_000);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match.state.phase !== "pass", undefined, { timeout: 30_000 });
   // Each seat holds what its right-hand neighbour passed, and reads it once its envelopes are open; nobody else does.
-  for (const p of pages) await wait(p, () => window.ddp.match.state.received[window.ddp.match.me].every((s) => window.ddp.match.face(s) !== null));
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match.state.received[ddp.match.me].every((s) => ddp.match.face(s) !== null));
   const st1 = await state(host);
   for (let seat = 0; seat < 4; seat++) {
     const from = (seat + 3) % 4;
@@ -113,7 +97,7 @@ test("four friends play Hearts in four browsers: a secret pass, a whole hand aud
     }
   }
   // The cards passed to you are marked (the 2 of clubs may already have gone to the first trick).
-  for (const p of pages) await wait(p, () => document.querySelectorAll(".hr-hcard.received").length === window.ddp.match.state.received[window.ddp.match.me].length, undefined, 20_000);
+  for (const p of pages) await waitForState(p, (ddp) => document.querySelectorAll(".hr-hcard.received").length === ddp.match.state.received[ddp.match.me].length);
   // A seat's only legal card plays by itself (the 2 of clubs, then a lone club), and may be a passed one: count them all at one moment.
   const [kept, unplayed] = await host.evaluate(() => {
     const st = window.ddp.match.state;
@@ -123,9 +107,9 @@ test("four friends play Hearts in four browsers: a secret pass, a whole hand aud
   assert.equal(kept, unplayed, "every passed card not yet played is still marked as passed");
 
   await Promise.all(pages.map(autoplay));
-  await wait(host, () => window.ddp.match.state.tricks >= 4 || window.ddp.match.phase !== "playing", undefined, 120_000);
+  await waitForState(host, (ddp) => ddp.match.state.tricks >= 4 || ddp.match.phase !== "playing", undefined, { timeout: 120_000 });
   await friends[0].screenshot({ path: `${ARTIFACTS}/hr-2-four-mobile-dark.png`, fullPage: true });
-  for (const p of pages) await wait(p, () => window.ddp.match.phase === "over", undefined, 240_000);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match.phase === "over", undefined, { timeout: 240_000 });
   await Promise.all(pages.map(stopAutoplay));
   for (const p of pages) {
     assert.deepEqual(await leaks(p), [], "no seat knew another's card during play");
@@ -137,7 +121,7 @@ test("four friends play Hearts in four browsers: a secret pass, a whole hand aud
   assert.equal(st.history.length, 1);
   assert.equal(st.history[0].raw.reduce((a, b) => a + b, 0), 26);
   for (const p of pages) {
-    await wait(p, () => window.ddp.match.verdict, undefined, 60_000);
+    await waitForState(p, (ddp) => ddp.match.verdict, undefined, { timeout: 60_000 });
     assert.deepEqual(await p.evaluate(() => window.ddp.match.verdict), { ok: true });
     await p.locator("#hr-sheet").waitFor();
     assert.match(await p.locator("#hr-verdict").innerText(), /Fair play verified/);
@@ -150,15 +134,15 @@ test("four friends play Hearts in four browsers: a secret pass, a whole hand aud
 
   // A rematch: the scores carry on, as one hand a game adds up across rematches.
   for (const p of pages) await p.click("#rematch");
-  for (const p of pages) await wait(p, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing", undefined, 60_000);
+  for (const p of pages) await waitForState(p, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing", undefined, { timeout: 60_000 });
   assert.deepEqual((await host.locator(".pb-score").innerText()).match(/-?\d+/g).map(Number), [0, 1, 2, 3].map((p) => st.scores[p]));
   await Promise.all(pages.map(autoplay));
-  await wait(host, () => window.ddp.match.state.tricks >= 2 || window.ddp.match.phase !== "playing", undefined, 90_000);
+  await waitForState(host, (ddp) => ddp.match.state.tricks >= 2 || ddp.match.phase !== "playing", undefined, { timeout: 90_000 });
   await Promise.all(pages.map(stopAutoplay));
   // Cy leaves: their key went with them, so this hand stops, and a robot takes their seat from the next.
   await friends[1].close();
   for (const p of [host, friends[0], friends[2]]) {
-    await wait(p, () => window.ddp.match.phase === "aborted" && window.ddp.match.abortSeat === 2, undefined, 20_000);
+    await waitForState(p, (ddp) => ddp.match.phase === "aborted" && ddp.match.abortSeat === 2);
     await p.locator("body", { hasText: "Cy left. Every card needs every player's key" }).waitFor();
     await p.locator(".pb-name", { hasText: "Cy (robot)" }).waitFor();
   }
@@ -170,5 +154,5 @@ test("four friends play Hearts in four browsers: a secret pass, a whole hand aud
     assert.match(await p.locator("#hr-ended").innerText(), /game is over for all 4 of you[\s\S]*Ada: -?\d+ points? \(left\)/);
     assert.match(await p.locator("#hr-ended").innerText(), /The game stopped before the end, so it wasn't checked\./);
   }
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

@@ -1,41 +1,16 @@
-// Shared by the Backgammon browser tests: loads Playwright and the page helpers.
+// Shared by the Backgammon browser tests: the page helpers.
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import path from "node:path";
-import { createRequire } from "node:module";
+import { waitForState } from "../helpers.js";
 
-export const ARTIFACTS = path.resolve("test-artifacts");
 export const START = [0, 0, 0, 0, 0, 0, 5, 0, 3, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0];
 
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-export const pw = await loadPlaywright();
-export const wait = (page, fn, arg, timeout = 20_000) => page.waitForFunction(fn, arg, { timeout });
 export const ply = (page) => page.evaluate(() => window.ddp.match.state.ply);
-export const noHorizontalScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
-// The settings fold to a summary line in the lobby card; open it first.
-export async function pick(page, name, value) {
-  if (!(await page.locator("#bg-settings[open]").count())) await page.click("#bg-settings > summary");
-  await page.click(`#bg-settings label:has(input[name="bg-${name}"][value="${value}"])`);
-}
 export const bg = (page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
 // Waits for this page's dice to roll themselves, then plays the whole turn by
 // tapping (or clicking) checkers and points, and confirms.
 export async function playTurnByHand(page, { tap = false } = {}) {
-  await wait(page, () => window.ddp.match.canMove() && window.ddp.match.state.rolled);
+  await waitForState(page, (ddp) => ddp.match.canMove() && ddp.match.state.rolled);
   const press = (sel) => (tap ? page.tap(sel) : page.click(sel));
   const start = await ply(page);
   for (let k = 0; k < 4 && (await page.locator(".bg-cell.src").count()); k++) {
@@ -48,7 +23,7 @@ export async function playTurnByHand(page, { tap = false } = {}) {
     assert.ok(await page.locator("#bg-confirm").isEnabled(), "the whole roll is played");
     await press("#bg-confirm");
   }
-  await wait(page, (n) => window.ddp.match.state.ply > n, start);
+  await waitForState(page, (ddp, n) => ddp.match.state.ply > n, start);
 }
 
 // Robot games only: puts the same position on both sides before the first

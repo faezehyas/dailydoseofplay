@@ -1,32 +1,4 @@
-// Shared by the Ludo browser tests: loads Playwright and the page helpers.
-import { execSync } from "node:child_process";
-import path from "node:path";
-import { createRequire } from "node:module";
-
-export const ARTIFACTS = path.resolve("test-artifacts");
-
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-export const pw = await loadPlaywright();
-export const wait = (page, fn, arg, timeout = 20_000) => page.waitForFunction(fn, arg, { timeout });
-export const noHorizontalScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
-// The settings fold to a summary line in the lobby card; open it first.
-export async function pick(page, name, value) {
-  if (!(await page.locator("#ld-settings[open]").count())) await page.click("#ld-settings > summary");
-  await page.click(`#ld-settings label:has(input[name="ld-${name}"][value="${value}"])`);
-}
+// Shared by the Ludo browser tests: the page helpers.
 export const bg = (page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 export const state = (page) => page.evaluate(() => window.ddp.match.state);
 // Where this screen draws the yard of a colour: its label's place on the board.

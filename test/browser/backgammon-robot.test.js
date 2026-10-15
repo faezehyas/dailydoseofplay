@@ -6,24 +6,16 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
-import { startServer } from "../helpers.js";
-import { ARTIFACTS, START, pw, wait, ply, noHorizontalScroll, pick, playTurnByHand, setPosition, autoplay } from "./backgammon.shared.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, waitForPhase, noHorizontalScroll, pick } from "../helpers.js";
+import { START, ply, playTurnByHand, setPosition, autoplay } from "./backgammon.shared.js";
 
-test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and drag, a race played for you, then a loss on the clock", { skip: !pw && "Playwright not installed", timeout: 180_000 }, async (t) => {
-  mkdirSync(ARTIFACTS, { recursive: true });
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const errors = [];
-  const page = await (await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true, colorScheme: "light" })).newPage();
-  page.on("pageerror", (e) => errors.push(e.message));
+const skip = skipWithoutPlaywright();
+
+test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and drag, a race played for you, then a loss on the clock", { skip, timeout: 180_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { phone: true, colorScheme: "light", clock: true, robotPace: 1 });
   const sounds = new Map();
   page.on("response", (r) => r.url().includes("/backgammon/sounds/") && sounds.set(r.url().split("/").pop(), r.status()));
-  await page.clock.install();
 
   await page.goto(`${srv.base}/`);
   await page.click('.game-card[data-slug="backgammon"]');
@@ -35,7 +27,7 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
   assert.ok(await noHorizontalScroll(page), "settings fit at 360 px");
   await page.screenshot({ path: `${ARTIFACTS}/bg-4-settings-mobile-light.png`, fullPage: true });
   await page.click("#play-robot");
-  await wait(page, () => window.ddp.match?.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing");
   assert.match(await page.locator(".pb-players").innerText(), /Cleo[\s\S]*Robot/);
   // On a phone the names use the full width, from the scoreboard's left edge.
   const left = (sel) => page.locator(sel).evaluate((n) => n.getBoundingClientRect().left);
@@ -49,8 +41,8 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
   await playTurnByHand(page, { tap: true });
   // The robot answers: its checkers fly one at a time, then all of them land.
   await page.locator(".checker.ghost").first().waitFor({ timeout: 10_000 });
-  await wait(page, () => window.ddp.match.state.turn === 0 && window.ddp.match.state.ply >= 4);
-  await wait(page, () => !document.querySelector(".checker.ghost, .pending"));
+  await waitForState(page, (ddp) => ddp.match.state.turn === 0 && ddp.match.state.ply >= 4);
+  await waitForState(page, () => !document.querySelector(".checker.ghost, .pending"));
   assert.notDeepEqual(await page.evaluate(() => window.ddp.match.state.pos[1]), START, "the robot moved");
   // Its last play stays marked on the checkers it moved: a ring on each that arrived.
   await page.locator(".checker.theirs.arrived").first().waitFor();
@@ -58,7 +50,7 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
   assert.ok([...sounds.keys()].some((f) => f.startsWith("checker-")) && [...sounds.keys()].some((f) => f.startsWith("dice-")));
 
   // Turn 2 by keyboard: arrows move between points, Enter picks a checker, Space drops it.
-  await wait(page, () => window.ddp.match.canMove() && window.ddp.match.state.rolled);
+  await waitForState(page, (ddp) => ddp.match.canMove() && ddp.match.state.rolled);
   await page.locator('.bg-cell[data-n="12"]').focus();
   await page.keyboard.press("ArrowRight");
   assert.equal(await page.evaluate(() => document.activeElement.dataset.n), "11");
@@ -77,10 +69,10 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
     await page.locator("#bg-confirm").focus();
     await page.keyboard.press("Enter");
   }
-  await wait(page, (n) => window.ddp.match.state.ply > n, start);
+  await waitForState(page, (ddp, n) => ddp.match.state.ply > n, start);
 
   // Turn 3 by dragging: a checker dropped off the board goes back, one dropped on a point lands there.
-  await wait(page, () => window.ddp.match.canMove() && window.ddp.match.state.rolled);
+  await waitForState(page, (ddp) => ddp.match.canMove() && ddp.match.state.rolled);
   await page.locator(".bg-cell.src").first().waitFor();
   const centreOf = async (loc) => {
     const b = await loc.boundingBox();
@@ -94,14 +86,14 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
   assert.ok(await page.locator(".bg-cell.dest").count(), "where it can go is shown");
   await page.mouse.move(10, 10, { steps: 5 });
   await page.mouse.up();
-  await wait(page, () => !document.querySelector(".checker.ghost, .pending"));
+  await waitForState(page, () => !document.querySelector(".checker.ghost, .pending"));
   assert.equal(await page.locator("#bg-undo").isEnabled(), false, "nothing moved");
   await page.mouse.move(sx, sy);
   await page.mouse.down();
   const [dx, dy] = await centreOf(page.locator(".bg-cell.dest").first());
   await page.mouse.move(dx, dy, { steps: 8 });
   await page.mouse.up();
-  await wait(page, () => !document.querySelector(".checker.ghost, .pending"));
+  await waitForState(page, () => !document.querySelector(".checker.ghost, .pending"));
   assert.ok((await page.locator("#bg-dice .die.used").count()) >= 1, "the dropped checker was played");
   await page.screenshot({ path: `${ARTIFACTS}/bg-5-robot-mobile-light.png`, fullPage: true });
 
@@ -109,7 +101,8 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
   // checks above catch its checkers in flight).
   await page.evaluate(() => (globalThis.ddpRobotPace = 0.1));
   await autoplay(page, 50);
-  await wait(page, () => window.ddp.match.phase === "over", undefined, 120_000);
+  // The last move reaches the robot's table after mine: wait for its match to end too.
+  await waitForPhase(page, "over", { timeout: 120_000 });
   const st = await page.evaluate(() => window.ddp.match.state);
   assert.equal(st.reason, "off");
   assert.equal(st.pos[st.winner][0], 15);
@@ -122,7 +115,7 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
   // Rematch: a race home. The test puts the same race position on both sides
   // before the first roll; the game then offers to move for you.
   await page.click("#rematch");
-  await wait(page, () => window.ddp.match.m === 2 && window.ddp.match.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing");
   await setPosition(page, { 6: 2, 5: 2, 4: 2, 3: 2, 2: 2, 1: 2 }, { 6: 3, 5: 3, 4: 3, 3: 3, 2: 3 });
   await page.locator("#bg-offer").waitFor();
   assert.match(await page.locator("#bg-offer").innerText(), /race/);
@@ -131,7 +124,7 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
   await page.tap("#bg-auto-no");
   assert.ok(await page.locator("#bg-offer").isHidden());
   await playTurnByHand(page, { tap: true });
-  await wait(page, () => window.ddp.match.canMove() && window.ddp.match.state.rolled);
+  await waitForState(page, (ddp) => ddp.match.canMove() && ddp.match.state.rolled);
   assert.ok(await page.locator("#bg-offer").isHidden(), "asked once a game");
   // Changed your mind: the game moves for you to the end, and the robot
   // keeps the same quick pace (its usual pause is 800 ms, at full pace).
@@ -148,7 +141,7 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
   await page.tap("#bg-auto");
   await page.locator("#bg-status").filter({ hasText: "Moving for you" }).waitFor();
   assert.equal(await page.locator("#bg-auto").innerText(), "Stop");
-  await wait(page, () => window.ddp.match.phase === "over", undefined, 60_000);
+  await waitForState(page, (ddp) => ddp.match.phase === "over", undefined, { timeout: 60_000 });
   assert.equal(await page.evaluate(() => window.ddp.match.state.reason), "off");
   assert.equal(await page.evaluate(() => window.ddp.robot.match.state.ply), await ply(page), "the robot checked every move");
   const pauses = await page.evaluate(() => window.__robotPauses);
@@ -158,12 +151,12 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
   // Another rematch: your last checker on your 1 point, so whatever you roll
   // there is only one way to play it. The game plays it and ends your turn.
   await page.locator("#rematch").click();
-  await wait(page, () => window.ddp.match.m === 3 && window.ddp.match.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match.m === 3 && ddp.match.phase === "playing");
   await setPosition(page, { 1: 1 }, { 6: 15 });
   await page.locator("#bg-status").filter({ hasText: "only one way to play it" }).waitFor();
   assert.ok(await page.locator("#bg-offer").isHidden(), "no race offer for a forced turn");
   assert.equal(await page.locator("#bg-undo").isEnabled(), false);
-  await wait(page, () => window.ddp.match.phase === "over");
+  await waitForState(page, (ddp) => ddp.match.phase === "over");
   assert.equal(await page.evaluate(() => window.ddp.match.state.winner), 0);
   await page.locator("#toast").filter({ hasText: "Only one way to play" }).waitFor();
   await page.locator("#result").waitFor();
@@ -171,16 +164,16 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
 
   // The robot accepts another rematch. This time let the 30 s turn clock run out.
   await page.locator("#rematch").click();
-  await wait(page, () => window.ddp.match.m === 4 && window.ddp.match.phase === "playing");
+  await waitForState(page, (ddp) => ddp.match.m === 4 && ddp.match.phase === "playing");
   await page.click("#theme-toggle");
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "dark");
   assert.ok(await noHorizontalScroll(page));
-  await wait(page, () => window.ddp.match.state.rolled);
+  await waitForState(page, (ddp) => ddp.match.state.rolled);
   await page.click(".bg-cell.src >> nth=0");
   await page.clock.fastForward(1500);
   await page.screenshot({ path: `${ARTIFACTS}/bg-8-robot-dark-clock.png`, fullPage: true });
   await page.clock.fastForward(30_000);
-  await wait(page, () => window.ddp.match.phase === "over");
+  await waitForState(page, (ddp) => ddp.match.phase === "over");
   assert.equal(await page.evaluate(() => window.ddp.match.state.reason), "timeout");
   await page.locator("#result").waitFor();
   assert.equal(await page.locator("#result").innerText(), "You lost");
@@ -188,5 +181,5 @@ test("Backgammon vs the robot on a 360 px phone: a game by touch, keyboard and d
   assert.match(await page.locator("#score").innerText(), /Robot\s+[1-4]/);
   await page.click("#leave");
   await page.locator("#play-friend").waitFor();
-  assert.deepEqual(errors, []);
+  assertNoErrors();
 });

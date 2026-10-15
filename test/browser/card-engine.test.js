@@ -7,40 +7,15 @@
 //   node --test test/browser/card-engine.test.js
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { skipWithoutPlaywright, openBrowser } from "../helpers.js";
 
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
+const skip = skipWithoutPlaywright();
 const FIXTURE = readFileSync(new URL("../fixtures/toy-cards.js", import.meta.url), "utf8").replaceAll("../../public/engine/", "/engine/");
 
-test("four robots play a card game in one page, with the deck in a Web Worker", { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const page = await browser.newPage();
-  const problems = [];
-  page.on("pageerror", (e) => problems.push(e.message));
-  page.on("console", (m) => m.type() === "error" && problems.push(m.text()));
+test("four robots play a card game in one page, with the deck in a Web Worker", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("page");
   const workers = [];
   page.on("worker", (w) => workers.push(w.url()));
   // The test game isn't part of the site: serve it from the same origin for this page only.
@@ -79,7 +54,7 @@ test("four robots play a card game in one page, with the deck in a Web Worker", 
     };
   });
   t.diagnostic(`deck ready after ${result.startedMs} ms, game and audit done after ${result.totalMs} ms; longest task ${result.longestTaskMs} ms, timer up to ${result.timerLateMs} ms late`);
-  assert.deepEqual(problems, []);
+  assertNoErrors();
   assert.deepEqual(result.verdicts, [{ ok: true }, { ok: true }, { ok: true }, { ok: true }]);
   assert.ok(result.agree, "every seat ends with the same state");
   assert.deepEqual(workers.map((u) => new URL(u).pathname), ["/engine/deck-worker.js"], "one deck worker for the whole page");
@@ -88,14 +63,9 @@ test("four robots play a card game in one page, with the deck in a Web Worker", 
   assert.ok(result.timerLateMs < 200, `a timer fired ${result.timerLateMs} ms late`);
 });
 
-test("a proof that crashes the deck worker is blamed on its input, and the jobs behind it run on a fresh worker", { skip: !pw && "Playwright not installed", timeout: 60_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const page = await browser.newPage();
+test("a proof that crashes the deck worker is blamed on its input, and the jobs behind it run on a fresh worker", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open } = await openBrowser(t);
+  const page = await open("page");
   const workers = [];
   page.on("worker", (w) => workers.push(w.url()));
   await page.goto(`${srv.base}/`);

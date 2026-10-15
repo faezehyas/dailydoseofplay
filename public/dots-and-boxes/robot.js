@@ -14,7 +14,7 @@
 //   fight over the long chains.
 import { TurnMatch } from "../engine/turn-match.js";
 import { matchRouter } from "../engine/session.js";
-import { robotPause } from "../engine/robot-pace.js";
+import { robotPause, robotRng } from "../engine/robot-pace.js";
 import { geometry, freeLines, isTimed, timeLeft } from "./rules.js";
 
 const NODE_BUDGET = 20_000; // positions and captures tried per move; keeps the biggest board well under 100 ms
@@ -392,7 +392,7 @@ export function thinkTime(state, me, rng = Math.random) {
 }
 
 // Drives the robot's side of a session (startTurnRobot with a pause per move).
-export function startRobot(session, { rules, level = "easy", rng = Math.random, think = thinkTime }) {
+export function startRobot(session, { rules, level = "easy", rng = robotRng(session.index), think = thinkTime }) {
   const router = matchRouter(session);
   let match = null;
   let timer = null;

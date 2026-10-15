@@ -7,27 +7,10 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { startServer } from "../helpers.js";
+import { skipWithoutPlaywright, openBrowser } from "../helpers.js";
 
-async function loadPlaywright() {
-  const require = createRequire(import.meta.url);
-  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"];
-  try {
-    candidates.push(path.join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright"));
-  } catch {}
-  for (const c of candidates.filter(Boolean)) {
-    try {
-      return require(c);
-    } catch {}
-  }
-  return null;
-}
-
-const pw = await loadPlaywright();
+const skip = skipWithoutPlaywright();
 const GAMES = JSON.parse(readFileSync(new URL("../../public/games.json", import.meta.url), "utf8")).games.filter((g) => g.status === "ready");
 // The column at 1280 px: the lobby is always narrow.
 const WIDTHS = { narrow: 520, medium: 640, wide: 980 };
@@ -56,19 +39,12 @@ function assertColumn(m, where, width) {
 }
 
 for (const width of [1280, 360]) {
-  test(`at ${width} px the lobby, the game and "How to play" share one column in every game`, { skip: !pw && "Playwright not installed", timeout: 120_000 }, async (t) => {
-    const srv = await startServer();
-    const browser = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-background-timer-throttling"] });
-    t.after(async () => {
-      await browser.close();
-      await srv.close();
-    });
-    const errors = [];
+  test(`at ${width} px the lobby, the game and "How to play" share one column in every game`, { skip, timeout: 120_000 }, async (t) => {
+    const { srv, open, assertNoErrors } = await openBrowser(t);
     // Inside the 16 px page gutters on a phone.
     const column = (layout) => (width === 360 ? 328 : WIDTHS[layout]);
     for (const game of GAMES) {
-      const page = await browser.newPage({ viewport: { width, height: 900 } });
-      page.on("pageerror", (e) => errors.push(`${game.slug}: ${e.message}`));
+      const page = await open(game.slug, { viewport: { width, height: 900 } });
       await page.goto(`${srv.base}/${game.slug}/`);
       await page.locator("#play-friend").waitFor();
       const lobby = await measure(page);
@@ -91,18 +67,13 @@ for (const width of [1280, 360]) {
       assert.ok(Object.values(bar).every((d) => Math.abs(d) <= 1), `${game.slug}: Leave is at the player bar's top right (${JSON.stringify(bar)})`);
       await page.close();
     }
-    assert.deepEqual(errors, []);
+    assertNoErrors();
   });
 }
 
-test("a game that passes no layout gets the wide column, and its rules panel matches it", { skip: !pw && "Playwright not installed", timeout: 30_000 }, async (t) => {
-  const srv = await startServer();
-  const browser = await pw.chromium.launch({ args: ["--no-sandbox"] });
-  t.after(async () => {
-    await browser.close();
-    await srv.close();
-  });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+test("a game that passes no layout gets the wide column, and its rules panel matches it", { skip, timeout: 30_000 }, async (t) => {
+  const { srv, open } = await openBrowser(t);
+  const page = await open("page", { viewport: { width: 1280, height: 900 } });
   // A game written before layouts existed: no layout, and its own narrower box.
   await page.route("**/tic-tac-toe/main.js", (route) =>
     route.fulfill({
