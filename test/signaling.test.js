@@ -10,6 +10,11 @@ import { cleanName } from "../public/engine/names.js";
 
 const once = (emitter, type) => new Promise((resolve) => emitter.on(type, resolve));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Polls until fn() is true: for state the server reaches without a reply.
+async function until(fn) {
+  for (let i = 0; i < 500 && !fn(); i++) await sleep(10);
+  assert.ok(fn(), "timed out waiting");
+}
 
 async function clients(t, srv, game, n) {
   const list = Array.from({ length: n }, () => new RoomClient({ game, url: srv.wsUrl }));
@@ -86,7 +91,7 @@ test("host creates a room, friend joins with the code, signals relay both ways",
   friend.close();
   assert.deepEqual(await left, { id: friend.id });
   host.leave();
-  await new Promise((r) => setTimeout(r, 50));
+  await until(() => srv.signaling.stats().rooms === 0);
   assert.equal((await (await fetch(`${srv.base}/healthz`)).json()).rooms, 0);
 });
 
@@ -163,10 +168,11 @@ test("malformed traffic gets error replies, not crashes", async (t) => {
   ws.send(JSON.stringify({ t: "signal", to: "999", data: {} }));
   ws.send(JSON.stringify({ t: "nope" }));
   ws.send(JSON.stringify({ t: "ping" }));
-  await new Promise((r) => setTimeout(r, 100));
+  for (const json of ["null", "5", '"create"', "true", "[]"]) ws.send(json);
+  await until(() => replies.length === 10);
   assert.deepEqual(
     replies.map((m) => m.code || m.t),
-    ["hello", "bad_json", "not_in_room", "unknown_type", "pong"],
+    ["hello", "bad_json", "not_in_room", "unknown_type", "pong", "bad_json", "bad_json", "bad_json", "bad_json", "unknown_type"],
   );
   ws.close();
   assert.equal((await fetch(`${srv.base}/healthz`)).status, 200);
@@ -196,7 +202,8 @@ test("the 6th wrong code within a minute is refused and closes the connection; t
 });
 
 test("rate limits: the client-IP header picks the bucket, CLIENT_IP_HEADER overrides it, and the window slides", async (t) => {
-  const srv = await startServer({ limits: { windowMs: 300 } });
+  const clock = { now: Date.now() };
+  const srv = await startServer({ now: () => clock.now });
   t.after(() => srv.close());
   const spend = async (headers) => {
     const sock = await rawSocket(t, srv, headers);
@@ -208,7 +215,7 @@ test("rate limits: the client-IP header picks the bucket, CLIENT_IP_HEADER overr
   assert.equal((await guess(same, "ZZZZ")).code, "rate_limited");
   const other = await rawSocket(t, srv, { "X-Forwarded-For": "198.51.100.2" });
   assert.equal((await guess(other, "ZZZZ")).code, "no_such_room");
-  await sleep(350);
+  clock.now += 60_000;
   const later = await rawSocket(t, srv, { "X-Forwarded-For": "203.0.113.7" });
   assert.equal((await guess(later, "ZZZZ")).code, "no_such_room", "budget back after the window");
 
@@ -264,10 +271,11 @@ test("a code-only join waits for the host: Accept seats it, Decline closes it", 
   await door.closed;
   assert.deepEqual(door.replies.at(-1), { t: "error", code: "declined" });
 
+  const boSeen = once(host, "peer");
   host.admit(bo.id);
   const joined = await boJoined;
   assert.equal(joined.host, host.id);
-  await sleep(20);
+  await boSeen;
   assert.deepEqual(peers, [{ id: bo.id, name: "Bo" }]);
 
   const cyKnock = once(host, "knock");
@@ -350,7 +358,8 @@ test("one address may hold 20 connections; the 21st is refused and a closed one 
 
   socks[0].ws.close();
   await socks[0].closed;
-  await sleep(20);
+  const { id } = socks[0].replies[0];
+  await until(() => ![...srv.wss.clients].some((ws) => ws.meta.id === id));
   assert.equal((await rawSocket(t, srv, ip("203.0.113.5"))).replies[0].t, "hello");
 
   // The browser client reports the code instead of a generic connection failure.
@@ -378,7 +387,7 @@ test("one address may have 5 rooms waiting; the 6th is refused until one closes"
   assert.equal((await create(sixth)).t, "created");
   hosts[1].ws.close();
   await hosts[1].closed;
-  await sleep(20);
+  await until(() => srv.signaling.stats().rooms === 5);
   assert.equal((await create(await rawSocket(t, srv, ip("203.0.113.6")))).t, "created");
 });
 
@@ -433,8 +442,11 @@ test("signal data up to 16 KB is relayed; bigger gets too_big and goes nowhere",
   const refused = once(host, "error");
   host.signal(guest.id, fits + "x");
   assert.equal((await refused).code, "too_big");
-  await sleep(50);
-  assert.deepEqual(relayed, [fits.length]);
+  // Relays keep their order, so once the next one arrives the big one never will.
+  const next = once(guest, "signal");
+  host.signal(guest.id, "y");
+  await next;
+  assert.deepEqual(relayed, [fits.length, 1]);
 });
 
 test("a room that doesn't start within 30 minutes closes for everyone and frees its slot", { timeout: 10_000 }, async (t) => {
@@ -471,4 +483,180 @@ test("a room that doesn't start within 30 minutes closes for everyone and frees 
     const again = await rawSocket(t, srv, ip("203.0.113.8"));
     assert.equal((await again.ask({ t: "create", game: "ludo", name: "Ada" })).t, "created");
   }
+});
+
+test("a message up to 64 KB is read; a bigger one closes the socket with 1009", async (t) => {
+  const srv = await startServer();
+  t.after(() => srv.close());
+  const sock = await rawSocket(t, srv);
+  const pad = (bytes) => "x".repeat(bytes - JSON.stringify({ t: "ping", pad: "" }).length);
+  assert.equal((await sock.ask({ t: "ping", pad: pad(64 * 1024) })).t, "pong");
+  sock.ws.send(JSON.stringify({ t: "ping", pad: pad(64 * 1024 + 1) }));
+  assert.equal((await sock.closed).code, 1009);
+  assert.deepEqual(sock.replies.map((m) => m.t), ["hello", "pong"]);
+});
+
+// A socket that never touches the network, for tests that need thousands.
+function fakeSocket() {
+  const handlers = {};
+  return { readyState: 1, handlers, send() {}, close() {}, terminate() {}, on: (type, fn) => (handlers[type] = fn) };
+}
+
+test("the server holds 10,000 rooms; the next create gets server_full until one closes", { timeout: 30_000 }, async (t) => {
+  const srv = await startServer();
+  t.after(() => srv.close());
+  // Filled in-process, with no client address, so the per-address limits don't apply.
+  const hosts = Array.from({ length: 10_000 }, () => {
+    const ws = fakeSocket();
+    srv.signaling.handleConnection(ws, {});
+    ws.handlers.message(JSON.stringify({ t: "create", game: "sea-battle", name: "H" }));
+    return ws;
+  });
+  assert.equal(srv.signaling.stats().rooms, 10_000);
+  const late = await rawSocket(t, srv);
+  const create = () => late.ask({ t: "create", game: "ludo", name: "Ada" });
+  assert.deepEqual(await create(), { t: "error", code: "server_full" });
+  hosts[0].handlers.close();
+  assert.equal((await create()).t, "created", "the socket stays open");
+});
+
+test("at most 4 knocks wait at a door; the 5th gets room_busy until one is answered", async (t) => {
+  const srv = await startServer();
+  t.after(() => srv.close());
+  const [host] = await clients(t, srv, "ludo", 1);
+  const { room } = await host.create("Ada");
+  const knock = (sock) => sock.ask({ t: "join", game: "ludo", room, name: "K" });
+  const knockers = [];
+  for (let i = 0; i < 4; i++) {
+    const sock = await rawSocket(t, srv);
+    assert.equal((await knock(sock)).t, "knocking", `knock ${i + 1}`);
+    knockers.push(sock);
+  }
+  const fifth = await rawSocket(t, srv);
+  assert.deepEqual(await knock(fifth), { t: "error", code: "room_busy" });
+  host.decline(knockers[0].replies[0].id);
+  await knockers[0].closed;
+  assert.equal((await knock(fifth)).t, "knocking", "the socket stays open");
+});
+
+test("joining a room you are already in, seated or knocking, gets already_in_room", async (t) => {
+  const srv = await startServer();
+  t.after(() => srv.close());
+  const join = (sock, key) => sock.ask({ t: "join", game: "ludo", room, key, name: "X" });
+  const host = await rawSocket(t, srv);
+  const { room, key } = await host.ask({ t: "create", game: "ludo", name: "Ada" });
+  assert.deepEqual(await join(host, key), { t: "error", code: "already_in_room" });
+  assert.deepEqual(await join(host), { t: "error", code: "already_in_room" });
+  const guest = await rawSocket(t, srv);
+  assert.equal((await join(guest, key)).t, "joined");
+  assert.deepEqual(await join(guest, key), { t: "error", code: "already_in_room" });
+  const knocker = await rawSocket(t, srv);
+  assert.equal((await join(knocker)).t, "knocking");
+  assert.deepEqual(await join(knocker), { t: "error", code: "already_in_room" });
+  assert.deepEqual(srv.signaling.stats(), { rooms: 1, players: 2, games: { ludo: 1 } });
+});
+
+test("admitting a knock into a room that filled meanwhile closes it with room_full", async (t) => {
+  const srv = await startServer();
+  t.after(() => srv.close());
+  const [host, guest] = await clients(t, srv, "sea-battle", 2);
+  const { room, key } = await host.create("Ada");
+  const knock = once(host, "knock");
+  const knocker = await rawSocket(t, srv);
+  assert.equal((await knocker.ask({ t: "join", game: "sea-battle", room, name: "Cy" })).t, "knocking");
+  const { id } = await knock;
+  await guest.join(room, "Bo", key);
+  host.admit(id);
+  assert.deepEqual(await knocker.closed, { code: 1000, reason: "room_full" });
+  assert.deepEqual(knocker.replies.at(-1), { t: "error", code: "room_full" });
+  assert.equal(srv.signaling.stats().players, 2);
+});
+
+test("a declined knock counts as a failed join for its connection and address", async (t) => {
+  const srv = await startServer({ limits: { failedJoins: 1 } });
+  t.after(() => srv.close());
+  const [host] = await clients(t, srv, "ludo", 1);
+  const { room, key } = await host.create("Ada");
+  const join = (sock, key) => sock.ask({ t: "join", game: "ludo", room, key, name: "Bo" });
+  const knock = once(host, "knock");
+  const knocker = await rawSocket(t, srv, ip("203.0.113.9"));
+  assert.equal((await join(knocker)).t, "knocking");
+  host.decline((await knock).id);
+  assert.deepEqual(await knocker.closed, { code: 1000, reason: "declined" });
+  const again = await rawSocket(t, srv, ip("203.0.113.9"));
+  assert.equal((await join(again)).code, "rate_limited");
+  const keyed = await rawSocket(t, srv, ip("203.0.113.9"));
+  assert.equal((await join(keyed, key)).t, "joined", "the right key still gets in");
+});
+
+test("admit or decline of an unknown knock, and a signal to yourself or anyone not seated, get no_such_peer", async (t) => {
+  const srv = await startServer();
+  t.after(() => srv.close());
+  const [host, guest, knocker] = await clients(t, srv, "ludo", 3);
+  const { room, key } = await host.create("Ada");
+  await guest.join(room, "Bo", key);
+  const knock = once(host, "knock");
+  const pending = knocker.join(room, "Cy");
+  await knock;
+  const error = async (send) => {
+    const got = once(host, "error");
+    send();
+    return (await got).code;
+  };
+  assert.equal(await error(() => host.admit("999")), "no_such_peer");
+  assert.equal(await error(() => host.decline("999")), "no_such_peer");
+  assert.equal(await error(() => host.admit(guest.id)), "no_such_peer", "a seated guest is not a knock");
+  assert.equal(await error(() => host.signal(host.id, {})), "no_such_peer");
+  assert.equal(await error(() => host.signal("999", {})), "no_such_peer");
+  assert.equal(await error(() => host.signal(knocker.id, {})), "no_such_peer", "a knocker can't be reached");
+  host.admit(knocker.id);
+  assert.equal((await pending).host, host.id, "the knock still waits");
+});
+
+test("create while in a room leaves it first: a host's room closes, a guest's seat frees", async (t) => {
+  const srv = await startServer();
+  t.after(() => srv.close());
+  const [host, guest, other] = await clients(t, srv, "ludo", 3);
+  const first = await host.create("Ada");
+  await guest.join(first.room, "Bo", first.key);
+  const hostLeft = once(guest, "host-left");
+  const second = await host.create("Ada");
+  await hostLeft;
+  assert.deepEqual(srv.signaling.stats(), { rooms: 1, players: 1, games: { ludo: 1 } });
+
+  await other.join(second.room, "Cy", second.key);
+  const left = once(host, "leave");
+  await other.create("Cy");
+  assert.deepEqual(await left, { id: other.id });
+  assert.deepEqual(srv.signaling.stats(), { rooms: 2, players: 2, games: { ludo: 2 } });
+});
+
+test("the sweep drops a socket silent for more than 75 s", async (t) => {
+  const clock = { now: Date.now() };
+  const srv = await startServer({ now: () => clock.now });
+  t.after(() => srv.close());
+  const quiet = await rawSocket(t, srv);
+  const chatty = await rawSocket(t, srv);
+  clock.now += 75_000;
+  srv.signaling.sweep(srv.wss.clients);
+  assert.ok([...srv.wss.clients].every((ws) => ws.readyState === WebSocket.OPEN), "75 s is still in time");
+  clock.now += 1;
+  assert.equal((await chatty.ask({ t: "ping" })).t, "pong");
+  srv.signaling.sweep(srv.wss.clients);
+  assert.equal((await quiet.closed).code, 1006, "dropped without a close frame");
+  assert.equal((await chatty.ask({ t: "ping" })).t, "pong", "a socket that pinged stays");
+});
+
+test("the sweep forgets an address's failed joins only once they leave the window", async (t) => {
+  const clock = { now: Date.now() };
+  const srv = await startServer({ now: () => clock.now, limits: { failedJoins: 1 } });
+  t.after(() => srv.close());
+  const fail = async (addr) => (await guess(await rawSocket(t, srv, ip(addr)), "ZZZZ")).code;
+  assert.equal(await fail("203.0.113.10"), "no_such_room");
+  clock.now += 30_000;
+  assert.equal(await fail("203.0.113.11"), "no_such_room");
+  clock.now += 30_000; // the first failure is a minute old, the second half a minute
+  srv.signaling.sweep(srv.wss.clients);
+  assert.equal(await fail("203.0.113.10"), "no_such_room", "budget back");
+  assert.equal(await fail("203.0.113.11"), "rate_limited", "a failure still in the window is kept");
 });

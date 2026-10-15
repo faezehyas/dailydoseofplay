@@ -374,6 +374,15 @@ a matching `If-None-Match` (GET or HEAD) gets `304` with no body. The hash is
 taken on each request, so a deploy or a local edit shows up on the next load.
 `/healthz`, `/ws` and the 404 page carry no `ETag`.
 
+**Compression.** Text files over 1 KB (HTML, CSS, JS, JSON, SVG) go out
+gzipped when the browser sends `Accept-Encoding: gzip`, with `Vary:
+Accept-Encoding`. A game page can't paint until its CSS arrives, and on a
+phone connection that CSS shares the line with the page's preloaded modules;
+gzip makes both 3 to 5 times smaller, and first paint after a tap on a home
+tile about twice as fast. Each file is compressed once per `ETag`, and the
+gzipped copy's tag ends in `-gz`; an `If-None-Match` with either tag gets
+`304`. If gzipping fails, files go out as they are.
+
 **Page loading.** A game page's modules import each other in a chain
 (`main.js` → `engine/lobby.js` → `engine/reactions.js` → `engine/sound.js` →
 `engine/loudness.js`), and a browser finds each level only when the one above
@@ -382,11 +391,29 @@ has a `<link rel="modulepreload">` for every engine module its `main.js`
 imports statically (not the tutorial's `import()`), and the browser fetches
 them all at once. `test/preload.test.js` walks the real import graph and names
 any preload that is missing or extra. While they load, `#lobby` holds a static
-`.lobby-card` with the game's title and a spinner, which the lobby's first
-screen replaces; `theme.css` keeps the header's height free above it until
-`shell.js` adds the header, so nothing jumps. A `<noscript>` line in it says
-the games need JavaScript. `test/browser/page-loading.test.js` holds back
-`engine/lobby.js` and checks the title shows.
+`.lobby-card` with the lobby home screen's own markup: the game's icon
+(`/<slug>/icon.svg`, already cached from the home tile), title, tagline (its
+`games.json` description, which `lobby.js` reads from it), How to play, the
+nickname field and the settings summary with the default chips, disabled. The
+button row holds the Play buttons, hidden so it keeps their height, and over
+them a piece of the game making its move (`.loading-piece`: inline SVG
+animated by CSS alone, with the home hero's shapes and keyframes where it has
+them). The piece fades in only after 400 ms (CSS `animation-delay`), so a fast
+load never flashes it; under reduced motion it shows at once and stands still.
+Screen readers hear "Loading…" from its `role="status"` line. The real home
+screen replaces the card without moving anything; `theme.css` keeps the
+header's height free above it until `shell.js` adds the header. A `<noscript>`
+line under the tagline says the games need JavaScript. The tapped home tile's
+icon moves into the lobby's (and back) with a cross-document view transition:
+the same `view-transition-name` (`icon-<slug>`) on the tile's `.game-icon`
+(`home.js`) and the `.lobby-icon` (`index.html`, `lobby.js`). Every page opts
+in with an inline `<style>` in its head (`@view-transition`, off under reduced
+motion): when one page opts in and the next hasn't yet when it first shows,
+as with a rule in `theme.css` in Chromium's headless shell, Chrome reports an
+uncaught error. Browsers without them just navigate. `test/browser/page-loading.test.js` holds back `engine/lobby.js` and
+checks that every game shows its icon, title and piece, that the title and
+button row don't move when the lobby arrives, and that nothing visible
+animates in the first 400 ms.
 
 **Who may open `/ws`.** Browsers always send an `Origin` header on a
 WebSocket handshake, and a page can't change it, so the upgrade handler
@@ -414,7 +441,7 @@ A fixed list alone would break LAN play, hence rule 3. Nothing about refused
 connections is logged.
 
 The server sticks to the APIs the reference proved on EdgeJS, which is not
-upstream Node: `node:http`, the `upgrade` event, `fs.readFile` and `ws` (and so `node:crypto`, which `ws` loads itself).
+upstream Node: `node:http`, the `upgrade` event, `fs.readFile` and `ws` (and so `node:crypto` and `node:zlib`, which `ws` loads itself).
 
 **Signaling protocol** (JSON over `/ws`, game-agnostic):
 
@@ -562,7 +589,7 @@ a blocked name over WebRTC either. Nicknames are never logged.
 | `deck-crypto.js` | A synchronous layer over the vendored mental-poker WebAssembly (`vendor/mental-poker/`): keys, shuffles and their proofs, shares, opening, the audit. Bytes in, bytes out. |
 | `base64.js` | Bytes to base64 and back, strict about its input, for binary data in JSON messages |
 | `vendor/mental-poker/` | The built library, committed (see **Card games**): `cards_play_bg.wasm`, its loader `cards_play.js`, `LICENSE`, and `SOURCE` (the commit it was built from) |
-| `lobby.js` | `startGameShell()`: the game's `description` from `games.json` under its name (the lobby shows at once and the text fills in when the file arrives), a "How to play" link under it that opens the game's `howToPlay` panel (see `how-to-play.js`, put under `#game`) and moves focus to its summary, the "Play with a friend" / "Play vs robot" / join-by-code UI with a quiet line under the Play buttons that games connect browsers directly, invite link with copy and share (inside the mobile app the app's share sheet; on the web a share that fails, other than a cancelled sheet, copies the link instead and says so), the waiting room (a player list and a Start button when a game allows more than two, with Add robot on each empty seat and Remove on each robot; Accept / Decline for anyone knocking), `?room=CODE&key=KEY` auto-join, `?robot=1` (a robot game), `?friend=1` (a new room at once, as if "Play with a friend" was pressed; dropped from the address bar so a reload doesn't make another) and `?learn` (the game's tutorial, also opened by a Learn button under the Play buttons and a link at the top of "How to play"; see **Tutorials**), your record against the robot once you have one (in the robot box, else under the Play buttons), with a Reset that asks first (see **Record against the robot**), connection-failure and player-left screens, and "You're offline" when `/ws` can't be reached (see **Mobile app**). It hands the game a `shell` with `leave()` and `setInProgress(on)` (see **Leaving**). With a game's `settings` it shows them inside the home screen's card, between the nickname and the Play buttons, and their summary on the host's waiting screen, so friends see the rules before the game starts; it passes them to the settings panel and locks them while a game is on. Each new screen moves focus to its heading (not on page load); progress such as "Creating a room…" or "Bo joined" is read out from one `role="status"` line, and the connection-problem screen uses `role="alert"`. The code field takes only the server's code letters (uppercased, spaces and dashes dropped, anything else refused with a hint) and joins by itself at four; a join that fails returns to it with the code still in, the error under the field and read out from the status line. It also sets which view is on show for the page column. |
+| `lobby.js` | `startGameShell()`: the game's icon over its name and its `description` from `games.json` under it (read from the page's loading card, see **Page loading**), a "How to play" link under it that opens the game's `howToPlay` panel (see `how-to-play.js`, put under `#game`) and moves focus to its summary, the "Play with a friend" / "Play vs robot" / join-by-code UI with a quiet line under the Play buttons that games connect browsers directly, invite link with copy and share (inside the mobile app the app's share sheet; on the web a share that fails, other than a cancelled sheet, copies the link instead and says so), the waiting room (a player list and a Start button when a game allows more than two, with Add robot on each empty seat and Remove on each robot; Accept / Decline for anyone knocking), `?room=CODE&key=KEY` auto-join, `?robot=1` (a robot game), `?friend=1` (a new room at once, as if "Play with a friend" was pressed; dropped from the address bar so a reload doesn't make another) and `?learn` (the game's tutorial, also opened by a Learn button under the Play buttons and a link at the top of "How to play", and from the waiting screen by "Learn while you wait"; see **Tutorials**), your record against the robot once you have one (in the robot box, else under the Play buttons), with a Reset that asks first (see **Record against the robot**), connection-failure and player-left screens, and "You're offline" when `/ws` can't be reached (see **Mobile app**). It hands the game a `shell` with `leave()` and `setInProgress(on)` (see **Leaving**). With a game's `settings` it shows them inside the home screen's card, between the nickname and the Play buttons, and their summary on the host's waiting screen, so friends see the rules before the game starts; it passes them to the settings panel and locks them while a game is on. Each new screen moves focus to its heading (not on page load); progress such as "Creating a room…" or "Bo joined" is read out from one `role="status"` line, and the connection-problem screen uses `role="alert"`. The code field takes only the server's code letters (uppercased, spaces and dashes dropped, anything else refused with a hint) and joins by itself at four; a join that fails returns to it with the code still in, the error under the field and read out from the status line. It also sets which view is on show for the page column. |
 | `fair.js` | `commit` and `verifyCommit` (SHA-256 commitments), `HashChain` and `SharedRandom` (random draws all peers agree on; `drop(seat)` and `forSeat(seat)` for a seat a robot took over). SHA-256 uses WebCrypto where the page has it, else a plain-JS copy (see below). |
 | `players.js` | `playerBar(session, { onLeave, classes })`: the bar above every game (see **Player bar**), with "(robot)" after a player a robot took over from. |
 | `reactions.js` | Quick reactions in the player bar (see **Reactions**): the React tray, the bubbles with their pop, the checks on `$react`, and `robotBanter()`, which the lobby starts for every robot seat. |
@@ -942,12 +969,14 @@ the scene is off screen (IntersectionObserver) or the tab is hidden, and with
 `prefers-reduced-motion` the scene is still.
 
 **Tile previews.** While a ready game's home tile is hovered or has keyboard
-focus, or on a touch screen (`hover: none`) while it crosses a line that moves
-from the top of the screen to the bottom as the page scrolls (so one tile, or
-one row of tiles, plays at a time, and every tile gets a turn), it loops a
-3–5 second preview of the game: its pieces move and small player tags light
-up in turn. Each loop holds its last frame for a moment; when the
-tile loses hover, focus or the line, its icon comes back. `home.js` fetches
+focus, or on a touch screen (`hover: none`) while it crosses the middle of
+the screen once scrolling pauses (in the last half screen of the page the line
+moves down to the bottom, so one tile, or one row of tiles, plays at a time,
+and every tile gets a turn), it loops a 3–5 second preview of the game: its
+pieces move and small player tags light up in turn. Each loop holds its last
+frame for a moment; when the tile loses hover, focus or the line, or the page
+is hidden (`pagehide`: leaving through a tile fires no `mouseleave`, and Back
+may restore the page as it was), its icon comes back. `home.js` fetches
 `<slug>/preview.svg` the first time, inlines it in place of the icon (an
 `<img>` couldn't reach the page's tokens or be started) and calls `play()` on
 its animations, which start paused, again after each loop. Without the file,
@@ -1174,6 +1203,15 @@ flowchart LR
   `engine/tutorial.js` and the game's `tutorial.js` only then. The last
   lesson ends on a screen with "Play the robot now", which plays the result
   moment's win (`celebrate()`).
+- **While waiting for friends:** the waiting screen (host and guests, except
+  a guest with an invite link to a two-player game, who starts at once) has
+  "Learn while you wait". The tutorial opens over the waiting screen, which
+  stays in the page with the room open; its history entry keeps the address,
+  so Back or "Back to the room" (which stands in for "Play the robot now" on
+  the end screen too) shows the room as it was, focus on the button. A friend
+  joining (or knocking) closes it with a toast ("Bo joined"); the game
+  starting closes it and takes over its history entry. A lesson left
+  half-way isn't ticked. No room message changes.
 - **Progress** stays on the device: `ddp-lessons` in `localStorage` holds
   each game's finished lessons, which get a tick in the list.
 - **Access:** the step's text is in a `role="status"` line, so it is read

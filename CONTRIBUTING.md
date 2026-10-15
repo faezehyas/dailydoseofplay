@@ -80,7 +80,7 @@ your protocol:
 
 ```
 public/<slug>/
-├── index.html       page shell: copy public/sea-battle/index.html, change title, description, the placeholder's <h1> and the modulepreload links; keep the icon, manifest and theme-color tags
+├── index.html       page shell: copy public/sea-battle/index.html, change title, description, the loading card and its piece, and the modulepreload links; keep the icon, manifest, theme-color and view-transition tags
 ├── style.css        game-specific styles; only var(--…) tokens from /engine/theme.css, light and dark
 ├── main.js          startGameShell(...) and the view
 ├── rules.js         pure rules
@@ -98,10 +98,23 @@ public/<slug>/
 
 Keep `index.html`'s `<section id="lobby">` and `<section id="game" hidden>`;
 the engine renders into them. Keep them in its `<main>` too: the header's
-"Skip to content" link jumps there. `#lobby` starts with a placeholder card
-(the game's name as in `games.json`, a spinner and a `<noscript>` line) that
-the lobby replaces. List a `<link rel="modulepreload">` for each engine module
-your `main.js` imports, directly or through your other files, so they load at
+"Skip to content" link jumps there. `#lobby` starts with a loading card that
+the lobby's home screen replaces without moving anything: copy the lobby's
+home screen markup up to its Play buttons (with a fresh profile, so the
+nickname is empty and the settings chips are the defaults), drop the ids,
+disable the field and buttons, mark How to play and the settings `inert` and
+leave out the settings' options. It starts with the icon
+(`<div class="lobby-icon" style="view-transition-name: icon-<slug>">`), the
+game's name as in `games.json` and its description as the tagline, then the
+`<noscript>` line. The button row gets the class `loading-row`, which hides
+its buttons, and last in it goes the `role="status"` line with
+a piece of your game and "Loading…" for screen readers: an inline
+`<svg class="loading-piece" viewBox="0 0 80 48">` from the shapes and
+animation classes under `.loading-piece` in `theme.css`; copy the closest
+game's. `npm test` checks the top of the card, and
+`test/browser/page-loading.test.js` that nothing moves. List a
+`<link rel="modulepreload">` for each engine module your `main.js` imports,
+directly or through your other files, so they load at
 once: `npm test` (`test/preload.test.js`) prints each link that is missing or
 extra. Don't make `#lobby` a live region: the
 lobby moves focus to each new screen and reads out its own progress. Shared
@@ -425,8 +438,9 @@ A tutorial teaches the rules on your real board: 3 to 6 short lessons of 1 to
 and wait for one move, which your `rules.js` checks (see **Tutorials** in
 `ARCHITECTURE.md`). The engine does the rest: the lesson list and its ticks,
 hints, the check mark and its chime, the end screen, a Learn button in the
-lobby, a link at the top of "How to play" and `/<slug>/?learn`. Tic Tac Toe's
-is the shortest to copy, and Chess shows a promotion picker.
+lobby and on the waiting screen, a link at the top of "How to play" and
+`/<slug>/?learn`. Tic Tac Toe's is the shortest to copy, and Chess shows a
+promotion picker.
 
 `lessons.js` is data, in your game's own move format:
 
@@ -519,6 +533,7 @@ no change.
 - **`lessons.test.js`** (with a tutorial): every step's expected moves and reply are legal in its position according to `rules.js`, a step without a position follows a reply, and there are 3 to 6 lessons of 1 to 4 steps (see Chess's).
 - **Sounds:** nothing to add. `test/browser/sound-levels.test.js` finds every `sounds.js` and checks each sound's loudness.
 - **Message size:** add the game to `GAMES` in `test/message-size.test.js` (its biggest board and most players). It plays a full match and fails if a message is over 4 K characters; a browser cuts off a player whose message is over 64 K (see **Message size** in `ARCHITECTURE.md`). Send moves, not whole states.
+- **Fuzzing:** nothing to add. `test/rules-fuzz.test.js` reads `games.json` and plays every game at random, against its robots at every level and with garbage moves, in each player count and each option value `normalizeConfig` keeps. Your rules must take a move time (`ms`) on every move of a timed game; throw `RuleError` (never a `TypeError`) for anything malformed, such as `null`, a string, a huge number or a field of the wrong type, and leave the state as it was; use randomness only on moves `needsRandom` names; and stay within `draws`. If a move is more than one integer field (a path, a list of steps), list its legal moves in `LEGAL` there.
 - **Browser (recommended):** add `test/browser/<slug>.test.js` modelled on `test/browser/friend-match.test.js`. Host clicks `#play-friend`, the guest opens `#invite-link`, both play through `window.ddp.match`, then a rematch.
   - Use the helpers in `test/helpers.js`: `skipWithoutPlaywright()` for the test's `skip`, `openBrowser(t)` for the server, the browser and `open(name, options)` (a page with its own nickname, `phone` size, colour scheme, fake `clock` and init scripts; `assertNoErrors()` checks no page threw or logged an error), `joinByInvite()`, `waitForState()`, `waitForPhase()`, `waitForSameState()`, `pick()` for a setting and `noHorizontalScroll()`.
   - Don't wait in real time. `open()` runs robots at a tenth of their usual pause (pass `robotPace: 1` only where the test checks the robot's pace). To let a clock run out, pass `clock: true` and call `page.clock.fastForward()` past the limit.

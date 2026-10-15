@@ -10,6 +10,7 @@
     <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#12151c" media="(prefers-color-scheme: dark)" />
     <link rel="preload" href="/engine/fonts/fredoka.woff2" as="font" type="font/woff2" crossorigin />
+    <style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>
     <link rel="stylesheet" href="/engine/theme.css" />
     <link rel="stylesheet" href="./style.css" />
     <link rel="modulepreload" href="/engine/lobby.js" />
@@ -45,9 +46,45 @@
     <main class="page">
       <section id="lobby">
         <div class="card lobby-card">
+          <div class="lobby-icon" style="view-transition-name: icon-dots-and-boxes"><img src="/dots-and-boxes/icon.svg" alt="" /></div>
           <h1>Dots and Boxes</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="tagline">Join the dots, close a box and go again. Most boxes wins.</p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
+          <p class="how-to-play" inert><a href="#how-to-play">How to play</a></p>
+          <label class="field">
+            <span>Nickname</span>
+            <input type="text" maxlength="20" placeholder="Your nickname (optional)" disabled />
+            <small>Saved on this device only.</small>
+          </label>
+          <details class="settings" inert>
+            <summary>
+              <span class="settings-title">Game settings</span>
+              <span class="settings-change">Change</span>
+              <span class="settings-line">
+                <span class="chip">4×4 boxes</span>
+                <span class="sr-only">, </span>
+                <span class="chip">No clocks</span>
+                <span class="sr-only">, </span>
+                <span class="chip">Coin toss</span>
+                <span class="sr-only">, </span>
+                <span class="chip robot">Easy robot</span>
+              </span>
+            </summary>
+          </details>
+          <div class="lobby-actions loading-row">
+            <button class="btn primary big" type="button" disabled>Play with a friend</button>
+            <button class="btn big" type="button" disabled>Play vs robot</button>
+            <button class="btn learn" type="button" disabled>Learn</button>
+            <p class="loading" role="status">
+              <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+                <path class="mark teal" d="M22 12h18M22 12v24M22 36h18" />
+                <path class="mark draw-1" pathLength="1" d="M40 12v24" />
+                <circle class="dot" cx="22" cy="12" r="2.5" /><circle class="dot" cx="40" cy="12" r="2.5" /><circle class="dot" cx="58" cy="12" r="2.5" />
+                <circle class="dot" cx="22" cy="36" r="2.5" /><circle class="dot" cx="40" cy="36" r="2.5" /><circle class="dot" cx="58" cy="36" r="2.5" />
+              </svg>
+              <span class="sr-only">Loading…</span>
+            </p>
+          </div>
         </div>
       </section>
       <section id="game" hidden></section>
