@@ -7,7 +7,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
-import { createApp, parseOrigins, parseRegistry, wsOriginAllowed } from "../server/app.js";
+import { PUBLIC_DIR, createApp, parseOrigins, parseRegistry, wsOriginAllowed } from "../server/app.js";
 import { startServer } from "./helpers.js";
 
 const registry = JSON.parse(fs.readFileSync(new URL("../public/games.json", import.meta.url)));
@@ -94,6 +94,39 @@ test("static files: ETag, 304 when it matches, a new ETag after an edit", async 
   assert.equal(edited.status, 200);
   assert.notEqual(edited.headers.get("etag"), etag);
   assert.equal(await edited.text(), "export const v = 2;\n");
+});
+
+test("static files: text goes out gzipped when the browser accepts it, with its own ETag", async (t) => {
+  const srv = await startServer();
+  t.after(() => srv.close());
+  const url = `${srv.base}/engine/theme.css`;
+  const css = fs.readFileSync(path.join(PUBLIC_DIR, "engine", "theme.css"), "utf8");
+
+  const plain = await fetch(url, { headers: { "Accept-Encoding": "identity" } });
+  assert.equal(plain.headers.get("content-encoding"), null);
+  assert.equal(plain.headers.get("vary"), "Accept-Encoding");
+  assert.equal(await plain.text(), css);
+
+  const gz = await fetch(url, { headers: { "Accept-Encoding": "gzip, deflate, br" } });
+  assert.equal(gz.headers.get("content-encoding"), "gzip");
+  assert.equal(gz.headers.get("vary"), "Accept-Encoding");
+  assert.ok(Number(gz.headers.get("content-length")) < css.length / 3, "much smaller");
+  assert.equal(await gz.text(), css, "fetch unzips it to the same file");
+  const tag = gz.headers.get("etag");
+  assert.equal(tag, plain.headers.get("etag").replace(/"$/, '-gz"'));
+
+  // Either tag still names the same content.
+  for (const sent of [tag, plain.headers.get("etag")]) {
+    const again = await fetch(url, { headers: { "Accept-Encoding": "gzip", "If-None-Match": sent } });
+    assert.equal(again.status, 304, sent);
+    assert.equal(again.headers.get("etag"), tag);
+  }
+
+  // Images, fonts and small files go out as they are.
+  for (const file of ["/engine/fonts/fredoka.woff2", "/favicon.svg"]) {
+    const res = await fetch(`${srv.base}${file}`, { headers: { "Accept-Encoding": "gzip" } });
+    assert.equal(res.headers.get("content-encoding"), null, file);
+  }
 });
 
 test("privacy page: served, and it names every localStorage key in public/", async (t) => {

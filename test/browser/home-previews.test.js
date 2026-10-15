@@ -1,8 +1,8 @@
 // Headless-browser tests: while a ready game's home tile is hovered or has
 // keyboard focus, it loops a short preview of the game in place of its icon,
 // without changing size, and shows the icon again after (also when a click
-// left focus in the tile); on a touch screen only the tile crossing a line
-// across the screen loops; with reduced motion, or without a preview, the
+// left focus in the tile, or the page was left through it); on a touch screen
+// only the tile crossing the middle of the screen loops, once scrolling pauses; with reduced motion, or without a preview, the
 // icon stays. Skips if Playwright is missing.
 //
 //   npm run test:browser
@@ -138,6 +138,13 @@ test("a tile loops its game's preview while hovered or focused, then shows its i
   await page.locator(`.game-card[data-slug="${first}"] .game-icon img`).waitFor();
   assert.equal(await preview(page, first), null, "the first tile shows its icon again");
 
+  // Leaving the page through a tile fires no mouseleave; Back may bring the page back as it was.
+  await page.locator(`.game-card[data-slug="${second}"]`).hover();
+  await page.locator(`.game-card[data-slug="${second}"] svg.tile-preview`).waitFor();
+  await page.evaluate(() => dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true })));
+  await page.locator(`.game-card[data-slug="${second}"] .game-icon img`).waitFor();
+  assert.equal(await page.locator("svg.tile-preview").count(), 0, "no preview plays on a page left through a tile");
+
   // Mouse: pressing a tile's link focuses it, but the preview still stops once the pointer leaves.
   await page.locator(`.game-card[data-slug="${first}"] h2 a`).hover();
   await page.mouse.down();
@@ -166,11 +173,17 @@ test("previews loop in view on a touch screen and never play with reduced motion
   assert.equal(await preview(phone, last), null, "a tile below the screen waits");
   const played = new Set();
   const end = await phone.evaluate(() => document.documentElement.scrollHeight - innerHeight);
-  for (let y = 0; y <= end; y += 40) {
-    await phone.evaluate((y) => scrollTo(0, y), y);
-    await phone.waitForTimeout(150);
-    const playing = await phone.locator(".game-card:has(svg.tile-preview)").evaluateAll((els) => els.map((e) => e.dataset.slug));
+  for (let y = 0; y <= end + 79; y += 80) {
+    await phone.evaluate((y) => scrollTo(0, y), Math.min(y, end));
+    await phone.waitForTimeout(400); // switches once scrolling pauses
+    const tiles = phone.locator(".game-card:has(svg.tile-preview)");
+    const playing = await tiles.evaluateAll((els) => els.map((e) => e.dataset.slug));
     assert.ok(playing.length <= 1, `${playing.join(" and ")} play at once`);
+    // Above the last half screen, it's the tile across the middle (740 / 2).
+    if (playing.length && end - Math.min(y, end) > 370) {
+      const { y: top, height } = await tiles.boundingBox();
+      assert.ok(top <= 370 && 370 < top + height, `${playing[0]} plays away from the middle of the screen`);
+    }
     for (const slug of playing) played.add(slug);
     if (playing[0] === last) assert.ok(started(await preview(phone, last)), "the last tile plays");
   }

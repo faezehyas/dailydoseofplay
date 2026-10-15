@@ -10,6 +10,7 @@
     <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#12151c" media="(prefers-color-scheme: dark)" />
     <link rel="preload" href="/engine/fonts/fredoka.woff2" as="font" type="font/woff2" crossorigin />
+    <style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>
     <link rel="stylesheet" href="/engine/theme.css" />
     <link rel="stylesheet" href="/engine/cards/cards.css" />
     <link rel="stylesheet" href="./style.css" />
@@ -53,9 +54,56 @@
     <main class="page">
       <section id="lobby">
         <div class="card lobby-card">
+          <div class="lobby-icon" style="view-transition-name: icon-crazy-eights"><img src="/crazy-eights/icon.svg" alt="" /></div>
           <h1>Crazy Eights</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="tagline">Match the suit or the rank, play an 8 to change it, and empty your hand first. Nobody deals, nobody peeks.</p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
+          <p class="how-to-play" inert><a href="#how-to-play">How to play</a></p>
+          <label class="field">
+            <span>Nickname</span>
+            <input type="text" maxlength="20" placeholder="Your nickname (optional)" disabled />
+            <small>Saved on this device only.</small>
+          </label>
+          <details class="settings" inert>
+            <summary>
+              <span class="settings-title">Game settings</span>
+              <span class="settings-change">Change</span>
+              <span class="settings-line">
+                <span class="chip">Coin toss</span>
+                <span class="sr-only">, </span>
+                <span class="chip">No move limit</span>
+                <span class="sr-only">, </span>
+                <span class="chip robot">Easy robots</span>
+              </span>
+            </summary>
+          </details>
+          <div class="lobby-actions loading-row">
+            <button class="btn primary big" type="button" disabled>Play with friends</button>
+            <div class="robot-play">
+              <fieldset class="settings-group players-choice" disabled>
+                <legend>Players (you + robots)</legend>
+                <div class="seg-options">
+                  <label class="seg-opt"><input type="radio" /><span>2</span></label>
+                  <label class="seg-opt"><input type="radio" /><span>3</span></label>
+                  <label class="seg-opt"><input type="radio" checked /><span>4</span></label>
+                </div>
+              </fieldset>
+              <button class="btn big" type="button" disabled>Play vs 3 robots</button>
+            </div>
+            <button class="btn learn" type="button" disabled>Learn</button>
+            <p class="loading" role="status">
+              <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+                <g transform="translate(20 11) rotate(-10)"><rect class="card-back" width="22" height="30" rx="3" /><rect class="card-trim" x="3" y="3" width="16" height="24" rx="2" /></g>
+                <g transform="translate(38 9) rotate(8)">
+                  <g class="flip">
+                    <rect class="card-face" width="22" height="30" rx="3" /><path class="heart" d="M11 19c-4-3-6-5-6-7.5a3 3 0 0 1 6-1 3 3 0 0 1 6 1c0 2.5-2 4.5-6 7.5z" />
+                    <g class="flip-back"><rect class="card-back" width="22" height="30" rx="3" /><rect class="card-trim" x="3" y="3" width="16" height="24" rx="2" /></g>
+                  </g>
+                </g>
+              </svg>
+              <span class="sr-only">Loading…</span>
+            </p>
+          </div>
         </div>
       </section>
       <section id="game" hidden></section>

@@ -10,6 +10,7 @@
     <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#12151c" media="(prefers-color-scheme: dark)" />
     <link rel="preload" href="/engine/fonts/fredoka.woff2" as="font" type="font/woff2" crossorigin />
+    <style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>
     <link rel="stylesheet" href="/engine/theme.css" />
     <link rel="stylesheet" href="./style.css" />
     <link rel="modulepreload" href="/engine/lobby.js" />
@@ -45,9 +46,54 @@
     <main class="page">
       <section id="lobby">
         <div class="card lobby-card">
+          <div class="lobby-icon" style="view-transition-name: icon-chess"><img src="/chess/icon.svg" alt="" /></div>
           <h1>Chess</h1>
-          <p class="waiting"><span class="spinner"></span>Loading…</p>
+          <p class="tagline">Sixty-four squares, two armies, one king to trap. Your move.</p>
           <noscript><p class="notice">The games need JavaScript. Turn it on in your browser to play.</p></noscript>
+          <p class="how-to-play" inert><a href="#how-to-play">How to play</a></p>
+          <label class="field">
+            <span>Nickname</span>
+            <input type="text" maxlength="20" placeholder="Your nickname (optional)" disabled />
+            <small>Saved on this device only.</small>
+          </label>
+          <details class="settings" inert>
+            <summary>
+              <span class="settings-title">Game settings</span>
+              <span class="settings-change">Change</span>
+              <span class="settings-line">
+                <span class="chip">No clocks</span>
+                <span class="sr-only">, </span>
+                <span class="chip">Coin toss</span>
+                <span class="sr-only">, </span>
+                <span class="chip robot">Easy robot</span>
+              </span>
+            </summary>
+          </details>
+          <div class="lobby-actions loading-row">
+            <button class="btn primary big" type="button" disabled>Play with a friend</button>
+            <button class="btn big" type="button" disabled>Play vs robot</button>
+            <button class="btn learn" type="button" disabled>Learn</button>
+            <p class="loading" role="status">
+              <svg class="loading-piece" viewBox="0 0 80 48" aria-hidden="true">
+                <rect class="square" x="10" y="16" width="60" height="30" />
+                <path class="square dark" d="M22 16h12v10h-12zM46 16h12v10h-12zM10 26h12v10h-12zM34 26h12v10h-12zM58 26h12v10h-12zM22 36h12v10h-12zM46 36h12v10h-12z" />
+                <g class="rival" transform="translate(64 24) scale(0.17) translate(-50 -86)">
+                  <path d="M41 46h18l9 32H32z" /><ellipse cx="50" cy="46" rx="13" ry="4.5" /><circle cx="50" cy="30" r="12" />
+                  <path d="M24 78h52a4 4 0 0 1 4 4v2a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4v-2a4 4 0 0 1 4-4z" />
+                </g>
+                <g transform="translate(28 44)">
+                  <g class="knight">
+                    <g transform="scale(-0.2 0.2) translate(-50 -86)">
+                      <path d="M30 78c0-12 5-20 14-26-5 2-10 5-14 8l-8-8c3-12 10-21 20-26l4-10 6 8c14 3 22 17 20 54z" />
+                      <path d="M24 78h52a4 4 0 0 1 4 4v2a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4v-2a4 4 0 0 1 4-4z" />
+                      <circle class="eye" cx="38" cy="38" r="4" />
+                    </g>
+                  </g>
+                </g>
+              </svg>
+              <span class="sr-only">Loading…</span>
+            </p>
+          </div>
         </div>
       </section>
       <section id="game" hidden></section>
