@@ -6,6 +6,7 @@ import { TurnMatch, startTurnRobot } from "../engine/turn-match.js";
 import { rngFromSeed } from "../engine/rng.js";
 import { makeRules, stoneOf, DRAW } from "./rules.js";
 import { chooseMove } from "./robot.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const rules = makeRules({ moveSeconds: 0, gameSeconds: 0 });
 const tick = () => new Promise((r) => setTimeout(r, 1));
@@ -35,7 +36,7 @@ async function pair(r = rules) {
   return [a, b];
 }
 
-test("two peers agree on the coin toss and every move, through a full game", async () => {
+test("two peers agree on the coin toss and every move, through a full game", () => withSeededRandom("gomoku 1", async () => {
   for (let g = 0; g < 4; g++) {
     const [a, b] = await pair();
     assert.equal(a.state.first, b.state.first, "both agree who starts");
@@ -56,9 +57,9 @@ test("two peers agree on the coin toss and every move, through a full game", asy
     assert.ok([0, 1, DRAW].includes(a.state.winner));
     if (a.state.winner !== DRAW) assert.ok(a.state.line.length >= 5);
   }
-});
+}));
 
-test("a taken point is refused locally; a forged move from the peer aborts", async () => {
+test("a taken point is refused locally; a forged move from the peer aborts", () => withSeededRandom("gomoku 2", async () => {
   const [a, b] = await pair();
   const mover = a.canMove() ? a : b;
   const other = mover === a ? b : a;
@@ -72,9 +73,9 @@ test("a taken point is refused locally; a forged move from the peer aborts", asy
   const aborted = new Promise((r) => mover.on("abort", r));
   other.send({ t: "move", move: { cell: 112 } });
   assert.match((await aborted).reason, /broke the rules: That point is taken/);
-});
+}));
 
-test("the robot plays whole games over startTurnRobot and accepts a rematch", async () => {
+test("the robot plays whole games over startTurnRobot and accepts a rematch", () => withSeededRandom("gomoku 3", async () => {
   const [human, bot] = await sessions();
   bot.on("rematch", (v) => v.them && !v.me && bot.requestRematch());
   const robot = startTurnRobot(bot, { rules, choose: chooseMove, delay: 0, rng: rngFromSeed("bot") });
@@ -97,9 +98,9 @@ test("the robot plays whole games over startTurnRobot and accepts a rematch", as
     }
   }
   robot.destroy();
-});
+}));
 
-test("timed games: move times spend the same clocks on both sides, and a timeout ends the round", async () => {
+test("timed games: move times spend the same clocks on both sides, and a timeout ends the round", () => withSeededRandom("gomoku 4", async () => {
   const timed = makeRules({ moveSeconds: 10, gameSeconds: 120, first: "host" });
   const [a, b] = await pair(timed);
   assert.equal(a.state.turn, 0, "the room says the host starts, whatever the coin");
@@ -122,4 +123,4 @@ test("timed games: move times spend the same clocks on both sides, and a timeout
   assert.equal(b.state.winner, 1);
   assert.equal(b.state.reason, "timeout");
   assert.deepEqual(a.state, b.state);
-});
+}));

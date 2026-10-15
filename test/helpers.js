@@ -23,6 +23,47 @@ export async function startServer({ publicDir, allowedOrigins, clientIpHeader, a
   };
 }
 
+// Runs fn with crypto.getRandomValues drawing from rngFromSeed(seed), so a
+// protocol test's shared draws, card keys and deals are the same every run.
+// WebCrypto (crypto.subtle) stays real. An error from fn names the seed.
+export async function withSeededRandom(seed, fn) {
+  const rng = rngFromSeed(seed);
+  globalThis.crypto.getRandomValues = (array) => {
+    const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(rng() * 256);
+    return array;
+  };
+  try {
+    return await fn();
+  } catch (err) {
+    const name = `seed ${JSON.stringify(seed)}`;
+    err.message = `${name}: ${err.message}`;
+    if (typeof err.stack === "string") err.stack = `${name}: ${err.stack}`;
+    throw err;
+  } finally {
+    delete globalThis.crypto.getRandomValues;
+  }
+}
+
+// How long fn takes, in ms.
+export function elapsed(fn) {
+  const t0 = performance.now();
+  fn();
+  return performance.now() - t0;
+}
+
+// The fastest of 5 timings after one to warm up: what the code costs,
+// without whatever else the machine is doing. sample(run) returns the ms it
+// measured (run 0 is the warm-up), or a list of them that is the same every
+// run, such as each move of a seeded game: then each gets its fastest, and
+// the slowest of those is returned.
+export function bestOf5(sample) {
+  sample(0);
+  let best = [sample(1)].flat();
+  for (let run = 2; run <= 5; run++) best = [sample(run)].flat().map((ms, i) => Math.min(ms, best[i] ?? ms));
+  return Math.max(...best);
+}
+
 // An import in a module's source: group 1 or 2 is a static import's
 // specifier, group 3 a dynamic import()'s.
 export const IMPORT = /^\s*(?:import|export)\b[^;]*?\bfrom\s*["']([^"']+)["']|^\s*import\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)/gm;

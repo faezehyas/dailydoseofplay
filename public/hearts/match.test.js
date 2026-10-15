@@ -13,6 +13,7 @@ import { rngFromSeed } from "../engine/rng.js";
 import { suitOf } from "../engine/cards/faces.js";
 import { makeRules, cardsOf, isPoint, TWO_CLUBS, HEARTS } from "./rules.js";
 import { chooseMove, startRobot } from "./robot.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const tick = () => new Promise((r) => setTimeout(r, 1));
 async function until(fn, ms = 280_000) {
@@ -57,7 +58,7 @@ async function play({ players = 4, config = {}, choose = () => null, seed = "" }
   return { matches: robots.map((r) => r.match), checks };
 }
 
-test("four seats, a game to 50: the same state everywhere, every pass sealed, a passing audit and no seat knowing another's card", { timeout: 300_000 }, async () => {
+test("four seats, a game to 50: the same state everywhere, every pass sealed, a passing audit and no seat knowing another's card", { timeout: 300_000 }, () => withSeededRandom("hearts 1", async () => {
   const { matches, checks } = await play({ config: { target: 50 }, seed: "full" });
   for (const m of matches) {
     assert.equal(m.phase, "over", m.abortReason);
@@ -73,9 +74,9 @@ test("four seats, a game to 50: the same state everywhere, every pass sealed, a 
   assert.equal(matches[0].sealed.length, 12 * passing);
   // Once the audit has passed, every seat can read the last hand's cards: one full deck.
   for (const m of matches) assert.deepEqual(st.cards.map((s) => cardsOf(4, (x) => m.face(x))(s)).sort((a, b) => a - b), [...Array(52).keys()]);
-});
+}));
 
-test("three seats: 17 cards each from 51, a pass left, and a passing audit", { timeout: 300_000 }, async () => {
+test("three seats: 17 cards each from 51, a pass left, and a passing audit", { timeout: 300_000 }, () => withSeededRandom("hearts 2", async () => {
   const { matches } = await play({ players: 3, config: { target: 0 }, seed: "three" });
   for (const m of matches) {
     assert.deepEqual(m.verdict, { ok: true });
@@ -83,9 +84,9 @@ test("three seats: 17 cards each from 51, a pass left, and a passing audit", { t
   }
   assert.equal(matches[0].sealed.length, 9);
   assert.equal(matches[0].rules.deckSize, 51);
-});
+}));
 
-test("a seat out of turn can't move: refused at home, and stops the match if sent anyway", { timeout: 60_000 }, async () => {
+test("a seat out of turn can't move: refused at home, and stops the match if sent anyway", { timeout: 60_000 }, () => withSeededRandom("hearts 3", async () => {
   const sessions = localRoom({ game: "hearts", names: ["A", "B", "C", "D"], mode: "friend" });
   const rules = makeRules({}, 4);
   const matches = sessions.map((s) => {
@@ -106,7 +107,7 @@ test("a seat out of turn can't move: refused at home, and stops the match if sen
     assert.ok(m.abortSeat === idle.me || m.abortAbout === idle.me);
     assert.match(m.abortReason, /moved out of turn/);
   }
-});
+}));
 
 // A seat that lies when it can: lie(state, me, face) returns an illegal move or null;
 // prep(state, me, face), a legal move that sets one up.
@@ -140,7 +141,7 @@ async function caught(lie, reason, prep, seats = [1]) {
 
 const hand = (st, me, face) => st.hands[me].map((s) => [s, face(s)]);
 
-test("the audit names a player who didn't follow suit while holding it", { timeout: 300_000 }, async () => {
+test("the audit names a player who didn't follow suit while holding it", { timeout: 300_000 }, () => withSeededRandom("hearts 4", async () => {
   await caught((st, me, face) => {
     if (st.phase !== "play" || !st.trick.length) return null;
     const lead = suitOf(st.trick[0].face);
@@ -148,18 +149,18 @@ test("the audit names a player who didn't follow suit while holding it", { timeo
     const off = mine.find(([, f]) => suitOf(f) !== lead && !(st.tricks === 0 && isPoint(f)));
     return mine.some(([, f]) => suitOf(f) === lead) && off ? { play: off[0] } : null;
   }, /didn't follow suit/);
-});
+}));
 
-test("the audit names a player who led a heart before hearts were broken", { timeout: 300_000 }, async () => {
+test("the audit names a player who led a heart before hearts were broken", { timeout: 300_000 }, () => withSeededRandom("hearts 5", async () => {
   await caught((st, me, face) => {
     if (st.phase !== "play" || st.trick.length || st.broken) return null;
     const mine = hand(st, me, face);
     const heart = mine.find(([, f]) => suitOf(f) === HEARTS);
     return heart && mine.some(([, f]) => suitOf(f) !== HEARTS) ? { play: heart[0] } : null;
   }, /led a heart before hearts were broken/, undefined, [0, 1, 2, 3]);
-});
+}));
 
-test("the audit names a player who threw a point card on the first trick while holding something else", { timeout: 300_000 }, async () => {
+test("the audit names a player who threw a point card on the first trick while holding something else", { timeout: 300_000 }, () => withSeededRandom("hearts 6", async () => {
   // It passes its clubs when it has three or fewer, to be out of them on the first trick.
   const passClubs = (st, me, face) => {
     if (st.phase !== "pass") return null;
@@ -173,10 +174,10 @@ test("the audit names a player who threw a point card on the first trick while h
     const point = mine.find(([, f]) => isPoint(f));
     return point && mine.some(([, f]) => !isPoint(f)) ? { play: point[0] } : null;
   }, /point card on the first trick/, passClubs, [0, 1, 2, 3]);
-});
+}));
 
-test("the audit names a player who said they hadn't got the 2 of clubs", { timeout: 300_000 }, async () => {
+test("the audit names a player who said they hadn't got the 2 of clubs", { timeout: 300_000 }, () => withSeededRandom("hearts 7", async () => {
   // Whoever holds it lies, so every game has the lie; the game stops when nobody plays it.
   const lie = (st, me, face) => (st.phase === "find" && st.hands[me].some((s) => face(s) === TWO_CLUBS) ? { none: true } : null);
   await caught(lie, /didn't have the 2 of clubs/, undefined, [0, 1, 2, 3]);
-});
+}));

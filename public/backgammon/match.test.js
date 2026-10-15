@@ -6,6 +6,7 @@ import { TurnMatch } from "../engine/turn-match.js";
 import { rngFromSeed } from "../engine/rng.js";
 import { makeRules, CHECKERS, OFF } from "./rules.js";
 import { chooseMove, startRobot } from "./robot.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const rules = makeRules({ moveSeconds: 0, gameSeconds: 0 });
 const tick = () => new Promise((r) => setTimeout(r, 1));
@@ -40,7 +41,7 @@ async function step(a, b, rng, extra = {}) {
   await until(() => (a.state.ply > ply && b.state.ply > ply && !a.working && !b.working) || a.phase === "aborted");
 }
 
-test("two peers agree on the coin toss, every roll and every play, through full games", async () => {
+test("two peers agree on the coin toss, every roll and every play, through full games", () => withSeededRandom("backgammon 1", async () => {
   for (let g = 0; g < 3; g++) {
     const [a, b] = await pair();
     assert.equal(a.state.first, b.state.first, "both agree who starts");
@@ -54,9 +55,9 @@ test("two peers agree on the coin toss, every roll and every play, through full 
     assert.equal(a.state.pos[a.state.winner][OFF], CHECKERS);
     assert.ok(a.state.ply > 40, `${a.state.ply} moves`);
   }
-});
+}));
 
-test("an illegal play is refused locally; a forged play from the peer aborts the match", async () => {
+test("an illegal play is refused locally; a forged play from the peer aborts the match", () => withSeededRandom("backgammon 2", async () => {
   const [a, b] = await pair();
   const mover = a.canMove() ? a : b;
   const other = mover === a ? b : a;
@@ -70,9 +71,9 @@ test("an illegal play is refused locally; a forged play from the peer aborts the
   const aborted = new Promise((r) => mover.on("abort", r));
   other.send({ t: "move", move: { type: "roll" } });
   assert.match((await aborted).reason, /broke the rules: move out of turn/);
-});
+}));
 
-test("the robot plays whole games over startRobot, with the pause it is given, and accepts a rematch", async () => {
+test("the robot plays whole games over startRobot, with the pause it is given, and accepts a rematch", () => withSeededRandom("backgammon 3", async () => {
   const [x, y] = localPair();
   const [human, bot] = await Promise.all([
     openSession({ channel: x, mode: "robot", index: 0, name: "A", game: "backgammon" }),
@@ -106,9 +107,9 @@ test("the robot plays whole games over startRobot, with the pause it is given, a
   assert.ok(asked.length > 20);
   assert.ok(told.length > 20 && told.every((ms) => ms === 0 || ms === 1));
   robot.destroy();
-});
+}));
 
-test("timed games: rolls and plays spend the same clocks on both sides, and a timeout ends the round", async () => {
+test("timed games: rolls and plays spend the same clocks on both sides, and a timeout ends the round", () => withSeededRandom("backgammon 4", async () => {
   const timed = makeRules({ moveSeconds: 30, gameSeconds: 300, first: "guest" });
   const [a, b] = await pair(timed);
   assert.equal(a.state.turn, 1, "the room says the guest starts, whatever the coin");
@@ -122,4 +123,4 @@ test("timed games: rolls and plays spend the same clocks on both sides, and a ti
   assert.equal(b.state.winner, 1 - mover.me);
   assert.equal(b.state.reason, "timeout");
   assert.deepEqual(a.state, b.state);
-});
+}));

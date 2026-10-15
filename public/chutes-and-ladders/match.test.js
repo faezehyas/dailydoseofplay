@@ -4,8 +4,10 @@ import { localPair } from "../engine/channel.js";
 import { openSession, matchRouter } from "../engine/session.js";
 import { localRoom } from "../engine/room.js";
 import { TurnMatch, startTurnRobot } from "../engine/turn-match.js";
+import { rngFromSeed } from "../engine/rng.js";
 import { makeRules, LAST } from "./rules.js";
 import { chooseMove } from "./robot.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const tick = () => new Promise((r) => setTimeout(r, 1));
 async function until(fn, ms = 20_000) {
@@ -38,7 +40,7 @@ test("chooseMove always spins", () => {
   assert.deepEqual(chooseMove(), { type: "spin" });
 });
 
-test("two peers agree on the coin toss and every spin, through full games", async () => {
+test("two peers agree on the coin toss and every spin, through full games", () => withSeededRandom("chutes-and-ladders 1", async () => {
   for (const config of [{ finish: "exact" }, { finish: "bounce", sixAgain: true }, { finish: "any" }]) {
     const [a, b] = await pair(makeRules(config));
     assert.equal(a.state.first, b.state.first);
@@ -57,20 +59,20 @@ test("two peers agree on the coin toss and every spin, through full games", asyn
     assert.deepEqual(a.state, b.state);
     assert.equal(a.state.pos[a.state.winner], LAST);
   }
-});
+}));
 
-test("a spin out of turn from the peer aborts the match", async () => {
+test("a spin out of turn from the peer aborts the match", () => withSeededRandom("chutes-and-ladders 2", async () => {
   const [a, b] = await pair(makeRules({ first: "host" }));
   assert.equal(a.state.turn, 0);
   b.send({ t: "move", move: { type: "spin" } });
   await until(() => a.phase === "aborted");
   assert.match(a.abortReason, /out of turn|broke the rules/);
-});
+}));
 
-test("a robot game plays to the end through startTurnRobot", async () => {
+test("a robot game plays to the end through startTurnRobot", () => withSeededRandom("chutes-and-ladders 3", async () => {
   const [human, robotSession] = await sessions();
   const rules = makeRules({ first: "guest" });
-  const robot = startTurnRobot(robotSession, { rules, choose: chooseMove, delay: 0 });
+  const robot = startTurnRobot(robotSession, { rules, choose: chooseMove, delay: 0, rng: rngFromSeed("robot") });
   const match = new TurnMatch({ send: (m) => human.send(m), me: 0, rules });
   matchRouter(human).start(match);
   await until(() => match.phase === "playing");
@@ -82,9 +84,9 @@ test("a robot game plays to the end through startTurnRobot", async () => {
   await until(() => robot.match.phase === "over");
   assert.deepEqual(robot.match.state.pos, match.state.pos);
   robot.destroy();
-});
+}));
 
-test("four players agree on every spin through a full game, and only the seat on turn may spin", async () => {
+test("four players agree on every spin through a full game, and only the seat on turn may spin", () => withSeededRandom("chutes-and-ladders 4", async () => {
   const sessions = localRoom({ game: "chutes-and-ladders", names: ["A", "B", "C", "D"], mode: "friend" });
   const rules = makeRules({ sixAgain: true });
   const matches = sessions.map((s) => {
@@ -118,4 +120,4 @@ test("four players agree on every spin through a full game, and only the seat on
   next[2].send({ t: "move", move: { type: "spin" } });
   await until(() => next[0].phase === "aborted");
   assert.match(next[0].abortReason, /out of turn/);
-});
+}));

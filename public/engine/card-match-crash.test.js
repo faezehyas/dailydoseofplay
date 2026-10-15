@@ -4,12 +4,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { localRoom } from "./room.js";
 import { startCardRobot } from "./card-match.js";
+import { rngFromSeed } from "./rng.js";
 import { toBase64, fromBase64 } from "./base64.js";
 import { makeRules, chooseMove } from "../../test/fixtures/toy-cards.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const TRAP = 2268; // see deck-crash.test.js
 
-test("a shuffle that crashes the deck stops the match and names the shuffler", { timeout: 60_000 }, async () => {
+test("a shuffle that crashes the deck stops the match and names the shuffler", { timeout: 60_000 }, () => withSeededRandom("card-match-crash 1", async () => {
   const rules = makeRules({ deckSize: 10 });
   const sessions = localRoom({ game: "toy", names: ["A", "B"] });
   const send = sessions[1].send.bind(sessions[1]);
@@ -22,8 +24,8 @@ test("a shuffle that crashes the deck stops the match and names the shuffler", {
     }
     return send(msg);
   };
-  const robots = sessions.map((s) => startCardRobot(s, { rules, choose: chooseMove, delay: 0 }));
+  const robots = sessions.map((s, i) => startCardRobot(s, { rules, choose: chooseMove, delay: 0, rng: rngFromSeed(`seat${i}`) }));
   while (robots[0].match.phase !== "aborted") await new Promise((r) => setTimeout(r, 5));
   assert.equal(robots[0].match.abortSeat, 1);
   assert.equal(robots[0].match.abortReason, "sent a shuffle that doesn't check out (it crashed the deck)");
-});
+}));

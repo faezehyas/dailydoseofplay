@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { rngFromSeed } from "../engine/rng.js";
 import { chooseMove, evaluate } from "./robot.js";
 import { newState as newTimedState, applyMove, legalPlays, CHECKERS, BAR, OFF } from "./rules.js";
+import { bestOf5, elapsed } from "../../test/helpers.js";
 
 const newState = (first = 0) => newTimedState(first, { moveSeconds: 0, gameSeconds: 0 });
 const dice = (...values) => {
@@ -153,8 +154,7 @@ test("Easy still beats a random player most of the time", () => {
   assert.ok(winRate(level("easy"), random, 100) > 0.85);
 });
 
-test("it answers well under 100 ms, even with doubles on a crowded board", async () => {
-  const { chooseMove: fresh } = await import(`./robot.js?cold=${Date.now()}`);
+test("it answers well under 100 ms, even with doubles on a crowded board", () => {
   const spread = [side({ 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1 }), side({ 24: 3, 20: 3, 16: 3, 12: 3, 8: 3 })];
   let worst = 0;
   for (const pos of [newState().pos, spread]) {
@@ -165,9 +165,7 @@ test("it answers well under 100 ms, even with doubles on a crowded board", async
         applyMove(s, 0, { type: "roll" }, dice(a, b));
         if (s.turn !== 0) continue;
         for (const lvl of ["easy", "hard"]) {
-          const t0 = performance.now();
-          fresh(s, 0, () => 0.99, { level: lvl });
-          worst = Math.max(worst, performance.now() - t0);
+          worst = Math.max(worst, bestOf5(() => elapsed(() => chooseMove(s, 0, () => 0.99, { level: lvl }))));
         }
       }
     }

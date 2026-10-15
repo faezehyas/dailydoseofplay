@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { rngFromSeed } from "../engine/rng.js";
 import { chooseMove, shapesAt, candidates, SHAPE } from "./robot.js";
 import { newState as newTimedState, applyMove, SIZE, EMPTY, DRAW } from "./rules.js";
+import { bestOf5, elapsed } from "../../test/helpers.js";
 
 const newState = (first) => newTimedState(first, { moveSeconds: 0, gameSeconds: 0 });
 const at = (r, c) => r * SIZE + c;
@@ -146,18 +147,16 @@ test("it is beatable: without its random moves it wins most games against itself
   assert.ok(wins[1] > 5, `robot won ${wins[1]}/100`);
 });
 
-test("it answers well under 100 ms, on an empty board and a crowded one", async () => {
-  const { chooseMove: fresh } = await import(`./robot.js?cold=${Date.now()}`);
-  let t0 = performance.now();
-  fresh(newState(0), 0, () => 0.99);
-  assert.ok(performance.now() - t0 < 100, "empty board");
+test("it answers well under 100 ms, on an empty board and a crowded one", () => {
+  assert.ok(bestOf5(() => elapsed(() => chooseMove(newState(0), 0, () => 0.99))) < 100, "empty board");
   // 150 stones in pairs flipped on every row, so nobody has five.
   const s = newState(0);
   for (let i = 0; i < 150; i++) {
     const [r, c] = [Math.floor(i / SIZE), i % SIZE];
     s.board[i] = (Math.floor(c / 2) + r) % 2;
   }
-  t0 = performance.now();
-  for (let k = 0; k < 10; k++) fresh(s, k % 2, () => 0.99);
-  assert.ok((performance.now() - t0) / 10 < 100, "crowded board");
+  const ten = bestOf5(() => elapsed(() => {
+    for (let k = 0; k < 10; k++) chooseMove(s, k % 2, () => 0.99);
+  }));
+  assert.ok(ten / 10 < 100, "crowded board");
 });

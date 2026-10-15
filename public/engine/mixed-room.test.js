@@ -10,6 +10,7 @@ import { rngFromSeed } from "./rng.js";
 import { makeRules as ludoRules } from "../ludo/rules.js";
 import { chooseMove, startRobot } from "../ludo/robot.js";
 import { makeRules as toyRules, chooseMove as toyMove } from "../../test/fixtures/toy-cards.js";
+import { withSeededRandom } from "../../test/helpers.js";
 
 const tick = () => new Promise((r) => setTimeout(r, 1));
 async function until(fn, ms = 60_000) {
@@ -33,7 +34,7 @@ async function friendRoom(game, names, robots) {
   return [host, ...seated, ...host.players.filter((p) => p.robot).map((p) => host.seatRobot(p.seat))];
 }
 
-test("robots sit after the people, every seat knows which are robots, and a robot hears everyone", async () => {
+test("robots sit after the people, every seat knows which are robots, and a robot hears everyone", () => withSeededRandom("mixed-room 1", async () => {
   const sessions = await friendRoom("hearts", ["Ada", "Bo"], ["Robot 1", "Robot 2"]);
   assert.deepEqual(sessions.map((s) => s.index), [0, 1, 2, 3]);
   for (const s of sessions) {
@@ -54,7 +55,7 @@ test("robots sit after the people, every seat knows which are robots, and a robo
   // A two-player game: no robots, and nobody takes a seat over.
   const duel = await friendRoom("chess", ["Ada", "Bo"]);
   assert.ok(duel.every((s) => !s.takeover && s.players.every((p) => !p.robot)));
-});
+}));
 
 test("the host fills only empty seats with robots, named by the lowest number free, and two-player rooms take none", () => {
   const room = new HostRoom({ game: "hearts", name: "Ada", maxPlayers: 4 });
@@ -70,7 +71,7 @@ test("the host fills only empty seats with robots, named by the lowest number fr
   assert.deepEqual(duel.robots, []);
 });
 
-test("draws go on without a seat whose player left: everyone agrees, and so does the robot's copy", async () => {
+test("draws go on without a seat whose player left: everyone agrees, and so does the robot's copy", () => withSeededRandom("mixed-room 2", async () => {
   const srs = await Promise.all([0, 1, 2].map(() => SharedRandom.create(8)));
   const tips = srs.map((sr) => sr.tip);
   srs.forEach((sr, i) => sr.setPeers(tips, i));
@@ -90,9 +91,9 @@ test("draws go on without a seat whose player left: everyone agrees, and so does
   peers[2] = robot;
   const third = await Promise.all([srs[0].draw(send(0)), srs[1].draw(send(1)), robot.draw(() => assert.fail("a robot taking over reveals nothing"))]);
   assert.equal(new Set(third.map((rng) => rng())).size, 1);
-});
+}));
 
-test("Ludo: a guest who leaves mid-game is replaced by a robot, and the game finishes the same everywhere", async () => {
+test("Ludo: a guest who leaves mid-game is replaced by a robot, and the game finishes the same everywhere", () => withSeededRandom("mixed-room 3", async () => {
   const rules = ludoRules({});
   const sessions = await friendRoom("ludo", ["Ada", "Bo", "Cy"], []);
   const [host, bo, cy] = sessions;
@@ -131,9 +132,9 @@ test("Ludo: a guest who leaves mid-game is replaced by a robot, and the game fin
   assert.deepEqual(events, [["host", 2, "left"], ["bo", 2, "left"]]);
   assert.ok(!host.ended && !bo.ended, "the game went on");
   assert.ok(host.players[2].robot && bo.players[2].robot);
-});
+}));
 
-test("cards: a guest leaving stops the hand, and the robot plays from the rematch without seeing anyone's cards", async () => {
+test("cards: a guest leaving stops the hand, and the robot plays from the rematch without seeing anyone's cards", () => withSeededRandom("mixed-room 4", async () => {
   const rules = toyRules({ deckSize: 12, maxTurns: 40 });
   const sessions = await friendRoom("toy", ["Ada", "Bo", "Cy"], []);
   const drive = (s, i) => startCardRobot(s, { rules, choose: toyMove, delay: 0, rng: rngFromSeed(`seat${i}`) });
@@ -164,4 +165,4 @@ test("cards: a guest leaving stops the hand, and the robot plays from the rematc
   await until(() => next.every((r) => r.match.verdict));
   assert.ok(next.every((r) => r.match.verdict.ok));
   assert.deepEqual(robot.match.state, robots[0].match.state);
-});
+}));

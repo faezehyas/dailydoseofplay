@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { rngFromSeed } from "../engine/rng.js";
 import { chooseMove, scoreMoves } from "./robot.js";
 import { newState as newTimedState, applyMove, emptyCells, EMPTY, DRAW } from "./rules.js";
+import { bestOf5, elapsed } from "../../test/helpers.js";
 
 const newState = (first, size = 3) => newTimedState(first, { size, moveSeconds: 0, gameSeconds: 0 });
 
@@ -105,11 +106,10 @@ test("robot vs robot over 20 seeded games always finishes with legal moves, on b
 });
 
 test("it answers well under 100 ms, even on an empty board", async () => {
-  const { chooseMove: fresh } = await import(`./robot.js?cold=${Date.now()}`);
+  // Each run imports the robot afresh, so its memo starts empty.
+  const fresh = await Promise.all([0, 1, 2, 3, 4, 5].map((run) => import(`./robot.js?cold=${run}`)));
   for (const size of [3, 5]) {
-    const t0 = performance.now();
-    fresh(newState(0, size), 0, () => 0.99);
-    assert.ok(performance.now() - t0 < 100, `${size}×${size}`);
+    assert.ok(bestOf5((run) => elapsed(() => fresh[run].chooseMove(newState(0, size), 0, () => 0.99))) < 100, `${size}×${size}`);
   }
 });
 

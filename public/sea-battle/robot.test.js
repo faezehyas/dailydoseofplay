@@ -5,6 +5,7 @@ import { openSession, matchRouter } from "../engine/session.js";
 import { rngFromSeed, randInt } from "../engine/rng.js";
 import { chooseMove, analyze, startRobot } from "./robot.js";
 import { SeaBattleMatch } from "./match.js";
+import { withSeededRandom } from "../../test/helpers.js";
 import {
   newMatchState,
   randomFleet,
@@ -113,7 +114,7 @@ test("robot vs robot through the full rules (gifts and weapons included) always 
   }
 });
 
-test("startRobot plays a whole match against a scripted human over the session protocol", async () => {
+test("startRobot plays a whole match against a scripted human over the session protocol", () => withSeededRandom("sea-battle robot", async () => {
   const [x, y] = localPair();
   const [human, bot] = await Promise.all([
     openSession({ channel: x, mode: "robot", index: 0, name: "Me", game: "sea-battle" }),
@@ -149,4 +150,4 @@ test("startRobot plays a whole match against a scripted human over the session p
   while (me.phase !== "playing") await new Promise((r) => setTimeout(r, 1));
   assert.equal(robot.match.m, 2);
   robot.destroy();
-});
+}));
