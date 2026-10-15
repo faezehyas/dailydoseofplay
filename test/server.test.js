@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
-import { PUBLIC_DIR, createApp, wsOriginAllowed } from "../server/app.js";
+import { PUBLIC_DIR, createApp, parseOrigins, parseRegistry, wsOriginAllowed } from "../server/app.js";
 import { startServer } from "./helpers.js";
 
 const registry = JSON.parse(fs.readFileSync(new URL("../public/games.json", import.meta.url)));
@@ -40,7 +42,8 @@ test("HTTP routes: home, games, healthz, ws, 404s", async (t) => {
     assert.equal(bare.headers.get("location"), `/${game.slug}/?room=ABCD`);
   }
 
-  for (const bad of ["/../package.json", "/%2e%2e/package.json", "/.git/config", "/sea-battle/rules.test.js", "/nope/", "/engine/missing.js"]) {
+  // Bad %-encoding, and a backslash or NUL once decoded, are 404s too.
+  for (const bad of ["/../package.json", "/%2e%2e/package.json", "/.git/config", "/sea-battle/rules.test.js", "/nope/", "/engine/missing.js", "/%E0%A4%A", "/engine%5Clobby.js", "/index.html%00"]) {
     const res = await fetch(`${srv.base}${bad}`);
     assert.equal(res.status, 404, bad);
   }
@@ -330,6 +333,53 @@ test("wsOriginAllowed: whole-host match, rewritten Host plus X-Forwarded-Host", 
   assert.equal(wsOriginAllowed({ host: "games.example", origin: "http://games.example:8080" }), false, "port differs");
   assert.equal(wsOriginAllowed({ host: "games.example", origin: "null" }), false);
   assert.equal(wsOriginAllowed({ host: "games.example" }), true, "no Origin");
+  assert.equal(wsOriginAllowed({ host: "games.example:port", origin: "http://games.example" }), false, "unparseable Host");
+});
+
+test("parseOrigins: keeps http and https origins, drops anything else", () => {
+  const list = " https://a.example/path , ftp://b.example, not a url, , http://10.0.0.7:3000, javascript:alert(1)";
+  assert.deepEqual(parseOrigins(list), ["https://a.example", "http://10.0.0.7:3000"]);
+  assert.deepEqual(parseOrigins(["https://a.example", "nope", 5]), ["https://a.example"]);
+  assert.deepEqual(parseOrigins(undefined), []);
+});
+
+test("parseRegistry: maxPlayers is clamped to 2 to 8, and 2 when missing or not a number", () => {
+  const games = parseRegistry(JSON.stringify({
+    games: [
+      { slug: "one", maxPlayers: 1, status: "ready" },
+      { slug: "four", maxPlayers: "4", status: "ready" },
+      { slug: "many", maxPlayers: 100, status: "soon" },
+      { slug: "none", status: "ready" },
+      { slug: "word", maxPlayers: "lots", status: "ready" },
+    ],
+  }));
+  assert.deepEqual(Object.fromEntries([...games].map(([slug, g]) => [slug, g.maxPlayers])), { one: 2, four: 4, many: 8, none: 2, word: 2 });
+  assert.equal(games.get("many").status, "soon");
+});
+
+test("server/server.js listens on PORT and HOST, and stops on SIGTERM", { timeout: 10_000 }, async (t) => {
+  // With PORT=0 the log would print ":0", so ask the OS for a free port first.
+  const free = net.createServer().listen(0, "127.0.0.1");
+  await once(free, "listening");
+  const { port } = free.address();
+  await new Promise((resolve) => free.close(resolve));
+
+  const child = spawn(process.execPath, ["server/server.js"], {
+    cwd: new URL("..", import.meta.url),
+    env: { ...process.env, HOST: "127.0.0.1", PORT: String(port) },
+  });
+  t.after(() => child.kill());
+  const exited = once(child, "exit");
+  const log = await new Promise((resolve, reject) => {
+    let out = "";
+    child.stdout.on("data", (d) => (out += d).includes("listening") && resolve(out));
+    child.once("exit", () => reject(new Error(`exited early: ${out}`)));
+  });
+  assert.match(log, new RegExp(`listening on http://127\\.0\\.0\\.1:${port}\\n`));
+
+  assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/healthz`)).json(), { ok: true, rooms: 0, players: 0, games: {} });
+  child.kill("SIGTERM");
+  assert.deepEqual(await exited, [null, "SIGTERM"]);
 });
 
 test("security headers on every response: pages, files, 304, 301, 404, 400, 405, 426, healthz and the /ws refusal", async (t) => {
