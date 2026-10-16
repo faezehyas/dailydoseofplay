@@ -33,6 +33,9 @@ npm install
 npm start               # http://localhost:8080 (PORT to change)
 npm test                # unit + integration tests (node --test)
 npm run test:browser    # Playwright: full friend match, robot game, failure screen
+npm run coverage        # unit tests with line coverage; lcov in test-artifacts/unit.lcov
+npm run coverage:browser                             # browser tests in Chromium: lines run per folder
+npm run coverage:browser -- test-artifacts/unit.lcov # the same, counting lines the unit tests ran too
 anybuild plan .                       # Anybuild: show the detected build (see README)
 anybuild . --start                    # build and serve on PORT (default 8080)
 anybuild . --start --runner=wasmer    # the same inside Wasmer's runtime; needs the Wasmer CLI
@@ -50,7 +53,10 @@ scripts/build-mental-poker.sh --check  # what CI runs: fail if it differs from t
 `npm run test:browser` skips itself when Playwright is missing. If it is
 installed globally, the test finds it through `npm root -g`, or set
 `PLAYWRIGHT_MODULE=/path/to/playwright/index.js`. Screenshots go to
-`test-artifacts/`, which git ignores.
+`test-artifacts/`, which git ignores. `BROWSER=firefox` or `BROWSER=webkit`
+runs them in another browser. `coverage:browser` prints its table even when a
+test fails; it doesn't count code in Web Workers. CI measures coverage weekly
+([.github/workflows/coverage.yml](.github/workflows/coverage.yml)).
 
 ## Recipe: add a game
 
@@ -540,6 +546,7 @@ no change.
 - **`lessons.test.js`** (with a tutorial): every step's expected moves and reply are legal in its position according to `rules.js`, a step without a position follows a reply, and there are 3 to 6 lessons of 1 to 4 steps (see Chess's).
 - **Sounds:** nothing to add. `test/browser/sound-levels.test.js` finds every `sounds.js` and checks each sound's loudness.
 - **Message size:** add the game to `GAMES` in `test/message-size.test.js` (its biggest board and most players). It plays a full match and fails if a message is over 4 K characters; a browser cuts off a player whose message is over 64 K (see **Message size** in `ARCHITECTURE.md`). Send moves, not whole states.
+- **Page weight:** `test/budgets.test.js` follows the static imports of each game's `main.js` and of `home.js`, and fails when a page loads more modules or bytes than its budget in `test/fixtures/budgets.json` (the size when it was set, plus 10%), naming the module that grew most. A new game needs a budget: run `UPDATE_BUDGETS=1 node --test test/budgets.test.js` and commit the file. Do the same after a deliberate growth, and say why in the PR.
 - **Fuzzing:** nothing to add. `test/rules-fuzz.test.js` reads `games.json` and plays every game at random, against its robots at every level and with garbage moves, in each player count and each option value `normalizeConfig` keeps. Your rules must take a move time (`ms`) on every move of a timed game; throw `RuleError` (never a `TypeError`) for anything malformed, such as `null`, a string, a huge number or a field of the wrong type, and leave the state as it was; use randomness only on moves `needsRandom` names; and stay within `draws`. If a move is more than one integer field (a path, a list of steps), list its legal moves in `LEGAL` there.
 - **Browser (recommended):** add `test/browser/<slug>.test.js` modelled on `test/browser/friend-match.test.js`. Host clicks `#play-friend`, the guest opens `#invite-link`, both play through `window.ddp.match`, then a rematch.
   - Use the helpers in `test/helpers.js`: `skipWithoutPlaywright()` for the test's `skip`, `openBrowser(t)` for the server, the browser and `open(name, options)` (a page with its own nickname, `phone` size, colour scheme, fake `clock` and init scripts; `assertNoErrors()` checks no page threw or logged an error), `joinByInvite()`, `waitForState()`, `waitForPhase()`, `waitForSameState()`, `pick()` for a setting and `noHorizontalScroll()`.
@@ -550,6 +557,12 @@ no change.
 
 Run `npm test` and `npm run test:browser`. All tests must pass. Never skip or
 weaken an existing test to get green.
+
+CI splits the browser test files into three shards. A file with a failing test
+runs once more; a test that passes then is flaky. The run still passes, but
+the test gets a warning on its line and a row under "Flaky this run" in the
+run's summary. Fix it, or file an issue with that line. A second failure fails
+the run.
 
 ### 8. Check by hand
 

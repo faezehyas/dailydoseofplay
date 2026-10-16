@@ -8,13 +8,14 @@ on:
 permissions:
   contents: read
 
+env:
+  PLAYWRIGHT_VERSION: 1.63.0
+
 jobs:
-  test:
-    name: test
+  unit:
+    name: unit
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      PLAYWRIGHT_VERSION: 1.63.0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -33,6 +34,27 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
+  # Each shard runs a third of the browser test files (new files included).
+  browser:
+    name: browser (${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
       # Playwright stays out of package.json (ws is the only dependency), so
       # install it globally and point the browser tests at it.
       - name: Install Playwright
@@ -47,8 +69,102 @@ jobs:
       - name: Check Playwright loads
         run: node -e 'require(process.env.PLAYWRIGHT_MODULE)'
 
+      # The files with a failing test run once more. A test that passes then
+      # is flaky: the job passes, with a warning on its line and a row in the
+      # run's summary. A second failure fails the job.
       - name: Browser tests
-        run: npm run test:browser
+        env:
+          SHARD: ${{ matrix.shard }}/3
+        run: |
+          npx playwright --version
+          mkdir -p test-artifacts
+          report=(--test-reporter=spec --test-reporter-destination=stdout --test-reporter=./test/reporters/failed-files.js --test-reporter-destination=test-artifacts/failed.txt)
+          if node --test --test-shard="$SHARD" "${report[@]}" test/browser/*.test.js; then exit 0; fi
+          if [ ! -s test-artifacts/failed.txt ]; then echo "::error::The browser tests failed outside any test"; exit 1; fi
+          mapfile -t files < <(cut -f1 test-artifacts/failed.txt | sort -u)
+          echo "Running again, once: ${files[*]}"
+          node --test --test-reporter=spec "${files[@]}"
+          printf '### Flaky this run\n\nThese failed, then passed when their file ran again.\n\n| Test | Where | Error |\n| --- | --- | --- |\n' >> "$GITHUB_STEP_SUMMARY"
+          while IFS=$'\t' read -r file line name error; do
+            echo "::warning file=$file,line=$line,title=Flaky test::${name//%/%25}: ${error//%/%25}"
+            echo "| ${name//|/\\|} | \`$file:$line\` | ${error//|/\\|} |" >> "$GITHUB_STEP_SUMMARY"
+          done < test-artifacts/failed.txt
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-artifacts-browser-${{ matrix.shard }}
+          path: test-artifacts/
+          if-no-files-found: ignore
+
+  # The check main requires: the unit tests and every browser shard passed.
+  test:
+    name: test
+    if: always()
+    needs: [unit, browser]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Unit and browser tests passed
+        env:
+          UNIT: ${{ needs.unit.result }}
+          BROWSER: ${{ needs.browser.result }}
+        run: |
+          echo "unit: $UNIT, browser: $BROWSER"
+          [ "$UNIT" = success ] && [ "$BROWSER" = success ]
+
+  # A few pages in Firefox and in WebKit, Safari's engine and every iPhone
+  # browser's. It doesn't block a merge; its result is in the run's summary.
+  smoke:
+    name: smoke (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [firefox, webkit]
+    env:
+      BROWSER: ${{ matrix.browser }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright
+        run: |
+          npm install --global "playwright@$PLAYWRIGHT_VERSION"
+          echo "PLAYWRIGHT_MODULE=$(npm root -g)/playwright" >> "$GITHUB_ENV"
+
+      - name: Install ${{ matrix.browser }}
+        run: npx playwright install --with-deps "$BROWSER"
+
+      # Home, a turn game against the robot, a card game against three robots,
+      # two friends' Sea Battle, and the lobby offline.
+      - name: Smoke tests
+        id: smoke
+        run: |
+          npx playwright --version
+          node --test --test-reporter=spec \
+            --test-name-pattern="^home page tiles" --test-name-pattern="^Tic Tac Toe vs the robot" \
+            --test-name-pattern="^Crazy Eights with animations off" --test-name-pattern="^two friends play a full match in real browsers" \
+            --test-name-pattern="^the lobby shows the offline state" \
+            test/browser/home.test.js test/browser/tic-tac-toe.test.js test/browser/crazy-eights-fast.test.js test/browser/friend-match.test.js test/browser/offline-lobby.test.js
+
+      - name: Summary
+        if: always()
+        env:
+          OUTCOME: ${{ steps.smoke.outcome }}
+        run: |
+          echo "Smoke tests in $BROWSER: $OUTCOME (they don't block a merge)" >> "$GITHUB_STEP_SUMMARY"
 
   # The committed mental-poker WebAssembly must be what its pinned source builds.
   mental-poker:
