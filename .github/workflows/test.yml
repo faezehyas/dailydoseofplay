@@ -9,7 +9,9 @@ permissions:
   contents: read
 
 env:
-  PLAYWRIGHT_VERSION: 1.63.0
+  # 1.63's Firefox now and then loses a new page's first navigation on a busy
+  # runner: the page loads but goto() never returns.
+  PLAYWRIGHT_VERSION: 1.64.0
 
 jobs:
   unit:
