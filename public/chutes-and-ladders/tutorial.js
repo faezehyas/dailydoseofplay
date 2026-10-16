@@ -3,7 +3,7 @@
 // spin played by rules.js with the step's fixed number. The adapter
 // engine/tutorial.js asks for.
 import { el } from "../engine/shell.js";
-import { newState, applyMove } from "./rules.js";
+import { newState, applyMove, LAST } from "./rules.js";
 import { play as sound } from "./sounds.js";
 import { s, U, center, buildBoard, spinnerArt, makeSpinner, pawnMotion } from "./art.js";
 
@@ -19,6 +19,8 @@ export function load(square) {
 // The spinner stops on the step's number.
 export const play = (state, move, step) => applyMove(state, state.turn, move, () => (step.spin - 0.5) / 6);
 export const cells = () => ["spin"];
+// Reaching the last square lights it up, as at the game's win.
+export const result = (state) => (state.winner === 0 ? [LAST] : []);
 
 // Tap Spin, or the spinner; the spin plays out as in the game.
 export function board() {

@@ -316,19 +316,32 @@
   cursor: pointer;
 }
 
-/* The tutorial's lit lines and hint: a soft band under the line. */
+/* The tutorial's lit lines and hint: a soft band under the line, edged
+   (dashed for the hint); a box the learner closed gets a green edge. */
 .db-board .band {
   fill: transparent;
 }
 
-.db-board .band.tut-lit {
-  fill: color-mix(in srgb, var(--accent-2) 30%, transparent);
+.db-board .band:is(.tut-lit, .tut-hint) {
+  fill: color-mix(in srgb, var(--accent-2) 25%, transparent);
+  stroke: var(--accent-2);
+  stroke-width: 2.5;
+  outline: none;
 }
 
 .db-board .band.tut-hint {
-  fill: color-mix(in srgb, var(--accent) 35%, transparent);
+  stroke-dasharray: 8 5;
   transform-box: fill-box;
   transform-origin: center;
+}
+
+.db-board .box.tut-result {
+  outline: none;
+}
+
+.db-board .box.tut-result .tint {
+  stroke: var(--ok);
+  stroke-width: 3;
 }
 
 /* Claimed boxes: a tint, a pencil hatch and the owner's initial. */

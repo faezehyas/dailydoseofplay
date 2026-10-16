@@ -1,16 +1,18 @@
 // Headless-browser test for the tutorials (engine/tutorial.js): the first
 // Chess lesson played by keyboard on a 360 px phone, with a wrong move that
-// springs back, a second one that brings the hint, and a tick saved for the
-// finished lesson; the Learn button and Back; Tic Tac Toe's last lesson,
-// whose end screen starts a robot game; and the first lesson of Connect 4
-// (by keyboard), Gomoku, Checkers, Dots and Boxes, Backgammon, Sea Battle,
-// Chutes and Ladders, Ludo, Crazy Eights, Go Fish, Gin Rummy and Hearts.
+// springs back, a second one that brings the hint, a right one that lights
+// up green, and a tick saved for the finished lesson; the Learn button and
+// Back; Tic Tac Toe's last lesson, whose end screen starts a robot game;
+// how a highlight looks, in light and dark, with and without motion; and the
+// first lesson of Connect 4 (by keyboard), Gomoku, Checkers, Dots and Boxes,
+// Backgammon, Sea Battle, Chutes and Ladders, Ludo, Crazy Eights, Go Fish,
+// Gin Rummy and Hearts.
 // Skips if Playwright is missing.
 //
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
-import { skipWithoutPlaywright, openBrowser, waitForState, noHorizontalScroll } from "../helpers.js";
+import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, noHorizontalScroll } from "../helpers.js";
 
 const skip = skipWithoutPlaywright();
 
@@ -88,10 +90,11 @@ test("the first Chess lesson by keyboard: a wrong move springs back, the second 
   );
   assert.ok(await noHorizontalScroll(page), "no sideways scroll at 360 px");
 
-  // The right moves: a check mark, then the next step.
+  // The right moves: the square lights up green and the step's dot turns green, then the next step.
   await move(page, "d4", "a4");
   assert.equal(await feedback(page), "Right!");
-  await page.waitForSelector(".tut-check:not([hidden])", { timeout: 2000 }); // a check mark once the rook lands
+  await page.waitForSelector(`.tut-stage .sq[data-sq="${sq("a4")}"].tut-result`, { timeout: 2000 }); // once the rook lands
+  assert.equal(await page.locator(".tut-dots span").first().getAttribute("class"), "done right");
   assert.equal(await square(page, "a4").getAttribute("data-p"), ROOK);
   await step(page, "Step 2 of 3");
   await move(page, "c1", "h6");
@@ -133,6 +136,58 @@ test("Tic Tac Toe's last lesson ends with Play the robot now, which starts a rob
   await page.click("#tut-play-robot");
   await waitForState(page, (ddp) => ddp.match?.phase === "playing");
   assert.equal(new URL(page.url()).search, "", "?learn is dropped");
+  assertNoErrors();
+});
+
+// How each lit cell looks, beside the primary buttons' coral.
+const looks = (page, selector) =>
+  page.locator(selector).evaluateAll((nodes) => {
+    const probe = document.body.appendChild(Object.assign(document.createElement("span"), { style: "background: var(--accent)" }));
+    const primary = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return nodes.map((node) => {
+      const s = getComputedStyle(node);
+      return { filled: s.backgroundColor === primary, outline: s.outlineStyle, outlineWidth: parseFloat(s.outlineWidth), outlineColor: s.outlineColor, animation: s.animationName, lit: node.classList.contains("celebrate-lit") };
+    });
+  });
+
+test("Tutorial highlights ring a square, never fill it: the hint is dashed, a finished line lights up as at the win", { skip, timeout: 90_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  for (const [colorScheme, width, reducedMotion] of [["light", 360, "no-preference"], ["dark", 1280, "reduce"]]) {
+    const page = await open(colorScheme, { viewport: { width, height: 800 }, colorScheme, reducedMotion });
+    await page.goto(`${srv.base}/tic-tac-toe/?learn`);
+    await page.locator(".tut-lesson").nth(1).click();
+    await step(page, "Step 1 of 3");
+    const lit = await looks(page, ".tut-lit");
+    assert.equal(lit.length, 2, "the two Xs are lit");
+    for (const cell of lit) assert.deepEqual([cell.filled, cell.outline], [false, "solid"], `${colorScheme}: a lit cell is ringed`);
+
+    // Two wrong tries bring the hint on the square to play.
+    for (let i = 0; i < 2; i++) {
+      await page.click('.tut-stage .ttt-cell[data-i="8"]');
+      await page.waitForFunction((n) => document.querySelector("#tut-feedback").textContent && document.querySelectorAll(".tut-hint").length === n, i);
+    }
+    const [hint] = await looks(page, ".tut-hint");
+    assert.equal(hint.filled, false, `${colorScheme}: the hint doesn't fill its square with the primary colour`);
+    assert.equal(hint.outline, "dashed", `${colorScheme}: the hint has a dashed ring`);
+    assert.ok(hint.outlineWidth >= 2);
+    assert.equal(hint.animation === "none", reducedMotion === "reduce", `${colorScheme}: the hint pulses only with motion`);
+    await page.locator(".tut-stage").screenshot({ path: `${ARTIFACTS}/tutorial-hint-${colorScheme}.png` });
+
+    // The finished row lights up as the game's win does, with an outline of its own.
+    await page.click('.tut-stage .ttt-cell[data-i="2"]');
+    await page.waitForFunction(() => document.querySelectorAll(".tut-result").length === 3);
+    const result = await looks(page, ".tut-result");
+    for (const cell of result) {
+      assert.equal(cell.filled, false, `${colorScheme}: a finished line doesn't fill its squares with the primary colour`);
+      assert.equal(cell.lit, true, "lit as celebrate() lights a win");
+      assert.equal(cell.outline, "solid", `${colorScheme}: the result has a solid outline`);
+      assert.ok(cell.outlineWidth >= 2);
+      assert.notEqual(cell.outlineColor, hint.outlineColor, "the result and the hint differ in colour too");
+      assert.equal(cell.animation === "none", reducedMotion === "reduce", `${colorScheme}: it lights up without motion when motion is reduced`);
+    }
+    await page.locator(".tut-stage").screenshot({ path: `${ARTIFACTS}/tutorial-result-${colorScheme}.png` });
+  }
   assertNoErrors();
 });
 

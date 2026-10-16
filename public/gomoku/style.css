@@ -242,9 +242,8 @@
   opacity: 0.45;
 }
 
-/* The tutorial's lit points and hint are round, and a lit stone gets a ring. */
-.gmk-cell.tut-lit,
-.gmk-cell.tut-hint {
+/* The tutorial's highlights are round, and a lit stone gets a ring. */
+.gmk-cell:is(.tut-lit, .tut-hint, .tut-result) {
   border-radius: 50%;
 }
 

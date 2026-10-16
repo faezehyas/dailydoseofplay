@@ -20,6 +20,8 @@ export function load(position) {
 }
 export const play = (state, move) => applyMove(state, state.turn, move);
 export const cells = (move) => [move.cell];
+// The line the learner finished lights up, as at the game's win.
+export const result = (state) => (state.winner === 0 ? state.line : []);
 
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const cellName = (i) => `Row ${Math.floor(i / 3) + 1}, column ${(i % 3) + 1}`;
@@ -55,7 +57,6 @@ export function board() {
           cell.dataset.v = mark;
           cell.innerHTML = mark ? MARK_SVG[mark] : "";
         }
-        cell.classList.toggle("win", line.has(i));
         cell.classList.toggle("last", state.moves.at(-1) === i);
         cell.setAttribute("aria-label", `${cellName(i)}, ${mark || "empty"}${line.has(i) ? ", winning line" : ""}`);
       });

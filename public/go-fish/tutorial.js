@@ -46,6 +46,8 @@ export function play(state, move) {
   return events;
 }
 export const cells = (move) => ["ask", rankWords(move.ask)];
+// A book the learner laid ("book:<slot>") lights up, as at the game's win.
+export const result = (state, played = []) => played.filter((e) => e.type === "book" && e.p === 0).map((e) => `book:${e.slots[0]}`);
 
 // The pause before a move nobody taps: Teal's as the robot's, yours as your browser's.
 const beat = (ev) => (ev.p === 0 ? { give: AUTO.answer, fish: AUTO.answer, book: AUTO.book, lucky: AUTO.show, pass: AUTO.done } : { ask: ROBOT_PACE.ask, give: ROBOT_PACE.answer, fish: ROBOT_PACE.answer, book: ROBOT_PACE.book, pass: ROBOT_PACE.done })[ev.type] ?? 0;
@@ -185,7 +187,7 @@ export function board() {
 
   return {
     node,
-    cell: (c) => (typeof c === "number" ? handCards.get(c) : (spots[c] ?? rankCard(c))) ?? hand,
+    cell: (c) => (typeof c === "number" ? handCards.get(c) : c.startsWith("book:") ? myBooks.querySelector(`[data-book="${c.slice(5)}"]`) : (spots[c] ?? rankCard(c))) ?? hand,
     onMove: (fn) => (moveFn = fn),
     async render(st, played) {
       state = st;

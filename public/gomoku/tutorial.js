@@ -19,6 +19,8 @@ export function load({ x = [], o = [] }) {
 }
 export const play = (state, move) => applyMove(state, state.turn, move);
 export const cells = (move) => [move.cell];
+// The line the learner finished lights up, as at the game's win.
+export const result = (state) => (state.winner === 0 ? state.line : []);
 
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -62,7 +64,6 @@ export function board() {
       points.forEach((cell, i) => {
         const owner = st.board[i];
         cell.dataset.v = owner === EMPTY ? "" : stoneOf(st, owner);
-        cell.classList.toggle("win", line.has(i));
         cell.classList.toggle("last", last === i);
         const who = owner === EMPTY ? "empty" : owner === 0 ? "your stone" : "ringed stone";
         cell.setAttribute("aria-label", `${pointName(i)}, ${who}${line.has(i) ? ", winning line" : last === i ? ", last move" : ""}`);

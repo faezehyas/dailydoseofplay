@@ -56,6 +56,9 @@ export function play(state, move) {
   return events;
 }
 export const cells = (move) => (move.draw ? [move.draw] : move.knock ? ["knock", "pile"] : [move.discard, "pile"]);
+// The melds the learner laid down on a knock or gin ("spread:<slot>") light
+// up, as at the game's win.
+export const result = (state, played = []) => played.filter((e) => e.type === "lay" && e.p === 0).flatMap((e) => e.melds.flat().map((s) => `spread:${s}`));
 
 // As in the game: tap the stock or the pile (or Take, Draw); tap a card to
 // pick it and again to discard it; Knock knocks with the best throw. D, T
@@ -212,7 +215,7 @@ export function board() {
     await wait(PACE.between * k, g);
   }
 
-  const cell = (c) => ({ stock: gin.stockBtn, pile: gin.pile, knock: gin.knockBtn, deadwood: gin.deadChip })[c] ?? handCards.get(c) ?? gin.pile;
+  const cell = (c) => (String(c).startsWith("spread:") ? gin.mySpread.cards.get(Number(c.slice(7))) : ({ stock: gin.stockBtn, pile: gin.pile, knock: gin.knockBtn, deadwood: gin.deadChip })[c] ?? handCards.get(c) ?? gin.pile);
 
   return {
     node,

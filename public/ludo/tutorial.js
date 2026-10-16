@@ -21,6 +21,11 @@ export function load({ mine, theirs, die }) {
 }
 export const play = (state, move) => applyMove(state, state.turn, move);
 export const cells = (move) => [`t${move.token}`];
+// A token that captured or reached home lights up, as at the game's win.
+export function result(state, played = []) {
+  const ev = played.find((e) => e.type === "move" && e.player === 0 && (e.captures.length || e.home));
+  return ev ? [`t${ev.token}`] : [];
+}
 
 const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const colors = colorsFor(2);

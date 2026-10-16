@@ -64,6 +64,11 @@ function shooterOf(events) {
   const e = events.find((e) => e.type === "again" || e.type === "win" || e.type === "turn");
   return e.type === "turn" ? R.other(e.player) : (e.player ?? e.winner);
 }
+// A ship the learner sank lights up, as at the game's win.
+export function result(state, played = []) {
+  const sunk = played.find((e) => e.type === "sunk");
+  return sunk && shooterOf(played) === 0 ? sunk.ship.cells : [];
+}
 
 // Placing works as in the game: drag a ship (R turns it mid-drag), tap a
 // ship to pick it and tap it again to turn it; on a focused ship R, Enter
