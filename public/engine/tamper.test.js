@@ -465,7 +465,7 @@ test("group: a frame that isn't an object, has no msg, or has a from that isn't 
   assert.deepEqual(atSpoke, [["ok", 0]]);
 });
 
-test("draw inbox stays bounded", { todo: true }, () => withSeededRandom("tamper draws", async () => {
+test("draw inbox stays bounded", () => withSeededRandom("tamper draws", async () => {
   const { match, send } = turnByHand(chessRules());
   await until(() => match.sr);
   for (let k = 2; k < 100_002; k++) send({ t: "draw", k, v: "0".repeat(64) });

@@ -1592,7 +1592,8 @@ sides, from the same messages in the same order.
 Every value was fixed when the tip was published, so the second peer to
 reveal can't change its value after seeing the first. Nobody can compute a
 future value from the published ones. Each draw costs one message per peer,
-with no extra commit round.
+with no extra commit round. A reveal that arrives early is kept until its
+draw uses it; one for a draw already made or past the chain's end is dropped.
 
 **Hashing on plain http.** Browsers only give `crypto.subtle` to secure
 origins: https, `localhost` and `127.0.0.1`. A page opened at
