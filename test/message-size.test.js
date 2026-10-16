@@ -156,21 +156,20 @@ async function largestIn(slug) {
   return largest;
 }
 
-test("every game's largest message is far below the cap", { timeout: 600_000 }, async (t) => {
+test("every game in games.json is measured here", () => {
   const registry = JSON.parse(readFileSync(new URL("../public/games.json", import.meta.url), "utf8"));
   const ready = registry.games.filter((g) => g.status === "ready").map((g) => g.slug);
-  assert.deepEqual(ready.filter((slug) => !GAMES[slug]), [], "every game in games.json is measured here");
-  const rows = [];
-  for (const slug of Object.keys(GAMES)) {
-    const largest = await largestIn(slug);
-    rows.push([slug, largest]);
-    t.diagnostic(`${slug}: ${largest.size} characters (${largest.t})`);
-  }
-  for (const [slug, { size }] of rows) {
-    assert.ok(size > 0, `${slug}: messages were measured`);
-    assert.ok(size * HEADROOM <= MAX_MESSAGE_LENGTH, `${slug}: ${size} is too close to ${MAX_MESSAGE_LENGTH}`);
-  }
+  assert.deepEqual(ready.filter((slug) => !GAMES[slug]), []);
 });
+
+for (const slug of Object.keys(GAMES)) {
+  test(`${slug}: the largest message is far below the cap`, { timeout: 600_000 }, async (t) => {
+    const largest = await largestIn(slug);
+    t.diagnostic(`${slug}: ${largest.size} characters (${largest.t})`);
+    assert.ok(largest.size > 0, `${slug}: messages were measured`);
+    assert.ok(largest.size * HEADROOM <= MAX_MESSAGE_LENGTH, `${slug}: ${largest.size} is too close to ${MAX_MESSAGE_LENGTH}`);
+  });
+}
 
 test("the engine's own handshake, with four players at the longest names, is far below the cap", async (t) => {
   const largest = { size: 0, t: null };
