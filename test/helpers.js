@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { createApp } from "../server/app.js";
@@ -98,13 +99,23 @@ const pageInfo = new WeakMap();
 
 // A browser and a server for one test, both closed after it. open(name,
 // options) gives a page in a context of its own; errors collects every page
-// error and console error as "name: message".
+// error and console error as "name: message". With BROWSER_COVERAGE=1 in
+// Chromium, each page's JavaScript coverage goes to test-artifacts/coverage/
+// (scripts/browser-coverage.js reads it).
 export async function openBrowser(t, { server, browserType = process.env.BROWSER || "chromium", launch = {} } = {}) {
   mkdirSync(ARTIFACTS, { recursive: true });
   const srv = await startServer(server);
   const args = browserType === "chromium" ? ["--no-sandbox", "--disable-background-timer-throttling", "--autoplay-policy=no-user-gesture-required"] : [];
-  const browser = await loadPlaywright()[browserType].launch({ ...launch, args: [...args, ...(launch.args ?? [])] });
+  // Firefox leaves the loopback address the test server is on out of WebRTC.
+  const prefs = browserType === "firefox" ? { firefoxUserPrefs: { "media.peerconnection.ice.loopback": true } } : {};
+  const browser = await loadPlaywright()[browserType].launch({ ...prefs, ...launch, args: [...args, ...(launch.args ?? [])] });
+  const covered = process.env.BROWSER_COVERAGE === "1" && browserType === "chromium" ? [] : null;
   t.after(async () => {
+    for (const page of covered ?? []) {
+      const entries = await page.coverage.stopJSCoverage().catch(() => null); // null: the test closed the page
+      const ours = entries?.filter((e) => e.url.startsWith(srv.base)).map(({ url, functions }) => ({ url, functions }));
+      if (ours?.length) writeFileSync(path.join(ARTIFACTS, "coverage", `${randomUUID()}.json`), JSON.stringify(ours));
+    }
     await browser.close();
     await srv.close();
   });
@@ -126,6 +137,11 @@ export async function openBrowser(t, { server, browserType = process.env.BROWSER
     if (nickname) await ctx.addInitScript((n) => localStorage.setItem("ddp-name", n), nickname);
     for (const script of [init].flat()) await ctx.addInitScript(script);
     const page = await ctx.newPage();
+    if (covered && context.javaScriptEnabled !== false) {
+      mkdirSync(path.join(ARTIFACTS, "coverage"), { recursive: true });
+      await page.coverage.startJSCoverage({ resetOnNavigation: false });
+      covered.push(page);
+    }
     page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
     page.on("console", (m) => m.type() === "error" && errors.push(`${name}: ${m.text()}`));
     if (clock) await page.clock.install(clock === true ? undefined : clock);

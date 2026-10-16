@@ -11,7 +11,9 @@
     "dev": "PORT=8080 node --watch server/server.js",
     "test": "node --test \"public/**/*.test.js\" \"test/*.test.js\"",
     "test:browser": "node --test test/browser/*.test.js",
-    "test:all": "npm test && npm run test:browser"
+    "test:all": "npm test && npm run test:browser",
+    "coverage": "mkdir -p test-artifacts && node --test --experimental-test-coverage --test-coverage-exclude=\"**/*.test.js\" --test-coverage-exclude=\"test/**\" --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=test-artifacts/unit.lcov \"public/**/*.test.js\" \"test/*.test.js\"",
+    "coverage:browser": "rm -rf test-artifacts/coverage && BROWSER_COVERAGE=1 node --test test/browser/*.test.js; node scripts/browser-coverage.js"
   },
   "dependencies": { "ws": "^8.18.0" }
 }

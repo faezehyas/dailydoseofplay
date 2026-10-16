@@ -1,0 +1,52 @@
+name: Coverage
+
+# Weekly, not on every PR: the share of lines the unit and browser tests run,
+# per folder, in the run's summary and as lcov.
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PLAYWRIGHT_VERSION: 1.63.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright
+        run: |
+          npm install --global "playwright@$PLAYWRIGHT_VERSION"
+          echo "PLAYWRIGHT_MODULE=$(npm root -g)/playwright" >> "$GITHUB_ENV"
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Unit coverage
+        run: npm run coverage
+
+      - name: Browser coverage
+        run: npm run coverage:browser
+
+      - name: Unit and browser coverage
+        run: node scripts/browser-coverage.js test-artifacts/unit.lcov | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: test-artifacts/*.lcov

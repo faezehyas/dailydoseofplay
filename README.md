@@ -197,7 +197,7 @@ or [idea](https://github.com/Faezehyas/dailydoseofplay/issues/new?template=idea.
 
 - **The template.** A new PR starts from the [PR template](.github/pull_request_template.md): summary, rules, protocol, screenshots, known limitations, tests and the checklist. [CODEOWNERS](.github/CODEOWNERS) requests the maintainer's review.
 - **The checklist.** Reviewers go through the checklist at the end of [CONTRIBUTING.md](CONTRIBUTING.md#checklist-before-opening-the-pr): pure, tested rules; a robot that finishes its games; a friend match with rematch; no hidden information on the wire; 360 px wide in light and dark; original art and text; no new dependencies and no server changes.
-- **CI.** Every PR runs `npm test`, a dependency audit and the browser tests in Chromium ([.github/workflows/test.yml](.github/workflows/test.yml)). They must pass.
+- **CI.** Every PR runs `npm test`, a dependency audit and the browser tests in Chromium ([.github/workflows/test.yml](.github/workflows/test.yml)). They must pass. A browser test that fails and then passes on its one rerun is reported as flaky in the run's summary. A few pages also run in Firefox and WebKit, without blocking the merge.
 - **Timing.** A review usually comes within a few days. Once the PR is merged, the game goes live on the site.
 
 ## Tests
@@ -205,6 +205,8 @@ or [idea](https://github.com/Faezehyas/dailydoseofplay/issues/new?template=idea.
 ```bash
 npm test                  # unit (rules, robot, fair play, protocol) + server/signaling integration
 npm run test:browser      # headless Chromium: friend matches with rematch, robot games, failure screen
+npm run coverage          # unit tests with line coverage, lcov in test-artifacts/
+npm run coverage:browser  # browser tests with line coverage per folder (Chromium)
 ```
 
 The browser test needs Playwright (`npm i -g playwright && npx playwright
