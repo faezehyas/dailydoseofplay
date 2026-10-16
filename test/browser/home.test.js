@@ -21,20 +21,7 @@ test("home page tiles are all the same size", { skip, timeout: 60_000 }, async (
 
   for (const width of [1280, 768, 560, 360]) {
     const page = await open(`${width}`, { viewport: { width, height: 900 } });
-    const pending = new Map();
-    const t0 = Date.now();
-    page.on("request", (r) => pending.set(r, Date.now() - t0));
-    page.on("requestfinished", (r) => pending.delete(r));
-    page.on("requestfailed", (r) => { console.log("DIAG failed", r.url(), r.failure()?.errorText); pending.delete(r); });
-    page.on("console", (m) => console.log("DIAG console", m.type(), m.text()));
-    page.on("domcontentloaded", () => console.log("DIAG dcl", width, Date.now() - t0));
-    page.on("load", () => console.log("DIAG load", width, Date.now() - t0));
-    const diag = setTimeout(async () => {
-      console.log("DIAG stuck", width, [...pending].map(([r, at]) => `${r.method()} ${r.url()} @${at}`));
-      console.log("DIAG state", await page.evaluate(() => ({ rs: document.readyState, fonts: document.fonts.status, imgs: [...document.images].map((i) => `${i.src} ${i.complete} ${i.loading}`) })).catch((e) => e.message));
-    }, 15_000);
     await page.goto(`${srv.base}/`);
-    clearTimeout(diag);
     await page.locator(".game-card[data-slug]").nth(games.length - 1).waitFor();
     const cards = await page.locator(".game-card[data-slug]").evaluateAll((els) =>
       els.map((card) => {
