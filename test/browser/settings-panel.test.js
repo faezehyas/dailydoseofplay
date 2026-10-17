@@ -1,15 +1,17 @@
 // Headless-browser test for the settings panel behind the header's gear: the
 // theme and volume chosen on the home page apply in a game; a
 // room setting is locked during a game until the next one, while a view
-// setting stays open; and the panel works with the keyboard alone. Skips if
-// Playwright is missing.
+// setting stays open, in every game's robot game at 360 px; and the panel
+// works with the keyboard alone. Skips if Playwright is missing.
 //
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, noHorizontalScroll } from "../helpers.js";
 
 const skip = skipWithoutPlaywright();
+const { games } = JSON.parse(readFileSync("public/games.json", "utf8"));
 
 // The gain that feeds the speakers: the master volume.
 function findMaster() {
@@ -132,6 +134,53 @@ test("a room setting is locked during a game until the next one; a view setting 
   await page.screenshot({ path: `${ARTIFACTS}/settings-3-view-desktop-dark.png` });
   await page.keyboard.press("Escape");
   assertNoErrors();
+});
+
+// The settings a game lets you change during a game, with an option to pick:
+// every other one is locked. Card colours only change how this device draws
+// the cards, so they should stay open too.
+const VIEW = { "chutes-and-ladders": { spin: "auto" } };
+for (const slug of ["crazy-eights", "go-fish", "gin-rummy", "hearts"]) VIEW[slug] = { fourColor: "true" };
+const TODO = { fourColor: "#142: card colours are locked during a game" };
+
+test("in every game's robot game the panel locks the room's settings and keeps its view settings open, at 360 px", { skip, timeout: 180_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await setup(t);
+  const checked = (page, name) => page.locator(`#settings input[name="panel-${name}"]:checked`).getAttribute("value");
+  for (const { slug } of games) {
+    await t.test(slug, async (t) => {
+      const view = VIEW[slug] ?? {};
+      const page = await open();
+      await page.goto(`${srv.base}/${slug}/?robot=1`);
+      await waitForState(page, (ddp) => !!ddp.match);
+      await page.tap("#settings-open");
+      await page.tap("#settings-tab-game");
+      await page.locator("#panel-locked").waitFor();
+      assert.ok(await noHorizontalScroll(page), `${slug}: no sideways scroll at 360 px`);
+      const groups = await page.locator("#settings-game fieldset").evaluateAll((sets) =>
+        sets.map((f) => ({ name: f.querySelector("input").name.replace("panel-", ""), disabled: f.disabled, values: [...f.querySelectorAll("input")].map((i) => i.value) })),
+      );
+      assert.ok(groups.length, `${slug}: the game's settings are in the panel`);
+      for (const { name, disabled, values } of groups.filter((g) => !(g.name in view))) {
+        assert.ok(disabled, `${slug}: ${name} is locked during a game`);
+        const was = await checked(page, name);
+        await page.tap(option(`panel-${name}`, values.find((v) => v !== was)), { force: true });
+        assert.equal(await checked(page, name), was, `${slug}: a tap on ${name} changes nothing`);
+      }
+      const key = readFileSync(`public/${slug}/settings.js`, "utf8").match(/key: "([\w-]+)"/)[1];
+      for (const [name, value] of Object.entries(view)) {
+        await t.test(`${name} changes during a game`, { todo: TODO[name] }, async () => {
+          assert.ok(groups.some((g) => g.name === name && !g.disabled), `${slug}: ${name} is open during a game`);
+          await page.tap(option(`panel-${name}`, value));
+          assert.equal(await checked(page, name), value, `${slug}: ${name} takes the tap`);
+          assert.equal(String(await page.evaluate(([key, name]) => JSON.parse(localStorage.getItem(key))[name], [key, name])), value, `${slug}: ${name} is saved`);
+        });
+      }
+      await page.keyboard.press("Escape");
+      await page.locator("#settings").waitFor({ state: "detached" });
+      assertNoErrors();
+      await page.context().close();
+    });
+  }
 });
 
 test("the panel works with the keyboard alone", { skip, timeout: 120_000 }, async (t) => {

@@ -1,6 +1,7 @@
 // Headless-browser test for the result moment (engine/celebrate.js): every
-// game, played to the end against the robot, celebrates as its result panel
-// opens, with its own chime, and nothing moves with reduced motion; in a
+// game, played to the end against the robot (the card games seeded, with the
+// robots at full speed), celebrates as its result panel opens, with its own
+// chime, and nothing moves with reduced motion; in a
 // friend game of Tic Tac Toe each browser plays its own player's moment, and
 // nothing plays when muted. Skips if Playwright is missing.
 //
@@ -8,6 +9,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { skipWithoutPlaywright, openBrowser, waitForState, joinByInvite } from "../helpers.js";
+import { autoplay as crazyEights } from "./crazy-eights.shared.js";
+import { autoplay as goFish } from "./go-fish.shared.js";
+import { autoplay as ginRummy } from "./gin-rummy.shared.js";
+import { autoplay as hearts } from "./hearts.shared.js";
 
 const skip = skipWithoutPlaywright();
 
@@ -22,7 +27,13 @@ const GAMES = [
   ["chutes-and-ladders", "bell"],
   ["dots-and-boxes", "paper"],
   ["ludo", "wood"],
+  ["crazy-eights", "paper", "#141: its own over box, without the result moment"],
+  ["go-fish", "water"],
+  ["gin-rummy", "paper"],
+  ["hearts", "bell"],
 ];
+// The card games play through their own controls, seeded, with the robots at full speed.
+const CARD_GAMES = { "crazy-eights": crazyEights, "go-fish": goFish, "gin-rummy": ginRummy, hearts };
 // The outcome each title stands for: someone else's win is "over" with more than two players.
 const OUTCOME = { "You won": "win", "You lost": "loss", Draw: "draw" };
 
@@ -42,38 +53,48 @@ function autoplay(page, slug) {
 }
 
 async function playToTheEnd(open, base, slug) {
+  const cards = CARD_GAMES[slug];
   const page = await open(slug, {
     viewport: { width: 1200, height: 900 },
     reducedMotion: "reduce",
+    ...(cards && { seed: slug, robotPace: 0.001 }),
     init: [
       () => (window.ddpSounds = []),
       // Two robots in the games for up to four, so a robot's win is "over" for you.
       () => localStorage.setItem("ddp-ludo-settings", JSON.stringify({ robots: 2 })),
       () => localStorage.setItem("ddp-cl-settings", JSON.stringify({ robots: 2 })),
+      // One hand is a whole game.
+      () => localStorage.setItem("ddp-gin-rummy-settings", JSON.stringify({ target: 0 })),
+      () => localStorage.setItem("ddp-hearts-settings", JSON.stringify({ target: 0 })),
     ],
   });
   await page.goto(`${base}/${slug}/?robot=1`);
   await waitForState(page, (ddp) => !!ddp.match);
-  await autoplay(page, slug);
-  await page.locator("#result-panel.celebrate").waitFor({ timeout: 180_000 });
+  await (cards ? cards(page) : autoplay(page, slug));
+  await waitForState(page, (ddp) => ddp.match.phase === "over", undefined, { timeout: 180_000, why: `${slug} ends` });
   await page.evaluate(() => clearInterval(window.__autoplay));
+  await page.locator("#result-panel.celebrate").waitFor({ timeout: 5000 });
   return page;
 }
 
 test("every game celebrates the end of a robot game with its own chime, and nothing moves with reduced motion", { skip, timeout: 900_000 }, async (t) => {
   const { srv, open, assertNoErrors } = await openBrowser(t);
-  for (const [slug, flavour] of GAMES) {
-    const page = await playToTheEnd(open, srv.base, slug);
-    const title = await page.locator("#result").innerText();
-    const outcome = OUTCOME[title] ?? "over";
-    assert.ok(await page.locator(`#result-panel.celebrate-${outcome}`).count(), `${slug}: "${title}" celebrates as ${outcome}`);
-    const sounds = await page.evaluate(() => window.ddpSounds);
-    assert.deepEqual(sounds.filter((n) => /^(win|loss|draw|over)-/.test(n)), [`${outcome}-${flavour}`], `${slug}: one chime, in its flavour`);
-    assert.ok(!sounds.some((n) => /^(win|lose|draw)$/.test(n)), `${slug}: no end tune of its own`);
-    const moving = await page.evaluate(() => document.getAnimations().filter((a) => a.animationName?.startsWith("celebrate")).length + document.querySelectorAll(".celebrate-dot").length);
-    assert.equal(moving, 0, `${slug}: nothing moves with reduced motion`);
-    assertNoErrors();
-    await page.context().close();
+  for (const [slug, flavour, todo] of GAMES) {
+    await t.test(slug, { todo }, async () => {
+      const page = await playToTheEnd(open, srv.base, slug);
+      const title = await page.locator("#result").innerText();
+      const outcome = OUTCOME[title] ?? "over";
+      assert.ok(await page.locator(`#result-panel.celebrate-${outcome}`).count(), `${slug}: "${title}" celebrates as ${outcome}`);
+      const sounds = await page.evaluate(() => window.ddpSounds);
+      assert.deepEqual(sounds.filter((n) => /^(win|loss|draw|over)-/.test(n)), [`${outcome}-${flavour}`], `${slug}: one chime, in its flavour`);
+      // A card game's "draw" is a card drawn, not a tune.
+      const tune = CARD_GAMES[slug] ? /^(win|lose)$/ : /^(win|lose|draw)$/;
+      assert.ok(!sounds.some((n) => tune.test(n)), `${slug}: no end tune of its own`);
+      const moving = await page.evaluate(() => document.getAnimations().filter((a) => a.animationName?.startsWith("celebrate")).length + document.querySelectorAll(".celebrate-dot").length);
+      assert.equal(moving, 0, `${slug}: nothing moves with reduced motion`);
+      assertNoErrors();
+      await page.context().close();
+    });
   }
 });
 

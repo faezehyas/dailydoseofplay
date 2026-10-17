@@ -6,15 +6,19 @@
 // how a highlight looks, in light and dark, with and without motion; and the
 // first lesson of Connect 4 (by keyboard), Gomoku, Checkers, Dots and Boxes,
 // Backgammon, Sea Battle, Chutes and Ladders, Ludo, Crazy Eights, Go Fish,
-// Gin Rummy and Hearts.
+// Gin Rummy and Hearts; and every lesson of every game, read from its
+// lessons.js and played through each step's expected move by keyboard.
 // Skips if Playwright is missing.
 //
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, noHorizontalScroll } from "../helpers.js";
+import { stepCursor } from "../../public/dots-and-boxes/art.js";
 
 const skip = skipWithoutPlaywright();
+const { games } = JSON.parse(readFileSync("public/games.json", "utf8"));
 
 const sq = (name) => (Number(name[1]) - 1) * 8 + "abcdefgh".indexOf(name[0]);
 const square = (page, name) => page.locator(`.tut-stage .sq[data-sq="${sq(name)}"]`);
@@ -367,3 +371,154 @@ test("Hearts' first lesson: the A♦ takes violet's diamond trick, then you lead
       await hcard(page, "9C").click();
     },
   ]));
+
+// Runs the page's fake clock until fn(arg) holds in the page: the
+// tutorial's pauses between a move and the next step take no real time.
+async function until(page, fn, arg, why) {
+  for (let ms = 0; ms < 20_000; ms += 50) {
+    if (await page.evaluate(fn, arg)) return;
+    await page.clock.runFor(50);
+  }
+  throw new Error(`${why}: still waiting after 20 s on the page's clock for ${fn}`);
+}
+const stage = (page, selector) => page.locator(`.tut-stage ${selector}`);
+// Focuses a control and presses a key on it, Enter by default.
+async function pressKey(locator, key = "Enter") {
+  await locator.focus();
+  await locator.page().keyboard.press(key);
+}
+// The step has taken a move, right or wrong.
+const answered = (page) => page.evaluate(() => document.querySelector("#tut-feedback").textContent !== "");
+// Presses each control in turn until the step takes the move.
+async function pressAll(page, locators) {
+  for (const locator of locators) {
+    if (await answered(page)) return;
+    await pressKey(locator);
+  }
+}
+const slotCard = (page, slot) => stage(page, `.pc-hcard[data-slot="${slot}"]`);
+// A key for the card table while it has focus.
+const tableKey = (page, key) => pressKey(stage(page, ".pc-hcard").first(), key);
+
+// The arrow keys that take Dots and Boxes' cursor from one line to another
+// on the tutorial's 3 × 3 board, found breadth first.
+function arrowsTo(from, to) {
+  const keys = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] };
+  const paths = new Map([[from, []]]);
+  for (const [line, path] of paths) {
+    if (line === to) return path;
+    for (const [key, step] of Object.entries(keys)) if (!paths.has(stepCursor(3, line, ...step))) paths.set(stepCursor(3, line, ...step), [...path, key]);
+  }
+}
+
+// How to make a lesson's move on each game's tutorial board. at holds what
+// a game needs to remember between steps (Sea Battle's ships and shots, Dots
+// and Boxes' cursor).
+const PLAY = {
+  async "sea-battle"(page, move, step, at) {
+    if (step.position) Object.assign(at, { fleet: step.position.fleet.map((s) => ({ ...s })), shots: new Set(step.position.shots) });
+    if (move.type === "fire") {
+      // "Fire at any square": the first one not fired at yet.
+      const target = move.target ?? [...Array(100).keys()].find((i) => !at.shots.has(i));
+      at.shots.add(target);
+      return pressKey(stage(page, `.enemy .cell[data-i="${target}"]`));
+    }
+    // Arrow keys move a focused ship, R turns it in place, and Tab away places it.
+    const ship = stage(page, `.own .ship[data-k="${move.ship}"]`);
+    const was = at.fleet[move.ship];
+    at.fleet[move.ship] = { ...was, r: move.r, c: move.c, vertical: move.vertical };
+    if (was.vertical !== move.vertical) return pressKey(ship, "r");
+    await ship.focus();
+    for (let r = was.r; r !== move.r; r += Math.sign(move.r - r)) await page.keyboard.press(move.r > r ? "ArrowDown" : "ArrowUp");
+    for (let c = was.c; c !== move.c; c += Math.sign(move.c - c)) await page.keyboard.press(move.c > c ? "ArrowRight" : "ArrowLeft");
+    await page.keyboard.press("Tab");
+  },
+  "tic-tac-toe": (page, { cell }) => pressKey(stage(page, `.ttt-cell[data-i="${cell}"]`)),
+  "connect-4": (page, { col }) => pressKey(stage(page, `.c4-col[data-col="${col}"]`)),
+  gomoku: (page, { cell }) => pressKey(stage(page, `.gmk-cell[data-i="${cell}"]`)),
+  async chess(page, { from, to, promo }) {
+    await pressAll(page, [from, to].map((sq) => stage(page, `.sq[data-sq="${sq}"]`)));
+    if (promo) await pressKey(stage(page, `.promo-opt[data-promo="${promo}"]`));
+  },
+  checkers: (page, { path }) => pressAll(page, path.map((sq) => stage(page, `.ck-sq[data-sq="${sq}"]`))),
+  // Each step is [from, die]: pick the checker unless it still is, then its point; then Confirm.
+  async backgammon(page, { steps }) {
+    for (const [k, [from, die]] of steps.entries()) {
+      const cell = (n) => stage(page, `.bg-cell[data-n="${n}"]`);
+      if (!(await cell(from).evaluate((n) => n.classList.contains("selected")))) await pressKey(cell(from));
+      await pressKey(cell(Math.max(from - die, 0)));
+      await until(page, (n) => document.querySelectorAll(".tut-stage .die.used").length === n, k + 1, `die ${k + 1} played`);
+    }
+    await pressKey(stage(page, "button:text-is('Confirm'):enabled"));
+  },
+  "chutes-and-ladders": (page) => pressKey(stage(page, ".cl-spin-btn")),
+  // Arrow keys move the cursor from line to line; Enter draws it.
+  async "dots-and-boxes"(page, { line }, step, at) {
+    await stage(page, ".db-board").focus();
+    for (const key of arrowsTo(at.cursor ?? 0, line)) await page.keyboard.press(key);
+    await page.keyboard.press("Enter");
+    at.cursor = line;
+  },
+  // R rolls, then a number key picks the token.
+  async ludo(page, { token }) {
+    await page.keyboard.press("r");
+    await until(page, () => document.querySelector(".tut-stage .hit-token"), undefined, "the die rolled");
+    await page.keyboard.press(String(token + 1));
+  },
+  async "crazy-eights"(page, move) {
+    if (move.draw) return tableKey(page, "d");
+    await pressKey(slotCard(page, move.play));
+    if (move.suit !== undefined) await pressKey(stage(page, `.ce-pick[data-suit="${move.suit}"]`));
+  },
+  // A card of the rank picks it, then A asks.
+  async "go-fish"(page, { ask }) {
+    const slot = await stage(page, ".pc-hcard").evaluateAll((cards, rank) => cards.map((c) => Number(c.dataset.slot)).find((s) => s % 13 === rank), ask);
+    await pressKey(slotCard(page, slot));
+    await page.keyboard.press("a");
+  },
+  // T takes the pile, D draws; a card pressed twice is thrown, or pressed once then K knocks with it.
+  async "gin-rummy"(page, move) {
+    if (move.draw) return tableKey(page, move.draw === "pile" ? "t" : "d");
+    await pressKey(slotCard(page, move.discard));
+    await page.keyboard.press(move.knock ? "k" : "Enter");
+  },
+  async hearts(page, move) {
+    if (move.play !== undefined) return pressKey(slotCard(page, move.play));
+    for (const slot of move.pass) await pressKey(slotCard(page, slot));
+    await page.keyboard.press("p");
+  },
+};
+
+test("every lesson of every game plays to its end through its expected moves", { skip, timeout: 600_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  for (const { slug } of games.filter((g) => existsSync(`public/${g.slug}/lessons.js`))) {
+    await t.test(slug, async () => {
+      assert.ok(PLAY[slug], `${slug}: add how its tutorial board takes a lesson's move to PLAY`);
+      const { lessons } = await import(`../../public/${slug}/lessons.js`);
+      const page = await open(slug, { viewport: { width: 360, height: 740 }, reducedMotion: "reduce", clock: true });
+      await page.goto(`${srv.base}/${slug}/?learn`);
+      await pressKey(page.locator(".tut-lesson").first());
+      const at = {};
+      for (const [i, lesson] of lessons.entries()) {
+        if (i) {
+          await until(page, () => document.querySelector(".tut-next:not([hidden]) #tut-next"), undefined, `${slug} lesson ${i}: Next lesson`);
+          assert.equal(await page.evaluate(() => document.activeElement.id), "tut-next", `${slug} lesson ${i}: Next lesson takes focus`);
+          await page.keyboard.press("Enter");
+        }
+        for (const [k, s] of lesson.steps.entries()) {
+          const where = `${slug} lesson ${i + 1} ("${lesson.title}") step ${k + 1}`;
+          await until(page, ([n, text]) => document.querySelector(".tut-step")?.textContent === n && document.querySelector("#tut-text")?.textContent === text, [`Step ${k + 1} of ${lesson.steps.length}`, s.text], `${where} shows`);
+          await PLAY[slug](page, [s.expect].flat()[0], s, at);
+          await until(page, () => document.querySelector("#tut-feedback").textContent, undefined, `${where} takes the move`);
+          assert.equal(await page.locator("#tut-feedback").textContent(), "Right!", `${where}: the expected move is right`);
+        }
+      }
+      await until(page, () => document.querySelector("#tut-end"), undefined, `${slug}: the end screen`);
+      assert.equal(await page.locator("#tut-end").textContent(), "You've finished every lesson!", `${slug}: the end screen`);
+      assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("ddp-lessons"))), { [slug]: lessons.map((_, i) => i) }, `${slug}: every lesson ticked`);
+      assert.ok(await noHorizontalScroll(page), `${slug}: no sideways scroll at 360 px`);
+      assertNoErrors();
+      await page.context().close();
+    });
+  }
+});

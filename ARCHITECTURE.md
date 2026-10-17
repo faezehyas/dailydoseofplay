@@ -1260,7 +1260,10 @@ adapter's `play` makes in order; moves nobody chooses in the game (your
 lay-down after a knock, handing over the cards asked for) are made for you,
 as they are there.
 `test/browser/tutorial.test.js` plays the first Chess and Connect 4 lessons
-by keyboard and the first of every other game by tap.
+by keyboard and the first of every other game by tap, then every lesson of
+every game through each step's expected move by keyboard (each game's way of
+making a move is its entry in `PLAY` there), on the page's fake clock so the
+pauses between steps take no real time.
 
 **Player colours.** A player has the same colour on every screen, so "I'm the
 coral one" is true for everyone at the table. In a two-player game whoever

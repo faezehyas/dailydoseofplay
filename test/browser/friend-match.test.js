@@ -397,6 +397,37 @@ test("home page, theme toggle, drag-to-move and a robot game on a phone", { skip
   assertNoErrors();
 });
 
+test("a robot game played to the end, then a rematch the robot takes: back to placing, on fresh boards", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("player", { viewport: { width: 360, height: 740 }, hasTouch: true, reducedMotion: "reduce", seed: "sea-battle rematch" });
+  await page.goto(`${srv.base}/sea-battle/?robot=1`);
+  await page.locator("#ready").waitFor();
+  // Ready, then every shot the robot would fire, at once.
+  await page.evaluate(async () => {
+    const { chooseMove } = await import("/sea-battle/robot.js");
+    window.__autoplay = setInterval(() => {
+      const match = window.ddp.match;
+      if (match.phase === "placing" && !match.locked) document.querySelector("#ready")?.click();
+      if (match.canFire()) {
+        const { weapon, target, dir } = chooseMove(match.state, match.me);
+        match.fire(weapon, target, 1, dir);
+      }
+    }, 10);
+  });
+  await waitForState(page, (ddp) => ddp.match.phase === "over", undefined, { timeout: 90_000, why: "the robot game ends" });
+  await page.evaluate(() => clearInterval(window.__autoplay));
+  await page.locator("#rematch").tap();
+  await waitForState(page, (ddp) => ddp.match.m === 2 && ddp.match.phase === "placing" && ddp.robots[0].match.m === 2, undefined, { why: "the robot takes the rematch" });
+  assert.equal(await page.locator(".own .cell:is(.hit, .sunk, .miss, .clear)").count(), 0, "no shots on my board");
+  assert.equal(await page.locator("#result-panel:visible").count(), 0, "the result panel is gone");
+  assert.deepEqual((await page.locator("#score dd").allInnerTexts()).map(Number).sort(), [0, 1], "the finished game counts");
+  await page.locator("#ready").tap();
+  await waitForState(page, (ddp) => ddp.match.m === 2 && ddp.match.phase === "playing" && ddp.robots[0].match.phase === "playing", undefined, { why: "the rematch starts" });
+  // The robot's waters show this game's shots only.
+  await waitForState(page, (ddp) => document.querySelectorAll(".enemy .cell:is(.hit, .sunk, .miss, .clear)").length === ddp.match.state.boards[1].cells.filter((v) => v !== 0).length, undefined, { why: "a fresh board to fire at" });
+  assertNoErrors();
+});
+
 test("a robot game on a 360 px phone with the longest nickname has no sideways scroll", { skip, timeout: 60_000 }, async (t) => {
   const { srv, open, assertNoErrors } = await openBrowser(t);
   const page = await open("player", { nickname: "W".repeat(20), viewport: { width: 360, height: 780 }, hasTouch: true });
