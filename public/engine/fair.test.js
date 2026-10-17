@@ -50,6 +50,17 @@ test("shared random: a peer that changes its value is caught", async () => {
   await assert.rejects(Promise.all([a.draw(sendB), b.draw(tamper)]), FairPlayError);
 });
 
+test("shared random: only reveals for a draw still to come, within the chain, are kept", async () => {
+  const { a, b, sendA, sendB } = await pairOfRandoms();
+  a.receive(1, b.chain.reveal(1)); // before a draws: kept for draw 1
+  for (const k of [0, -1, 1.5, "2", 17]) a.receive(k, "0".repeat(64));
+  assert.deepEqual([...a.inbox.keys()], ["1:1"]);
+  const [ra, rb] = await Promise.all([a.draw(sendA), b.draw(sendB)]); // b's own reveal of draw 1 reaches a after it is used
+  assert.equal(ra(), rb());
+  a.receive(1, b.chain.reveal(1));
+  assert.equal(a.inbox.size, 0);
+});
+
 test("sessions exchange names, buffer early game messages, and agree on rematches", async () => {
   const [x, y] = localPair();
   const [host, guest] = await Promise.all([

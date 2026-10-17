@@ -143,6 +143,7 @@ export class SharedRandom {
   // chain: null for a robot that took a seat over (forSeat()): it reveals nothing.
   constructor(chain) {
     this.chain = chain;
+    this.length = chain?.length ?? 0; // draws this match can make
     this.k = 0;
     this.inbox = new Map(); // "k:seat" -> value
     this.waiters = new Map(); // "k:seat" -> { resolve, reject }
@@ -167,13 +168,15 @@ export class SharedRandom {
     this.setPeers(tips, index);
   }
   // from: the revealing seat; optional with a single peer once it is set.
+  // A reveal no draw waits for is kept only for a draw still to come, within
+  // the chain's length; no draw could use any other, so it is dropped.
   receive(k, value, from = this.#onlyPeer()) {
     const key = `${k}:${from}`;
     const waiter = this.waiters.get(key);
     if (waiter) {
       this.waiters.delete(key);
       waiter.resolve(value);
-    } else {
+    } else if (Number.isInteger(k) && k > this.k && k <= this.length) {
       this.inbox.set(key, value);
     }
   }
@@ -201,6 +204,7 @@ export class SharedRandom {
     const copy = new SharedRandom(null);
     const verifier = (last, k) => Object.assign(new ChainVerifier(last), { k });
     copy.k = this.k;
+    copy.length = this.length;
     copy.index = seat;
     copy.inbox = new Map(this.inbox);
     copy.dropped = new Map(this.dropped);
