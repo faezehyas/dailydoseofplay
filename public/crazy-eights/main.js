@@ -814,6 +814,7 @@ function mountGame(session, root, shell) {
     offMsg,
     session.on("end", onEnd),
     session.on("rematch-start", () => config && newMatch()),
+    settings.onChange(() => render()),
   ];
   view = emptyView();
   if (robotGame) begin(settings.get());
