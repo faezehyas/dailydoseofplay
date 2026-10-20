@@ -72,7 +72,7 @@ for (const { width, height, colorScheme } of SCREENS) {
         const where = `${slug} robot game at ${width} px`;
         checkScreen(play, where);
         assert.ok(count(play, (n) => n.role === "status" || n.role === "log"), `${where}: a status or log region`);
-        await t.test("one h1 in a robot game", { todo: "#144: no h1 once a game starts" }, () => assert.equal(h1s(play), 1, `${where}: one h1`));
+        assert.equal(h1s(play), 1, `${where}: one h1`);
         await checkSettings(page, where);
         assertNoErrors();
         await page.context().close();

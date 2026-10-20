@@ -23,7 +23,7 @@ const measure = (page) =>
       return { name: node.id || node.className, left: r.left, right: r.right, width: r.width };
     };
     const shown = (node) => node.getClientRects().length > 0;
-    const views = [...document.querySelectorAll("#lobby > .card, #game > :not(.overlay)")].filter(shown);
+    const views = [...document.querySelectorAll("#lobby > .card, #game > :not(.overlay, .sr-only)")].filter(shown);
     const { view, layout } = document.querySelector(".page").dataset;
     return { view, layout, views: views.map(box), rules: box(document.querySelector(".rules")), scroll: document.documentElement.scrollWidth, inner: innerWidth };
   });
@@ -54,7 +54,7 @@ for (const width of [1280, 360]) {
       assertColumn(lobby, `${game.slug} lobby`, column("narrow"));
 
       await page.click("#play-robot");
-      await page.locator("#game > :not(.overlay)").first().waitFor();
+      await page.locator("#game > :not(.overlay, .sr-only)").first().waitFor();
       const playing = await measure(page);
       assert.equal(playing.view, "game");
       assertColumn(playing, `${game.slug} robot game`, column(lobby.layout));
