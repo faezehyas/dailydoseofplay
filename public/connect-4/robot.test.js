@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { rngFromSeed } from "../engine/rng.js";
 import { chooseMove, LEVELS } from "./robot.js";
 import { newState as newTimedState, applyMove, openColumns, landing, SIZES, DRAW } from "./rules.js";
-import { bestOf5, elapsed } from "../../test/helpers.js";
+import { bestOf5, elapsed, skipUnderCoverage } from "../../test/helpers.js";
 
 const newState = (first, size = "7x6") => newTimedState(first, { size, moveSeconds: 0, gameSeconds: 0 });
 
@@ -141,7 +141,7 @@ test("robot vs robot over 20 seeded games always finishes with legal moves, on e
   }
 });
 
-test("it answers well under 100 ms, from a cold start and on every board", async () => {
+test("it answers well under 100 ms, from a cold start and on every board", { skip: skipUnderCoverage }, async () => {
   // Each run has its own fresh import of the robot, so every board size starts cold.
   const fresh = await Promise.all([0, 1, 2, 3, 4, 5].map((run) => import(`./robot.js?cold=${run}`)));
   let worst = 0;

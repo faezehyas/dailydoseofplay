@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { rngFromSeed } from "../engine/rng.js";
 import { chooseMove, scoreMoves, evaluateState, thinkTime, LEVELS } from "./robot.js";
 import { newState as newTimedState, stateFromFen, applyMove, listMoves, legalMoves, isAttacked, parseSquare, BLACK, DRAW } from "./rules.js";
-import { bestOf5, elapsed } from "../../test/helpers.js";
+import { bestOf5, elapsed, skipUnderCoverage } from "../../test/helpers.js";
 
 const newState = (first) => newTimedState(first, { moveSeconds: 0, gameSeconds: 0 });
 const fen = (f) => stateFromFen(f, { white: 0 });
@@ -124,18 +124,24 @@ test("the levels play visibly differently", () => {
   assert.ok(counts.easy > counts.medium && counts.medium >= counts.hard, JSON.stringify(counts));
 });
 
-test("each level answers fast, even in a busy middlegame", () => {
-  const busy = [
-    "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
-    "r1bq1rk1/pp2bppp/2n1pn2/3p4/2PP4/2N1PN2/PP3PPP/R2QKB1R w KQ - 0 8",
-    "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
-  ].map(fen);
+const busy = [
+  "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+  "r1bq1rk1/pp2bppp/2n1pn2/3p4/2PP4/2N1PN2/PP3PPP/R2QKB1R w KQ - 0 8",
+  "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+].map(fen);
+
+test("each level keeps to its node budget, even in a busy middlegame", () => {
   for (const level of LEVEL_NAMES) {
     for (const s of busy) {
       const { nodes } = scoreMoves(s, legalMoves(s), LEVELS[level]);
       assert.ok(nodes <= LEVELS[level].maxNodes + 1, `${level}: ${nodes} nodes`);
-      assert.ok(bestOf5(() => elapsed(() => chooseMove(s, 0, () => 0.5, { level }))) < 300, level);
     }
+  }
+});
+
+test("each level answers fast, even in a busy middlegame", { skip: skipUnderCoverage }, () => {
+  for (const level of LEVEL_NAMES) {
+    for (const s of busy) assert.ok(bestOf5(() => elapsed(() => chooseMove(s, 0, () => 0.5, { level }))) < 300, level);
   }
   // A time budget stops the search early but still answers.
   let move;
