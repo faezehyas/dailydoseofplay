@@ -1,13 +1,7 @@
 // Shared by the Crazy Eights browser tests: the page helpers.
-export { bg } from "./ludo.shared.js";
+export { bg, resultInView } from "./ludo.shared.js";
 
 export const state = (page) => page.evaluate(() => window.ddp.match.state);
-// The result box is in view without scrolling.
-export const resultInView = (page) =>
-  page.evaluate(() => {
-    const r = document.querySelector(".ce-over-card").getBoundingClientRect();
-    return r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth;
-  });
 
 // Plays this page's turns in the page itself: a glowing card, and the suggested suit after an 8.
 // Draws and passes with no choice are made by the game.

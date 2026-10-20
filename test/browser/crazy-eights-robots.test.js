@@ -184,11 +184,11 @@ test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, k
   for (let k = 0; k < 3; k++) assert.deepEqual(await page.evaluate((i) => window.ddp.robots[i].match.state, k), st, `robot ${k + 1} agrees`);
   assert.deepEqual(await leaks(page), []);
   assert.deepEqual(await domLeaks(page), []);
-  await page.locator("#ce-result").waitFor();
-  assert.match(await page.locator("#ce-result").innerText(), /^(You win!|Robot \d wins · you're (2nd|3rd|4th))$/);
+  await page.locator("#result").waitFor();
+  assert.match(await page.locator("#result").innerText(), /^(You won|Robot \d won)$/);
   await page.locator("#ce-verdict.ok").waitFor({ timeout: 60_000 });
   assert.match(await page.locator("#ce-verdict").innerText(), /Fair play verified/);
-  assert.ok((await heard()).includes(st.winner === 0 ? "win" : "lose"));
+  assert.ok((await heard()).includes(st.winner === 0 ? "win-paper" : "over-paper"));
   assert.ok(await resultInView(page), "the result fits the phone without scrolling");
   await page.screenshot({ path: `${ARTIFACTS}/ce-14-robot-over.png` });
 

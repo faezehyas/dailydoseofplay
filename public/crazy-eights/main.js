@@ -10,8 +10,9 @@ import { matchRouter } from "../engine/session.js";
 import { CardMatch } from "../engine/card-match.js";
 import { el, toast, setTabAlert } from "../engine/shell.js";
 import { playerBar } from "../engine/players.js";
-import { recordRobotResult } from "../engine/robot-record.js";
-import { cardTable, DECK_WORK as BUSY, still, tokenMs, easing } from "../engine/cards/table.js";
+import { resultPanel } from "../engine/result.js";
+import { celebrate } from "../engine/celebrate.js";
+import { cardTable, DECK_WORK as BUSY, tokenMs, easing } from "../engine/cards/table.js";
 import { humanPause } from "../engine/cards/paced-robot.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { SUIT_NAMES, cardWords } from "../engine/cards/faces.js";
@@ -79,7 +80,6 @@ function mountGame(session, root, shell) {
   let rules = null;
   let match = null;
   let m = 0;
-  let rematch = { me: false, them: false, seats: [] };
   let destroyed = false;
   let ended = false;
   let current = null; // the event being played out
@@ -92,7 +92,6 @@ function mountGame(session, root, shell) {
   let deadlineKey = "";
   let autoKey = "";
   let lastTick = 0;
-  let celebrated = false;
   let picking = null; // the slot of the 8 waiting for a suit
   let abortInfo = null;
   let previous = null; // the match before a rematch, whose verdict may still be on its way
@@ -136,11 +135,11 @@ function mountGame(session, root, shell) {
   );
   const myCount = el("span", { class: "count mono" }, "0");
   const handHint = el("p", { class: table.cls("hand-hint"), id: "ce-hand-hint" });
-  const meArea = el("div", { class: table.cls("me", `p-${me}`) }, hand, el("span", { class: "pill" }, el("span", { class: "dot", "aria-hidden": "true" }), el("span", { class: "name" }, myName), myCount), handHint);
+  const myPill = el("span", { class: "pill" }, el("span", { class: "dot", "aria-hidden": "true" }), el("span", { class: "name" }, myName), myCount);
+  const meArea = el("div", { class: table.cls("me", `p-${me}`) }, hand, myPill, handHint);
   const tableBox = el("div", { class: table.cls("table", count === 4 ? "four-seats" : ""), id: "ce-table" }, el("div", { class: table.cls("opps") }, opps.map((o) => o.node)), centre, meArea);
   const picker = el("div", { class: "ce-picker", id: "ce-picker", hidden: true, role: "dialog", "aria-modal": "true", "aria-labelledby": "ce-picker-title" });
-  const overBox = el("div", { class: "ce-over", id: "ce-over", hidden: true, role: "dialog", "aria-labelledby": "ce-result" });
-  const tableWrap = el("div", { class: table.cls("table-wrap") }, tableBox, flyLayer, picker, overBox);
+  const tableWrap = el("div", { class: table.cls("table-wrap") }, tableBox, flyLayer, picker);
 
   const drawBtn = el("button", { class: "btn primary", type: "button", id: "ce-draw", onclick: () => drawNow() }, "Draw");
   const passBtn = el("button", { class: "btn", type: "button", id: "ce-pass", onclick: () => passNow() }, "Pass");
@@ -152,6 +151,12 @@ function mountGame(session, root, shell) {
   const configLine = el("p", { class: table.cls("config"), id: "ce-config" });
   const note = el("p", { class: table.cls("note"), id: "ce-note" });
 
+  const result = resultPanel(session, {
+    onLeave: () => shell.leave(),
+    // The result moment: the winner's pill and the card they went out on light up; a loss dims the table.
+    onShow: ({ outcome }) => outcome && celebrate({ outcome, flavour: "paper", highlight: winnerNodes(), board: tableBox }),
+  });
+
   const rootBox = el(
     "div",
     { class: "crazy-eights pc-game", dataset: { you: me === 0 ? "a" : me === 1 ? "b" : "", seat: me } },
@@ -162,7 +167,7 @@ function mountGame(session, root, shell) {
     configLine,
     note,
   );
-  root.append(rootBox);
+  root.append(rootBox, result.node);
 
   // ---------- the table as drawn ----------
   const emptyView = () => ({ hands: seats.map(() => []), stock: 52, discard: [], suit: -1, named: false, top: -1, dir: 1, arriving: new Set() });
@@ -232,11 +237,6 @@ function mountGame(session, root, shell) {
 
   function bubble(p, text, g, ms = PACE.bubble) {
     table.bubble(p === me ? meArea : seatOf(p).node, p, text, g, ms);
-  }
-
-  // Confetti in the winner's colour (and the others'), from where they sit.
-  function confetti(p, g) {
-    table.confetti(p === me ? rectIn(hand) : seatRect(p), p, seats, g);
   }
 
   // ---------- playing events out ----------
@@ -569,7 +569,7 @@ function mountGame(session, root, shell) {
     hint.textContent = !st || phase !== "playing" ? "" : mine ? (plays ? "Tap a glowing card. Keys: arrows, Enter; D draws, P passes." : "") : d ? `${nameOf(d.player)}'s turn` : "";
     handHint.textContent = mine && plays ? `${plural(plays, "card")} can go on ${cardName(st.top)}${st.named ? ` (${SUIT_NAMES[st.suit].toLowerCase()} named)` : ""}` : "";
     renderTimer();
-    renderOver();
+    renderResult();
     setTabAlert(mine ? "Your turn" : null);
     if (mine) {
       const key = `${m}:${st.moves}`;
@@ -658,39 +658,32 @@ function mountGame(session, root, shell) {
     return el("p", { class: "verdict", id: "ce-verdict" }, el("span", { class: "spinner", "aria-hidden": "true" }), "Checking every shuffle and replaying the game…");
   }
 
-  function renderOver() {
+  // The winner's pill and the card they went out on, in the order they light up.
+  function winnerNodes() {
+    const st = match?.state;
+    if (!st || match.phase !== "over") return [];
+    return [st.winner === me ? myPill : seatOf(st.winner).pill, st.ended === "out" ? pile.lastElementChild : null];
+  }
+
+  let shownFor = null;
+  let extra = null;
+  function renderResult() {
     const phase = match?.phase;
     // Let the last card land first.
     if (ended || (phase !== "over" && phase !== "aborted") || (phase === "over" && table.pending)) {
-      overBox.hidden = true;
-      if (overBox.firstChild) overBox.replaceChildren();
+      result.hide();
+      shownFor = null;
       return;
     }
+    if (phase === "aborted") return result.show({ stopped: true, reason: abortText(abortInfo || { reason: match.abortReason }, nameOf) });
     const st = match.state;
-    if (overBox.hidden) {
-      overBox.hidden = false;
-      tableWrap.scrollIntoView?.({ block: "nearest", behavior: still() ? "auto" : "smooth" });
-      if (phase === "over" && !celebrated) {
-        celebrated = true;
-        // Crazy Eights has its own game-over panel, so it records a robot match itself.
-        if (robotGame) recordRobotResult(session.game, st.winner === me ? "win" : "loss", count);
-        play(st.winner === me ? "win" : "lose");
-        confetti(st.winner, table.gen);
-      }
-    }
-    let title;
-    let detail = null;
-    let list = null;
-    if (phase === "aborted") {
-      title = "Match stopped";
-      detail = el("p", { class: "detail bad", id: "ce-detail" }, abortText(abortInfo || { reason: match.abortReason }, nameOf));
-    } else {
-      const w = st.winner;
+    const w = st.winner;
+    const reason = st.ended === "blocked" ? "Nobody could move, so the fewest cards won." : st.ended === "long" ? "The game went on too long, so the fewest cards won." : `${w === me ? "You" : nameOf(w)} went out in ${plural(st.plays[w], "play")}.`;
+    const key = `${m}:${!!match.verdict}`;
+    if (shownFor !== key) {
+      shownFor = key;
       const { order, known, pts } = standings();
-      const myPlace = order.indexOf(me) + 1;
-      title = w === me ? "You win!" : count > 2 ? `${nameOf(w)} wins · you're ${PLACE[myPlace]}` : `${nameOf(w)} wins`;
-      detail = el("p", { class: "detail", id: "ce-detail" }, st.ended === "blocked" ? "Nobody could move, so the fewest cards won." : st.ended === "long" ? "The game went on too long, so the fewest cards won." : `${w === me ? "You" : nameOf(w)} went out in ${plural(st.plays[w], "play")}.`);
-      list = el(
+      const list = el(
         "ol",
         { class: "ce-standings", id: "ce-standings" },
         order.map((p, i) => {
@@ -708,39 +701,15 @@ function mountGame(session, root, shell) {
           );
         }),
       );
+      extra = el("div", { class: "ce-over pc-game" }, list, verdictLine());
     }
-    let rematchText = "";
-    if (rematch.me) rematchText = `Waiting for ${listOf(seats.filter((p) => !rematch.seats?.includes(p)).map(nameOf))}…`;
-    else if (rematch.them) rematchText = wantsRematch();
-    overBox.replaceChildren(
-      el(
-        "div",
-        { class: "ce-over-card" },
-        el("h2", { class: st?.winner === me && phase === "over" ? "win" : "", id: "ce-result" }, title),
-        list,
-        detail,
-        verdictLine(),
-        el(
-          "div",
-          { class: "ce-actions-over" },
-          el("button", { class: "btn primary", type: "button", id: "rematch", disabled: rematch.me, onclick: () => session.requestRematch() }, rematch.them && !rematch.me ? "Accept rematch" : "Rematch"),
-          el("button", { class: "btn", type: "button", onclick: () => shell.leave() }, "Leave"),
-        ),
-        rematchText && el("p", { class: "rematch-status", id: "rematch-status" }, rematchText),
-      ),
-    );
-  }
-
-  function wantsRematch() {
-    const voters = (rematch.seats || []).filter((p) => p !== me);
-    return `${listOf(voters.map(nameOf))} ${voters.length === 1 ? "wants" : "want"} a rematch!`;
+    result.show({ winner: w, reason, extra });
   }
 
   // ---------- match lifecycle ----------
   function newMatch() {
     m += 1;
     table.reset();
-    rematch = { me: false, them: false, seats: [] };
     clearTimeout(forcedTimer);
     current = null;
     view = emptyView();
@@ -749,7 +718,7 @@ function mountGame(session, root, shell) {
     forcedKey = "";
     deadlineKey = "";
     autoKey = "";
-    celebrated = false;
+    shownFor = null;
     picking = null;
     picker.hidden = true;
     abortInfo = null;
@@ -844,11 +813,6 @@ function mountGame(session, root, shell) {
   const offs = [
     offMsg,
     session.on("end", onEnd),
-    session.on("rematch", (votes) => {
-      rematch = votes;
-      if (votes.them && !votes.me) toast(wantsRematch().replace("!", ""));
-      render();
-    }),
     session.on("rematch-start", () => config && newMatch()),
   ];
   view = emptyView();

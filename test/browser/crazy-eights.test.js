@@ -80,8 +80,8 @@ test("two friends play Crazy Eights on the host's settings through the invite li
     assert.deepEqual(a, b, "both browsers end on the same state");
     if (a.ended === "out") assert.equal(a.hands[a.winner].length, 0, "the winner went out");
     const won = a.winner === 0 ? host : guest;
-    assert.match(await won.locator("#ce-result").innerText(), /^You win!$/);
-    assert.equal(await (won === host ? guest : host).locator("#ce-result").innerText(), `${a.winner === 0 ? "Ada" : "Bo"} wins`);
+    assert.equal(await won.locator("#result").innerText(), "You won");
+    assert.equal(await (won === host ? guest : host).locator("#result").innerText(), "You lost");
     // After the audit the loser's leftover hand is shown face up, with its points.
     const loser = 1 - a.winner;
     if (a.hands[loser].length) assert.match(await host.locator("#ce-standings").innerText(), /\d+ pts/);

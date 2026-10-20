@@ -27,7 +27,7 @@ const GAMES = [
   ["chutes-and-ladders", "bell"],
   ["dots-and-boxes", "paper"],
   ["ludo", "wood"],
-  ["crazy-eights", "paper", "#141: its own over box, without the result moment"],
+  ["crazy-eights", "paper"],
   ["go-fish", "water"],
   ["gin-rummy", "paper"],
   ["hearts", "bell"],
