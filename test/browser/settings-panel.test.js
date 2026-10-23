@@ -141,7 +141,6 @@ test("a room setting is locked during a game until the next one; a view setting 
 // the cards, so they should stay open too.
 const VIEW = { "chutes-and-ladders": { spin: "auto" } };
 for (const slug of ["crazy-eights", "go-fish", "gin-rummy", "hearts"]) VIEW[slug] = { fourColor: "true" };
-const TODO = { fourColor: "#142: card colours are locked during a game" };
 
 test("in every game's robot game the panel locks the room's settings and keeps its view settings open, at 360 px", { skip, timeout: 180_000 }, async (t) => {
   const { srv, open, assertNoErrors } = await setup(t);
@@ -168,11 +167,12 @@ test("in every game's robot game the panel locks the room's settings and keeps i
       }
       const key = readFileSync(`public/${slug}/settings.js`, "utf8").match(/key: "([\w-]+)"/)[1];
       for (const [name, value] of Object.entries(view)) {
-        await t.test(`${name} changes during a game`, { todo: TODO[name] }, async () => {
+        await t.test(`${name} changes during a game`, async () => {
           assert.ok(groups.some((g) => g.name === name && !g.disabled), `${slug}: ${name} is open during a game`);
           await page.tap(option(`panel-${name}`, value));
           assert.equal(await checked(page, name), value, `${slug}: ${name} takes the tap`);
           assert.equal(String(await page.evaluate(([key, name]) => JSON.parse(localStorage.getItem(key))[name], [key, name])), value, `${slug}: ${name} is saved`);
+          if (name === "fourColor") await page.locator(".pc-game.four-colour").first().waitFor({ timeout: 1000 });
         });
       }
       await page.keyboard.press("Escape");

@@ -690,7 +690,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     showView("game");
     lobbyRoot.hidden = true;
     gameRoot.hidden = false;
-    gameRoot.replaceChildren();
+    // The game's name stays the page's one h1 during play, for heading navigation; the board shows it already.
+    gameRoot.replaceChildren(el("h1", { class: "sr-only" }, title));
     // The game starts at the top, however far down the lobby's Play button was.
     scrollTo(0, 0);
     // The game has a history entry of its own, so Back leaves it as Leave does.

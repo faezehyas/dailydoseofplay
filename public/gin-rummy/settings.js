@@ -13,7 +13,7 @@ const GROUPS = [
   { name: "dealer", legend: "Who deals first", options: [["random", "Coin toss"], ["host", "Me"], ["guest", "The other player"]], summary: (v, l) => ({ host: "You deal first", guest: "The other player deals first" })[v] ?? l },
   { name: "moveSeconds", legend: "Time per move", options: [[0, "No limit"], [15, "15 s"], [30, "30 s"], [60, "60 s"]], summary: (v, l) => (v ? `${l} a move` : "No time limit") },
   { name: "level", legend: "Robot level", robot: true, options: [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]], summary: (v, l) => `${l} robot` },
-  { name: "fourColor", legend: "Card colours", options: [[false, "Two colours"], [true, "Four colours", "♦ blue · ♣ green"]], summary: () => "" },
+  { name: "fourColor", legend: "Card colours", scope: "view", options: [[false, "Two colours"], [true, "Four colours", "♦ blue · ♣ green"]], summary: () => "" },
 ];
 
 export const settings = gameSettings({

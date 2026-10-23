@@ -65,6 +65,12 @@ export function bestOf5(sample) {
   return Math.max(...best);
 }
 
+// A speed test's skip reason under coverage (--experimental-test-coverage, or
+// NODE_V8_COVERAGE, which the test runner sets for each test file), else
+// false: instrumentation slows the code, so wall-clock budgets don't hold.
+export const skipUnderCoverage =
+  (process.execArgv.includes("--experimental-test-coverage") || !!process.env.NODE_V8_COVERAGE) && "coverage instrumentation slows the code too much for this wall-clock budget";
+
 // An import in a module's source: group 1 or 2 is a static import's
 // specifier, group 3 a dynamic import()'s.
 export const IMPORT = /^\s*(?:import|export)\b[^;]*?\bfrom\s*["']([^"']+)["']|^\s*import\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)/gm;

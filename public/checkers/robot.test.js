@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { rngFromSeed } from "../engine/rng.js";
 import { chooseMove, evaluate, LEVELS } from "./robot.js";
 import { newState as newTimedState, applyMove, legalMoves, EMPTY, DRAW } from "./rules.js";
-import { bestOf5, elapsed } from "../../test/helpers.js";
+import { bestOf5, elapsed, skipUnderCoverage } from "../../test/helpers.js";
 
 const newState = (first) => newTimedState(first, { moveSeconds: 0, gameSeconds: 0 });
 const sq = (r, c) => r * 8 + c;
@@ -104,7 +104,7 @@ test("even Easy beats a random player almost always", () => {
   assert.ok(easy.a >= 17, JSON.stringify(easy));
 });
 
-test("it answers well under 100 ms, from the opening and in a crowded middle game", () => {
+test("it answers well under 100 ms, from the opening and in a crowded middle game", { skip: skipUnderCoverage }, () => {
   const opening = newState(0);
   const middle = stateFrom([".o.o.o.o", "o.o...o.", ".o.o.o.o", "x...o...", "...x.x.x", "x.x...x.", ".x.x.x.x", "x.x.x.x."], 0);
   for (const [name, s] of [["opening", opening], ["middle", middle]]) {

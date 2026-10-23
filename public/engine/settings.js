@@ -10,7 +10,8 @@ import { el, segGroup } from "./shell.js";
 // scope: "room" (the default) is the game's rules, sent to the other players;
 // "device" only applies to robots, in robot games and on the host of a friend
 // room (the robots' level; `robot: true` says the same); "view" is this player's own view of the game and
-// can change during a game, which the game reads with get() when it needs it.
+// can change during a game, which the game reads with get() when it needs it
+// (onChange(fn) calls fn after every change, and returns a function that stops it).
 // summary(value, label, config, robots) is the text of the group's chip in the
 // summary (default: the label; "" leaves it out); robots is how many play
 // against you in a robot game, when the lobby offers a choice (offerPlayers()).
@@ -27,6 +28,7 @@ export function gameSettings({ key, prefix, groups, normalize, hint, robot, defa
   let locked = false;
   let mode = "friend"; // the game that's on while locked
   const shown = new Map(); // what is on screen (summaries, options) → how to bring it up to date
+  const listeners = new Set();
   const scopeOf = (g) => g.scope ?? (g.robot ? "device" : "room");
   // The picks are kept next to the config. Settings saved before that: a
   // value other than the default can only have been picked.
@@ -53,6 +55,7 @@ export function gameSettings({ key, prefix, groups, normalize, hint, robot, defa
     config = normalize({ ...config, [name]: value });
     pick(name);
     refresh();
+    for (const fn of listeners) fn();
   }
   const current = (gameMode) => (gameMode === "robot" && robot ? robot(config, [...picked]) : config);
   function refresh() {
@@ -154,7 +157,11 @@ export function gameSettings({ key, prefix, groups, normalize, hint, robot, defa
     refresh();
   }
   // get("robot") is the config for a robot game.
-  return { get: (gameMode) => ({ ...current(gameMode) }), summary, panel, form, lock, offerPlayers, players: seats, playersForm };
+  function onChange(fn) {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  }
+  return { get: (gameMode) => ({ ...current(gameMode) }), summary, panel, form, lock, offerPlayers, players: seats, playersForm, onChange };
 }
 
 // The player count saved with a game's settings, if any. Settings saved

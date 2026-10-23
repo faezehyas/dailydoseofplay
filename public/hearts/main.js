@@ -714,7 +714,7 @@ function mountGame(session, root, shell) {
   document.addEventListener("visibilitychange", onVisible);
   const resize = new ResizeObserver(() => view && render());
   resize.observe(tableBox);
-  const offs = [offMsg, session.on("end", onEnd), session.on("rematch-start", () => config && newMatch())];
+  const offs = [offMsg, session.on("end", onEnd), session.on("rematch-start", () => config && newMatch()), settings.onChange(() => render())];
   view = emptyView();
   if (robotGame) begin(settings.get());
   else if (me === 0) {
