@@ -1,7 +1,7 @@
 # Architecture
 
-Daily Dose of Play is a free, no-login site of browser games for two or more
-players (Chutes and Ladders, Ludo, Crazy Eights, Go Fish and Hearts seat up to four). One small Node server
+Daily Dose of Play is a free site of browser games for two or more players,
+and playing never needs an account (Chutes and Ladders, Ludo, Crazy Eights, Go Fish and Hearts seat up to four). One small Node server
 on Wasmer Edge serves the pages and introduces players to each other. The games
 themselves run browser to browser over WebRTC DataChannels: with more than
 two players, every guest connects to the room creator's browser, which
@@ -26,7 +26,12 @@ flowchart TB
     ws["WS /ws<br>signaling: rooms scoped by game slug,<br>opaque SDP/ICE relay"]
     healthz["GET /healthz<br>{ok, rooms, players, games} (CORS *)"]
     wellknown["GET /.well-known/…<br>app links for the mobile app"]
+    api["/api/…<br>optional accounts, JSON"]
   end
+  db[("Wasmer PostgreSQL<br>accounts and sessions")]
+  google["Google<br>sign-in (OpenID Connect)"]
+  api --> db
+  api -- "code exchange, keys" --> google
   app -- "pages, and WebSocket only until connected" --> two
   app -- "pages, and WebSocket only until connected" --> star
   subgraph two ["Two players: one direct link"]
@@ -45,11 +50,11 @@ flowchart TB
 
 **Privacy page.** `/privacy/` (`public/privacy/index.html`, a static page on
 `engine/boot.js`) tells visitors, in plain words, what the site stores on
-their device, what the lobby server sees and logs, and who sees their address
-over WebRTC and STUN. It lists every `localStorage` key: `test/server.test.js`
-fails when a `"ddp-…"` key in `public/` is missing from it. Change the page
-with the facts it states (a log line, an ICE server, a new kind of data); the
-accounts work (F1) must rewrite it before it ships.
+their device, what an account keeps (and its cookies) if they sign in, what
+the lobby server sees and logs, and who sees their address over WebRTC and
+STUN. It lists every `localStorage` key: `test/server.test.js` fails when a
+`"ddp-…"` key in `public/` is missing from it. Change the page with the facts
+it states (a log line, an ICE server, a new kind of data, a new column).
 
 **Installing.** Every page links `/manifest.webmanifest` and two `theme-color`
 tags, light and dark, set to `--bg`. The manifest's icons are `favicon.svg`
@@ -85,7 +90,7 @@ offline. The site stays the same in it, with three exceptions:
 
 | Layer | Files | Knows about games? |
 |---|---|---|
-| Server | `server/app.js` (HTTP routes, static files, security headers), `server/signaling.js` (rooms, invite keys, knocks, join rate limits, relay), `server/limits.js` (per-client limits), `server/server.js` (entry). It imports the nickname rules from `public/engine/names.js`. | Only slugs and `maxPlayers` from `public/games.json` |
+| Server | `server/app.js` (HTTP routes, static files, security headers), `server/signaling.js` (rooms, invite keys, knocks, join rate limits, relay), `server/limits.js` (per-client limits), `server/accounts.js` (the `/api/` routes: sign-in, sessions, public names), `server/google.js` (Google's OpenID Connect), `server/store/` (the account store: `memory.js`, `postgres.js`, migrations in `server/db/migrations/`), `server/server.js` (entry). It imports the nickname rules from `public/engine/names.js`. | Only slugs and `maxPlayers` from `public/games.json` |
 | Engine (browser) | `public/engine/` | No |
 | Game | `public/<slug>/` | Yes, only its own |
 
@@ -510,7 +515,11 @@ host's IP address, and children use the site. So:
    `rate_limited` and the socket closes, whether or not the code exists, so the
    answer gives nothing away. The right key is never a guess, so it is never
    refused. The client address is the first value of `X-Forwarded-For`, else
-   the socket's address; `CLIENT_IP_HEADER` names another header. If neither
+   the socket's address; `CLIENT_IP_HEADER` names another header, and
+   `CLIENT_IP_ENTRY=last` takes its last value instead, for a proxy that
+   appends the visitor's address to whatever the visitor sent. An
+   IPv4-mapped address (`::ffff:203.0.113.5`, as Wasmer writes it) counts as
+   the plain IPv4 one. If neither
    gives an address, only the per-connection limit applies, because one shared
    bucket would lock everyone out. Addresses are kept in memory for the
    minute and never logged.
@@ -535,8 +544,9 @@ the numbers are `DEFAULT_LIMITS` in `server/signaling.js`.
 | Rooms on the server | 10,000 | `server_full` (last resort) |
 
 - The client address is the same as for the join rate limit above
-  (`X-Forwarded-For` or `CLIENT_IP_HEADER`, else the socket). With no address,
-  the per-address limits don't apply.
+  (`X-Forwarded-For` or `CLIENT_IP_HEADER`, its first or last value by
+  `CLIENT_IP_ENTRY`, else the socket). With no address, the per-address
+  limits don't apply.
 - Every open room is a waiting room: the host closes its signaling socket when
   the game starts, which frees the room. So "5 rooms" means 5 rooms still
   waiting for players, and the 30 minutes run from `create`. The check runs
@@ -583,13 +593,110 @@ lobby never stores such a name. Because the host checks each guest's `$hello`
 and guests check the host's `$roster` and `$start`, a modified page can't push
 a blocked name over WebRTC either. Nicknames are never logged.
 
+### Accounts
+
+Accounts are optional, and playing never needs one: every game, against the
+robot or with friends, works the same signed out. An account gives a player a
+unique public name, which leaderboards will show. Sign-in is with Google only,
+done by our own server with OpenID Connect: no Firebase and no Google script
+on our pages, so the CSP stays as it is. The routes live in
+`server/accounts.js`, under `/api/`, JSON in and out.
+
+| Route | What it does |
+|---|---|
+| `GET /api/me` | `{ accounts, user, signup }`: `user` is `{ id, name, email }` when signed in; `signup` is `{ email }` while a new account picks its name. `{ accounts: false }` while accounts are off. |
+| `GET /api/auth/google/start?return=/path` | Sets `__Host-ddp_oauth` (signed, 10 minutes: state, nonce, a PKCE verifier and the return path) and redirects to Google with `scope=openid email`. |
+| `GET /api/auth/google/callback` | Checks the state (and that it wasn't used before), exchanges the code at Google's token endpoint with `fetch`, and verifies the ID token. A known Google account gets a new session and goes back to the return path; a new one gets `__Host-ddp_signup` (signed, 30 minutes: its Google ID and email) and goes to `/account/` to pick a name. Problems go to `/account/?error=state`, `google` or `cancelled`. |
+| `POST /api/account` `{ name }` | Creates the account from the sign-up cookie, and signs in. |
+| `PATCH /api/account` `{ name }` | Changes the public name. |
+| `DELETE /api/account` `{ name }` | Deletes the account, its sessions and its email; the name must be typed again. |
+| `POST /api/auth/signout`, `POST /api/auth/signout-all` | Ends this session, or every session of the account. |
+
+Errors are `{ error }` with a status: `bad_json` and `bad_name` (with its
+`problem`, 400), `confirm` (400), `signed_out` (401), `forbidden` (403),
+`name_taken` (409), `too_big` (413), `rate_limited` (429) and `unavailable`
+(503).
+
+- **ID token.** `server/google.js` checks it with `node:crypto`: an RS256
+  signature by a key from Google's JWKS (fetched, cached for its `max-age`,
+  and fetched again for an unknown `kid`, at most once a minute), `iss`
+  (`https://accounts.google.com` or `accounts.google.com`), `aud` =
+  `GOOGLE_CLIENT_ID`, `exp` and `nonce`. Every Google URL is an option of
+  `createApp()`, so the tests point them at a local fake
+  (`test/fake-google.js`) with its own RSA key.
+- **Sessions.** `__Host-ddp_sid` holds 32 random bytes: `HttpOnly; Secure;
+  SameSite=Lax; Path=/`, 30 days, renewed once a day by `/api/me` (which
+  every page calls), and replaced at every sign-in. Lax, because Google's
+  callback is a top-level navigation from another site. The database keeps
+  only `HMAC-SHA256(SESSION_SECRET, token)`. The `/ws` handshake carries the
+  cookie too, which is why other sites can't open `/ws` (see **Who may open
+  `/ws`**); signaling doesn't read it.
+- **CSRF.** Every non-GET request under `/api/` needs `Origin` equal to
+  `PUBLIC_ORIGIN` (or `Sec-Fetch-Site: same-origin`) and `Content-Type:
+  application/json`, which a form on another site can't send; anything else
+  gets 403. Bodies are capped at 4 KB.
+- **Rate limits.** Per client address (as for `/ws`, see **Who may join a
+  room**), in memory: 10 requests a minute to every route but `/api/me`, and
+  5 new accounts an hour (`ACCOUNT_LIMITS`, counted with `createRateLimit()`
+  from `server/limits.js`). The minute limit runs before the kill switch, so
+  it can be checked while accounts are off.
+- **Public names.** `checkPublicName()` in `public/engine/names.js`: a
+  nickname (the same rules and blocklist, see **Nicknames**) of 3 to 20
+  characters. Names are unique without case: the store compares `nameKey()`
+  (NFKC, lower case). The account page pre-fills the first one from the
+  nickname.
+- **Only on `PUBLIC_ORIGIN`.** Google sends visitors back to one address, so
+  `/api/me` says `{ accounts: false }` on the site's other addresses
+  (`dailydoseofplay.wasmer.app`, a LAN address), which show no account UI.
+
+**Kill switch.** Accounts are off while `ACCOUNTS=off`, while
+`SESSION_SECRET` (at least 32 characters), `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, `PUBLIC_ORIGIN` or `GOOGLE_REDIRECT_URI` is missing,
+or while the database can't be reached (tried again at most every 30 s).
+Then every `/api/` route answers 503, except `GET /api/me`, which says
+`{ accounts: false }` with a 200 so pages hide the account UI without a
+failed request in the console. The server logs why, by name only, such as
+`accounts: off (missing GOOGLE_CLIENT_ID)`. Games, `/ws` and `/healthz` never
+touch any of it, and the server starts without waiting for the database.
+
+**Storage.** `server/store/memory.js` (when `DB_HOST` is unset, so `npm
+start` and the tests need no database) and `server/store/postgres.js` (Wasmer
+managed PostgreSQL from `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME` and
+`DB_PASSWORD`, over TLS without checking the certificate, as Wasmer's needs;
+`pg` is imported only then) have the same interface, and
+`test/store.test.js` runs one set of contract tests on both (PostgreSQL with
+`TEST_PG=1` and the `DB_` variables). Migrations are
+`server/db/migrations/NNN_name.sql`, applied in order at start inside one
+transaction under `pg_advisory_xact_lock`, so instances starting together
+take turns, and recorded in `schema_migrations`. They are forward-only and
+additive: a change is a new file, never an edit.
+
+| Table | Columns |
+|---|---|
+| `users` | `id` (random, public), `name`, `name_key` (unique), `google_sub` (unique), `email`, `created_at` |
+| `sessions` | `token_hash`, `user_id` (deleted with its user), `created_at`, `expires_at` |
+
+No IP address, nickname or game is stored. Expired sessions are swept once
+an hour. Nothing personal is logged: not names, emails, Google IDs, tokens
+or addresses, and a database error logs only its code.
+
+**Pages.** `account()` in `shell.js` asks `/api/me` once per page. The header
+shows "Sign in", or your public name, linking to `/account/` (with
+`?return=` the page you're on); a phone's header has no room for it, so
+there the settings panel's General tab has a Sign in row. Signed in, the
+lobby (and the settings panel) shows "Playing as" your public name instead
+of the nickname field, and you play under it; `ddp-name` stays as it was for
+playing signed out. `/account/` (`public/account.js`) signs in, picks the
+first name, changes it, signs out here or everywhere, and deletes the
+account once its name is typed again.
+
 ### Engine (`public/engine/`)
 
 | Module | Job |
 |---|---|
-| `shell.js` | Header with the home link in a `nav` landmark, a "Skip to content" link to the page's `<main>` (shown on focus), and light/dark and sound toggles (each keeps one label, "Dark mode" or "Mute sounds", and gives its state through `aria-pressed`) next to the gear that opens the settings panel (see **Settings**), the footer every page ends with (how games run, then links to this file, the repository and the privacy page; more links join `FOOTER_LINKS`), nickname in `localStorage` (`getNickname()` picks and saves a default when there is none) and the nickname field (`nicknameField()`, in the lobby and the panel), `segGroup()` (a group of segmented options), the theme on `<html data-theme>`, toasts (just below the header; a repeated one is announced again), a tab-title alert ("Your turn"), `el()` DOM helper, `load()` and `store()` (`localStorage` reads and writes that never throw), and `askBeforeLeaving()`, the panel's "Ask before leaving" switch |
+| `shell.js` | Header with the home link in a `nav` landmark, a "Skip to content" link to the page's `<main>` (shown on focus), and light/dark and sound toggles (each keeps one label, "Dark mode" or "Mute sounds", and gives its state through `aria-pressed`) next to the gear that opens the settings panel (see **Settings**), then the account link ("Sign in" or your public name, from `account()`, see **Accounts**), the footer every page ends with (how games run, then links to this file, the repository and the privacy page; more links join `FOOTER_LINKS`), nickname in `localStorage` (`getNickname()` picks and saves a default when there is none) and the nickname field (`nicknameField()`, in the lobby and the panel; "Playing as" your public name instead when signed in, and `accountName()` for the lobby), `segGroup()` (a group of segmented options), the theme on `<html data-theme>`, toasts (just below the header; a repeated one is announced again), a tab-title alert ("Your turn"), `el()` DOM helper, `load()` and `store()` (`localStorage` reads and writes that never throw), and `askBeforeLeaving()`, the panel's "Ask before leaving" switch |
 | `prefs.js` | The general settings (see **Settings**): `getPrefs()`, `setPrefs(patch)`, `onPrefsChange(fn)`, and `normalizePrefs()` and `loadPrefs(storage)`, which moves the old `ddp-theme` and `ddp-sound` into `ddp-settings`. No DOM; runs in node too. |
-| `names.js` | `checkName()` and `cleanName()`: the nickname rules (see **Nicknames**), shared with the server; `defaultName()`, a friendly default name |
+| `names.js` | `checkName()` and `cleanName()`: the nickname rules (see **Nicknames**), shared with the server; `defaultName()`, a friendly default name; `checkPublicName()` and `nameKey()`, an account's public name (see **Accounts**) |
 | `theme.css` | Design tokens for light and dark, fonts and motion (see **Type and motion**), chips and `.mono`, buttons, cards, lobby, the home hero with its steps and its game-table scene, the home grid (tiles whose name links to the lobby, with Play friends and Play the robot links; up to 600 px wide, compact tiles with the art on the left and the two links side by side), the moves the tiles' previews use (see **Tile previews**) and its loading tiles (see **Colours and contrast**), the game page column (see **Page column**), the player bar with the reactions' tray and bubbles, the result panel, the result moment, the tutorial (see **Tutorials**), the confirm dialog, the settings panel and `.text-page` (the privacy page's reading column) |
 | `signaling.js` | `RoomClient`: create, join (with or without the invite key), admit, decline, signal, leave. It uses the global `WebSocket`, so it also runs in Node 22 for the integration test. |
 | `peer.js` | `PeerChannel`: one ordered, reliable DataChannel to one other browser, pre-negotiated (`negotiated: true, id: 0`) on both sides; buffers early ICE candidates; detects ICE failure, a 20 s timeout and a 10 s disconnect grace. Refuses a message over `MAX_MESSAGE_LENGTH` before parsing it and closes with `message_too_big` (see **Message size**). |
@@ -909,7 +1016,8 @@ browser's Back closes it and returns focus to the gear. Arrow keys, Home and
 End move between its two tabs:
 
 - **General**, this device's preferences for every page: nickname
-  (`ddp-name`); theme (System, Light or Dark, a segmented control with
+  (`ddp-name`), or "Playing as" your public name when signed in, and a Sign
+  in row while accounts are on and you're signed out; theme (System, Light or Dark, a segmented control with
   icons); sound, a switch, with its volume slider; "Ask before leaving",
   a switch (see **Leaving**); and "Mute reactions", a switch (see
   **Reactions**). The switches are checkboxes with
