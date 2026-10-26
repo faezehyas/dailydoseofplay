@@ -33,7 +33,7 @@ function sameKey(a, b) {
   return diff === 0;
 }
 
-export function createSignaling({ games, log = () => {}, limits = {}, clientIpHeader, now = Date.now }) {
+export function createSignaling({ games, log = () => {}, limits = {}, clientIpHeader, clientIpEntry, now = Date.now }) {
   // games: Map slug -> { maxPlayers }
   const { failedJoins, windowMs, approvalMs, connectionsPerIp, roomsPerIp, messagesPerSecond, messageBurst, signalBytes, roomMs } = {
     ...DEFAULT_LIMITS,
@@ -243,7 +243,7 @@ export function createSignaling({ games, log = () => {}, limits = {}, clientIpHe
   }
 
   function handleConnection(ws, req) {
-    const ip = clientIp(req, clientIpHeader || undefined);
+    const ip = clientIp(req, clientIpHeader || undefined, clientIpEntry);
     const bucket = createTokenBucket({ rate: messagesPerSecond, burst: messageBurst, now });
     ws.meta = { id: String(nextPeerId++), room: null, knock: null, ip, failures: [], bucket, lastSeen: now() };
     const counted = ipConnections.take(ip);

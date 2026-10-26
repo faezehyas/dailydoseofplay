@@ -3,15 +3,21 @@ import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import net from "node:net";
 import path from "node:path";
 import { createApp } from "../server/app.js";
 import { rngFromSeed, sfc32 } from "../public/engine/rng.js";
 
 // Start the real HTTP + signaling server in-process on a random port.
-export async function startServer({ publicDir, allowedOrigins, clientIpHeader, appleTeamId, androidCertSha256, limits, now } = {}) {
-  const { server, wss, signaling } = await createApp({ publicDir, allowedOrigins, clientIpHeader, appleTeamId, androidCertSha256, limits, now, log: () => {} });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const { port } = server.address();
+// accounts, when given, is a function of the server's base URL that returns
+// its account settings (see accountsConfig() in server/accounts.js); without
+// it accounts are off, as when the secrets are unset.
+export async function startServer({ publicDir, allowedOrigins, clientIpHeader, clientIpEntry, appleTeamId, androidCertSha256, accounts, accountStore, google, limits, now, log = () => {} } = {}) {
+  let port = accounts ? await freePort() : 0;
+  const settings = accounts ? accounts(`http://127.0.0.1:${port}`) : { off: true };
+  const { server, wss, signaling } = await createApp({ publicDir, allowedOrigins, clientIpHeader, clientIpEntry, appleTeamId, androidCertSha256, accounts: settings, accountStore, google, limits, now, log });
+  await new Promise((resolve) => server.listen(port, "127.0.0.1", resolve));
+  ({ port } = server.address());
   return {
     base: `http://127.0.0.1:${port}`,
     wsUrl: `ws://127.0.0.1:${port}/ws`,
@@ -22,6 +28,18 @@ export async function startServer({ publicDir, allowedOrigins, clientIpHeader, a
       await new Promise((resolve) => server.close(resolve));
     },
   };
+}
+
+// A port nothing listens on right now, for a server that must know its address before it starts.
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.on("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
 }
 
 // Runs fn with crypto.getRandomValues drawing from rngFromSeed(seed), so a

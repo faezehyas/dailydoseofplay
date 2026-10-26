@@ -170,7 +170,12 @@ flowchart TB
     s_app["app.js"]
     s_signaling["signaling.js"]
     s_limits["limits.js"]
+    s_accounts["accounts.js"]
+    s_google["google.js"]
+    s_store_memory["store/memory.js"]
+    s_store_postgres["store/postgres.js<br>loaded when DB_HOST is set"]
     s_ws["ws"]
+    s_pg["pg"]
   end
   games_json[("public/games.json")]
 
@@ -333,6 +338,16 @@ flowchart TB
   s_app --> s_ws
   s_signaling --> s_limits
   s_signaling --> e_names
+  s_app --> s_accounts
+  s_accounts --> s_limits
+  s_accounts --> s_google
+  s_accounts --> s_store_memory
+  s_accounts --> s_store_postgres
+  s_accounts --> e_names
+  s_store_memory --> e_names
+  s_store_postgres --> s_store_memory
+  s_store_postgres --> s_pg
+  s_store_postgres --> e_names
   s_app -.-> games_json
   p_home -.-> games_json
   e_lobby -.-> games_json

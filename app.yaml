@@ -7,6 +7,16 @@ package: .
 locality:
   regions:
     - fr-roub1
+# Accounts (see Accounts in ARCHITECTURE.md). Wasmer provisions the
+# PostgreSQL database and sets DB_HOST, DB_PORT, DB_NAME, DB_USERNAME and
+# DB_PASSWORD. SESSION_SECRET, GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are
+# app secrets, never in this file; without them accounts stay off.
+capabilities:
+  database:
+    engine: postgres
+env:
+  PUBLIC_ORIGIN: https://www.dailydoseofplay.com
+  GOOGLE_REDIRECT_URI: https://www.dailydoseofplay.com/api/auth/google/callback
 health_checks:
   - http:
       method: get
