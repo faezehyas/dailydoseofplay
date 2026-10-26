@@ -102,6 +102,7 @@ flowchart TB
   subgraph pages ["Pages"]
     p_home["home.js"]
     p_main["main.js<br>one per game"]
+    p_account["account.js<br>/account/"]
   end
   subgraph game ["A game's folder: public/#lt;slug#gt;/"]
     g_rules["rules.js"]
@@ -180,6 +181,8 @@ flowchart TB
   games_json[("public/games.json")]
 
   p_home --> e_shell
+  p_account --> e_shell
+  p_account --> e_names
   p_main --> e_celebrate
   p_main --> e_lobby
   p_main --> e_players

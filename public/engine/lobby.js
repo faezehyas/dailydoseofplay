@@ -35,7 +35,7 @@
 // waiting screen opens it with the room still open.
 // banter is optional: how robots react during a game ({ score, strong, lines },
 // see robotBanter() in reactions.js). Without it robots say "Good game!" at the end.
-import { initShell, el, $, toast, copyText, getNickname, setNickname, nicknameField, setTabAlert, askBeforeLeaving } from "./shell.js";
+import { initShell, el, $, toast, copyText, getNickname, setNickname, nicknameField, accountName, setTabAlert, askBeforeLeaving } from "./shell.js";
 import { confirmDialog } from "./confirm.js";
 import { HostRoom, GuestRoom, RoomError, localRoom } from "./room.js";
 import { howToPlayPanel } from "./how-to-play.js";
@@ -149,10 +149,11 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     return el("p", { class: "how-to-play" }, el("a", { href: "#how-to-play", id: "how-to-play-link", onclick: open }, "How to play"));
   }
 
-  // The typed nickname, or the saved default when the field is empty or refused.
+  // The signed-in account's public name; else the typed nickname, or the
+  // saved default when the field is empty or refused.
   function currentName() {
     const input = $("#nickname");
-    return (input && setNickname(input.value)) || getNickname();
+    return accountName() || (input && setNickname(input.value)) || getNickname();
   }
 
   // error: why the last join failed, shown under the code field, which keeps `code`.

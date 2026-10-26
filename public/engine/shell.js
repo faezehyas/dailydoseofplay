@@ -1,6 +1,6 @@
 // UI shell shared by the home page and every game: header, footer, theme and
-// sound toggles, the settings panel, nickname storage and field, toasts,
-// tab-title alerts and tiny DOM helpers.
+// sound toggles, the settings panel, nickname storage and field, the
+// optional account's links, toasts, tab-title alerts and tiny DOM helpers.
 import { getPrefs, setPrefs, onPrefsChange } from "./prefs.js";
 import { checkName, cleanName, defaultName } from "./names.js";
 
@@ -56,6 +56,20 @@ export function setNickname(name) {
 }
 export const displayName = (fallback = "Player") => getNickname() || fallback;
 
+// The account, from GET /api/me once per page: { accounts, user, signup }.
+// While accounts are off or the server can't be reached, no account UI shows.
+let me = null;
+let signedIn = null;
+export function account() {
+  me ??= fetch("/api/me")
+    .then((res) => res.json())
+    .catch(() => ({}))
+    .then((answer) => ((signedIn = (answer.accounts && answer.user?.name) || null), answer));
+  return me;
+}
+// The signed-in account's public name, once account() has answered.
+export const accountName = () => signedIn;
+
 // Why a nickname isn't used (see names.js); the player then plays under the default name.
 const NAME_PROBLEMS = {
   link: "Not used: no links or @handles, please.",
@@ -91,7 +105,26 @@ export function nicknameField(id = "nickname") {
     }
   });
   check();
-  return el("label", { class: "field" }, el("span", {}, "Nickname"), input, problem, el("small", {}, "Saved on this device only."));
+  const field = el("label", { class: "field" }, el("span", {}, "Nickname"), input, problem, el("small", {}, "Saved on this device only."));
+  // Signed in, you play under your public name; the nickname stays for signed-out play.
+  account().then(({ user }) => user && field.replaceWith(el("p", { class: "field signed-in-as", id: `${id}-account` }, el("span", {}, "Playing as"), el("strong", {}, user.name), el("small", {}, el("a", { href: "/account/" }, "Your account")))));
+  return field;
+}
+
+// Signing in comes back to this page.
+const signInHref = () => `/account/?return=${encodeURIComponent(location.pathname + location.search)}`;
+
+// The header's "Sign in" link, or your public name, once accounts are on.
+// A phone's header has no room for it: the settings panel has it there.
+function accountLink() {
+  const link = el("a", { class: "header-account", id: "account-link", hidden: true });
+  account().then(({ accounts, user }) => {
+    if (!accounts || location.pathname === "/account/") return;
+    link.href = user ? "/account/" : signInHref();
+    link.textContent = user ? user.name : "Sign in";
+    link.hidden = false;
+  });
+  return link;
 }
 
 // Whether Leave asks first during a live friend match ("Ask before leaving" in the settings panel).
@@ -160,7 +193,7 @@ export function initShell({ title, settings } = {}) {
     renderSoundBtn();
     right.append(el("span", { class: "header-game" }, title), soundBtn);
   }
-  right.append(themeBtn, settingsBtn);
+  right.append(themeBtn, settingsBtn, accountLink());
   onPrefsChange(() => {
     applyTheme();
     renderThemeBtn();
@@ -178,7 +211,7 @@ export function initShell({ title, settings } = {}) {
     el(
       "footer",
       { class: "site-footer" },
-      el("p", {}, "Games run directly between your browsers. Nothing to install, no account: your nickname and settings are kept only on your device."),
+      el("p", {}, "Games run directly between your browsers. Nothing to install, no account needed: your nickname and settings are kept only on your device."),
       el("ul", { class: "footer-links" }, FOOTER_LINKS.map(([text, href]) => el("li", {}, el("a", { href }, text)))),
     ),
   );
@@ -299,8 +332,16 @@ function generalSettings() {
     setPrefs({ sound: on });
     volume.disabled = !on;
   });
+  // Signed in, the nickname field above links to the account instead.
+  const signIn = el(
+    "div",
+    { class: "pref-list", hidden: true },
+    el("a", { class: "pref-row pref-link", id: "settings-sign-in", href: signInHref() }, el("span", { class: "pref-label" }, "Sign in", el("small", {}, "Optional: a public name of your own")), el("span", { "aria-hidden": "true" }, "›")),
+  );
+  account().then(({ accounts, user }) => (signIn.hidden = !accounts || !!user || location.pathname === "/account/"));
   return [
     nicknameField("settings-nickname"),
+    signIn,
     theme,
     el("div", { class: "pref-list" }, sound, el("div", { class: "pref-row volume" }, icon("volumeLow"), volume, icon("soundOn"))),
     el(
