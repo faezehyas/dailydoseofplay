@@ -15,5 +15,5 @@
     "coverage": "mkdir -p test-artifacts && node --test --experimental-test-coverage --test-coverage-exclude=\"**/*.test.js\" --test-coverage-exclude=\"test/**\" --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=test-artifacts/unit.lcov \"public/**/*.test.js\" \"test/*.test.js\"",
     "coverage:browser": "rm -rf test-artifacts/coverage && BROWSER_COVERAGE=1 node --test test/browser/*.test.js; node scripts/browser-coverage.js"
   },
-  "dependencies": { "ws": "^8.18.0" }
+  "dependencies": { "pg": "^8.23.1", "ws": "^8.18.0" }
 }

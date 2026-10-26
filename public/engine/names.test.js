@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkName, cleanName, defaultName, ADJECTIVES, ANIMALS, NAME_MAX } from "./names.js";
+import { checkName, checkPublicName, cleanName, defaultName, nameKey, ADJECTIVES, ANIMALS, NAME_MAX } from "./names.js";
 import { localPair } from "./channel.js";
 import { openSession } from "./session.js";
 
@@ -110,4 +110,17 @@ test("every default name is two capitalised words that pass the nickname rules a
     const [adjective, animal] = defaultName().split(" ");
     assert.ok(ADJECTIVES.includes(adjective) && ANIMALS.includes(animal));
   }
+});
+
+test("public names: a nickname of 3 to 20 characters; nameKey ignores case", () => {
+  assert.deepEqual(checkPublicName("  Brave   Otter "), { name: "Brave Otter", problem: null });
+  assert.deepEqual(checkPublicName("Bo"), { name: "Bo", problem: "short" });
+  assert.deepEqual(checkPublicName("Zoë"), { name: "Zoë", problem: null });
+  assert.equal(checkPublicName("x".repeat(NAME_MAX)).problem, null);
+  assert.equal(checkPublicName("x".repeat(NAME_MAX + 1)).problem, "long");
+  assert.equal(checkPublicName("BigAss").problem, "word");
+  assert.equal(checkPublicName("@me").problem, "link");
+  assert.equal(checkPublicName(null).problem, "short", "not a string");
+  assert.equal(nameKey("Brave OTTER"), nameKey("brave otter"));
+  assert.equal(nameKey("ＢＲＡＶＥ"), "brave", "full-width letters count as the same name");
 });
