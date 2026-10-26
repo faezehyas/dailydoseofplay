@@ -1028,6 +1028,11 @@ input::placeholder {
   font-weight: 700;
 }
 
+/* A robot's short name keeps its room beside its dots; yours gives way. */
+.pb-players:has(> .pb-robot) {
+  grid-template-columns: minmax(0, max-content) auto max-content;
+}
+
 /* Three or four players wrap, at most two to a row. */
 .player-bar.many .pb-players {
   display: flex;
@@ -1097,6 +1102,100 @@ input::placeholder {
 .pb-vs {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+/* A wait: three dots that bounce in turn (players.js), in the seat's colour
+   in a pill, else the text's. In a robot's pill they follow the name, with
+   no words, so the pill reads the same on a phone and a desktop; their room
+   is kept while they are hidden, so the names don't move. */
+.think {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+}
+
+.think i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--seat, currentColor);
+}
+
+.pb-who > .think {
+  display: none;
+}
+
+.pb-who.pb-robot > .think {
+  display: inline-flex;
+  margin: 0 -4px 0 -2px;
+  visibility: hidden;
+}
+
+.pb-who.thinking > .think {
+  visibility: visible;
+}
+
+/* A player's shuffle is checked. */
+.pb-tick {
+  display: inline-flex;
+  flex: none;
+}
+
+.pb-tick svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--seat-text);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .think i {
+    animation: think 1.1s ease-in-out infinite;
+  }
+
+  .think i:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+
+  .think i:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+
+  .pb-who:not(.thinking) > .think i {
+    animation: none;
+  }
+
+  .pb-tick:not([hidden]) {
+    animation: tick-pop var(--dur-slow) var(--ease-spring);
+  }
+}
+
+@keyframes think {
+  0%,
+  60%,
+  100% {
+    transform: none;
+    opacity: 0.45;
+  }
+
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@keyframes tick-pop {
+  0% {
+    transform: scale(0.5);
+  }
+
+  60% {
+    transform: scale(1.18);
+  }
 }
 
 .pb-score {
@@ -3184,8 +3283,8 @@ input.mono {
      the result moment when a match ends, the hero's scene and, on a touch
      screen, a tile's preview.
    Loading indicators (.spinner, a game page's .loading-piece, the home
-   page's loading tiles) are the one exception: they run only while
-   something loads.
+   page's loading tiles, the three dots of .think) are the one exception:
+   they run only while something loads or someone thinks.
    Timings come from --dur-fast, --dur-med and --dur-slow, easing from
    --ease-out and --ease-spring. */
 

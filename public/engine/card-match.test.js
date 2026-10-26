@@ -73,6 +73,28 @@ test("four players: the same, with a bigger deck", () => withSeededRandom("card-
   }
 }));
 
+test("each seat's shuffle is checked in turn: the others' once this browser checks them, its own once sent", () => withSeededRandom("card-match checked", async () => {
+  const seen = [[], [], []]; // by seat: checked, as each update showed it while shuffling
+  let started = 0;
+  await play({
+    players: 3,
+    rules: makeRules({ deckSize: 15, maxTurns: 1 }),
+    until: (ms) => ms.every((m) => m.phase !== "starting"),
+    before: (sessions, ref) =>
+      queueMicrotask(() =>
+        ref.robots.forEach(({ match }, seat) => {
+          match.on("update", () => match.busy === "shuffling" && seen[seat].push(match.checked.join()));
+          match.on("start", () => {
+            assert.deepEqual(match.checked, [0, 1, 2]);
+            started++;
+          });
+        }),
+      ),
+  });
+  assert.equal(started, 3);
+  for (const s of seen) assert.deepEqual([...new Set(s)], ["", "0", "0,1", "0,1,2"]);
+}));
+
 test("once the audit passes, every seat can read every card; a failed audit shows nothing more", () => withSeededRandom("card-match 3", async () => {
   const { matches } = await play({ players: 3, rules: makeRules({ deckSize: 15, maxTurns: 12 }) });
   for (const m of matches) {

@@ -442,12 +442,8 @@ button.pc-stock:disabled {
   transform: translateX(-50%);
 }
 
-.pc-busy .spinner {
-  width: 14px;
-  height: 14px;
-  border-width: 2px;
-  border-color: rgb(255 255 255 / 30%);
-  border-top-color: var(--pc-glow);
+.pc-busy .think {
+  --seat: var(--pc-glow);
 }
 
 /* ---------- cards ---------- */

@@ -351,7 +351,7 @@ function mountChess(session, root, shell) {
       case "starting":
         return config.first === "random" ? "Tossing a coin for White…" : "Getting ready…";
       case "playing":
-        if (st.turn !== me) return `${oppName} is thinking…`;
+        if (st.turn !== me) return session.mode === "robot" ? `${oppName}'s turn` : `${oppName} is thinking…`;
         return inCheck(st) ? "Check! Save your king." : `Your move (${COLOR_NAMES[myColor()]}).`;
       case "over":
         if (st.winner === DRAW) return `Draw: ${drawText(st.reason)}`;

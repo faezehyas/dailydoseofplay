@@ -12,10 +12,10 @@ import { startGameShell } from "../engine/lobby.js";
 import { matchRouter } from "../engine/session.js";
 import { CardMatch } from "../engine/card-match.js";
 import { el, toast, setTabAlert } from "../engine/shell.js";
-import { playerBar } from "../engine/players.js";
+import { playerBar, thinkingDots } from "../engine/players.js";
 import { resultPanel } from "../engine/result.js";
 import { celebrate } from "../engine/celebrate.js";
-import { cardTable, DECK_WORK } from "../engine/cards/table.js";
+import { cardTable } from "../engine/cards/table.js";
 import { humanPause } from "../engine/cards/paced-robot.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { cardWords, cardName, suitOf, SUIT_NAMES } from "../engine/cards/faces.js";
@@ -191,7 +191,7 @@ function mountGame(session, root, shell) {
     deckBox.classList.toggle("away", !dealing);
     if (dealing) table.renderStock(view.stock || count * handSize(count));
     const busy = match?.busy && match.phase !== "over" ? match.busy : null;
-    table.renderBusy(busy, { starting: match?.phase === "starting", redraw: () => !destroyed && renderCentre() });
+    table.renderBusy(busy, { starting: match?.phase === "starting", redraw: () => !destroyed && render() });
   }
 
   // ---------- motion ----------
@@ -380,7 +380,7 @@ function mountGame(session, root, shell) {
     if (!match) return "Getting the room's settings…";
     const st = match.state;
     if (match.phase === "aborted") return "Match stopped.";
-    if (match.phase === "starting") return DECK_WORK[match.busy]?.[0] ?? "Getting ready…";
+    if (match.phase === "starting") return table.deckLine(match, nameOf);
     const now = describe(current);
     if (now) return now;
     if (table.pending) return status.textContent || "…";
@@ -396,7 +396,7 @@ function mountGame(session, root, shell) {
     if (d.phase === "find") return d.player === me && legalPlays(st, me, faceOf).length ? "You lead the 2 of clubs." : "Who has the 2 of clubs?";
     if (d.phase === "result") return "On to the next hand…";
     if (d.player !== me) return `${session.players[d.player].name}'s turn…`;
-    if (match.busy) return DECK_WORK[match.busy][0];
+    if (match.busy) return table.deckLine(match, nameOf);
     if (myChoice() !== "play") return "Playing your only card…";
     if (!st.trick.length) return st.broken ? "Your lead." : "Your lead: hearts aren't broken yet.";
     const lead = suitOf(st.trick[0].face);
@@ -423,13 +423,15 @@ function mountGame(session, root, shell) {
     if (view) {
       bar.update({
         turn: phase === "playing" && shownTurn !== undefined ? shownTurn : -1,
+        thinking: current || match?.busy ? -1 : undefined,
         notes: seats.map((p) => (st ? plural(view.hands[p].length, "card") : "")),
         score: { wins: seats.map((p) => scoreOf(p)) },
+        checked: match?.checked ?? [],
       });
     }
     for (const o of opps) o.node.classList.toggle("active", shownTurn === o.p && phase === "playing");
     meArea.classList.toggle("active", (shownTurn === me || picking()) && phase === "playing");
-    status.textContent = statusText();
+    status.textContent = table.dealtLine(match, statusText());
     const mine = myDecision() || picking();
     status.className = `${table.cls("status")} ${mine ? `mine p-${me}` : d ? `p-${d.player}` : ""}`;
     if (view) {
@@ -549,7 +551,7 @@ function mountGame(session, root, shell) {
     if (match.verdict?.ok) return el("p", { class: "verdict ok", id: "hr-verdict" }, el("span", {}, "✓ Fair play verified"), el("small", {}, "Every shuffle and pass proved, and every hand replayed with every card shown."));
     if (match.verdict) return el("p", { class: "verdict bad", id: "hr-verdict" }, `⚠ ${verdictText(match.verdict)}`);
     if (match.phase === "aborted") return null;
-    return el("p", { class: "verdict", id: "hr-verdict" }, el("span", { class: "spinner", "aria-hidden": "true" }), "Checking every shuffle and replaying the game…");
+    return el("p", { class: "verdict", id: "hr-verdict" }, thinkingDots(), "Checking every shuffle and replaying the game…");
   }
 
   // The score sheet: a row a hand, a column a player, the totals at the foot.
@@ -586,7 +588,7 @@ function mountGame(session, root, shell) {
       const key = `${m}:aborted:${!!match.verdict}:${match.disputing}`;
       if (shownFor !== key) {
         shownFor = key;
-        extra = match.disputing || match.verdict ? el("div", { class: "hr-over pc-game" }, match.verdict ? verdictLine() : el("p", { class: "verdict" }, el("span", { class: "spinner", "aria-hidden": "true" }), "Checking who was right about the passed card…")) : null;
+        extra = match.disputing || match.verdict ? el("div", { class: "hr-over pc-game" }, match.verdict ? verdictLine() : el("p", { class: "verdict" }, thinkingDots(), "Checking who was right about the passed card…")) : null;
       }
       // "Al stopped the match: you passed…": you, mid-sentence.
       const who = (p) => (p === me && p !== match.abortSeat ? "you" : nameOf(p));

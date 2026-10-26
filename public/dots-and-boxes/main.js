@@ -356,7 +356,7 @@ function mountGame(session, root, shell) {
 
   function renderPills(counts) {
     const st = match?.state;
-    bar.update({ turn: match?.phase !== "playing" ? -1 : current ? current.player : pendingOpp ? -1 : st.turn });
+    bar.update({ turn: match?.phase !== "playing" ? -1 : current ? current.player : pendingOpp ? -1 : st.turn, thinking: current ? -1 : undefined });
     for (const [k, player] of [me, opp].entries()) {
       const pill = pills[k];
       const n = counts[player];
