@@ -3,7 +3,8 @@
 // star over WebRTC today; a server relay or a mesh later) can change without
 // touching the lobby or any game.
 //
-//   new HostRoom({ game, name, maxPlayers }) open() -> code (and .key); emits "players", "knocks", "guest-gone", "lost" (reason),
+//   new HostRoom({ game, name, maxPlayers }) open() -> code (and .key); emits "status" ({ step: "lobby" }: the lobby connection is open),
+//                                       "players", "knocks", "guest-gone", "lost" (reason),
 //                                       "seat-taken" ({ name, robot }: a friend took a robot's seat);
 //                                       accept(id) / decline(id) a knock; addRobot() / removeRobot(name) with more than two seats;
 //                                       start() -> [Session, ...each robot's Session]
@@ -50,6 +51,7 @@ export class HostRoom extends Emitter {
     const rooms = new RoomClient({ game: this.game, url: this.signalingUrl });
     this.rooms = rooms;
     await rooms.connect();
+    this.emit("status", { step: "lobby" });
     rooms.on("close", (reason) => !this.started && !this.closed && this.emit("lost", reason));
     const { room, key } = await rooms.create(this.name);
     this.code = room;

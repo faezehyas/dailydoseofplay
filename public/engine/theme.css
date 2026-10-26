@@ -767,37 +767,65 @@ input::placeholder {
   list-style: none;
   padding: 0;
   margin: 12px 0;
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 6px;
-  text-align: left;
 }
 
-.roster li {
+/* A seat: its colour with the initial, then the name; an open seat, or a
+   friend still connecting, is dashed. */
+.roster li.seat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px 12px 3px 3px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.roster li.seat:has(.btn) {
+  padding-right: 3px;
+}
+
+.seat-initial {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--seat);
+  color: var(--accent-ink);
+  font-size: 0.75rem;
+}
+
+.roster li.seat:not(.ready) {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.roster li.seat:not(.ready) .seat-initial {
+  background: transparent;
+  border: 2px dashed var(--control-border);
+  color: var(--muted);
+}
+
+.roster li.knock {
   display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px dashed var(--border);
-  color: var(--muted);
-}
-
-.roster li.ready {
-  border-style: solid;
-  color: var(--text);
-}
-
-.roster small {
-  color: var(--muted);
-}
-
-.roster li.knock {
-  flex-wrap: wrap;
-  align-items: center;
-  border-style: solid;
-  border-color: var(--accent);
-  color: var(--text);
+  border: 1px solid var(--accent);
+  text-align: left;
 }
 
 .knock-actions {
@@ -806,11 +834,11 @@ input::placeholder {
 }
 
 /* Add robot and Remove stay quieter than the invite and Start buttons. */
-.roster li.robot .btn,
-.roster li.empty .btn {
-  min-height: 32px;
-  padding: 0 12px;
-  font-size: 0.875rem;
+.roster li.seat .btn {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
 }
 
 #start-game {
@@ -3184,8 +3212,10 @@ input.mono {
      the result moment when a match ends, the hero's scene and, on a touch
      screen, a tile's preview.
    Loading indicators (.spinner, a game page's .loading-piece, the home
-   page's loading tiles) are the one exception: they run only while
-   something loads.
+   page's loading tiles, and the lobby's four dots with its open seats
+   breathing) are the one exception: they run only while something loads
+   or the lobby waits. The dots move only after 300 ms (engine/dots.js),
+   and with reduced motion they stand in place, lit or not.
    Timings come from --dur-fast, --dur-med and --dur-slow, easing from
    --ease-out and --ease-spring. */
 
@@ -3201,6 +3231,216 @@ input.mono {
   from {
     opacity: 0;
     transform: translateY(-0.4em) scale(0.8);
+  }
+}
+
+/* The lobby's four dots (engine/dots.js), in the logo's square: top left,
+   top right, bottom right, bottom left. They wait apart, drifting, and come
+   home lit as steps finish; with all four home (data-done) the logo's square
+   appears behind them and a ring of small dots bursts out once. Nothing
+   shows for the first 300 ms (data-stage="none"), the words from 2 s and the
+   help line from 10 s. */
+.dots-cue {
+  display: grid;
+  place-items: center;
+  width: 130px;
+  height: 130px;
+  margin: 4px auto;
+  opacity: 0;
+}
+
+.dots-cue > * {
+  grid-area: 1 / 1;
+}
+
+.dots-wait:not([data-stage="none"]) .dots-cue {
+  opacity: 1;
+}
+
+.dots {
+  display: grid;
+  grid-template-columns: repeat(2, 18px);
+  grid-template-rows: repeat(2, 18px);
+  gap: 12px;
+}
+
+.dots .d1 {
+  grid-area: 1 / 2;
+}
+
+.dots .d2 {
+  grid-area: 2 / 2;
+}
+
+.dots .d3 {
+  grid-area: 2 / 1;
+}
+
+.dots i,
+.dots b {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+
+.dots b {
+  background: color-mix(in srgb, var(--text) 16%, transparent);
+}
+
+.dots .on b {
+  background: var(--accent);
+}
+
+.dots-square {
+  width: 76px;
+  height: 76px;
+  border-radius: 22px;
+  background: var(--accent);
+  opacity: 0;
+  transform: scale(0.6);
+}
+
+.dots-wait[data-done] .dots-square {
+  opacity: 1;
+  transform: none;
+}
+
+/* As .logo-dot and .logo-dot2. */
+.dots-wait[data-done] .dots b {
+  background: var(--accent-ink);
+}
+
+.dots-wait[data-done] :is(.d1, .d3) b {
+  opacity: 0.55;
+}
+
+.dots-burst {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+
+.dots-burst i {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+}
+
+.dots-burst i:nth-child(even) {
+  background: var(--accent-2);
+}
+
+.dots-words {
+  min-height: 1.6em;
+  margin: 0;
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* A tick before the words once every step is done. */
+.dots-wait[data-done] .dots-words::before {
+  content: "";
+  width: 6px;
+  height: 11px;
+  margin: -3px 2px 0;
+  border: solid var(--ok);
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+
+.dots-help {
+  min-height: 4.6em;
+  margin: 12px 0 4px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.dots-help .btn {
+  display: flex;
+  margin: 6px auto 0;
+}
+
+.dots-wait:is([data-stage="none"], [data-stage="dots"]):not([data-done]) .dots-words,
+.dots-wait:not([data-stage="help"]) .dots-help,
+.dots-wait[data-done] .dots-help {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dots-cue,
+  .dots-square,
+  .dots-help {
+    transition:
+      opacity var(--dur-slow) var(--ease-out),
+      transform var(--dur-slow) var(--ease-spring);
+  }
+  /* Apart while they wait, drifting; home with a spring. */
+  .dots i {
+    transition: transform 0.6s var(--ease-spring);
+  }
+  .dots .d0:not(.on) {
+    transform: translate(-30px, -22px);
+  }
+  .dots .d1:not(.on) {
+    transform: translate(32px, -28px);
+  }
+  .dots .d2:not(.on) {
+    transform: translate(28px, 30px);
+  }
+  .dots .d3:not(.on) {
+    transform: translate(-34px, 26px);
+  }
+  .dots i:not(.on) b {
+    animation: dots-drift 2.6s ease-in-out calc(var(--i) * -0.7s) infinite alternate;
+  }
+  .dots-wait[data-done] .dots-burst i {
+    animation: dots-burst 0.7s var(--ease-out) 0.25s;
+  }
+  /* Open seats breathe; a seat that fills pops once. */
+  .roster li.seat:not(.ready) .seat-initial {
+    animation: seat-breathe 2.8s ease-in-out infinite;
+  }
+  .roster li.seat.pop .seat-initial {
+    animation: seat-pop 0.4s var(--ease-spring);
+  }
+}
+
+@keyframes dots-drift {
+  to {
+    transform: translate(4px, -5px);
+  }
+}
+
+@keyframes dots-burst {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--a)) translateX(30px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateX(64px) scale(0.3);
+  }
+}
+
+@keyframes seat-breathe {
+  50% {
+    opacity: 0.6;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes seat-pop {
+  0% {
+    transform: scale(0.5);
+  }
+  60% {
+    transform: scale(1.18);
   }
 }
 

@@ -205,7 +205,7 @@ test("a typed room code waits for the host: Decline turns a stranger away, Accep
   assert.match(await host.title(), /Mal wants to join/, "the tab title tells a host who is busy elsewhere");
   await knock.getByRole("button", { name: "Decline" }).click();
   await stranger.locator("#join-error", { hasText: "didn't let you in" }).waitFor();
-  await host.locator("#roster").waitFor({ state: "hidden" });
+  await knock.waitFor({ state: "detached" });
   assert.equal(await stranger.locator("#ready").count(), 0);
 
   const friend = await open("Bo");
