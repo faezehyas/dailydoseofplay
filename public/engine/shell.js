@@ -211,7 +211,7 @@ export function initShell({ title, settings } = {}) {
     el(
       "footer",
       { class: "site-footer" },
-      el("p", {}, "Games run directly between your browsers. Nothing to install, no account needed: your nickname and settings are kept only on your device."),
+      el("p", {}, "Games run directly between your browsers. Nothing to install, no account: your nickname and settings are kept only on your device."),
       el("ul", { class: "footer-links" }, FOOTER_LINKS.map(([text, href]) => el("li", {}, el("a", { href }, text)))),
     ),
   );
