@@ -60,7 +60,7 @@ test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, k
   await page.screenshot({ path: `${ARTIFACTS}/ce-11-robot-dealt.png` });
 
   // My turn first: by keyboard, a card that plays, or the draw made for me.
-  await waitForState(page, (ddp) => ddp.match.state.turn === 0 && !document.querySelector("#ce-status").textContent.startsWith("Dealing"), undefined, { timeout: 30_000 });
+  await waitForState(page, (ddp) => ddp.match.state.turn === 0 && !document.querySelector("#ce-status").textContent.includes("Dealing"), undefined, { timeout: 30_000 });
   const before = (await state(page)).moves;
   if (await page.locator(".ce-hcard.playable").count()) {
     await page.locator(".ce-hcard[tabindex='0']").focus();
