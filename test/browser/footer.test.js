@@ -1,8 +1,8 @@
-// Headless-browser test: the home page, every game page, the privacy page and
-// the 404 page end with the same footer, below <main>, with its line on how
-// games run and its links to "How it works", the GitHub repository and the
-// privacy page, at 360 px in light and 1280 px in dark, with no sideways
-// scroll. Skips if Playwright is missing.
+// Headless-browser test: the home page, every game page, the privacy and
+// account pages and the 404 page end with the same footer, below <main>,
+// with its line on how games run and its links to "How it works", the GitHub
+// repository and the privacy page, at 360 px in light and 1280 px in dark,
+// with no sideways scroll. Skips if Playwright is missing.
 //
 //   npm run test:browser
 import test from "node:test";
@@ -19,7 +19,7 @@ const SCREENS = [
   { width: 360, height: 640, colorScheme: "light" },
   { width: 1280, height: 800, colorScheme: "dark" },
 ];
-const PAGES = [{ name: "home", url: "/" }, ...games.map((g) => ({ name: g.slug, url: `/${g.slug}/` })), { name: "privacy", url: "/privacy/" }, { name: "404", url: "/no-such-page/" }];
+const PAGES = [{ name: "home", url: "/" }, ...games.map((g) => ({ name: g.slug, url: `/${g.slug}/` })), { name: "privacy", url: "/privacy/" }, { name: "account", url: "/account/" }, { name: "404", url: "/no-such-page/" }];
 
 for (const { width, height, colorScheme } of SCREENS) {
   test(`at ${width} px every page ends with the footer and its links`, { skip, timeout: 120_000 }, async (t) => {

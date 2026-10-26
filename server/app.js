@@ -5,6 +5,7 @@
 //   /healthz     JSON status, CORS open
 //   /.well-known/apple-app-site-association, /.well-known/assetlinks.json
 //                invite links open the mobile app (404 until its IDs are set)
+//   /api/…       optional accounts (accounts.js), JSON; 503 while they're off
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -12,6 +13,7 @@ import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { createSignaling } from "./signaling.js";
+import { accountsConfig, createAccounts } from "./accounts.js";
 
 // Text files go out gzipped when the browser accepts it: the CSS a page needs
 // before it can paint, and its modules, are 3 to 5 times smaller. ws loads
@@ -172,14 +174,19 @@ export async function createApp({
   log = console.log,
   allowedOrigins = process.env.ALLOWED_ORIGINS,
   clientIpHeader = process.env.CLIENT_IP_HEADER,
+  clientIpEntry = process.env.CLIENT_IP_ENTRY,
   appleTeamId = process.env.APPLE_TEAM_ID,
   androidCertSha256 = process.env.ANDROID_CERT_SHA256,
+  accounts: accountSettings = accountsConfig(),
+  accountStore,
+  google,
   limits,
   now,
 } = {}) {
   const extraOrigins = parseOrigins(allowedOrigins);
   const games = parseRegistry(await readText(path.join(publicDir, "games.json")));
-  const signaling = createSignaling({ games, log, limits, clientIpHeader, now });
+  const signaling = createSignaling({ games, log, limits, clientIpHeader, clientIpEntry, now });
+  const accounts = createAccounts({ config: accountSettings, store: accountStore, google, headers: SECURITY_HEADERS, log, now, clientIpHeader, clientIpEntry, limits });
   const notFoundPage = path.join(publicDir, "404.html");
   const appLinks = appLinkFiles({ appleTeamId, androidCertSha256 });
 
@@ -278,6 +285,7 @@ export async function createApp({
       res.writeHead(426, { ...SECURITY_HEADERS, "Content-Type": "text/plain" });
       return res.end("Upgrade Required");
     }
+    if (pathname === "/api" || pathname.startsWith("/api/")) return accounts.handle(req, res, pathname);
     if (req.method !== "GET" && req.method !== "HEAD") {
       res.writeHead(405, { ...SECURITY_HEADERS, Allow: "GET, HEAD" });
       return res.end();
@@ -302,9 +310,15 @@ export async function createApp({
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
   });
 
-  const sweeper = setInterval(() => signaling.sweep(wss.clients), 30_000);
+  const sweeper = setInterval(() => {
+    signaling.sweep(wss.clients);
+    accounts.sweep();
+  }, 30_000);
   sweeper.unref?.();
-  server.on("close", () => clearInterval(sweeper));
+  server.on("close", () => {
+    clearInterval(sweeper);
+    accounts.close();
+  });
 
   return { server, wss, signaling };
 }

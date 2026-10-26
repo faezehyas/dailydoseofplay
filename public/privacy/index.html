@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Privacy · Daily Dose of Play</title>
-    <meta name="description" content="What Daily Dose of Play keeps on your device, what its server and other players see, and how to clear it." />
+    <meta name="description" content="What Daily Dose of Play keeps on your device, what it keeps if you sign in, what its server and other players see, and how to clear or delete it." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)" />
@@ -18,7 +18,7 @@
     <main class="page">
       <article class="card text-page">
         <h1>Privacy</h1>
-        <p class="tagline">No accounts, no cookies, no ads, no analytics. Here is everything the site keeps, and who sees what while you play.</p>
+        <p class="tagline">No ads, no analytics, and accounts are optional: every game works without one. Here is everything the site keeps, and who sees what while you play.</p>
 
         <h2>On your device</h2>
         <p>Your browser keeps your choices for this site in its local storage. Your nickname goes to the people you play with, and a host's game settings go to their guests; nothing else leaves your device.</p>
@@ -50,9 +50,22 @@
           <li><code>ddp-last-game</code>: the last game you opened. The site no longer saves it, but an earlier visit may have left it behind. Clearing your data removes it.</li>
         </ul>
 
+        <h2>If you sign in</h2>
+        <p>Signing in with Google is optional. It gives you a public name nobody else can take, which leaderboards will show. If you never sign in, the site sets no cookies and keeps nothing about you.</p>
+        <p>When you sign in, the site keeps, in its database:</p>
+        <ul>
+          <li>your Google account ID, a number Google gives your account, so the next sign-in finds the same account;</li>
+          <li>the email address Google sends, shown only to you on your account page;</li>
+          <li>your public name, which other players see in games and on leaderboards, and when the account was made;</li>
+          <li>for each device you're signed in on, a session: a fingerprint of its cookie (not the cookie itself) and when it ends.</li>
+        </ul>
+        <p>Your browser keeps one cookie, <code>__Host-ddp_sid</code>, that keeps you signed in. It lasts 30 days from your last visit and only ever goes to this site. While you sign in, two short-lived cookies hold the sign-in's details: <code>__Host-ddp_oauth</code> for 10 minutes, and <code>__Host-ddp_signup</code> for 30 minutes while a new account picks its name.</p>
+        <p>The site asks Google only for your account ID and email address, nothing else. Google knows you signed in to Daily Dose of Play. The database is hosted by Wasmer, which runs the site, in the same region as its server. IP addresses are never stored in it.</p>
+        <p>Your data stays until you delete the account. On your <a href="/account/">account page</a>, <strong>Delete account</strong> removes your account ID, email address, public name and every session at once. <strong>Sign out everywhere</strong> ends every session but keeps the account.</p>
+
         <h2>The lobby server</h2>
         <p>Against the robot, the game runs in your browser alone. To play friends, your browser talks to the lobby server only while players connect. It sees your nickname, the game, the room code and your IP address, and it passes on the connection details your browsers swap to find each other. All of this lives in the server's memory, and the room is gone once the game starts, the host leaves or 30 minutes pass.</p>
-        <p>The server logs two lines per room, such as <code>room ludo/ABCD created by 12</code> and <code>room ludo/ABCD closed</code>: the game, the room code and a connection number that counts up from 1 and isn't tied to you. Nicknames and IP addresses are never logged. To stop one device from flooding the server, it counts each IP address's open connections, open rooms and failed joins in memory; the failed joins are forgotten after a minute.</p>
+        <p>The server logs two lines per room, such as <code>room ludo/ABCD created by 12</code> and <code>room ludo/ABCD closed</code>: the game, the room code and a connection number that counts up from 1 and isn't tied to you. Nicknames and IP addresses are never logged. To stop one device from flooding the server, it counts each IP address's open connections, open rooms and failed joins in memory; the failed joins are forgotten after a minute. Sign-in requests are counted the same way, per IP address in memory: for a minute, and for an hour for new accounts.</p>
 
         <h2>Playing over WebRTC</h2>
         <p>Moves go straight from browser to browser over WebRTC, not through the server. To connect, the browsers learn each other's IP address:</p>
@@ -64,7 +77,7 @@
         <p>There's no relay server to pass moves along in between, so your address can't be hidden from the players you connect to. An IP address can show roughly where you are, so play with people you know.</p>
 
         <h2>Clearing your data</h2>
-        <p>Open your browser's settings for this site and choose <strong>Clear site data</strong> (some browsers call it Delete data or Manage website data). That removes everything listed above. A private window keeps nothing once you close it.</p>
+        <p>Open your browser's settings for this site and choose <strong>Clear site data</strong> (some browsers call it Delete data or Manage website data). That removes everything your device keeps, and signs you out. It doesn't delete an account: do that on your <a href="/account/">account page</a>. A private window keeps nothing once you close it.</p>
 
         <h2>Questions</h2>
         <p>Open an issue on <a href="https://github.com/Faezehyas/dailydoseofplay/issues">GitHub</a>. Issues are public, so leave out anything private.</p>

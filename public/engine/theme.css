@@ -347,6 +347,46 @@ h3 {
   margin: 6px 0;
 }
 
+/* ---------- account ---------- */
+/* The header's "Sign in" link or public name (shell.js), and /account/. */
+.header-account {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  max-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.header-account[hidden] {
+  display: none;
+}
+
+.signed-in-as strong {
+  font-size: 1.05rem;
+}
+
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.account-note {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.btn.danger {
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 .site-footer {
   max-width: 1100px;
   margin: 0 auto;
@@ -3128,6 +3168,9 @@ input::placeholder {
   .header-game {
     display: none;
   }
+  .header-account {
+    display: none;
+  }
 }
 
 /* ---------- chips and facts ---------- */
@@ -3542,6 +3585,11 @@ input.mono {
 .pref-label {
   display: grid;
   font-weight: 600;
+}
+
+.pref-link {
+  color: inherit;
+  text-decoration: none;
 }
 
 .pref-label small {
