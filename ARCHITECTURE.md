@@ -149,6 +149,7 @@ flowchart TB
     e_celebrate["celebrate.js"]
     e_chimes["chimes.js"]
     e_confirm["confirm.js"]
+    e_dots["dots.js"]
     e_robot_record["robot-record.js"]
     e_settings["settings.js"]
     e_prefs["prefs.js"]
@@ -297,7 +298,9 @@ flowchart TB
   e_fair --> e_rng
   e_group --> e_channel
   e_confirm --> e_shell
+  e_dots --> e_shell
   e_lobby --> e_confirm
+  e_lobby --> e_dots
   e_lobby --> e_how_to_play
   e_lobby --> e_reactions
   e_lobby --> e_robot_record
@@ -714,7 +717,8 @@ account once its name is typed again.
 | `deck-crypto.js` | A synchronous layer over the vendored mental-poker WebAssembly (`vendor/mental-poker/`): keys, shuffles and their proofs, shares, opening, the audit. Bytes in, bytes out. |
 | `base64.js` | Bytes to base64 and back, strict about its input, for binary data in JSON messages |
 | `vendor/mental-poker/` | The built library, committed (see **Card games**): `cards_play_bg.wasm`, its loader `cards_play.js`, `LICENSE`, and `SOURCE` (the commit it was built from) |
-| `lobby.js` | `startGameShell()`: the game's icon over its name and its `description` from `games.json` under it (read from the page's loading card, see **Page loading**), a "How to play" link under it that opens the game's `howToPlay` panel (see `how-to-play.js`, put under `#game`) and moves focus to its summary, the "Play with a friend" / "Play vs robot" / join-by-code UI with a quiet line under the Play buttons that games connect browsers directly, invite link with copy and share (inside the mobile app the app's share sheet; on the web a share that fails, other than a cancelled sheet, copies the link instead and says so), the waiting room (a player list and a Start button when a game allows more than two, with Add robot on each empty seat and Remove on each robot; Accept / Decline for anyone knocking), `?room=CODE&key=KEY` auto-join, `?robot=1` (a robot game), `?friend=1` (a new room at once, as if "Play with a friend" was pressed; dropped from the address bar so a reload doesn't make another) and `?learn` (the game's tutorial, also opened by a Learn button under the Play buttons and a link at the top of "How to play", and from the waiting screen by "Learn while you wait"; see **Tutorials**), your record against the robot once you have one (in the robot box, else under the Play buttons), with a Reset that asks first (see **Record against the robot**), connection-failure and player-left screens, and "You're offline" when `/ws` can't be reached (see **Mobile app**). It hands the game a `shell` with `leave()` and `setInProgress(on)` (see **Leaving**). With a game's `settings` it shows them inside the home screen's card, between the nickname and the Play buttons, and their summary on the host's waiting screen, so friends see the rules before the game starts; it passes them to the settings panel and locks them while a game is on. Each new screen moves focus to its heading (not on page load), and the game screen keeps the game's name as a visually hidden `<h1>` during play; progress such as "Creating a room…" or "Bo joined" is read out from one `role="status"` line, and the connection-problem screen uses `role="alert"`. The code field takes only the server's code letters (uppercased, spaces and dashes dropped, anything else refused with a hint) and joins by itself at four; a join that fails returns to it with the code still in, the error under the field and read out from the status line. It also sets which view is on show for the page column. |
+| `lobby.js` | `startGameShell()`: the game's icon over its name and its `description` from `games.json` under it (read from the page's loading card, see **Page loading**), a "How to play" link under it that opens the game's `howToPlay` panel (see `how-to-play.js`, put under `#game`) and moves focus to its summary, the "Play with a friend" / "Play vs robot" / join-by-code UI with a quiet line under the Play buttons that games connect browsers directly, invite link with copy and share (inside the mobile app the app's share sheet; on the web a share that fails, other than a cancelled sheet, copies the link instead and says so), connecting and the waiting room under the logo's four dots (`dots.js`, see **Loading in the lobby**), the waiting room's seats as pills (a Start button too when a game allows more than two, with Add robot on each open seat and Remove on each robot; Accept / Decline for anyone knocking, in rows under them), `?room=CODE&key=KEY` auto-join, `?robot=1` (a robot game), `?friend=1` (a new room at once, as if "Play with a friend" was pressed; dropped from the address bar so a reload doesn't make another) and `?learn` (the game's tutorial, also opened by a Learn button under the Play buttons and a link at the top of "How to play", and from the waiting screen by "Learn while you wait"; see **Tutorials**), your record against the robot once you have one (in the robot box, else under the Play buttons), with a Reset that asks first (see **Record against the robot**), connection-failure and player-left screens, and "You're offline" when `/ws` can't be reached (see **Mobile app**). It hands the game a `shell` with `leave()` and `setInProgress(on)` (see **Leaving**). With a game's `settings` it shows them inside the home screen's card, between the nickname and the Play buttons, and their summary on the host's waiting screen, so friends see the rules before the game starts; it passes them to the settings panel and locks them while a game is on. Each new screen moves focus to its heading (not on page load), and the game screen keeps the game's name as a visually hidden `<h1>` during play; progress such as "Creating your room" or "Bo joined" is read out from one `role="status"` line, and the connection-problem screen uses `role="alert"`. The code field takes only the server's code letters (uppercased, spaces and dashes dropped, anything else refused with a hint) and joins by itself at four; a join that fails returns to it with the code still in, the error under the field and read out from the status line. It also sets which view is on show for the page column. |
+| `dots.js` | `dotsLoader({ words, help, shown, onStage })`: the logo's four dots as a loader, with the timing every lobby wait keeps (nothing for 300 ms, the words from 2 s, the help line from 10 s); `lit()` brings dots home as steps finish, `done()` makes the logo and bursts. `seatDots()` says which dots a waiting room's seats bring home. See **Loading in the lobby**. |
 | `fair.js` | `commit` and `verifyCommit` (SHA-256 commitments), `HashChain` and `SharedRandom` (random draws all peers agree on; `drop(seat)` and `forSeat(seat)` for a seat a robot took over). SHA-256 uses WebCrypto where the page has it, else a plain-JS copy (see below). |
 | `players.js` | `playerBar(session, { onLeave, classes })`: the bar above every game (see **Player bar**), with "(robot)" after a player a robot took over from. |
 | `reactions.js` | Quick reactions in the player bar (see **Reactions**): the React tray, the bubbles with their pop, the checks on `$react`, and `robotBanter()`, which the lobby starts for every robot seat. |
@@ -1082,7 +1086,38 @@ screen, in view; everything stops under `prefers-reduced-motion`; no motion star
 without a user action, except the room code, whose letters settle in one by
 one (350 ms) when the waiting room opens, the result moment when a match
 ends (see **Result moment**), the hero's scene, and a tile's preview on a
-touch screen. Loading indicators run only while something loads.
+touch screen. Loading indicators run only while something loads (the
+lobby's dots also while it waits for friends).
+
+**Loading in the lobby.** No wait in the lobby has a spinner: the logo's four
+dots (`dots.js`, styled in `theme.css` next to the motion rules) say what it
+is waiting for. Each wait shows nothing for its first 300 ms (most end there),
+then the dots, the words from about 2 s and, while connecting, from about
+10 s a help line with Try again, which starts the step over ("Taking a while?
+Check your connection or try again." when creating a room, "Taking a
+while? Check the link or try again." when joining). While connecting, the dots wait apart, drifting,
+and one comes home, lit coral, as each real step finishes, while the words
+name the current one. Creating: the lobby connection opens ("Reaching the
+server", then "Creating your room"), and the room arriving brings the invite
+link and your seat with it, so it lights the other three ("Room ready").
+Joining: a typed code knocking lights one ("Waiting for the host to let you
+in"), being let in two more ("Connecting to Bo"; an invite link has no letting
+in, so it lights two and the fourth waits), and the direct connection the last
+("Connected"). No dot lights without a real step behind it. With all four home
+the logo's coral square appears behind them, the dots turn `--accent-ink` as
+the logo's do, and a ring of small dots bursts out once; a screen that moves on
+from there (the host's waiting room, a full table's game) waits `DONE`
+(1 s) for the burst, unless the dots never showed. The waiting room keeps
+the same dots, in view at once if they were: each seat taken, by a friend or
+a robot, brings its dots home (two each at a table for two, one each at four;
+at three the host's seat brings two), and a full table makes the logo. Under
+them the seats are pills, the seat's colour (coral, teal, amber, violet) with
+the initial and the name; an open seat, or a friend still connecting, is
+dashed and breathes, and a seat that fills pops once. The status line keeps
+its words, and this wait has no help line, since it is open-ended. Only
+transform and opacity move; under reduced motion the dots stand in their
+square, lit or not, and the words still change. The dots are `aria-hidden`:
+screen readers hear the words from the lobby's progress line.
 
 **Hero scene.** The home hero ends with a small game table, an inline SVG in
 `index.html` (decorative, `aria-hidden`), drawn in theme tokens so it follows

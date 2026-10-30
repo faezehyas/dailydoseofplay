@@ -42,6 +42,7 @@ import { howToPlayPanel } from "./how-to-play.js";
 import { robotBanter, setGameLines } from "./reactions.js";
 import { robotRecord, resetRobotRecord } from "./robot-record.js";
 import { isApp, share } from "./native.js";
+import { dotsLoader, seatDots } from "./dots.js";
 
 const ERRORS = {
   no_such_room: "That room doesn't exist any more. Ask your friend for a fresh invite link.",
@@ -65,12 +66,19 @@ const ERRORS = {
   message_too_big: "A player's browser sent something unexpected.",
 };
 
+// The help line a wait for the lobby shows from about 10 s, with Try again.
+const SLOW_CREATE = "Taking a while? Check your connection or try again.";
+const SLOW_JOIN = "Taking a while? Check the link or try again.";
+
 const NO_TURN_HELP =
   "Couldn't connect to your friend. Games here run directly between your browsers, and some networks " +
   "(mobile data, office or school Wi-Fi, VPNs, strict firewalls) block direct connections. We don't run a relay " +
   "(TURN) server, so there's no fallback. Try both joining from home Wi-Fi, turn off VPNs, or play vs the robot.";
 
 const LAYOUTS = ["narrow", "medium", "wide"];
+
+// The waiting room's seats, in order: coral, teal, amber, violet.
+const SEAT_COLOURS = ["--accent", "--accent-2", "--hit-2", "--gift"];
 
 // Room codes, as server/signaling.js makes them (no I, L, O, 0 or 1).
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -108,6 +116,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   const progress = el("p", { class: "sr-only", id: "lobby-progress", role: "status" });
   lobbyRoot.append(progress);
   let firstView = true;
+  let dots = null; // the four dots (dots.js) of the screen on show, while it waits
+  let filled = []; // who sat in each seat at the last showRoster(), so a seat that fills pops once
 
   // The game's icon and description, as the page's loading card (index.html)
   // shows them, so nothing moves when the home screen replaces it. The icon
@@ -124,6 +134,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     if (old) old.replaceWith(card);
     else lobbyRoot.prepend(card);
     progress.textContent = "";
+    dots?.stop();
+    dots = null;
     showView("lobby");
     lobbyRoot.hidden = false;
     gameRoot.hidden = true;
@@ -273,6 +285,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   }
 
   function showWaiting(room) {
+    // The connecting dots carry on: in view already if they were.
+    const waiting = dotsLoader({ shown: dots?.shown });
     const link = `${location.origin}/${slug}/?room=${room.code}&key=${encodeURIComponent(room.key)}`;
     const linkInput = el("input", { id: "invite-link", class: "mono", type: "text", readonly: true, value: link, "aria-label": "Invite link" });
     linkInput.addEventListener("focus", () => linkInput.select());
@@ -323,24 +337,28 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
           el("p", { class: "room-settings-label" }, "Game settings"),
           el("p", { class: "settings-line" }, settings.summary(0)),
         ),
-      el("ul", { class: "roster", id: "roster", "aria-label": "Players", hidden: duel }),
+      waiting.node,
+      el("ul", { class: "roster", id: "roster", "aria-label": "Players" }),
       el("p", { class: "waiting", id: "lobby-status" }),
       learnButton(),
       !duel && el("button", { class: "btn primary", type: "button", id: "start-game", disabled: true, onclick: () => (friendsIn(room) ? begin(room) : playRobot(room.players.length)) }, "Start game"),
       el("button", { class: "btn ghost", type: "button", onclick: () => showHome() }, "Cancel"),
     );
+    dots = waiting;
+    filled = [];
     setStatus(duel ? "Waiting for your friend to join…" : "Waiting for friends to join…");
     showRoster(room);
   }
 
-  // Players so far (4-seat games), robots and empty seats each with a
-  // button to add or remove a robot, then anyone with only the code asking to join.
+  // The seats as pills (you, then players, robots and open seats), each
+  // seat taken bringing its dots home; with more than two seats an open seat
+  // has a button to add a robot and a robot one to remove it. Then anyone
+  // with only the code asking to join.
   function showRoster(room) {
     const list = $("#roster");
     if (!list) return;
     const players = room.players;
     const knocks = room.knocking;
-    list.hidden = duel && knocks.length === 0;
     setTabAlert(knocks.length ? `${knocks[0].name} wants to join` : null);
     // Accept and Decline go with their row, so focus moves back to the heading;
     // after adding or removing a robot it stays on the seats.
@@ -350,24 +368,37 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
       change();
       progress.textContent = text;
     };
-    const empty = duel ? 0 : maxPlayers - players.length;
+    const empty = maxPlayers - players.length;
+    const seats = [...players, ...Array(empty).fill(null)];
+    const taken = seats.map((p) => !!p?.ready);
+    if (taken.every(Boolean)) dots?.done();
+    else dots?.lit(seatDots(taken));
+    const sat = seats.map((p) => (p?.ready ? p.name : null));
+    const pill = (i, cls, label, ...rest) =>
+      el(
+        "li",
+        { class: `seat ${cls}${sat[i] && sat[i] !== filled[i] ? " pop" : ""}`, style: `--seat: var(${SEAT_COLOURS[i]})` },
+        el("b", { class: "seat-initial", "aria-hidden": "true" }, seats[i] ? label[0] : ""),
+        el("span", {}, label),
+        ...rest,
+      );
     list.replaceChildren(
-      ...(duel ? [] : players).map((p, i) =>
+      ...players.map((p, i) =>
         p.robot
-          ? el(
-              "li",
-              { class: "ready robot" },
-              el("span", {}, p.name),
+          ? pill(
+              i,
+              "ready robot",
+              p.name,
               el("button", { class: "btn small ghost", type: "button", "aria-label": `Remove ${p.name}`, onclick: () => seat(() => room.removeRobot(p.name), `${p.name} removed`) }, "Remove"),
             )
-          : el("li", { class: p.ready ? "ready" : "" }, el("span", {}, p.name), el("small", {}, i === 0 ? "host" : p.ready ? "in" : "connecting…")),
+          : pill(i, p.ready ? "ready" : "", i === 0 ? "You" : p.name, el("small", { class: "sr-only" }, i === 0 ? "host" : p.ready ? "in" : "connecting…")),
       ),
-      ...Array.from({ length: empty }, (_, i) =>
-        el(
-          "li",
-          { class: "empty" },
-          el("span", {}, "Empty seat"),
-          el("button", { class: "btn small", type: "button", id: i === 0 ? "add-robot" : undefined, onclick: () => seat(() => room.addRobot(), "Robot added") }, "Add robot"),
+      ...Array.from({ length: empty }, (_, k) =>
+        pill(
+          players.length + k,
+          "empty",
+          "Open seat",
+          !duel && el("button", { class: "btn small", type: "button", id: k === 0 ? "add-robot" : undefined, onclick: () => seat(() => room.addRobot(), "Robot added") }, "Add robot"),
         ),
       ),
       ...knocks.map(({ id, name }) =>
@@ -384,6 +415,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
         ),
       ),
     );
+    filled = sat;
     if (onSeat) ($("#add-robot") || $("#roster .robot button") || $("h1", lobbyRoot)).focus();
     else if (hadFocus) focusHeading();
     if (duel) return;
@@ -396,25 +428,28 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     start.textContent = ready < minPlayers ? `Start game (needs ${minPlayers} players)` : friends ? `Start game (${ready} players)` : "Play with robots only";
     const status = !empty && friends ? "Every seat is taken. Start when you're ready." : !empty ? "Waiting for a friend: one who joins takes a robot's seat." : "Waiting for friends to join…";
     const line = $("#lobby-status");
-    if (line.textContent !== status) line.replaceChildren(...(!empty && friends ? [] : [el("span", { class: "spinner" })]), status);
+    if (line.textContent !== status) line.textContent = status;
   }
 
   const friendsIn = (room) => room.players.filter((p, i) => i > 0 && p.ready && !p.robot).length;
 
-  function showBusy(text, ...extra) {
-    view(
-      el("h1", {}, title),
-      el("p", { class: "waiting", id: "lobby-status" }),
-      ...extra,
-      el("button", { class: "btn ghost", type: "button", onclick: () => showHome() }, "Cancel"),
-    );
+  // A wait for the lobby server or a friend: the four dots, the words naming
+  // the step (setStatus), and from about 10 s a help line whose Try again
+  // starts the step over. Returns the dots, which come home as steps finish.
+  function showBusy(text, help, retry, ...extra) {
+    const words = el("p", { class: "waiting", id: "lobby-status" });
+    const helpLine = el("p", {}, help, " ", el("button", { class: "btn small", type: "button", id: "wait-retry", onclick: () => retry() }, "Try again"));
+    const busy = dotsLoader({ words, help: helpLine, onStage: (stage) => stage === "help" && (progress.textContent = help) });
+    view(el("h1", {}, title), busy.node, ...extra, el("button", { class: "btn ghost", type: "button", onclick: () => showHome() }, "Cancel"));
+    dots = busy;
     setStatus(text);
+    return busy;
   }
 
   function setStatus(...text) {
     const node = $("#lobby-status");
     if (!node) return;
-    node.replaceChildren(el("span", { class: "spinner" }), ...text);
+    node.replaceChildren(...text);
     progress.textContent = node.textContent;
   }
 
@@ -478,9 +513,16 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     cleanupConnection();
     const attempt = state.attempt;
     const current = () => attempt === state.attempt;
-    showBusy("Creating a room…");
+    // The lobby connection opening lights a dot; the room arriving brings the
+    // invite link and your seat with it, so it lights the rest.
+    const busy = showBusy("Reaching the server", SLOW_CREATE, host);
     const room = new HostRoom({ game: slug, name, maxPlayers });
     state.room = room;
+    room.on("status", () => {
+      if (!current()) return;
+      busy.lit(1);
+      setStatus("Creating your room");
+    });
     try {
       await room.open();
     } catch (err) {
@@ -488,8 +530,11 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
       return;
     }
     if (!current()) return;
-    showWaiting(room);
     room.on("lost", (reason) => current() && showFailure(ERRORS[reason] || ERRORS.closed));
+    setStatus("Room ready");
+    await busy.done();
+    if (!current()) return;
+    showWaiting(room);
     let knockCount = 0;
     room.on("knocks", (knocks) => {
       if (!current()) return;
@@ -503,7 +548,11 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     room.on("players", (players) => {
       if (!current()) return;
       const people = players.filter((p) => p.ready && !p.robot);
-      if (people.length >= maxPlayers) return begin(room);
+      // A full table makes the logo; the game starts once it has burst, if no one left meanwhile.
+      if (people.length >= maxPlayers) {
+        showRoster(room);
+        return dots.done().then(() => current() && room.players.filter((p) => p.ready && !p.robot).length >= maxPlayers && begin(room));
+      }
       if (!duel) {
         const inRoom = people.map((p) => p.name);
         const joined = inRoom.length > seated.length && `${inRoom.find((n, i) => n !== seated[i])} joined`;
@@ -514,6 +563,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
         return;
       }
       const joining = players.find((p, i) => i > 0 && !p.ready);
+      showRoster(room);
       setStatus(joining ? `${joining.name} joined. Connecting directly…` : "Waiting for your friend to join…");
       if (joining) backToRoom(`${joining.name} joined`);
     });
@@ -552,8 +602,10 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     const attempt = state.attempt;
     const current = () => attempt === state.attempt;
     // Only a guest who may wait gets "Learn while you wait": a friend with an
-    // invite link to a two-player game starts at once.
-    showBusy(`Joining room ${code}…`, (!duel || !key) && learnButton());
+    // invite link to a two-player game starts at once. Found, let in and
+    // connected each light dots; with an invite link there is no letting in,
+    // so its dot lights with the last.
+    const busy = showBusy(`Looking for room ${code}`, SLOW_JOIN, () => join(code, key), (!duel || !key) && learnButton());
     const room = new GuestRoom({ game: slug, code, key, name });
     state.room = room;
     let host = "your friend";
@@ -561,13 +613,16 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     room.on("status", ({ step, host: hostName, players, robots }) => {
       if (!current()) return;
       if (step === "knocking") {
-        setStatus("Waiting for the host to let you in…");
+        busy.lit(1);
+        setStatus("Waiting for the host to let you in");
       } else if (step === "connecting") {
         host = hostName || host;
-        setStatus(`Connecting to ${host}…`);
-      } else if (duel) {
-        setStatus("Connected! Starting the game…");
-      } else {
+        busy.lit(key ? 2 : 3);
+        setStatus(`Connecting to ${host}`);
+      } else if (step === "connected") {
+        busy.done();
+        setStatus("Connected");
+      } else if (!duel) {
         const people = players && (robots ? `${players.length - robots} players and ${robots} ${robots === 1 ? "robot" : "robots"} in` : `${players.length} players in`);
         const count = players ? [" (", el("span", { class: "mono" }, people), ")"] : [];
         setStatus(`Connected! Waiting for ${host} to start`, ...count, "…");
@@ -684,6 +739,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   // ---------- game hand-off ----------
   function startSession(session) {
     state.session = session;
+    dots?.stop();
     // A tutorial opened while waiting hands its history entry to the game.
     const learning = !!state.tutorial && history.state?.learn === slug;
     closeTutorial();
