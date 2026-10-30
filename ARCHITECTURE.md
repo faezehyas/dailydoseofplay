@@ -56,6 +56,17 @@ STUN. It lists every `localStorage` key: `test/server.test.js` fails when a
 `"ddp-…"` key in `public/` is missing from it. Change the page with the facts
 it states (a log line, an ICE server, a new kind of data, a new column).
 
+**Link previews.** The home page and every game page carry Open Graph tags
+(and `twitter:card`), so a shared link, an invite included, shows a card with
+the page's title, description and image. The image is a committed 1200x630
+JPEG next to the page, `public/og.jpg` or `public/<slug>/og.jpg`, drawn from
+the game's `icon.svg`, name, players and description by
+`scripts/og-images.js` in Playwright. JPEG keeps each one well under the
+300 KB above which WhatsApp shows no image. The tags use absolute URLs on
+`https://www.dailydoseofplay.com`, as scrapers need, so every domain the app
+answers on shares the same preview. `test/open-graph.test.js` checks each
+page's tags against its title and description, and each image's size.
+
 **Installing.** Every page links `/manifest.webmanifest` and two `theme-color`
 tags, light and dark, set to `--bg`. The manifest's icons are `favicon.svg`
 and PNGs in `public/icons/` (192 and 512 px, plus a 512 px maskable one with
