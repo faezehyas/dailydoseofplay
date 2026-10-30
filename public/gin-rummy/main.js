@@ -126,7 +126,7 @@ function mountGame(session, root, shell) {
   const { handGroups, spreadGroups, drawHand, drawSeat, drawCentre, drawActions, forgetMelds, seatRect, pileRect, spreadOf, dealTo, say, moment, thump, sparkle, countUp, layDown, layOffs, scoreHand } = gin;
 
   const hint = el("p", { class: table.cls("hint"), id: "gr-hint" });
-  const logList = el("ol", { class: table.cls("log"), id: "gr-log", "aria-label": "Recent moves" });
+  const logList = el("ol", { class: table.cls("log"), id: "gr-log", "aria-label": "Last move" });
   const configLine = el("p", { class: table.cls("config"), id: "gr-config" });
   const note = el("p", { class: table.cls("note"), id: "gr-note" });
 
@@ -149,7 +149,7 @@ function mountGame(session, root, shell) {
   root.append(rootBox, result.node);
 
   // ---------- the table as drawn ----------
-  const emptyView = (scores = [0, 0]) => ({ hands: [[], []], stock: 52, discard: [], took: new Set(), laid: [null, null], layoffs: [], knock: null, result: null, scores: scores.slice(), tally: [null, null], dealer: -1, limit: null, arriving: new Set() });
+  const emptyView = (scores = [0, 0]) => ({ hands: [[], []], stock: 52, discard: [], laid: [null, null], layoffs: [], knock: null, result: null, scores: scores.slice(), tally: [null, null], dealer: -1, limit: null, arriving: new Set() });
   const faceOf = (slot) => match?.face(slot) ?? null;
 
   // ---------- whose decision it is ----------
@@ -238,12 +238,11 @@ function mountGame(session, root, shell) {
     } else if (ev.type === "take") {
       const from = pileRect();
       view.discard = view.discard.filter((s) => s !== ev.slot);
-      view.took.add(ev.slot);
       view.hands[ev.p].push(ev.slot);
       view.arriving.add(ev.slot);
       render();
       play("draw");
-      await fly(faceOf(ev.slot), from, seatRect(ev.p, ev.slot), { ms: PACE.take * k, g });
+      await fly(faceOf(ev.slot), from, seatRect(ev.p, ev.slot), { ms: PACE.take * k, turn: ev.p === me ? null : "down", g });
       view.arriving.delete(ev.slot);
       if (!live(g)) return;
       render();
@@ -363,8 +362,8 @@ function mountGame(session, root, shell) {
   const logLine = (e) => [e.faces ? el("span", { class: "gr-minis" }, e.faces.map((f) => miniCard(f))) : e.face !== undefined ? miniCard(e.face) : null, el("span", {}, e.text)];
   function addLog(entry) {
     entry.node = el("li", { class: `${entry.player === undefined ? "" : `p-${entry.player}`} ${entry.kind || ""} fresh` }, logLine(entry));
-    log = [entry, ...log].slice(0, 7);
-    log.slice(1).forEach((e) => e.node.classList.remove("fresh"));
+    // Only the latest move: what came before is yours to remember, as at a real table.
+    log = [entry];
     logList.replaceChildren(...log.map((e) => e.node));
     renderLog();
   }

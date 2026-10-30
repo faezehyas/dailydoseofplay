@@ -23,7 +23,6 @@ export function viewOf(st) {
     hands: st.hands.map((h) => h.slice()),
     stock: st.stock.length,
     discard: st.discard.slice(),
-    took: new Set(st.log.slice(st.since).flatMap((e) => (e.t === "take" ? [e.slot] : []))),
     // Until the upcard is turned (its face can arrive after the deal has played), it is still on the stock.
     ...(st.limit === null && st.phase === "upcard" ? { discard: [], stock: st.stock.length + 1 } : {}),
     laid: st.laid.map((l) => l && { melds: l.melds.map((x) => x.slice()), deadwood: l.deadwood.slice() }),
@@ -228,10 +227,8 @@ export function ginTable(table, { me, names, myName, face: faceOf, view, render,
     oppSpread.node.hidden = !laid;
     if (laid) oppSpread.render(spreadGroups(them), { face: known, arriving: view().arriving, look: (s) => ({ classes: { layoff: laidOff(s), [`p-${me}`]: laidOff(s) } }) });
     const n = view().hands[them].length;
-    // Face up in the fan: only what they took from the pile (a knock shows the rest as it is laid down).
-    const shown = (s) => (view().took.has(s) ? known(s) : null);
-    const open = view().hands[them].filter((s) => shown(s) !== null);
-    seat.render(laid ? [] : view().hands[them], view().arriving, `${theirName}: ${plural(n, "card")}${open.length && !laid ? `, holding ${open.map((s) => cardName(faceOf(s))).join(" ")} from the pile` : ""}`, shown);
+    // All backs, even the cards they took from the pile: as at a real table, you remember those.
+    seat.render(laid ? [] : view().hands[them], view().arriving, `${theirName}: ${plural(n, "card")}`);
     seat.countEl.textContent = String(n);
     oppDealer.hidden = view().dealer !== them;
     myDealer.hidden = view().dealer !== me;
@@ -247,7 +244,10 @@ export function ginTable(table, { me, names, myName, face: faceOf, view, render,
   // The stock, the pile and the knock limit (knockRule: the room's, once known); choice: your real choice now, or null.
   function drawCentre({ choice, knockRule }) {
     table.renderStock(view().stock);
-    const top = view().discard.slice(-3);
+    // The pile is kept squared, as at a real table: only its top card shows, and the one
+    // under it only while a new one is in the air.
+    const top = view().discard.slice(-2);
+    const flying = view().arriving.has(view().discard.at(-1));
     const want = top.map(String);
     if ([...pile.children].map((c) => c.dataset.slot).join() !== want.join()) {
       pile.replaceChildren(
@@ -265,6 +265,7 @@ export function ginTable(table, { me, names, myName, face: faceOf, view, render,
       card.classList.toggle("down", face === null);
       card.style.transform = `rotate(${tilt(slot)}deg)`;
       card.style.opacity = view().arriving.has(slot) ? "0" : "";
+      card.style.visibility = slot !== view().discard.at(-1) && !flying ? "hidden" : "";
     }
     const topFace = view().discard.length ? known(view().discard.at(-1)) : null;
     const canTake = (choice === "upcard" || choice === "draw") && topFace !== null;

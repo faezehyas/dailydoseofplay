@@ -158,12 +158,11 @@ export function board() {
     if (ev.type === "take") {
       const from = gin.pileRect();
       view.discard = view.discard.filter((s) => s !== ev.slot);
-      view.took.add(ev.slot);
       view.hands[ev.p].push(ev.slot);
       view.arriving.add(ev.slot);
       draw();
       sound("draw");
-      await fly(face(ev.slot), from, gin.seatRect(ev.p, ev.slot), { ms: PACE.take * k, g });
+      await fly(face(ev.slot), from, gin.seatRect(ev.p, ev.slot), { ms: PACE.take * k, turn: ev.p === 0 ? null : "down", g });
       view.arriving.delete(ev.slot);
       if (!live(g)) return;
       draw();
