@@ -87,7 +87,7 @@ your protocol:
 
 ```
 public/<slug>/
-├── index.html       page shell: copy public/sea-battle/index.html, change title, description, the loading card and its piece, and the modulepreload links; keep the icon, manifest, theme-color and view-transition tags
+├── index.html       page shell: copy public/sea-battle/index.html, change title, description, the Open Graph tags (step 6), the loading card and its piece, and the modulepreload links; keep the icon, manifest, theme-color and view-transition tags
 ├── style.css        game-specific styles; only var(--…) tokens from /engine/theme.css, light and dark
 ├── main.js          startGameShell(...) and the view
 ├── rules.js         pure rules
@@ -97,6 +97,7 @@ public/<slug>/
 ├── sounds.js        optional: the game's sounds, played through the engine (step 5b)
 ├── icon.svg         original 16:10 card art (viewBox 0 0 320 200), no external refs
 ├── preview.svg      optional: the home tile's animated preview (step 5c)
+├── og.jpg           the link preview, drawn by node scripts/og-images.js (step 6)
 ├── tutorial.js      optional: the tutorial's adapter to your board, and lessons.js its lessons (step 5d)
 ├── rules.test.js    rules unit tests
 ├── robot.test.js    robot unit tests (+ a full robot-vs-robot game)
@@ -527,6 +528,11 @@ the lobby both show it. Add yourself to `credits` by GitHub handle, such as
 `"credits": [{ "github": "your-handle" }]` (one entry per person who built the
 game), then run `node scripts/credits.js` to add you to the README's
 Contributors list.
+Then run `node scripts/og-images.js <slug> home` to draw your game's link
+preview, `public/<slug>/og.jpg`, from its icon, name and description, and the
+home page's again, which counts the games. In your `index.html`, the `og:`
+tags repeat its `<title>` and description, and `og:url` and `og:image` use
+your slug; `test/open-graph.test.js` names any that don't match.
 The server reads `games.json` once at startup, so
 restart `npm start` after editing it, or creating a room will fail with `bad_game`.
 The browser test reads the "Coming soon" count from the registry, so it needs
@@ -596,7 +602,7 @@ windows (one private).
 
 The [PR template](.github/pull_request_template.md) repeats these lines, shortened.
 
-- [ ] `public/<slug>/` contains `index.html`, `style.css`, `main.js`, `rules.js`, `robot.js`, `how-to-play.js`, `icon.svg` and tests
+- [ ] `public/<slug>/` contains `index.html`, `style.css`, `main.js`, `rules.js`, `robot.js`, `how-to-play.js`, `icon.svg`, `og.jpg` and tests
 - [ ] `rules.js` is pure and fully unit-tested; illegal moves throw `RuleError`
 - [ ] Robot plays legal, decent moves, and robot-vs-robot games always finish
 - [ ] Friend match works in two windows: invite link, auto-join, full game, rematch, leave

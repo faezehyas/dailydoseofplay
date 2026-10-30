@@ -31,7 +31,7 @@
 
 <!-- For a new game. On other PRs, tick what applies and delete the rest. Each line is explained in CONTRIBUTING.md. -->
 
-- [ ] `public/<slug>/` has `index.html`, `style.css`, `main.js`, `rules.js`, `robot.js`, `how-to-play.js`, `icon.svg` and tests
+- [ ] `public/<slug>/` has `index.html`, `style.css`, `main.js`, `rules.js`, `robot.js`, `how-to-play.js`, `icon.svg`, `og.jpg` and tests
 - [ ] `rules.js` is pure and unit-tested; illegal moves throw `RuleError`
 - [ ] The robot plays legal, decent moves, and robot-vs-robot games always finish
 - [ ] Friend match in two windows: invite link, auto-join, full game, rematch, leave
