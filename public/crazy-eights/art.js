@@ -16,9 +16,11 @@ export const handOrder = (slot, face) => (face === null ? 1000 + slot : ORDER[su
 // A pile card's tilt, the same for a slot on every render.
 export const tilt = (slot) => ((slot * 37) % 15) - 7;
 
-// The top three cards of the discard pile, face up as far as face(slot) knows.
+// The discard pile's top card, face up as far as face(slot) knows. The pile is kept
+// squared, as at a real table: the card under it shows only while a new one is in the air.
 export function drawPile(table, pile, discard, { face, arriving }) {
-  const top = discard.slice(-3);
+  const top = discard.slice(-2);
+  const flying = arriving.has(discard.at(-1));
   const want = top.map((slot) => String(slot));
   if ([...pile.children].map((c) => c.dataset.slot).join() !== want.join()) {
     pile.replaceChildren(
@@ -36,6 +38,7 @@ export function drawPile(table, pile, discard, { face, arriving }) {
     card.classList.toggle("down", f === null);
     card.style.transform = `rotate(${tilt(slot)}deg)`;
     card.style.opacity = arriving.has(slot) ? "0" : "";
+    card.style.visibility = slot !== discard.at(-1) && !flying ? "hidden" : "";
   }
   const topFace = discard.length ? face(discard.at(-1)) : null;
   pile.setAttribute("aria-label", topFace === null ? "Discard pile" : `Discard pile: ${cardName(topFace)} on top`);
