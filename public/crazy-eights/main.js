@@ -9,10 +9,10 @@ import { startGameShell } from "../engine/lobby.js";
 import { matchRouter } from "../engine/session.js";
 import { CardMatch } from "../engine/card-match.js";
 import { el, toast, setTabAlert } from "../engine/shell.js";
-import { playerBar } from "../engine/players.js";
+import { playerBar, thinkingDots } from "../engine/players.js";
 import { resultPanel } from "../engine/result.js";
 import { celebrate } from "../engine/celebrate.js";
-import { cardTable, DECK_WORK as BUSY, tokenMs, easing } from "../engine/cards/table.js";
+import { cardTable, tokenMs, easing } from "../engine/cards/table.js";
 import { humanPause } from "../engine/cards/paced-robot.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { SUIT_NAMES, cardWords } from "../engine/cards/faces.js";
@@ -220,7 +220,7 @@ function mountGame(session, root, shell) {
     dirText.textContent = `${view.dir === 1 ? "Clockwise" : "Anticlockwise"}: ${nameOf((me + view.dir + count) % count)} after you`;
     // The deck's own work, once it has taken a moment (quick deals don't flicker).
     const busy = match?.busy && match.phase !== "over" ? match.busy : null;
-    table.renderBusy(busy, { starting: match?.phase === "starting", redraw: () => !destroyed && renderCentre() });
+    table.renderBusy(busy, { starting: match?.phase === "starting", redraw: () => !destroyed && render() });
   }
 
   // ---------- motion ----------
@@ -509,7 +509,7 @@ function mountGame(session, root, shell) {
     if (!match) return "Getting the room's settings…";
     const st = match.state;
     if (match.phase === "aborted") return "Match stopped.";
-    if (match.phase === "starting") return BUSY[match.busy]?.[0] ?? "Getting ready…";
+    if (match.phase === "starting") return table.deckLine(match, nameOf);
     if (current?.type === "deal" || current?.type === "flip" || current?.type === "bury") return "Dealing…";
     if (match.phase === "over" || table.pending) {
       if (table.pending) return status.textContent || "…";
@@ -546,10 +546,10 @@ function mountGame(session, root, shell) {
     rootBox.classList.toggle("four-colour", four());
     const d = decision();
     const turnOf = current?.player ?? (phase === "playing" ? st?.turn : undefined);
-    bar.update({ turn: phase === "playing" ? turnOf : -1, notes: seats.map((p) => (view && st ? where(p) : "")), score: { wins: score } });
+    bar.update({ turn: phase === "playing" ? turnOf : -1, notes: seats.map((p) => (view && st ? where(p) : "")), score: { wins: score }, thinking: current || match?.busy ? -1 : undefined, checked: match?.checked ?? [] });
     for (const o of opps) o.node.classList.toggle("active", turnOf === o.p && phase === "playing");
     meArea.classList.toggle("active", turnOf === me && phase === "playing");
-    status.textContent = statusText();
+    status.textContent = table.dealtLine(match, statusText());
     status.className = `${table.cls("status")} ${d ? `p-${d.player}` : ""} ${d?.player === me ? "mine" : ""}`;
     if (view) {
       renderSeats();
@@ -655,7 +655,7 @@ function mountGame(session, root, shell) {
     if (match.phase === "aborted") return null;
     if (match.verdict?.ok) return el("p", { class: "verdict ok", id: "ce-verdict" }, el("span", {}, "✓ Fair play verified"), el("small", {}, "Every shuffle proved, and the game replays the same with every card shown."));
     if (match.verdict) return el("p", { class: "verdict bad", id: "ce-verdict" }, `⚠ ${verdictText(match.verdict)}`);
-    return el("p", { class: "verdict", id: "ce-verdict" }, el("span", { class: "spinner", "aria-hidden": "true" }), "Checking every shuffle and replaying the game…");
+    return el("p", { class: "verdict", id: "ce-verdict" }, thinkingDots(), "Checking every shuffle and replaying the game…");
   }
 
   // The winner's pill and the card they went out on, in the order they light up.

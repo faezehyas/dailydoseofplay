@@ -4,17 +4,21 @@
 // and the pass (see "The shared table" in ARCHITECTURE.md).
 // Each part has the class pc-<part> (cards.css) and <prefix>-<part> (the game's).
 import { el } from "../shell.js";
+import { thinkingDots } from "../players.js";
+import { SHOW, HELP } from "../dots.js";
 import { suitOf, rankOf, RANK_NAMES, SUIT_NAMES } from "./faces.js";
 import { symbols, faceSvg, BACK_SVG, suitSvg } from "./art.js";
 
-// What the deck is doing, while the match is busy: the status line, then the table's chip.
+// What the deck is doing, while the match is busy: the status line, then the
+// table's chip. A shuffle has no chip: the deck riffles, the status line says
+// who shuffles (deckLine()) and the player bar ticks each checked shuffle.
 export const DECK_WORK = {
   keys: ["Getting ready…", "Each browser makes its key"],
-  shuffling: ["Shuffling the deck…", "Each browser shuffles in turn, with a proof"],
   dealing: ["Dealing…", "A card opens only with every browser's key"],
   auditing: ["Checking the game…", "Every key is shown and the game replayed"],
 };
 const BUSY_AFTER = 450; // ms of deck work before the table says what it's waiting for
+const CHECKED = "Shuffle checked.";
 
 export const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 export const tokenMs = (name) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(`--dur-${name}`)) || 200;
@@ -29,6 +33,8 @@ export function cardTable({ prefix, play, animate, done }) {
   let destroyed = false;
   let shuffleAnims = [];
   let shuffleSound = -Infinity;
+  let shuffleSince = null; // when the deck's shuffle began, until the deck's work is done
+  let shuffleTimers = [];
 
   // ---------- cards ----------
   // A card element: two sides that turn in 3D. face null shows the back.
@@ -123,23 +129,44 @@ export function cardTable({ prefix, play, animate, done }) {
   }
 
   // ---------- the deck's work, once it has taken a moment (quick deals don't flicker) ----------
-  const busyChip = el("div", { class: cls("busy"), id: `${prefix}-busy`, hidden: true }, el("span", { class: "spinner", "aria-hidden": "true" }), el("span"));
+  const busyChip = el("div", { class: cls("busy"), id: `${prefix}-busy`, hidden: true }, thinkingDots(), el("span"));
   let busyShown = { what: null, since: 0 };
   let busyTimer = null;
   // what: match.busy, or null; starting: before the first deal (shown at once,
-  // under the piles); redraw: called when the moment has passed.
+  // under the piles); redraw: called when the moment has passed, and when the
+  // shuffle's status line changes.
   function renderBusy(what, { starting, redraw }) {
     if (what !== busyShown.what) {
       busyShown = { what, since: performance.now() };
       clearTimeout(busyTimer);
       if (what) busyTimer = setTimeout(() => !destroyed && redraw(), BUSY_AFTER + 20);
+      if (what === "shuffling" || !what) shuffleTimers.forEach(clearTimeout);
+      shuffleSince = what === "shuffling" ? performance.now() : what ? shuffleSince : null;
+      if (what === "shuffling") shuffleTimers = [SHOW, HELP].map((ms) => setTimeout(() => !destroyed && redraw(), ms + 20));
     }
-    const show = what && (starting || performance.now() - busyShown.since >= BUSY_AFTER);
+    const show = DECK_WORK[what] && (starting || performance.now() - busyShown.since >= BUSY_AFTER);
     busyChip.hidden = !show;
     busyChip.classList.toggle("float", !starting);
     if (show) busyChip.lastChild.textContent = DECK_WORK[what][1];
     shuffling(what === "shuffling");
   }
+
+  // The status line while the deck works (match.busy). A shuffle has one
+  // steady line from SHOW ms until the deal: everyone in shuffle
+  // order, then from HELP ms whom we may be waiting for. nameOf(seat)
+  // names another player.
+  function deckLine(match, nameOf) {
+    const shuffle = match.busy === "shuffling" || (match.busy === "dealing" && match.phase === "starting");
+    const ms = shuffle && shuffleSince !== null ? performance.now() - shuffleSince : 0;
+    if (ms < SHOW) return DECK_WORK[shuffle ? "keys" : match.busy]?.[0] ?? DECK_WORK.keys[0];
+    const seats = Array.from({ length: match.players }, (_, p) => p);
+    const others = seats.filter((p) => p !== match.me);
+    if (ms >= HELP) return `Taking a while? ${nameOf(others.find((p) => !match.checked.includes(p)) ?? others[0])}'s connection may be slow. You can wait or leave the game.`;
+    return `Shuffling: ${seats.map((p) => (p === match.me ? "you" : nameOf(p))).join(", then ")}. Each browser checks the ${others.length > 1 ? "others'" : "other's"}.`;
+  }
+
+  // After the deal, until the first move, the status line starts with the shuffle checked.
+  const dealtLine = (match, text) => (match?.phase === "playing" && !match.log.length && !text.startsWith(CHECKED) ? `${CHECKED} ${text}` : text);
 
   // ---------- the other players: a fan of backs and a pill ----------
   function makeSeat({ p, name, pos }) {
@@ -682,6 +709,8 @@ export function cardTable({ prefix, play, animate, done }) {
     riffle,
     busyChip,
     renderBusy,
+    deckLine,
+    dealtLine,
     makeSeat,
     hand,
     handCards,
@@ -731,6 +760,7 @@ export function cardTable({ prefix, play, animate, done }) {
       destroyed = true;
       gen++;
       clearTimeout(busyTimer);
+      shuffleTimers.forEach(clearTimeout);
       shuffling(false);
     },
   };

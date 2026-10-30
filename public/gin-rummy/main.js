@@ -11,10 +11,10 @@ import { startGameShell } from "../engine/lobby.js";
 import { matchRouter } from "../engine/session.js";
 import { CardMatch } from "../engine/card-match.js";
 import { el, toast, setTabAlert } from "../engine/shell.js";
-import { playerBar } from "../engine/players.js";
+import { playerBar, thinkingDots } from "../engine/players.js";
 import { resultPanel } from "../engine/result.js";
 import { celebrate } from "../engine/celebrate.js";
-import { cardTable, DECK_WORK } from "../engine/cards/table.js";
+import { cardTable } from "../engine/cards/table.js";
 import { humanPause } from "../engine/cards/paced-robot.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { cardWords, cardName } from "../engine/cards/faces.js";
@@ -201,7 +201,7 @@ function mountGame(session, root, shell) {
   function renderCentre() {
     drawCentre({ choice: myChoice(), knockRule: config?.knock });
     const busy = match?.busy && match.phase !== "over" ? match.busy : null;
-    table.renderBusy(busy, { starting: match?.phase === "starting", redraw: () => !destroyed && renderCentre() });
+    table.renderBusy(busy, { starting: match?.phase === "starting", redraw: () => !destroyed && render() });
   }
 
   // ---------- motion ----------
@@ -467,7 +467,7 @@ function mountGame(session, root, shell) {
     if (!match) return "Getting the room's settings…";
     const st = match.state;
     if (match.phase === "aborted") return "Match stopped.";
-    if (match.phase === "starting") return DECK_WORK[match.busy]?.[0] ?? "Getting ready…";
+    if (match.phase === "starting") return table.deckLine(match, (p) => session.players[p].name);
     const now = describe(current);
     if (now) return now;
     if (table.pending) return status.textContent || "…";
@@ -488,7 +488,7 @@ function mountGame(session, root, shell) {
       if (d.phase === "lay" || d.phase === "defend") return `${theirName} ${d.phase === "lay" ? "lays down" : "lays down and lays off"}…`;
       return `${theirName}'s turn…`;
     }
-    if (match.busy) return DECK_WORK[match.busy][0];
+    if (match.busy) return table.deckLine(match, (p) => session.players[p].name);
     if (!choice) return d.phase === "lay" ? "Laying down your melds…" : d.phase === "defend" ? "Laying down your hand and laying off…" : "…";
     if (choice === "upcard") return `Your turn: take the ${topName}, or pass.`;
     if (choice === "draw") return `Your turn: draw from the stock${top !== null ? ` or take the ${cardName(top)}` : ""}.`;
@@ -517,14 +517,16 @@ function mountGame(session, root, shell) {
     if (view) {
       bar.update({
         turn: phase === "playing" && shownTurn !== undefined ? shownTurn : -1,
+        thinking: current || match?.busy ? -1 : undefined,
         notes: seats.map((p) => (st ? plural(view.hands[p].length, "card") : "")),
         score: { wins: seats.map((p) => carried[p] + view.scores[p]) },
+        checked: match?.checked ?? [],
       });
     }
     seat.node.classList.toggle("active", shownTurn === them && phase === "playing");
     meArea.classList.toggle("active", shownTurn === me && phase === "playing");
     tableBox.classList.toggle("laid", !!view?.laid.some(Boolean));
-    status.textContent = statusText();
+    status.textContent = table.dealtLine(match, statusText());
     const mine = myDecision();
     status.className = `${table.cls("status")} ${d ? `p-${d.player}` : ""} ${mine ? "mine" : ""}`;
     if (view) {
@@ -648,7 +650,7 @@ function mountGame(session, root, shell) {
   function verdictLine() {
     if (match.verdict?.ok) return el("p", { class: "verdict ok", id: "gr-verdict" }, el("span", {}, "✓ Fair play verified"), el("small", {}, "Every shuffle proved, and every hand replayed with every card shown."));
     if (match.verdict) return el("p", { class: "verdict bad", id: "gr-verdict" }, `⚠ ${verdictText(match.verdict)}`);
-    return el("p", { class: "verdict", id: "gr-verdict" }, el("span", { class: "spinner", "aria-hidden": "true" }), "Checking every shuffle and replaying the game…");
+    return el("p", { class: "verdict", id: "gr-verdict" }, thinkingDots(), "Checking every shuffle and replaying the game…");
   }
 
   // The game's points, the bonuses and the totals, a row each.

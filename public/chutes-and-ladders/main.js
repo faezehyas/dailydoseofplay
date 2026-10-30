@@ -218,6 +218,7 @@ function mountGame(session, root, shell) {
     root.querySelector(".chutes-ladders").dataset.phase = phase;
     bar.update({
       turn: phase !== "playing" ? -1 : current ? current.player : st.turn,
+      thinking: current ? -1 : undefined,
       notes: shown.map((n) => (n === 0 ? "start" : `square ${n}`)),
       score,
     });

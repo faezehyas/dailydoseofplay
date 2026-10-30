@@ -160,6 +160,7 @@ export class CardMatch extends Emitter {
     this.deck = deckService();
     this.phase = "starting"; // starting -> playing -> over | aborted
     this.busy = "keys"; // "keys" | "shuffling" | "dealing" | "auditing" | null
+    this.checked = []; // the seats whose part of the latest shuffle is checked (see #shuffleRound)
     this.state = null;
     this.verdict = null; // after the audit, or a dispute: { ok, reason?, seat? }
     this.audited = null; // every slot's face, once the audit has passed
@@ -425,7 +426,6 @@ export class CardMatch extends Emitter {
     const rng = await sr.draw((k, v) => this.send({ t: "draw", k, v }));
     this.first = Math.floor(rng() * this.players);
 
-    this.#busy("shuffling");
     const cards = await this.#shuffleRound(await this.#job("newDeck", this.rules.deckSize));
     const table = this.#liveTable();
     table.cards = cards.map((card) => this.slots.push({ ...newSlot(), card }) - 1);
@@ -439,8 +439,12 @@ export class CardMatch extends Emitter {
   }
 
   // Every seat in turn shuffles the cards; I check everyone else's proof.
+  // checked: theirs once I have checked it, mine once it has gone out with its
+  // proof (the others check it, and say nothing unless it fails).
   async #shuffleRound(cards) {
     const k = ++this.k;
+    this.checked = [];
+    this.#busy("shuffling");
     for (let s = 0; s < this.players; s++) {
       if (s === this.me) {
         const out = await this.#job("shuffle", this.joint, this.key.secret, cards);
@@ -455,6 +459,8 @@ export class CardMatch extends Emitter {
         }
         cards = await this.#check(s, "a shuffle", () => this.#job("verifyShuffle", this.joint, s, cards, proof));
       }
+      this.checked.push(s);
+      this.emit("update");
     }
     return cards;
   }
@@ -619,7 +625,6 @@ export class CardMatch extends Emitter {
     for (let i = 0; i < ops.length; ) {
       if (ops[i].type === "shuffle") {
         const { from, into } = ops[i++];
-        this.#busy("shuffling");
         const cards = await this.#shuffleRound(from.map((id) => this.slots[id].card));
         into.forEach((id, j) => (this.slots[id].card = cards[j]));
       } else {

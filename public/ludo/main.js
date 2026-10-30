@@ -456,7 +456,7 @@ function mountGame(session, root, shell) {
     shell.setInProgress(phase !== "ended" && phase !== "over" && phase !== "aborted");
     root.querySelector(".ludo").dataset.phase = phase;
     const d = decision();
-    bar.update({ turn: phase !== "playing" ? -1 : current ? current.player : st.turn, score });
+    bar.update({ turn: phase !== "playing" ? -1 : current ? current.player : st.turn, thinking: current ? -1 : undefined, score });
     for (const p of seats) {
       wheres[p].classList.toggle("done", !!st?.order.includes(p));
       wheres[p].textContent = st ? where(p) : "";

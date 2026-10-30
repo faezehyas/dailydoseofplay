@@ -2,7 +2,7 @@
 // All game logic lives in rules.js / match.js; this file is view + input.
 import { startGameShell } from "../engine/lobby.js";
 import { el, toast, setTabAlert } from "../engine/shell.js";
-import { playerBar } from "../engine/players.js";
+import { playerBar, thinkingDots } from "../engine/players.js";
 import { resultPanel } from "../engine/result.js";
 import { celebrate } from "../engine/celebrate.js";
 import { SeaBattleMatch } from "./match.js";
@@ -355,7 +355,7 @@ function mountSeaBattle(session, root, shell) {
     const { winner, reason } = match.state;
     const won = winner === me;
     let verdict;
-    if (!match.verdict) verdict = el("p", { class: "verdict" }, el("span", { class: "spinner" }), `Checking ${oppName}'s fleet against their locked-in commitment…`);
+    if (!match.verdict) verdict = el("p", { class: "verdict" }, thinkingDots(), `Checking ${oppName}'s fleet against their locked-in commitment…`);
     else if (match.verdict.ok) verdict = el("p", { class: "verdict ok", id: "verdict" }, `✓ Fair play verified: every answer from ${oppName} matched the fleet they locked in.`);
     else verdict = el("p", { class: "verdict bad", id: "verdict" }, `⚠ ${oppName}'s answers don't add up: ${match.verdict.reason}.`);
     let why;

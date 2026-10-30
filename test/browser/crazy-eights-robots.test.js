@@ -43,8 +43,8 @@ test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, k
   assert.ok(await noHorizontalScroll(page), "settings fit at 360 px");
   await page.screenshot({ path: `${ARTIFACTS}/ce-9-settings-mobile.png`, fullPage: true });
   await page.tap("#play-robot");
-  // The deck is shuffled by every seat with proofs; the table says so while it works.
-  await page.locator("#ce-busy:not([hidden])").waitFor();
+  // The deck is shuffled by every seat with proofs; the status line says so while it works.
+  await page.locator("#ce-status", { hasText: "Shuffling: you, then Robot 1, then Robot 2, then Robot 3. Each browser checks the others'." }).waitFor();
   await page.screenshot({ path: `${ARTIFACTS}/ce-10-robot-shuffling.png` });
   await waitForState(page, (ddp) => ddp.match?.phase === "playing", undefined, { timeout: 60_000 });
   assert.match(await page.locator(".pb-players").innerText(), /Cleo[\s\S]*Robot 1[\s\S]*Robot 2[\s\S]*Robot 3/);
@@ -60,7 +60,7 @@ test("Crazy Eights against three robots on a 360 px phone: deal, sounds, mute, k
   await page.screenshot({ path: `${ARTIFACTS}/ce-11-robot-dealt.png` });
 
   // My turn first: by keyboard, a card that plays, or the draw made for me.
-  await waitForState(page, (ddp) => ddp.match.state.turn === 0 && !document.querySelector("#ce-status").textContent.startsWith("Dealing"), undefined, { timeout: 30_000 });
+  await waitForState(page, (ddp) => ddp.match.state.turn === 0 && !document.querySelector("#ce-status").textContent.includes("Dealing"), undefined, { timeout: 30_000 });
   const before = (await state(page)).moves;
   if (await page.locator(".ce-hcard.playable").count()) {
     await page.locator(".ce-hcard[tabindex='0']").focus();

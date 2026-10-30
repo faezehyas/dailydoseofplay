@@ -267,7 +267,7 @@ function mountCheckers(session, root, shell) {
       case "starting":
         return config.first === "random" ? "Tossing a coin to see who starts…" : "Getting ready…";
       case "playing":
-        if (st.turn !== me) return `${oppName} is thinking…`;
+        if (st.turn !== me) return session.mode === "robot" ? `${oppName}'s turn` : `${oppName} is thinking…`;
         if (picked?.length > 1) return "Keep jumping!";
         return legal.length && isJump(legal[0]) ? "Your turn. You must capture." : "Your turn.";
       case "over":

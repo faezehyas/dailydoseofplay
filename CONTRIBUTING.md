@@ -126,7 +126,7 @@ once: `npm test` (`test/preload.test.js`) prints each link that is missing or
 extra. Don't make `#lobby` a live region: the
 lobby moves focus to each new screen and reads out its own progress. Shared
 styles (`.card`, `.btn`, `.btn.small`, `.rules` for the "How to play" panel,
-`.rematch-status`, `.overlay`, `.spinner`, `.sr-only`) live in
+`.rematch-status`, `.overlay`, `.sr-only`) live in
 `/engine/theme.css`. `style.css` holds only what is specific to your game.
 
 "How to play" has the same sections in every game, so players know where to
@@ -267,7 +267,8 @@ startGameShell({
 **Card games.** Use `CardMatch` from `../engine/card-match.js` the same way
 (`new CardMatch({ send, me, players, rules, m })`). While `match.busy` is set
 ("keys", "shuffling", "dealing" or "auditing") the deck is working, so show
-it. `match.face(slot)` is a card's face if you may see it (every card once
+it: the table's `renderBusy()`, `deckLine()` for the status line and
+`dealtLine()` around it, and `checked: match.checked` for the player bar's ticks. `match.face(slot)` is a card's face if you may see it (every card once
 the audit has passed), else `null`. After "over", a "verified" event
 brings `match.verdict`: show "Fair play verified" or what didn't add up, as
 Sea Battle does. If the session ends while
@@ -363,7 +364,7 @@ over a guest who leaves. What the game must do for that:
 
 The view must provide:
 
-- The player bar from `engine/players.js` (see **Player bar** in `ARCHITECTURE.md`), first in the view: names, whose turn it is, the score and **Leave**. Don't build your own. Pass `badges` (a node per seat: a mark, disc or colour) and `notes` (a short line per seat, such as pips) to `update()` if the game has them, and `classes` to `playerBar()` if seats have colours of their own.
+- The player bar from `engine/players.js` (see **Player bar** in `ARCHITECTURE.md`), first in the view: names, whose turn it is, the score and **Leave**. Don't build your own. Pass `badges` (a node per seat: a mark, disc or colour) and `notes` (a short line per seat, such as pips) to `update()` if the game has them, and `classes` to `playerBar()` if seats have colours of their own. A robot on turn gets its thinking dots from `turn`; if your `turn` follows a replay, pass `thinking: -1` while it plays out. Don't write "is thinking…" for a robot: its status line is "Robot's turn".
 - A clear status line.
 - On game over, the result panel from `engine/result.js` (see **Result panel** in `ARCHITECTURE.md`): call `show({ winner, stopped, reason, places, extra })` when the match ends and `hide()` while it is on. Don't build your own result box or Rematch button: the panel shows who won, a reason line, **Rematch** with everyone's votes, and Leave. Pass `places` (`[{ seat, note }]` in finishing order) if the game plays on for places, and `extra` for a node of your own (Sea Battle's fair-play verdict).
 - Your record against the robot (see **Record against the robot** in `ARCHITECTURE.md`): the result panel records each finished robot match once, when it opens on a match that wasn't stopped, so call `show()` with the real `winner` (with more than two players, the first to finish). A game with a game-over panel of its own calls `recordRobotResult(session.game, outcome, session.players.length)` from `engine/robot-record.js` once per finished robot match (`outcome` is `"win"`, `"draw"` or `"loss"`; anyone else finishing first is a loss), never for a stopped match or a friend game.

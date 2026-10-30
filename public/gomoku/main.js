@@ -197,7 +197,7 @@ function mountGomoku(session, root, shell) {
       case "starting":
         return config.first === "random" ? "Tossing a coin to see who starts…" : "Getting ready…";
       case "playing":
-        return st.turn === me ? (st.moves.length ? "Your turn. Place a stone." : "Your turn. Play anywhere.") : `${oppName} is thinking…`;
+        return st.turn === me ? (st.moves.length ? "Your turn. Place a stone." : "Your turn. Play anywhere.") : session.mode === "robot" ? `${oppName}'s turn` : `${oppName} is thinking…`;
       case "over":
         if (st.winner === DRAW) return "It's a draw. The board is full.";
         if (st.reason === "timeout") return st.winner === me ? `${oppName} ran out of time. You win!` : "You ran out of time.";

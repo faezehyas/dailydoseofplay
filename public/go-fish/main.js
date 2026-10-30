@@ -10,10 +10,10 @@ import { startGameShell } from "../engine/lobby.js";
 import { matchRouter } from "../engine/session.js";
 import { CardMatch } from "../engine/card-match.js";
 import { el, toast, setTabAlert } from "../engine/shell.js";
-import { playerBar } from "../engine/players.js";
+import { playerBar, thinkingDots } from "../engine/players.js";
 import { resultPanel } from "../engine/result.js";
 import { celebrate } from "../engine/celebrate.js";
-import { cardTable, DECK_WORK } from "../engine/cards/table.js";
+import { cardTable } from "../engine/cards/table.js";
 import { humanPause } from "../engine/cards/paced-robot.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { cardWords } from "../engine/cards/faces.js";
@@ -219,7 +219,7 @@ function mountGame(session, root, shell) {
     table.renderStock(view.stock);
     pondCount.textContent = view.stock ? "The pond" : "The pond is empty";
     const busy = match?.busy && match.phase !== "over" ? match.busy : null;
-    table.renderBusy(busy, { starting: match?.phase === "starting", redraw: () => !destroyed && renderCentre() });
+    table.renderBusy(busy, { starting: match?.phase === "starting", redraw: () => !destroyed && render() });
   }
 
   // ---------- motion ----------
@@ -399,7 +399,7 @@ function mountGame(session, root, shell) {
     if (!match) return "Getting the room's settings…";
     const st = match.state;
     if (match.phase === "aborted") return "Match stopped.";
-    if (match.phase === "starting") return DECK_WORK[match.busy]?.[0] ?? "Getting ready…";
+    if (match.phase === "starting") return table.deckLine(match, nameOf);
     const now = describe(current);
     if (now) return now;
     if (table.pending) return status.textContent || "…";
@@ -415,7 +415,7 @@ function mountGame(session, root, shell) {
     if (d.phase === "drawn" && !st.ask) return `${nameOf(d.player)} drew a card: nobody to ask.`;
     if (d.phase === "drawn") return d.player === me ? "You went fishing…" : `${nameOf(d.player)} went fishing…`;
     if (d.player !== me) return `${nameOf(d.player)}'s turn…`;
-    if (match.busy) return DECK_WORK[match.busy][0];
+    if (match.busy) return table.deckLine(match, nameOf);
     if (!myAsk()) return forcedMove(st, me, faceOf)?.book ? `Laying down your ${unit()}…` : "…";
     const options = askable(st, me);
     if (options.length === 1) return selRank === null ? `Your turn: pick a card to ask ${nameOf(options[0])} for.` : `Ask ${nameOf(options[0])} for ${rankWords(selRank)}?`;
@@ -448,13 +448,15 @@ function mountGame(session, root, shell) {
       const outs = st ? seats.map((p) => view.hands[p].length === 0 && st.out[p]) : [];
       bar.update({
         turn: phase === "playing" && shownTurn !== undefined ? shownTurn : -1,
+        thinking: current || match?.busy ? -1 : undefined,
         notes: seats.map((p) => (!st ? "" : phase === "over" ? plural(view.books[p].length, unit()) : outs[p] ? "out" : plural(view.hands[p].length, "card"))),
         score: { wins: seats.map((p) => view.books[p].length) },
+        checked: match?.checked ?? [],
       });
     }
     for (const o of opps) o.node.classList.toggle("active", shownTurn === o.p && phase === "playing");
     meArea.classList.toggle("active", shownTurn === me && phase === "playing");
-    status.textContent = statusText();
+    status.textContent = table.dealtLine(match, statusText());
     const mine = myDecision();
     status.className = `${table.cls("status")} ${d ? `p-${d.player}` : ""} ${mine ? "mine" : ""}`;
     const asking = myAsk();
@@ -566,7 +568,7 @@ function mountGame(session, root, shell) {
   function verdictLine() {
     if (match.verdict?.ok) return el("p", { class: "verdict ok", id: "gf-verdict" }, el("span", {}, "✓ Fair play verified"), el("small", {}, "Every shuffle proved, and every ask and answer checked with every card shown."));
     if (match.verdict) return el("p", { class: "verdict bad", id: "gf-verdict" }, `⚠ ${verdictText(match.verdict)}`);
-    return el("p", { class: "verdict", id: "gf-verdict" }, el("span", { class: "spinner", "aria-hidden": "true" }), "Checking every shuffle and replaying the game…");
+    return el("p", { class: "verdict", id: "gf-verdict" }, thinkingDots(), "Checking every shuffle and replaying the game…");
   }
 
   // Everyone's books, most first; players level on books share a place.
