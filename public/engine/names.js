@@ -65,6 +65,19 @@ export function cleanName(raw, fallback) {
   return name && !problem ? name : fallback;
 }
 
+// An account's public name, shown on leaderboards: a nickname of
+// PUBLIC_NAME_MIN to NAME_MAX characters. problem is checkName()'s, or
+// "short" or "long". Names are unique without case: nameKey() is what the
+// store compares.
+export const PUBLIC_NAME_MIN = 3;
+export function checkPublicName(raw) {
+  if (typeof raw !== "string") return { name: "", problem: "short" };
+  if ([...raw.trim()].length > NAME_MAX) return { name: "", problem: "long" };
+  const { name, problem } = checkName(raw);
+  return { name, problem: problem ?? ([...name].length < PUBLIC_NAME_MIN ? "short" : null) };
+}
+export const nameKey = (name) => name.normalize("NFKC").toLowerCase();
+
 // A friendly default for players who haven't picked a nickname ("Brave Otter"),
 // so nobody plays as a role word like Host or Guest. Every pair passes
 // checkName() and fits NAME_MAX (names.test.js checks them all).

@@ -25,8 +25,8 @@
 
 </div>
 
-No sign-up, no ads and nothing to install: send a link to friends or play the
-robot. Once everyone is in, the game runs browser to browser; the server only
+No sign-up needed, no ads and nothing to install: send a link to friends or
+play the robot. Once everyone is in, the game runs browser to browser; the server only
 introduces the players.
 
 ## Games
@@ -142,7 +142,7 @@ the other. Two devices on the same Wi-Fi work too: open
 `http://<your-computer's-LAN-IP>:8080`.
 
 <details>
-<summary>Server options: allowed origins and the client address header</summary>
+<summary>Server options: allowed origins, the client address and accounts</summary>
 
 The lobby socket (`/ws`) only accepts pages served by this server (whatever
 address you opened it at) or by the live site. To let pages from another
@@ -152,7 +152,15 @@ Details in [ARCHITECTURE.md](ARCHITECTURE.md#server).
 
 Wrong room codes are rate limited per client address (5 a minute). The
 address is the first one in `X-Forwarded-For`, else the socket's; set
-`CLIENT_IP_HEADER` to read another header, e.g. `CLIENT_IP_HEADER=X-Real-IP npm start`.
+`CLIENT_IP_HEADER` to read another header, e.g. `CLIENT_IP_HEADER=X-Real-IP npm start`,
+and `CLIENT_IP_ENTRY=last` to take the header's last address, for a proxy
+that appends the visitor's address to what the visitor sent.
+
+Accounts (optional sign-in with Google) stay off locally unless
+`SESSION_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_ORIGIN`
+and `GOOGLE_REDIRECT_URI` are set; without `DB_HOST` they keep accounts in
+memory. `ACCOUNTS=off` turns them off. See **Accounts** in
+[ARCHITECTURE.md](ARCHITECTURE.md#accounts).
 
 </details>
 
@@ -207,6 +215,7 @@ npm test                  # unit (rules, robot, fair play, protocol) + server/si
 npm run test:browser      # headless Chromium: friend matches with rematch, robot games, failure screen
 npm run coverage          # unit tests with line coverage, lcov in test-artifacts/
 npm run coverage:browser  # browser tests with line coverage per folder (Chromium)
+TEST_PG=1 DB_HOST=… npm test  # also the account store's tests on PostgreSQL (a throwaway database; DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD too)
 ```
 
 The browser test needs Playwright (`npm i -g playwright && npx playwright
@@ -216,13 +225,14 @@ go to `test-artifacts/`.
 ## Project layout
 
 ```
-server/            Node server: static files, /ws signaling, /healthz
+server/            Node server: static files, /ws signaling, /healthz, optional accounts (/api/, store/, db/migrations/)
 public/
   index.html       home page (cards from games.json)
   games.json       game registry
   engine/          shared browser engine: lobby, signaling client, WebRTC, sessions, fair play, card decks, UI shell
   <slug>/          one folder per game: page, rules, robot, view, sounds, tests
   privacy/         privacy page
+  account/         account page (its script is account.js)
 test/              integration and browser tests
 docs/              deploying
 vendor/            the mental-poker library behind card decks (git submodule), our patches and lock file
@@ -264,4 +274,5 @@ The code and the original art (game icons and boards) are under the
 
 ## Deploying
 
-The owner's Wasmer Edge setup and the site's domains are in [docs/deploy.md](docs/deploy.md).
+The owner's Wasmer Edge setup, the accounts setup (database, secrets and
+Google) and the site's domains are in [docs/deploy.md](docs/deploy.md).

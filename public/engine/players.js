@@ -7,18 +7,18 @@
 // default, or a game's own class per seat (see "player bar" in theme.css).
 import { el } from "./shell.js";
 import { reactionControls } from "./reactions.js";
+import { SHOW } from "./dots.js";
 
 // An arrow out of a door, so Leave reads as a way out at a glance.
 const LEAVE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M15 8l4 4-4 4M19 12H9"/></svg>';
 const TICK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
-export const THINK_AFTER = 300; // ms a robot's move takes before its pill shows the dots
 
 // Three dots that bounce in turn: a wait, in a robot's pill or beside the deck's work.
 export const thinkingDots = () => el("span", { class: "think", "aria-hidden": "true" }, el("i"), el("i"), el("i"));
 
 // show(seat) once `seat` has been thinking for `ms`, show(-1) when it stops;
 // returns set(seat), called with the seat that thinks now, or -1.
-export function thinkingDelay(show, ms = THINK_AFTER) {
+export function thinkingDelay(show, ms = SHOW) {
   let seat = -1;
   let timer = null;
   let shown = false;
@@ -81,7 +81,7 @@ export function playerBar(session, { onLeave, classes = () => "" }) {
   // Every field is optional and indexed by seat: turn (-1 for nobody),
   // score { wins: [...], draws } (no draws field, no Draws box), badges and notes.
   // thinking: the robot whose move is awaited, or -1; without it, the turn
-  // if a robot has it. Its dots wait THINK_AFTER ms. checked: the seats whose
+  // if a robot has it. Its dots wait SHOW ms (dots.js). checked: the seats whose
   // shuffle is checked, each with a tick.
   function update({ turn, score, badges, notes, thinking, checked }) {
     for (const p of pills) {

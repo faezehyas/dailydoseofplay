@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { thinkingDelay, THINK_AFTER } from "./players.js";
+import { thinkingDelay } from "./players.js";
+import { SHOW } from "./dots.js";
 
 function delayed(t) {
   t.mock.timers.enable({ apis: ["setTimeout"] });
@@ -10,9 +11,9 @@ function delayed(t) {
 
 test("a robot's dots show once its move has taken 300 ms", (t) => {
   const { set, shown } = delayed(t);
-  assert.equal(THINK_AFTER, 300);
+  assert.equal(SHOW, 300);
   set(1);
-  t.mock.timers.tick(THINK_AFTER - 1);
+  t.mock.timers.tick(SHOW - 1);
   assert.deepEqual(shown(), []);
   t.mock.timers.tick(1);
   assert.deepEqual(shown(), [1]);
@@ -35,7 +36,7 @@ test("the same seat again keeps its wait; the next robot waits afresh", (t) => {
   t.mock.timers.tick(100);
   assert.deepEqual(shown(), [1]);
   set(2);
-  t.mock.timers.tick(THINK_AFTER - 1);
+  t.mock.timers.tick(SHOW - 1);
   assert.deepEqual(shown(), [1, -1], "the first robot's dots go at once");
   t.mock.timers.tick(1);
   assert.deepEqual(shown(), [1, -1, 2]);

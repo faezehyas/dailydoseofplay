@@ -1,8 +1,9 @@
 # Contributing: how to work in this repo and add a game
 
-Daily Dose of Play is a free, no-login site of browser games for two or more players,
-inspired by papergames.io's gameplay. It is one Node server on Wasmer Edge
-(pages, `/ws` signaling, `/healthz`). Gameplay runs browser to browser over
+Daily Dose of Play is a free site of browser games for two or more players,
+inspired by papergames.io's gameplay; playing never needs an account. It is
+one Node server on Wasmer Edge (pages, `/ws` signaling, `/healthz`, and
+optional accounts under `/api/`). Gameplay runs browser to browser over
 WebRTC. Read `ARCHITECTURE.md` once before your first change.
 
 Everyone here follows the [Code of Conduct](CODE_OF_CONDUCT.md). Issues have
@@ -17,11 +18,11 @@ and a blank issue for anything else. Security problems go privately, as
 ## Ground rules
 
 - **Language:** plain JavaScript only. Node ES modules on the server; browser JS, HTML and CSS in `public/`. No TypeScript, no frameworks, no build step, no bundler.
-- **Dependencies:** `ws` is the only npm dependency. Do not add more. The card deck's cryptography, the mental-poker library, is a pinned git submodule built to WebAssembly and committed (see **Card games** in `ARCHITECTURE.md`); games don't need anything else.
+- **Dependencies:** `ws` and `pg` are the only npm dependencies: `ws` for the lobby socket, `pg` for the accounts database (imported only when one is configured). Do not add more. The card deck's cryptography, the mental-poker library, is a pinned git submodule built to WebAssembly and committed (see **Card games** in `ARCHITECTURE.md`); games don't need anything else.
 - **Originality:** use original names, art, text and sounds. Copy papergames' rules and flow only, never their logo, art, sounds or wording.
 - **License:** contributions are accepted under the repo's [MIT License](LICENSE). A third-party asset needs a license compatible with it, credited in the game's folder the way each `sounds/LICENSE.txt` credits its recordings.
-- **No accounts:** no logins, tournaments, leaderboards, ads, analytics or random matchmaking. The nickname stays in `localStorage`.
-- **No secrets:** no tokens or keys in the repo. Deploys happen through Wasmer's GitHub integration on every push to `main`.
+- **Accounts are optional:** signing in (with Google, see **Accounts** in `ARCHITECTURE.md`) is optional, and playing never needs an account: every game works the same signed out. Still no ads, no analytics and no random matchmaking. The nickname stays in `localStorage`.
+- **No secrets in the repo:** no tokens or keys. Secrets live in the Wasmer app's secrets (see [docs/deploy.md](docs/deploy.md)), and deploys happen through Wasmer's GitHub integration on every push to `main`.
 - **Server:** a new game must not need changes under `server/`. If it seems to, stop and explain why in the PR.
 - **Comments:** one short line, and only for the non-obvious. Rationale goes in `ARCHITECTURE.md`.
 - **Commits:** follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): `type(scope): description`, e.g. `feat(tic-tac-toe): add rules and robot`, `fix(engine): …`, `docs: …`, `test: …`, `chore: …`. Mark breaking changes with `!` or a `BREAKING CHANGE:` footer.
@@ -125,7 +126,7 @@ once: `npm test` (`test/preload.test.js`) prints each link that is missing or
 extra. Don't make `#lobby` a live region: the
 lobby moves focus to each new screen and reads out its own progress. Shared
 styles (`.card`, `.btn`, `.btn.small`, `.rules` for the "How to play" panel,
-`.rematch-status`, `.overlay`, `.spinner`, `.sr-only`) live in
+`.rematch-status`, `.overlay`, `.sr-only`) live in
 `/engine/theme.css`. `style.css` holds only what is specific to your game.
 
 "How to play" has the same sections in every game, so players know where to
@@ -624,6 +625,9 @@ The [PR template](.github/pull_request_template.md) repeats these lines, shorten
 |---|---|
 | `server/app.js` | HTTP routes, static files, security headers, `/healthz`, `/ws` upgrade |
 | `server/signaling.js` | Rooms scoped by game slug, plus the SDP/ICE relay |
+| `server/accounts.js`, `server/google.js` | Optional accounts under `/api/`: Google sign-in, sessions, public names |
+| `server/store/`, `server/db/migrations/` | The account store (in memory, or PostgreSQL) and its migrations |
+| `public/account.js` | The account page, `/account/` |
 | `public/engine/lobby.js` | `startGameShell()`: lobby UI, invite link, waiting room, robot mode |
 | `public/engine/room.js` | Seating players: `HostRoom`, `GuestRoom` (signaling + WebRTC) and `localRoom()` (robots) |
 | `public/engine/group.js` | The group transport: send to everyone, receive `(msg, fromSeat)`; today a star through the host |

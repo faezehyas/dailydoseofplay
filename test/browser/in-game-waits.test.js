@@ -8,9 +8,11 @@
 //   npm run test:browser
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { ARTIFACTS, skipWithoutPlaywright, openBrowser, waitForState, joinByInvite, noHorizontalScroll, pick } from "../helpers.js";
 
 const skip = skipWithoutPlaywright();
+const GAMES = JSON.parse(readFileSync(new URL("../../public/games.json", import.meta.url), "utf8")).games.filter((g) => g.status === "ready");
 const PHONE = { phone: true, colorScheme: "light" };
 const DESKTOP = { viewport: { width: 1280, height: 900 }, colorScheme: "dark" };
 const ROBOT_DELAY = 600; // Connect 4's robot pause at a player's pace
@@ -89,6 +91,17 @@ test("no game says a robot is thinking: its turn, and the dots in its pill", { s
   assertNoErrors();
 });
 
+test("no game page has a spinner, in its lobby or its game", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("page", PHONE);
+  for (const { slug } of GAMES) {
+    await page.goto(`${srv.base}/${slug}/`);
+    await page.locator("#play-robot").waitFor();
+    assert.equal(await page.locator(".spinner").count(), 0, slug);
+  }
+  assertNoErrors();
+});
+
 test("Ludo's robots show the dots in their own pill, in their colour", { skip, timeout: 120_000 }, async (t) => {
   const { srv, open, assertNoErrors } = await openBrowser(t);
   for (const [options, name] of [
@@ -132,7 +145,7 @@ const recordShuffle = (page) =>
         phase: window.ddp.match?.phase,
         ticks: document.querySelectorAll(".pb-tick:not([hidden])").length,
         riffle: !!document.querySelector(".ce-riffle:not([hidden])"),
-        spinners: document.querySelectorAll("#game .spinner").length,
+        spinners: document.querySelectorAll(".spinner").length,
       };
       const last = window.shuffleLog.at(-1);
       if (!last || Object.keys(row).some((k) => row[k] !== last[k])) window.shuffleLog.push(row);
@@ -177,7 +190,7 @@ test("Crazy Eights with a friend: one steady line while the deck is shuffled, an
     assert.equal(log[dealt - 1].ticks, 2, "both pills have a tick before the deal");
     assert.ok(log.slice(0, dealt).some((r) => r.ticks === 1), "the ticks come one by one");
     assert.match(log[next].status, /^Shuffle checked\. /, "the line after the deal starts with the shuffle checked");
-    assert.equal(Math.max(...log.map((r) => r.spinners)), 0, "no spinner on the game screen");
+    assert.equal(Math.max(...log.map((r) => r.spinners)), 0, "no spinner anywhere on the page");
     assert.equal(await p.locator(".ce-busy:not([hidden])").count(), 0);
   }
   // The first move ends the shuffle's words (a card, naming a suit for an 8, or a draw when nothing plays).

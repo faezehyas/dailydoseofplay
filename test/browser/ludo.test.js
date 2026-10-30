@@ -141,7 +141,7 @@ test("a four-seat Ludo room: two friends join by the invite key, a third types t
   await di.fill("#join-code", code);
   const knock = host.locator("#roster li.knock", { hasText: "Di wants to join" });
   await knock.waitFor();
-  assert.match(await host.locator("#roster").innerText(), /Ada\s+host[\s\S]*Bo\s+in[\s\S]*Cy\s+in[\s\S]*Di wants to join/, "the knock sits in the player list");
+  assert.match(await host.locator("#roster").innerText(), /You\s+host[\s\S]*Bo\s+in[\s\S]*Cy\s+in[\s\S]*Di wants to join/, "the knock sits in the player list");
   assert.match(await host.locator("#start-game").innerText(), /3 players/, "a knock is not a player");
   await knock.getByRole("button", { name: "Accept" }).click();
 

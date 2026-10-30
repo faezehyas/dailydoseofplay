@@ -60,7 +60,7 @@ test("three friends fill a room through the invite link, play on shared dice, re
   await host.goto(`${srv.base}/party/`);
   assert.equal(await host.locator("#play-friend").innerText(), "Play with friends");
   const { invite } = await joinByInvite(host, [], srv);
-  assert.match(await host.locator("#roster").innerText(), /Ada\s+host/);
+  assert.match(await host.locator("#roster").innerText(), /You\s+host/);
   assert.equal(await host.locator("#start-game").isDisabled(), true, "can't start alone");
 
   const bo = await open("Bo");

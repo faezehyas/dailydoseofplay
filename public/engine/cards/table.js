@@ -4,7 +4,8 @@
 // and the pass (see "The shared table" in ARCHITECTURE.md).
 // Each part has the class pc-<part> (cards.css) and <prefix>-<part> (the game's).
 import { el } from "../shell.js";
-import { thinkingDots, THINK_AFTER } from "../players.js";
+import { thinkingDots } from "../players.js";
+import { SHOW, HELP } from "../dots.js";
 import { suitOf, rankOf, RANK_NAMES, SUIT_NAMES } from "./faces.js";
 import { symbols, faceSvg, BACK_SVG, suitSvg } from "./art.js";
 
@@ -17,7 +18,6 @@ export const DECK_WORK = {
   auditing: ["Checking the game…", "Every key is shown and the game replayed"],
 };
 const BUSY_AFTER = 450; // ms of deck work before the table says what it's waiting for
-const SLOW_AFTER = 10_000; // ms of shuffling before the status line says who may be slow
 const CHECKED = "Shuffle checked.";
 
 export const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -142,7 +142,7 @@ export function cardTable({ prefix, play, animate, done }) {
       if (what) busyTimer = setTimeout(() => !destroyed && redraw(), BUSY_AFTER + 20);
       if (what === "shuffling" || !what) shuffleTimers.forEach(clearTimeout);
       shuffleSince = what === "shuffling" ? performance.now() : what ? shuffleSince : null;
-      if (what === "shuffling") shuffleTimers = [THINK_AFTER, SLOW_AFTER].map((ms) => setTimeout(() => !destroyed && redraw(), ms + 20));
+      if (what === "shuffling") shuffleTimers = [SHOW, HELP].map((ms) => setTimeout(() => !destroyed && redraw(), ms + 20));
     }
     const show = DECK_WORK[what] && (starting || performance.now() - busyShown.since >= BUSY_AFTER);
     busyChip.hidden = !show;
@@ -152,16 +152,16 @@ export function cardTable({ prefix, play, animate, done }) {
   }
 
   // The status line while the deck works (match.busy). A shuffle has one
-  // steady line from THINK_AFTER ms until the deal: everyone in shuffle
-  // order, then from SLOW_AFTER ms whom we may be waiting for. nameOf(seat)
+  // steady line from SHOW ms until the deal: everyone in shuffle
+  // order, then from HELP ms whom we may be waiting for. nameOf(seat)
   // names another player.
   function deckLine(match, nameOf) {
     const shuffle = match.busy === "shuffling" || (match.busy === "dealing" && match.phase === "starting");
     const ms = shuffle && shuffleSince !== null ? performance.now() - shuffleSince : 0;
-    if (ms < THINK_AFTER) return DECK_WORK[shuffle ? "keys" : match.busy]?.[0] ?? DECK_WORK.keys[0];
+    if (ms < SHOW) return DECK_WORK[shuffle ? "keys" : match.busy]?.[0] ?? DECK_WORK.keys[0];
     const seats = Array.from({ length: match.players }, (_, p) => p);
     const others = seats.filter((p) => p !== match.me);
-    if (ms >= SLOW_AFTER) return `Taking a while? ${nameOf(others.find((p) => !match.checked.includes(p)) ?? others[0])}'s connection may be slow. You can wait or leave the game.`;
+    if (ms >= HELP) return `Taking a while? ${nameOf(others.find((p) => !match.checked.includes(p)) ?? others[0])}'s connection may be slow. You can wait or leave the game.`;
     return `Shuffling: ${seats.map((p) => (p === match.me ? "you" : nameOf(p))).join(", then ")}. Each browser checks the ${others.length > 1 ? "others'" : "other's"}.`;
   }
 

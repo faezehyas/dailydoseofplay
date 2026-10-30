@@ -65,6 +65,82 @@ wasmer app secrets create --app faezeh_yass/dailydoseofplay APPLE_TEAM_ID ABCDE1
 Check with `curl -i https://www.dailydoseofplay.com/.well-known/assetlinks.json`:
 expect `200` and `content-type: application/json`.
 
+## Accounts (one-time setup)
+
+Accounts (optional sign-in with Google, see **Accounts** in
+[ARCHITECTURE.md](../ARCHITECTURE.md#accounts)) stay off, and the site works
+exactly as without them, until the database and all three secrets exist.
+`app.yaml` already sets `PUBLIC_ORIGIN` (`https://www.dailydoseofplay.com`)
+and `GOOGLE_REDIRECT_URI`
+(`https://www.dailydoseofplay.com/api/auth/google/callback`), and asks for a
+PostgreSQL database (`capabilities.database.engine: postgres`).
+
+1. **Create the database.** Open the app in the Wasmer dashboard →
+   **Databases** → create a **PostgreSQL** database, if the deploy hasn't
+   made one already. Wasmer then gives the app `DB_HOST`, `DB_PORT`,
+   `DB_NAME`, `DB_USERNAME` and `DB_PASSWORD`; the server creates its tables
+   on the next start.
+2. **Set up Google sign-in** in the [Google Cloud console](https://console.cloud.google.com/):
+   1. Create a project, e.g. "Daily Dose of Play".
+   2. **Google Auth Platform → Branding** (the OAuth consent screen): app
+      name `Daily Dose of Play`, a support email, home page
+      `https://www.dailydoseofplay.com`, privacy policy
+      `https://www.dailydoseofplay.com/privacy/`, authorized domain
+      `dailydoseofplay.com`, and a developer contact email. Leave the logo
+      empty: a logo needs Google's brand verification.
+   3. **Audience:** External, then **Publish app** so anyone can sign in, not
+      only test users. The site asks only for `openid` and `email`, which
+      need no review.
+   4. **Data Access:** add the scopes `openid` and `.../auth/userinfo.email`.
+   5. **Clients → Create client → Web application**, named e.g.
+      `dailydoseofplay`, with one **Authorized redirect URI**:
+      `https://www.dailydoseofplay.com/api/auth/google/callback`. No
+      JavaScript origins are needed. Copy the client ID and secret.
+3. **Add the three secrets** (the app → **Settings → Secrets**, or the CLI).
+   `read -rs` keeps the Google secret out of your shell history:
+
+   ```bash
+   wasmer app secrets create --app faezeh_yass/dailydoseofplay SESSION_SECRET "$(openssl rand -base64 48)"
+   ```
+
+   ```bash
+   wasmer app secrets create --app faezeh_yass/dailydoseofplay GOOGLE_CLIENT_ID "<the client ID>"
+   ```
+
+   ```bash
+   read -rs GOOGLE_SECRET && wasmer app secrets create --app faezeh_yass/dailydoseofplay GOOGLE_CLIENT_SECRET "$GOOGLE_SECRET"
+   ```
+
+   Then redeploy, so the server reads them. Changing `SESSION_SECRET` later
+   signs everyone out.
+4. **Check.** `curl -s https://www.dailydoseofplay.com/api/me` should print
+   `{"accounts":true,"user":null,"signup":null}`, and the app's log
+   `accounts: on (PostgreSQL)`. While something is missing it prints
+   `{"accounts":false}` and the log says what, e.g. `accounts: off (missing
+   GOOGLE_CLIENT_SECRET)` or `accounts: database unavailable (…)`. Then sign
+   in on the site, pick a name, and delete the account from `/account/`.
+5. **Check which address is the visitor's** (once, after the first deploy
+   with this code; accounts may still be off). Rate limits count requests
+   per client address, read from `X-Forwarded-For`. This sends 11 requests,
+   each claiming another address in that header:
+
+   ```bash
+   for i in $(seq 1 11); do curl -s -o /dev/null -w '%{http_code} ' -H "X-Forwarded-For: 198.51.100.$i" https://www.dailydoseofplay.com/api/auth/google/start; done; echo
+   ```
+
+   - Ten `302`s (or `503`s while accounts are off), then `429`: Wasmer
+     replaces the header or puts your address first, and the default (its
+     first entry) is right. Nothing to do.
+   - No `429`: Wasmer appends your address after the one you sent, so a
+     visitor could pick their own. Add `CLIENT_IP_ENTRY: last` under `env:`
+     in `app.yaml` (a PR), and once it's deployed, wait a minute and run the
+     loop again: the 11th must now be `429`.
+
+**Rolling back.** Pick an earlier version on the app's **Versions** page.
+To hide accounts without a code change, set `ACCOUNTS` to `off` (a secret
+works) and redeploy: every `/api/` route answers 503, the sign-in links
+disappear, and the database keeps its data for when they come back.
+
 ## Domains
 
 | Address | What it does |
