@@ -122,7 +122,7 @@ function mountGame(session, root, shell) {
   const { drawHand, drawSeats, drawCentre, drawActions, seatRect, wonRect, say, heartsBreak, cardToTrick, takeTrick, passCards, tallyUp } = parts;
 
   const hint = el("p", { class: table.cls("hint"), id: "hr-hint" });
-  const logList = el("ol", { class: table.cls("log"), id: "hr-log", "aria-label": "Recent moves" });
+  const logList = el("ol", { class: table.cls("log"), id: "hr-log", "aria-label": "Last move" });
   const configLine = el("p", { class: table.cls("config"), id: "hr-config" });
   const note = el("p", { class: table.cls("note"), id: "hr-note" });
 
@@ -147,8 +147,8 @@ function mountGame(session, root, shell) {
   root.append(rootBox);
 
   // ---------- the table as drawn ----------
-  const emptyView = (scores = seats.map(() => 0)) => ({ hands: seats.map(() => []), trick: [], won: seats.map(() => 0), points: seats.map(() => 0), scores: scores.slice(), broken: false, dir: "none", picks: seats.map(() => false), received: [], stock: 0, wins: -1, arriving: new Set(), flipping: new Set() });
-  const viewFromState = () => tableView(match.state, me, faceOf);
+  const emptyView = (scores = seats.map(() => 0)) => ({ hands: seats.map(() => []), trick: [], won: seats.map(() => 0), scores: scores.slice(), dir: "none", picks: seats.map(() => false), stock: 0, wins: -1, arriving: new Set(), flipping: new Set() });
+  const viewFromState = () => tableView(match.state);
   const known = (slot) => (view.arriving.has(slot) || view.flipping.has(slot) ? null : faceOf(slot));
   const scoreOf = (p) => carried[p] + view.scores[p];
 
@@ -180,7 +180,7 @@ function mountGame(session, root, shell) {
     const legal = new Set(choice === "play" ? legalPlays(match.state, me, faceOf) : []);
     const sent = new Set(match?.state?.picks?.[me] ?? []);
     picked = picked.filter((s) => slots.includes(s));
-    drawHand(slots, { face: known, arriving: view.arriving, choice, legal, pass: canPick(), sent, picked, received: new Set(view.received) });
+    drawHand(slots, { face: known, arriving: view.arriving, choice, legal, pass: canPick(), sent, picked });
   }
 
   function renderCentre() {
@@ -247,8 +247,6 @@ function mountGame(session, root, shell) {
       addLog({ player: ev.p, face: ev.face, kind: ev.face === QUEEN_SPADES ? "queen" : "", text: `${nameOf(ev.p)} ${ev.lead ? verb(ev.p, "leads") : verb(ev.p, "plays")} ${cardWords(ev.face)}` });
       if (ev.face === QUEEN_SPADES) await wait(PACE.look * k, g);
     } else if (ev.type === "broken") {
-      view.broken = true;
-      render();
       heartsBreak(g);
       addLog({ player: ev.p, kind: "broken", text: "Hearts are broken" });
     } else if (ev.type === "trick") {
@@ -305,8 +303,8 @@ function mountGame(session, root, shell) {
   function addLog(entry) {
     if (entry.named && entry.faces.every((f) => f !== null)) entry.text = entry.named(entry.faces);
     entry.node = el("li", { class: `${entry.player === undefined ? "" : `p-${entry.player}`} ${entry.kind || ""} fresh` }, logLine(entry));
-    log = [entry, ...log].slice(0, 7);
-    log.slice(1).forEach((e) => e.node.classList.remove("fresh"));
+    // Only the latest move: what came before is yours to remember, as at a real table.
+    log = [entry];
     logList.replaceChildren(...log.map((e) => e.node));
     renderLog();
   }
@@ -398,7 +396,7 @@ function mountGame(session, root, shell) {
     if (d.player !== me) return `${session.players[d.player].name}'s turn…`;
     if (match.busy) return table.deckLine(match, nameOf);
     if (myChoice() !== "play") return "Playing your only card…";
-    if (!st.trick.length) return st.broken ? "Your lead." : "Your lead: hearts aren't broken yet.";
+    if (!st.trick.length) return "Your lead.";
     const lead = suitOf(st.trick[0].face);
     const can = legalPlays(st, me, faceOf).some((s) => suitOf(faceOf(s)) === lead);
     return can ? `Your turn: follow ${SUIT_NAMES[lead].toLowerCase()}.` : `Your turn: no ${SUIT_NAMES[lead].toLowerCase()}, play anything${st.tricks === 0 ? " but points" : ""}.`;
@@ -465,7 +463,7 @@ function mountGame(session, root, shell) {
     const pass = picking() && view?.hands[me].length;
     const hadFocus = actionBar.contains(document.activeElement) ? document.activeElement : null;
     const note = !pass ? "" : wantPass ? "when it's your turn" : picked.length === PASS_COUNT ? `to ${nameOf(passTo(st, me))}` : `${picked.length} of 3 picked`;
-    drawActions({ dir: pass ? st.dir : null, note, ready: picked.length === PASS_COUNT && !wantPass, choice: myChoice(), wantPass, received: view?.received.length });
+    drawActions({ dir: pass ? st.dir : null, note, ready: picked.length === PASS_COUNT && !wantPass, choice: myChoice(), wantPass });
     if (hadFocus?.hidden || hadFocus?.disabled) status.focus({ preventScroll: true });
     if (!match || match.phase !== "playing") hint.textContent = "";
     else hint.textContent = "Follow suit if you can. Each heart is 1 point and the queen of spades 13; the lowest score wins. Hearts can't be led until a heart or the queen has been played. Keys: arrows and Enter in your hand, P to pass, Esc to clear.";

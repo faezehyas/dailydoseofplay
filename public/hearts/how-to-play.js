@@ -12,7 +12,7 @@ export const howToPlay = {
     "Follow the suit led if you can; if you can't, play anything. The highest card of the suit led takes the trick (aces are high).",
     "On the first trick you can't play a heart or the queen of spades unless you have nothing else.",
     "Hearts can't be led until a heart or the queen of spades has been played (**hearts are broken**), unless your hand is all hearts.",
-    "Tap a card to play it; only the cards you may play light up. To pass, tap three cards and press **Pass left** (right, across). You may pick and press it before your turn: the cards go when it comes. The cards passed to you are marked with a dot.",
+    "Tap a card to play it; only the cards you may play light up. To pass, tap three cards and press **Pass left** (right, across). You may pick and press it before your turn: the cards go when it comes.",
     "The 2 of clubs, a card you have to play and the next hand are played for you after a short beat.",
   ],
   winning: [

@@ -25,19 +25,15 @@ export const signed = (n) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0");
 const SUIT_ORDER = [3, 2, 0, 1];
 export const handOrder = (slot, f) => (f === null ? 1000 + slot : SUIT_ORDER.indexOf(suitOf(f)) * 20 + (f % 13 === 0 ? 14 : f % 13));
 
-// The table as drawn, from a match state (face: a slot's card).
-export function tableView(st, me, face) {
+// The table as drawn, from a match state.
+export function tableView(st) {
   return {
     hands: st.hands.map((h) => h.slice()),
     trick: st.trick.map((x) => ({ p: x.p, slot: x.slot })),
     won: st.won.map((w) => w.length / st.players),
-    // Hearts and the queen each seat has taken this hand.
-    points: st.won.map((slots) => slots.reduce((n, s) => n + (suitOf(face(s)) === HEARTS ? 1 : face(s) === QUEEN_SPADES ? 13 : 0), 0)),
     scores: st.scores.slice(),
-    broken: st.broken,
     dir: st.dir,
     picks: st.picks.map(Boolean),
-    received: st.phase === "pass" ? [] : st.received[me].slice(),
     stock: 0,
     wins: -1,
     arriving: new Set(),
@@ -72,9 +68,8 @@ export function heartsTable(table, { me, names, myName, onPass }) {
   const opps = around.slice(1).map((p, i) => {
     const seat = table.makeSeat({ p, name: names[p], pos: POS[i] });
     seat.won = table.makeWon(p);
-    seat.points = el("span", { class: "hr-points mono", hidden: true });
     seat.mark = el("span", { class: "hr-picked", hidden: true, "aria-hidden": "true" }, "✓");
-    seat.node.append(el("span", { class: "hr-seat-row" }, seat.won.node, seat.points));
+    seat.node.append(el("span", { class: "hr-seat-row" }, seat.won.node));
     seat.pill.append(seat.mark);
     return seat;
   });
@@ -104,16 +99,15 @@ export function heartsTable(table, { me, names, myName, onPass }) {
   const actionBar = el("div", { class: "hr-bar", id: "hr-bar" }, passBtn, timer);
   const myCount = el("span", { class: "count mono" }, "0");
   const myWon = table.makeWon(me);
-  const myPoints = el("span", { class: "hr-points mono", id: "hr-points", hidden: true });
   const myPill = el("span", { class: "pill" }, el("span", { class: "dot", "aria-hidden": "true" }), el("span", { class: "name" }, myName), myCount);
   const handHint = el("p", { class: table.cls("hand-hint"), id: "hr-hand-hint" });
-  const meArea = el("div", { class: table.cls("me", `p-${me}`) }, actionBar, hand, el("div", { class: "hr-me-row" }, myPill, myWon.node, myPoints), handHint);
+  const meArea = el("div", { class: table.cls("me", `p-${me}`) }, actionBar, hand, el("div", { class: "hr-me-row" }, myPill, myWon.node), handHint);
   const tableBox = el("div", { class: table.cls("table", `four-seats seats-${count}`), id: "hr-table" }, el("div", { class: table.cls("opps") }, opps.map((o) => o.node)), centre, meArea);
   const tableWrap = el("div", { class: table.cls("table-wrap") }, tableBox, flyLayer);
 
   // ---------- drawing ----------
   // Your hand: look gives each card its classes and words.
-  function drawHand(slots, { face, arriving, choice, legal, pass, sent, picked, received }) {
+  function drawHand(slots, { face, arriving, choice, legal, pass, sent, picked }) {
     table.renderHand(slots, {
       face,
       arriving,
@@ -123,11 +117,11 @@ export function heartsTable(table, { me, names, myName, onPass }) {
         const playable = legal.has(slot);
         return {
           lift: isPicked,
-          classes: { playable, dim: choice === "play" && !playable, picked: isPicked, pickable: pass && !sent.size, received: received.has(slot) },
+          classes: { playable, dim: choice === "play" && !playable, picked: isPicked, pickable: pass && !sent.size },
           label:
             f === null
               ? "A card, still being dealt"
-              : `${cardWords(f)}${received.has(slot) ? ", passed to you" : ""}${playable ? ", play it" : choice === "play" ? ", can't be played now" : ""}${isPicked ? ", picked to pass" : ""}`,
+              : `${cardWords(f)}${playable ? ", play it" : choice === "play" ? ", can't be played now" : ""}${isPicked ? ", picked to pass" : ""}`,
         };
       },
     });
@@ -138,16 +132,12 @@ export function heartsTable(table, { me, names, myName, onPass }) {
   function drawSeats(view, passing) {
     for (const o of opps) {
       const n = view.hands[o.p].length;
-      const pts = view.points[o.p];
-      o.render(view.hands[o.p], view.arriving, `${names[o.p]}: ${plural(n, "card")}, ${plural(view.won[o.p], "trick")} won${pts ? `, ${plural(pts, "point")} this hand` : ""}`);
+      // The tricks they've won, but not the points in them: those you remember, as at a real table.
+      o.render(view.hands[o.p], view.arriving, `${names[o.p]}: ${plural(n, "card")}, ${plural(view.won[o.p], "trick")} won`);
       o.won.render(view.won[o.p]);
-      o.points.hidden = !pts && !o.points.dataset.counting;
-      if (!o.points.dataset.counting) o.points.textContent = `♥ ${pts}`;
       o.mark.hidden = !(view.dir !== "none" && view.picks[o.p] && passing);
     }
     myWon.render(view.won[me]);
-    myPoints.hidden = !view.points[me];
-    myPoints.textContent = `♥ ${view.points[me]}`;
   }
 
   // The trick and the chips under it; to: the seat you pass to, while you pick (else null).
@@ -161,13 +151,12 @@ export function heartsTable(table, { me, names, myName, onPass }) {
       wins: view.wins,
       label: plays.length ? `The trick: ${plays.map((x) => `${nameOf(x.p)} ${cardName(face(x.slot) ?? 0)}`).join(", ")}${lead !== null ? `. Follow ${SUIT_NAMES[suitOf(lead)].toLowerCase()}` : ""}` : "The trick is empty",
     });
-    brokenChip.hidden = !view.broken;
     passChip.hidden = to === null;
     if (to !== null) passChip.textContent = `Pass ${DIR_WORD[view.dir]} ${DIR_ARROW[view.dir]} ${nameOf(to)}`;
   }
 
   // The Pass button (dir: this hand's pass while you pick, else null) and the line under your hand.
-  function drawActions({ dir, note, ready, choice, wantPass, received }) {
+  function drawActions({ dir, note, ready, choice, wantPass }) {
     passBtn.hidden = !dir;
     if (dir) {
       passLabel.textContent = `Pass ${DIR_WORD[dir]} ${DIR_ARROW[dir]}`;
@@ -175,7 +164,7 @@ export function heartsTable(table, { me, names, myName, onPass }) {
       passBtn.disabled = !ready;
     }
     tableBox.classList.toggle("my-turn", !!choice || !!dir);
-    handHint.textContent = dir ? (wantPass ? "Esc puts them back" : "Tap three cards to pass") : choice === "play" ? "Tap a lit card to play it" : received ? "The dots mark the cards passed to you" : "";
+    handHint.textContent = dir ? (wantPass ? "Esc puts them back" : "Tap three cards to pass") : choice === "play" ? "Tap a lit card to play it" : "";
   }
 
   // ---------- motion ----------
@@ -235,13 +224,17 @@ export function heartsTable(table, { me, names, myName, onPass }) {
       .finished.then(() => shade.remove(), () => shade.remove());
   }
 
-  // Hearts break: the chip's heart cracks in two with a heartbeat.
+  // Hearts break: the chip's heart cracks in two with a heartbeat, then the chip goes
+  // (whether they're broken is yours to remember, as at a real table).
   function heartsBreak(g) {
     play("broken");
     if (fast() || !live(g)) return;
     const [l, r] = brokenChip.querySelectorAll("path");
     const ms = tokenMs("slow") * 2.4;
-    brokenChip.animate([{ transform: "scale(.6)", opacity: 0 }, { transform: "scale(1.18)", opacity: 1, offset: 0.25 }, { transform: "scale(1)", offset: 0.4 }, { transform: "scale(1.1)", offset: 0.6 }, { transform: "scale(1)" }], { duration: ms, easing: easing("out") });
+    brokenChip.hidden = false;
+    brokenChip
+      .animate([{ transform: "scale(.6)", opacity: 0 }, { transform: "scale(1.18)", opacity: 1, offset: 0.12 }, { transform: "scale(1)", offset: 0.2 }, { transform: "scale(1.1)", offset: 0.3 }, { transform: "scale(1)", opacity: 1, offset: 0.8 }, { transform: "scale(1)", opacity: 0 }], { duration: ms * 2, easing: easing("out") })
+      .finished.then(() => (brokenChip.hidden = true), () => (brokenChip.hidden = true));
     l?.animate([{ transform: "translate(1px, 0) rotate(0)" }, { transform: "translate(-1.5px, 0) rotate(-8deg)", offset: 0.6 }, { transform: "translate(-1px, 0) rotate(-5deg)" }], { duration: ms, easing: easing("out"), fill: "forwards" });
     r?.animate([{ transform: "translate(-1px, 0) rotate(0)" }, { transform: "translate(1.5px, 0) rotate(8deg)", offset: 0.6 }, { transform: "translate(1px, 0) rotate(5deg)" }], { duration: ms, easing: easing("out"), fill: "forwards" });
     const host = rectIn(trick.node);
@@ -278,7 +271,6 @@ export function heartsTable(table, { me, names, myName, onPass }) {
   async function cardToTrick(view, ev, { g, k, render }) {
     const from = seatRect(ev.p, ev.slot);
     view.hands[ev.p] = view.hands[ev.p].filter((s) => s !== ev.slot);
-    view.received = view.received.filter((s) => s !== ev.slot);
     view.trick.push({ p: ev.p, slot: ev.slot });
     view.arriving.add(ev.slot);
     render();
@@ -305,7 +297,6 @@ export function heartsTable(table, { me, names, myName, onPass }) {
     view.wins = -1;
     view.won[ev.winner]++;
     const raw = ev.plays.reduce((n, x) => n + (suitOf(x.face) === HEARTS ? 1 : x.face === QUEEN_SPADES ? 13 : 0), 0);
-    view.points[ev.winner] += raw;
     render();
     return raw;
   }
@@ -326,7 +317,6 @@ export function heartsTable(table, { me, names, myName, onPass }) {
     await Promise.all(flights);
     if (!live(g)) return;
     for (let q = 0; q < count; q++) view.hands[to(q)].push(...ev.picks[q]);
-    view.received = mine.slice();
     view.picks = view.picks.map(() => false);
     render();
     await wait(tokenMs("med"), g);
