@@ -175,9 +175,9 @@ export function cardTable({ prefix, play, animate, done }) {
     const pill = el("span", { class: "pill" }, el("span", { class: "dot", "aria-hidden": "true" }), el("span", { class: "name" }, name), countEl);
     const node = el("div", { class: `${cls("seat")} p-${p} pos-${pos}`, dataset: { seat: p } }, fan, pill);
     const cards = new Map();
-    // slots: the hand; arriving: slots still in the air (hidden here); face(slot), if given,
-    // turns up the cards everyone knows (one taken from a pile).
-    function render(slots, arriving, label, face = () => null) {
+    // slots: the hand; arriving: slots still in the air (hidden here). Always backs, even
+    // for a card everyone saw go in (one taken from a pile): at a real table you remember it.
+    function render(slots, arriving, label) {
       for (const [slot, card] of cards) {
         if (!slots.includes(slot)) {
           card.remove();
@@ -194,9 +194,6 @@ export function cardTable({ prefix, play, animate, done }) {
           card = cardEl(null);
           cards.set(slot, card);
         }
-        const f = face(slot);
-        setFace(card, f);
-        card.classList.toggle("down", f === null);
         if (fan.children[i] !== card) fan.insertBefore(card, fan.children[i] ?? null);
         const k = i - (shown.length - 1) / 2;
         card.style.transform = `translateX(${(k * step).toFixed(1)}px) translateY(${(Math.abs(k) * 0.8).toFixed(1)}px) rotate(${(k * 3).toFixed(1)}deg)`;

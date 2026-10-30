@@ -862,23 +862,9 @@ button.pc-stock:disabled {
   border: 1.5px dashed rgb(255 255 255 / 35%);
 }
 
-/* The pass: cards you picked stand up in your colour; cards passed to you are marked until you play. */
+/* The pass: cards you picked stand up in your colour. */
 .pc-hcard.picked .pc-card .front {
   box-shadow: 0 0 0 3px var(--c), 0 8px 18px var(--pc-shadow);
-}
-
-.pc-hcard.received::after {
-  content: "";
-  position: absolute;
-  z-index: 2;
-  top: -6px;
-  left: 50%;
-  width: 12px;
-  height: 12px;
-  margin-left: -6px;
-  border-radius: 50%;
-  background: var(--received, var(--pc-glow));
-  box-shadow: 0 0 0 2px var(--pc-felt-2);
 }
 
 /* ---------- flying cards and effects ---------- */
@@ -997,10 +983,6 @@ button.pc-stock:disabled {
 @media (max-width: 600px) {
   .pc-status {
     font-size: 1rem;
-  }
-
-  .pc-log li:nth-child(n + 3) {
-    display: none;
   }
 
   .pc-table {

@@ -150,7 +150,7 @@ function mountGame(session, root, shell) {
   const tableWrap = el("div", { class: table.cls("table-wrap") }, tableBox, flyLayer);
 
   const hint = el("p", { class: table.cls("hint"), id: "gf-hint" });
-  const logList = el("ol", { class: table.cls("log"), id: "gf-log", "aria-label": "Recent moves" });
+  const logList = el("ol", { class: table.cls("log"), id: "gf-log", "aria-label": "Last move" });
   const configLine = el("p", { class: table.cls("config"), id: "gf-config" });
   const note = el("p", { class: table.cls("note"), id: "gf-note" });
 
@@ -315,8 +315,8 @@ function mountGame(session, root, shell) {
   ];
   function addLog(entry) {
     entry.node = el("li", { class: `${entry.player === undefined ? "" : `p-${entry.player}`} ${entry.kind || ""} fresh` }, logLine(entry));
-    log = [entry, ...log].slice(0, 7);
-    log.slice(1).forEach((e) => e.node.classList.remove("fresh"));
+    // Only the latest move: what came before is yours to remember, as at a real table.
+    log = [entry];
     logList.replaceChildren(...log.map((e) => e.node));
     renderLog();
   }

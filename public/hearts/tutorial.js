@@ -104,11 +104,11 @@ export function board() {
     const legal = new Set(choice ? legalPlays(state, 0, known) : []);
     const slots = view.hands[0].slice().sort((a, b) => handOrder(a, face(a)) - handOrder(b, face(b)));
     const pass = picking();
-    parts.drawHand(slots, { face, arriving: view.arriving, choice, legal, pass, sent: new Set(state.picks[0] ?? []), picked, received: new Set(view.received) });
+    parts.drawHand(slots, { face, arriving: view.arriving, choice, legal, pass, sent: new Set(state.picks[0] ?? []), picked });
     parts.drawSeats(view, state.phase === "pass");
     parts.drawCentre(view, { face, nameOf, to: state.phase === "pass" ? passTo(state, 0) : null });
     const note = picked.length === PASS_COUNT ? `to ${nameOf(passTo(state, 0))}` : `${picked.length} of 3 picked`;
-    parts.drawActions({ dir: pass ? state.dir : null, note, ready: picked.length === PASS_COUNT, choice, received: view.received.length });
+    parts.drawActions({ dir: pass ? state.dir : null, note, ready: picked.length === PASS_COUNT, choice });
     const shownTurn = current?.p ?? (state.phase !== "pass" ? state.turn : undefined);
     for (const o of parts.opps) o.node.classList.toggle("active", shownTurn === o.p);
     parts.meArea.classList.toggle("active", shownTurn === 0 || pass);
@@ -130,8 +130,6 @@ export function board() {
       await parts.cardToTrick(view, ev, { g, k, render: draw });
       if (ev.face === QUEEN_SPADES) await wait(PACE.look * k, g);
     } else if (ev.type === "broken") {
-      view.broken = true;
-      draw();
       parts.heartsBreak(g);
     } else if (ev.type === "trick") {
       await parts.takeTrick(view, ev, { face: known, g, k, render: draw });
@@ -155,7 +153,7 @@ export function board() {
         moving = false;
         current = null;
         parts.tally.hidden = true;
-        view = tableView(st, 0, known);
+        view = tableView(st);
         return draw();
       }
       const g = table.gen;
@@ -163,7 +161,7 @@ export function board() {
       for (const ev of played) await animate(ev, g);
       if (!live(g)) return;
       moving = false;
-      view = tableView(st, 0, known);
+      view = tableView(st);
       draw();
       if (mine() && st.phase === "play" && !forcedMove(st, 0, known)) sound("turn");
     },

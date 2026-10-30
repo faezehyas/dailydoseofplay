@@ -96,8 +96,8 @@ test("four friends play Hearts in four browsers: a secret pass, a whole hand aud
       known.forEach((f, k) => assert.equal(f !== null, k === seat || k === from, `seat ${k} reads slot ${s} passed from ${from} to ${seat}`));
     }
   }
-  // The cards passed to you are marked (the 2 of clubs may already have gone to the first trick).
-  for (const p of pages) await waitForState(p, (ddp) => document.querySelectorAll(".hr-hcard.received").length === ddp.match.state.received[ddp.match.me].length);
+  // The cards passed to you join your hand unmarked: as at a real table, you remember which they were.
+  for (const p of pages) assert.equal(await p.locator(".hr-hcard.received").count(), 0, "no card is marked as passed");
   // A seat's only legal card plays by itself (the 2 of clubs, then a lone club), and may be a passed one: count them all at one moment.
   const [kept, unplayed] = await host.evaluate(() => {
     const st = window.ddp.match.state;

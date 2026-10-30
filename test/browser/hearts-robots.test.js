@@ -48,7 +48,9 @@ test("Hearts against three robots on a 360 px phone: deal, pass, sounds, mute, t
   await page.screenshot({ path: `${ARTIFACTS}/hr-6-robot-pass-mobile.png` });
   await page.tap("#hr-pass");
   await waitForState(page, (ddp) => ddp.match.state.phase !== "pass", undefined, { timeout: 30_000 });
-  await waitForState(page, (ddp) => window.ddpSounds.includes("pass") && document.querySelectorAll(".hr-hcard.received").length === 3);
+  // The three passed to you land in your hand, unmarked.
+  await waitForState(page, (ddp) => window.ddpSounds.includes("pass") && ddp.match.state.received[ddp.match.me].every((s) => document.querySelector(`.hr-hcard[data-slot="${s}"]`)?.style.opacity === ""));
+  assert.equal(await page.locator(".hr-hcard.received").count(), 0, "no card is marked as passed");
   const st1 = await state(page);
   assert.deepEqual(st1.picks[0], slots);
   for (const s of slots) assert.ok(st1.hands[1].includes(s), "they went to Robot 1, on the left");

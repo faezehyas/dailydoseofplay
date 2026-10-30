@@ -147,7 +147,7 @@ function mountGame(session, root, shell) {
   const timerText = el("span", { class: "mono" });
   const timer = el("div", { class: "ce-timer", id: "ce-timer", hidden: true, role: "timer", "aria-label": "Time to move" }, el("span", { class: "bar" }, timerFill), timerText);
   const hint = el("p", { class: table.cls("hint"), id: "ce-hint" });
-  const logList = el("ol", { class: table.cls("log"), id: "ce-log", "aria-label": "Recent moves" });
+  const logList = el("ol", { class: table.cls("log"), id: "ce-log", "aria-label": "Last move" });
   const configLine = el("p", { class: table.cls("config"), id: "ce-config" });
   const note = el("p", { class: table.cls("note"), id: "ce-note" });
 
@@ -382,7 +382,7 @@ function mountGame(session, root, shell) {
     if (entry.draw && last?.draw && last.player === entry.player) {
       last.n = (last.n || 1) + 1;
       last.text = entry.player === me ? `You drew ${last.n} cards` : `${nameOf(entry.player)} drew ${last.n} cards`;
-    } else log = [entry, ...log].slice(0, 6);
+    } else log = [entry]; // only the latest move: what came before is yours to remember, as at a real table
     logList.replaceChildren(
       ...log.map((e, i) =>
         el(

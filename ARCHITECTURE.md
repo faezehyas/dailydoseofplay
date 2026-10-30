@@ -749,8 +749,8 @@ account once its name is typed again.
 | `cards/faces.js` | The standard 52-card deck: a face is 0–51, `suitOf()`, `rankOf()`, and the names of suits, ranks and cards. Pure, so rules use it too. |
 | `cards/melds.js` | Rummy melds over the standard deck, pure, so rules, views and robots share it: sets and runs (aces low), every candidate meld in a hand, `bestMelds()` (the arrangement with the least deadwood, tried exhaustively and remembered by the cards left: well under a millisecond for 11 cards), `fits()` and `bestLayoffs()` (onto someone else's melds, a run taking the next card in turn), and `bestDefence()` (your own melds and lay-offs that leave the least, which may break up a meld to lay off more). Deadwood counts aces 1 and court cards 10 unless a game passes its own `points`. |
 | `cards/art.js` | Playing-card art as inline SVG: `symbols()` (the shapes every card uses, added once), `faceSvg(face)`, `BACK_SVG` and `suitSvg(suit)` (see **Crazy Eights in depth** for the drawing) |
-| `cards/table.js` | `cardTable({ prefix, play, animate, done })`: the pieces of a card table. Cards that turn over (`cardEl`, `setFace`, `miniCard`), another player's seat (a fan of backs, with the cards everyone knows face up when the game passes `face`, and a pill with the count), the stock with its riffle while the deck is shuffled, the deck's work shown after 450 ms in a chip with the three dots (`DECK_WORK` has the words; a shuffle has none), the status line while the deck works (`deckLine(match, nameOf)`: a shuffle's one steady line from 300 ms until the deal, "Shuffling: you, then Bo. Each browser checks the other's.", in shuffle order, and from 10 s "Taking a while? Bo's connection may be slow. You can wait or leave the game."; the other work's `DECK_WORK` words) and `dealtLine(match, text)`, which starts the line after the deal with "Shuffle checked." until the first move, your hand fanned along an arc (it overlaps, then scrolls in its own row; one tab stop, arrow keys, Home and End), or laid flat in `groups` (melds set apart, closer together, with a mark under each), and rearranged when the game sets `onMove()` (drag a card along the row, or Shift and an arrow key; a vertical swipe still scrolls the page), a hand laid face up on the table (`makeSpread()`: groups of overlapping cards sized to fit the row, a mark under each), flying cards, bubbles over a seat, `shake()` for a card or pile that can't be played, confetti, the deal card by card, and the animation queue: in order, faster when it piles up, at once with reduced motion (read at each use) or a hidden tab, and a generation per match so a rematch drops the old one. For trick games: the trick (`makeTrick()`, each seat's card landing in front of it, the lead marked by a tab in its colour, the suit to follow under it in `info`, the winning card lit, and `gather()`, which slides the cards onto the winning one and flies them face down to the winner), the tricks a seat has won (`makeWon()`, a little stack of backs and the count), and the pass (`sendCards()`: cards leaving face down toward a seat; the hand marks cards you picked with `picked` and cards passed to you with `received`). Each part has the class `pc-<part>` and the game's `<prefix>-<part>`. |
-| `cards/cards.css` | The table's look for `cards/table.js`, linked by card games after `theme.css`: the status line, the layout with its side panel and the log, the felt and rim, cards (paper-white in both themes; `.four-colour` draws diamonds blue and clubs green), seats, stock, hand, flights, the trick, won tricks and the pass's marks, and the seat colours `p-0` to `p-3` (coral, teal, violet, amber), on a root with the class `pc-game` |
+| `cards/table.js` | `cardTable({ prefix, play, animate, done })`: the pieces of a card table. Cards that turn over (`cardEl`, `setFace`, `miniCard`), another player's seat (a fan of backs, never a face, even for a card everyone saw go in: at a real table you remember it; and a pill with the count), the stock with its riffle while the deck is shuffled, the deck's work shown after 450 ms in a chip with the three dots (`DECK_WORK` has the words; a shuffle has none), the status line while the deck works (`deckLine(match, nameOf)`: a shuffle's one steady line from 300 ms until the deal, "Shuffling: you, then Bo. Each browser checks the other's.", in shuffle order, and from 10 s "Taking a while? Bo's connection may be slow. You can wait or leave the game."; the other work's `DECK_WORK` words) and `dealtLine(match, text)`, which starts the line after the deal with "Shuffle checked." until the first move, your hand fanned along an arc (it overlaps, then scrolls in its own row; one tab stop, arrow keys, Home and End), or laid flat in `groups` (melds set apart, closer together, with a mark under each), and rearranged when the game sets `onMove()` (drag a card along the row, or Shift and an arrow key; a vertical swipe still scrolls the page), a hand laid face up on the table (`makeSpread()`: groups of overlapping cards sized to fit the row, a mark under each), flying cards, bubbles over a seat, `shake()` for a card or pile that can't be played, confetti, the deal card by card, and the animation queue: in order, faster when it piles up, at once with reduced motion (read at each use) or a hidden tab, and a generation per match so a rematch drops the old one. For trick games: the trick (`makeTrick()`, each seat's card landing in front of it, the lead marked by a tab in its colour, the suit to follow under it in `info`, the winning card lit, and `gather()`, which slides the cards onto the winning one and flies them face down to the winner), the tricks a seat has won (`makeWon()`, a little stack of backs and the count), and the pass (`sendCards()`: cards leaving face down toward a seat; the hand marks cards you picked with `picked`). Each part has the class `pc-<part>` and the game's `<prefix>-<part>`. |
+| `cards/cards.css` | The table's look for `cards/table.js`, linked by card games after `theme.css`: the status line, the layout with its side panel and the log (the latest move only: what came before is yours to remember, as at a real table), the felt and rim, cards (paper-white in both themes; `.four-colour` draws diamonds blue and clubs green), seats, stock, hand, flights, the trick, won tricks and the pass's marks, and the seat colours `p-0` to `p-3` (coral, teal, violet, amber), on a root with the class `pc-game` |
 | `cards/paced-robot.js` | `startPacedRobot()`: a card robot that asks the view how long to pause before each move (-1 waits for the screen to finish replaying), keeps a move it chose while waiting, and makes the game's fallback move when one is refused. `humanPause()` is the view's side: a blink in a hidden tab, less with reduced motion. |
 | `cards/lesson-deck.js` | The deck a card game's tutorial plays with: every card known and a slot its face (`card("10H")`), the deck API of `card-match.js` with nothing hidden and no shuffle, and `lessonMove()`, which plays a move for the side to move as `CardMatch` would and words a refusal as a sentence (see **Tutorials**). Pure, so `lessons.test.js` uses it too. |
 | `cards/leave-notice.js` | `leaveNotice()`: what a card game adds to the lobby's "Game ended" notice: whether the game got checked, and with three or more players that it is over for everyone, with each player's line. `verdictText()` and `abortText()` word a failed audit and a stopped match. |
@@ -2491,7 +2491,8 @@ adds the discard pile, the suit badge, the picker and its layout. The felt
 sits in a wooden rim. Opponents sit round it in turn
 order, the next player on your left, with a fan of card backs and a count;
 on a phone (or a narrow table, by container query) they share the top row.
-The stock and the discard pile are in the middle, with a badge for the suit
+The stock and the discard pile are in the middle (the pile squared, as at a
+real table: only its top card shows), with a badge for the suit
 to follow that glows when an 8 named it, and the direction of play when an
 ace can turn it. Your hand is fanned at the bottom and sorted by suit; a
 hand too big for the row overlaps more, then scrolls inside its own row.
@@ -2757,7 +2758,8 @@ Hard's choice for you.
 
 **Table.** A classic card room: deep green baize with a faint weave, in a
 walnut rim with a brass inlay. The other player sits at the top with a fan of
-backs (the cards they took from the pile face up in it), the stock and the pile
+backs (the cards they took from the pile too: you remember those, as at a real
+table), the stock and the pile (squared: only its top card shows)
 in the middle with the knock limit under them, and your hand at the bottom,
 grouped into its best melds (closer together, a brass mark under each, a gap
 between) with the deadwood after them and your deadwood counted beside it
@@ -2773,7 +2775,8 @@ the game's points (one hand a game: across rematches).
 
 **Motion.** The shared riffle, deal (ten each, alternating) and queue. The
 upcard flips onto the pile; a card drawn from the stock flies face down to
-the other player; one taken from the pile flies face up; a discard flies to
+the other player; one taken from the pile flies face up and turns down as it
+lands in their hand; a discard flies to
 the pile, turning over when it leaves a hidden hand. A knock thumps the table
 with "Knock!", gin adds a fanfare and sparkles; the knocker's hand fans open
 into its melds, then the defender's, the lay-offs fly onto the knocker's
@@ -2876,8 +2879,9 @@ replays.
 
 **Your turn.** To pass, tap three cards (they stand up in your colour) and
 **Pass left** (right, across); you may pick and press it before your turn,
-and your three go when it comes. The cards passed to you are marked with a
-heart-pink dot until you play them. To play, tap a lit card. On a keyboard
+and your three go when it comes. The cards passed to you turn up as they land
+and then sort into your hand unmarked: as at a real table, you remember which
+they were. To play, tap a lit card. On a keyboard
 the hand is one tab stop (arrow keys, Enter plays or picks); P passes, Esc
 puts the picks back. The move timer (15, 30 or 60 s, off by default) times
 your real choices and plays Hard's choice for you, or your three picks if
@@ -2885,11 +2889,12 @@ you made them.
 
 **Table.** A rose velvet table in a rosewood rim with a coral inlay. The
 others sit on your left, across and on your right (with three, left and
-right), each with a fan of backs, a pill, the tricks they have won and their
-points this hand; on a wide table the side seats sit beside the trick, on a
+right), each with a fan of backs, a pill and the tricks they have won (not the
+points in them: as at a real table, you remember those); on a wide table the side seats sit beside the trick, on a
 phone all three above it. In the middle each card lands in front of its
 seat, the lead marked by a tab in its colour, with chips under the trick for
-the suit to follow, hearts broken and, while passing, where your three go.
+the suit to follow and, while passing, where your three go. Whether hearts
+are broken is yours to remember: no chip says so.
 At the end of a hand a tally card counts each seat's points into the totals
 (the lowest in its colour). The player bar's score is each player's total
 and its note their cards in hand. The result panel holds the score sheet, a
@@ -2902,8 +2907,8 @@ to you land face down and turn over. A card flies to the trick from its seat,
 turning face up from a hidden hand; the winning card lights, the trick slides
 together and flies face down to the winner's tricks. The queen of spades
 drops onto the trick with weight: the table jolts and a shadow spreads.
-Hearts breaking cracks the chip's heart in two with a heartbeat and a ring of
-small hearts. The hand's points count up, a moon rises over the table with
+Hearts breaking shows a "Hearts broken" chip for a moment, its heart cracking
+in two with a heartbeat and a ring of small hearts, then the chip fades. The hand's points count up, a moon rises over the table with
 confetti in the shooter's colour, and between hands the cards gather back to
 the deck. The game's end is the result moment, the winner's pill and tricks
 lighting up.
