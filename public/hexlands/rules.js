@@ -57,12 +57,13 @@ export const ARMY_MIN = 3;
 // give may also be paid in parts of at least this many, over several steps.
 export const MAX_SHOWN = 16;
 
-const sum = (xs) => xs.reduce((a, b) => a + b, 0);
+export const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 const isIndex = (v, n) => Number.isInteger(v) && v >= 0 && v < n;
 const isSlots = (v) => Array.isArray(v) && v.length <= DECK_SIZE && v.every(Number.isInteger) && new Set(v).size === v.length;
 const isCounts = (v) => Array.isArray(v) && v.length === RESOURCES.length && v.every((x) => isIndex(x, PER_RESOURCE + 1));
-const seatsOf = (state) => [...Array(state.players).keys()];
-const other = (e, c) => (EDGES[e].a === c ? EDGES[e].b : EDGES[e].a);
+export const seatsOf = (state) => [...Array(state.players).keys()];
+// The far end of edge e from corner c.
+export const otherEnd = (e, c) => (EDGES[e].a === c ? EDGES[e].b : EDGES[e].a);
 
 // The 5 counts of the known resource faces among slots.
 export function counts(slots, face) {
@@ -89,7 +90,7 @@ export function payment(slots, face, cost) {
 }
 
 // The distance rule: a free corner with no building next to it.
-const isFree = (state, c) => !state.buildings[c] && CORNERS[c].corners.every((o) => !state.buildings[o]);
+export const isFree = (state, c) => !state.buildings[c] && CORNERS[c].corners.every((o) => !state.buildings[o]);
 const touchesRoad = (state, p, c) => CORNERS[c].edges.some((e) => state.roads[e] === p);
 // A new road joins a building of p's, or a road of p's at a corner without someone else's building.
 function joins(state, p, e) {
@@ -153,7 +154,7 @@ export function roadLength(state, p) {
     for (const e of CORNERS[c].edges) {
       if (state.roads[e] !== p || used.has(e)) continue;
       used.add(e);
-      walk(other(e, c), len + 1);
+      walk(otherEnd(e, c), len + 1);
       used.delete(e);
     }
   };
@@ -335,7 +336,6 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
     return f;
   }
 
-  // Checks that `slots` are p's and pay exactly `cost`; returns them.
   function checkPay(state, p, slots, cost, what, deck) {
     const hand = new Set(state.hands[p]);
     if (!isSlots(slots) || slots.length !== sum(cost) || !slots.every((s) => hand.has(s))) throw new RuleError(`pay for ${what} with ${sum(cost)} cards from your hand`);
@@ -349,14 +349,12 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
     if (!isSlots(slots) || !slots.every((s) => hand.has(s))) throw new RuleError(`${what}: name distinct cards from your hand`);
   }
 
-  // Shown cards back to the bank.
   function spend(state, p, slots, deck) {
     const set = new Set(slots);
     state.hands[p] = state.hands[p].filter((s) => !set.has(s));
     for (const s of slots) state.bank[resourceOf(shownFace(deck, s))].push(s);
   }
 
-  // A face-up bank card of r to p.
   function payOut(state, p, r, deck) {
     const s = state.bank[r].pop();
     deck.deal(s, p);

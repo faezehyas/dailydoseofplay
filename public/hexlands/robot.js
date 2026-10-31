@@ -29,6 +29,10 @@ import {
   forcedMove,
   devKind,
   resourceOf,
+  sum,
+  seatsOf,
+  otherEnd,
+  isFree,
 } from "./rules.js";
 
 // offer: the chance of offering a trade that would complete a build, each time one would.
@@ -38,11 +42,8 @@ export const LEVELS = {
   hard: { offer: 0.8 },
 };
 
-const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 const has = (k) => (m) => Object.hasOwn(m, k);
 const pickRandom = (list, rng) => list[Math.floor(rng() * list.length)];
-const seatsOf = (state) => [...Array(state.players).keys()];
-const other = (e, c) => (EDGES[e].a === c ? EDGES[e].b : EDGES[e].a);
 // The first of list with the highest score.
 function best(list, score) {
   let top;
@@ -54,7 +55,6 @@ function best(list, score) {
   return top;
 }
 const missing = (hand, cost) => sum(cost.map((n, r) => Math.max(0, n - hand[r])));
-const isFree = (state, c) => !state.buildings[c] && CORNERS[c].corners.every((o) => !state.buildings[o]);
 
 // ---------- the island ----------
 // Pips a corner collects each roll, by resource; the hex `skip` collects nothing.
@@ -129,7 +129,7 @@ export function roadTarget(ctx) {
     if (dist >= limit) continue;
     for (const e of CORNERS[c].edges) {
       if (state.roads[e] !== -1) continue;
-      const d = other(e, c);
+      const d = otherEnd(e, c);
       if (reach.has(d) || (state.buildings[d] && state.buildings[d].p !== me)) continue;
       reach.set(d, { dist: dist + 1, first: dist === 0 ? e : first });
       queue.push(d);
@@ -239,7 +239,7 @@ function setupMove(ctx, legal) {
   // Toward the best free corner two roads away.
   const from = state.setup.corner;
   const ahead = (e) => {
-    const d = other(e, from);
+    const d = otherEnd(e, from);
     const spots = CORNERS[d].corners.filter((c) => c !== from && isFree(state, c));
     return Math.max(0, ...spots.map((c) => cornerValue(ctx, c)));
   };
