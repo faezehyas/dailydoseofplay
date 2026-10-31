@@ -1,0 +1,971 @@
+/* Hexlands' card art (card-art.js): the tokens its fill (hx-cf-*) and stroke
+   (hx-cs-*) classes use, light and dark, and the card's two layouts. Cards stay
+   paper in the dark too, a little dimmer, with a dusk sky. The resource glyphs
+   use these tokens wherever they show (cards, harbours, the hand). */
+:root {
+  --hx-card-ink: #3a2e28;
+  --hx-card-muted: #6e5d4f;
+  --hx-card-paper: #fffaf0;
+  --hx-card-edge: #dccdb2;
+  --hx-card-shadow: #2a1a10;
+  --hx-card-glint: #ffffff;
+  --hx-card-sky: #96cce1;
+  --hx-card-sky-haze: #f0f6e4;
+  --hx-card-sun: #ffd36b;
+  --hx-card-cloud: #ffffff;
+  --hx-card-far: #b4d4b2;
+  --hx-card-far-clay: #ebcaa8;
+  --hx-card-forest: #69a552;
+  --hx-card-forest-lt: #8cbe68;
+  --hx-card-forest-dk: #3f7a3a;
+  --hx-card-pine: #3f8a4a;
+  --hx-card-pine-2: #4c9a50;
+  --hx-card-pine-dk: #2c6a3c;
+  --hx-card-pine-lt: #7cc163;
+  --hx-card-tree: #4f9a45;
+  --hx-card-tree-dk: #357a38;
+  --hx-card-tree-lt: #8fcf6a;
+  --hx-card-trunk: #7a4e2c;
+  --hx-card-trunk-dk: #56361e;
+  --hx-card-trunk-lt: #b8875a;
+  --hx-card-log: #ebc28c;
+  --hx-card-handle: #a8703f;
+  --hx-card-steel: #b9c3d0;
+  --hx-card-grass: #3f7a34;
+  --hx-card-grass-dk: #5f8a40;
+  --hx-card-hills: #e19c66;
+  --hx-card-hills-lt: #ebb586;
+  --hx-card-hills-dk: #b0663a;
+  --hx-card-clay: #c96a3e;
+  --hx-card-clay-lt: #f0ad7a;
+  --hx-card-clay-dk: #94462a;
+  --hx-card-kiln: #c8643a;
+  --hx-card-kiln-lt: #ec9566;
+  --hx-card-kiln-dk: #9c4a2a;
+  --hx-card-hole: #3a1d12;
+  --hx-card-fire: #ffb648;
+  --hx-card-fire-lt: #fff1a8;
+  --hx-card-smoke: #ffffff;
+  --hx-card-brick: #bb4f2c;
+  --hx-card-brick-lt: #df7a4c;
+  --hx-card-brick-dk: #8f3a1f;
+  --hx-card-pasture: #96cc62;
+  --hx-card-pasture-lt: #b4dc86;
+  --hx-card-pasture-dk: #5c9a3a;
+  --hx-card-wool: #fffaf0;
+  --hx-card-wool-sh: #e3d8c5;
+  --hx-card-face: #3b3330;
+  --hx-card-petal: #ff9fb4;
+  --hx-card-fence: #c58f58;
+  --hx-card-post: #9f6c3c;
+  --hx-card-fields: #f2c957;
+  --hx-card-fields-lt: #f8dc86;
+  --hx-card-fields-dk: #c4952b;
+  --hx-card-wheat: #e9b73f;
+  --hx-card-wheat-lt: #fbe08a;
+  --hx-card-wheat-dk: #b5841d;
+  --hx-card-band: #b5651d;
+  --hx-card-mill: #f6ead2;
+  --hx-card-mill-sh: #dfcdaa;
+  --hx-card-roof: #c4533a;
+  --hx-card-sail: #fffaf0;
+  --hx-card-sail-ln: #c9b48c;
+  --hx-card-mountains: #aaa9b4;
+  --hx-card-mountains-lt: #c5c5cd;
+  --hx-card-mountains-dk: #6c6b79;
+  --hx-card-alpine: #a9b994;
+  --hx-card-rock: #8a93a3;
+  --hx-card-rock-lt: #cfd4dc;
+  --hx-card-rock-dk: #646d7e;
+  --hx-card-snow: #ffffff;
+  --hx-card-snow-sh: #d6e0ec;
+  --hx-card-gem: #3fb2d2;
+  --hx-card-gem-lt: #a6ecf7;
+  --hx-card-coral: #e8603f;
+  --hx-card-coral-lt: #ff9a7a;
+  --hx-card-coral-dk: #a8442c;
+  --hx-card-gold: #f2b632;
+  --hx-card-gold-lt: #ffe08a;
+  --hx-card-gold-dk: #b7801a;
+  --hx-card-knight: #8b6cf0;
+  --hx-card-knight-lt: #ab94f6;
+  --hx-card-knight-dk: #5a3fb8;
+  --hx-card-knight-sky: #7656da;
+  --hx-card-knight-wall: #6247c4;
+  --hx-card-vp: #f0bd45;
+  --hx-card-vp-lt: #f8da8a;
+  --hx-card-vp-dk: #b5861a;
+  --hx-card-vp-sky: #f2c452;
+  --hx-card-prog: #4ea78b;
+  --hx-card-prog-lt: #86c8b0;
+  --hx-card-prog-dk: #2c7660;
+  --hx-card-prog-sky: #55ab90;
+  --hx-card-path: #ecd39c;
+  --hx-card-path-dk: #c4a265;
+  --hx-card-sign: #d9a464;
+  --hx-card-sign-lt: #f2cb92;
+  --hx-card-wicker: #d49c55;
+  --hx-card-wicker-lt: #f1c78c;
+  --hx-card-wicker-dk: #9a6630;
+  --hx-card-back: #e8603f;
+  --hx-card-back-dk: #b94a30;
+  --hx-card-back-ln: #ffe3d3;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --hx-card-ink: #1a1310;
+    --hx-card-muted: #5a4a3e;
+    --hx-card-paper: #efe6d4;
+    --hx-card-edge: #8f8574;
+    --hx-card-shadow: #000000;
+    --hx-card-glint: #fbf6ea;
+    --hx-card-sky: #2b4668;
+    --hx-card-sky-haze: #8aa4b2;
+    --hx-card-sun: #f6e7b4;
+    --hx-card-cloud: #c6d2df;
+    --hx-card-far: #6d8f84;
+    --hx-card-far-clay: #a58a76;
+    --hx-card-forest: #5e924d;
+    --hx-card-forest-lt: #7ca860;
+    --hx-card-forest-dk: #3a6d39;
+    --hx-card-pine: #3a7b46;
+    --hx-card-pine-2: #45894c;
+    --hx-card-pine-dk: #2a603a;
+    --hx-card-pine-lt: #6eaa5c;
+    --hx-card-tree: #488942;
+    --hx-card-tree-dk: #316d37;
+    --hx-card-tree-lt: #7fb762;
+    --hx-card-trunk: #6d482d;
+    --hx-card-trunk-dk: #4e3321;
+    --hx-card-trunk-lt: #a27954;
+    --hx-card-log: #ceab7f;
+    --hx-card-handle: #94653d;
+    --hx-card-steel: #a3acba;
+    --hx-card-grass: #3a6d33;
+    --hx-card-grass-dk: #557b3e;
+    --hx-card-hills: #c58b5e;
+    --hx-card-hills-lt: #cea07a;
+    --hx-card-hills-dk: #9b5c39;
+    --hx-card-clay: #b1603c;
+    --hx-card-clay-lt: #d29970;
+    --hx-card-clay-dk: #83412b;
+    --hx-card-kiln: #b05a39;
+    --hx-card-kiln-lt: #cf855e;
+    --hx-card-kiln-dk: #8a442b;
+    --hx-card-hole: #361d16;
+    --hx-card-fire: #dfa145;
+    --hx-card-fire-lt: #dfd497;
+    --hx-card-smoke: #d9dde4;
+    --hx-card-brick: #a5482d;
+    --hx-card-brick-lt: #c46d48;
+    --hx-card-brick-dk: #7f3621;
+    --hx-card-pasture: #85b45b;
+    --hx-card-pasture-lt: #9fc27a;
+    --hx-card-pasture-dk: #538939;
+    --hx-card-wool: #f1e9d8;
+    --hx-card-wool-sh: #c7beb0;
+    --hx-card-face: #373030;
+    --hx-card-petal: #df8da2;
+    --hx-card-fence: #ad7f52;
+    --hx-card-post: #8d613a;
+    --hx-card-fields: #d4b152;
+    --hx-card-fields-lt: #d9c27a;
+    --hx-card-fields-dk: #ac852c;
+    --hx-card-wheat: #cca23d;
+    --hx-card-wheat-lt: #dcc57d;
+    --hx-card-wheat-dk: #9f7620;
+    --hx-card-band: #9f5b20;
+    --hx-card-mill: #d7cebb;
+    --hx-card-mill-sh: #c4b599;
+    --hx-card-roof: #ac4c39;
+    --hx-card-sail: #dfdbd5;
+    --hx-card-sail-ln: #b19f7f;
+    --hx-card-mountains: #9696a2;
+    --hx-card-mountains-lt: #adaeb7;
+    --hx-card-mountains-dk: #61616f;
+    --hx-card-alpine: #95a486;
+    --hx-card-rock: #7a8393;
+    --hx-card-rock-lt: #b6bbc4;
+    --hx-card-rock-dk: #5a6273;
+    --hx-card-snow: #f3f1ea;
+    --hx-card-snow-sh: #bcc5d2;
+    --hx-card-gem: #3a9ebb;
+    --hx-card-gem-lt: #93cfdb;
+    --hx-card-coral: #cb573d;
+    --hx-card-coral-lt: #df8970;
+    --hx-card-coral-dk: #943f2d;
+    --hx-card-gold: #d4a132;
+    --hx-card-gold-lt: #dfc57d;
+    --hx-card-gold-dk: #a1731d;
+    --hx-card-knight: #7b61d5;
+    --hx-card-knight-lt: #9784da;
+    --hx-card-knight-dk: #513ba5;
+    --hx-card-knight-sky: #694ec2;
+    --hx-card-knight-wall: #5842af;
+    --hx-card-vp: #d2a742;
+    --hx-card-vp-lt: #d9c07d;
+    --hx-card-vp-dk: #9f781d;
+    --hx-card-vp-sky: #d4ad4d;
+    --hx-card-prog: #47947e;
+    --hx-card-prog-lt: #77b09e;
+    --hx-card-prog-dk: #2a6a59;
+    --hx-card-prog-sky: #4d9883;
+    --hx-card-path: #cfba8d;
+    --hx-card-path-dk: #ac905e;
+    --hx-card-sign: #be925d;
+    --hx-card-sign-lt: #d4b384;
+    --hx-card-wicker: #ba8b50;
+    --hx-card-wicker-lt: #d3b07f;
+    --hx-card-wicker-dk: #885c30;
+    --hx-card-back: #c4502f;
+    --hx-card-back-dk: #8f3520;
+    --hx-card-back-ln: #f3cdb8;
+  }
+}
+
+:root[data-theme="dark"] {
+  --hx-card-ink: #1a1310;
+  --hx-card-muted: #5a4a3e;
+  --hx-card-paper: #efe6d4;
+  --hx-card-edge: #8f8574;
+  --hx-card-shadow: #000000;
+  --hx-card-glint: #fbf6ea;
+  --hx-card-sky: #2b4668;
+  --hx-card-sky-haze: #8aa4b2;
+  --hx-card-sun: #f6e7b4;
+  --hx-card-cloud: #c6d2df;
+  --hx-card-far: #6d8f84;
+  --hx-card-far-clay: #a58a76;
+  --hx-card-forest: #5e924d;
+  --hx-card-forest-lt: #7ca860;
+  --hx-card-forest-dk: #3a6d39;
+  --hx-card-pine: #3a7b46;
+  --hx-card-pine-2: #45894c;
+  --hx-card-pine-dk: #2a603a;
+  --hx-card-pine-lt: #6eaa5c;
+  --hx-card-tree: #488942;
+  --hx-card-tree-dk: #316d37;
+  --hx-card-tree-lt: #7fb762;
+  --hx-card-trunk: #6d482d;
+  --hx-card-trunk-dk: #4e3321;
+  --hx-card-trunk-lt: #a27954;
+  --hx-card-log: #ceab7f;
+  --hx-card-handle: #94653d;
+  --hx-card-steel: #a3acba;
+  --hx-card-grass: #3a6d33;
+  --hx-card-grass-dk: #557b3e;
+  --hx-card-hills: #c58b5e;
+  --hx-card-hills-lt: #cea07a;
+  --hx-card-hills-dk: #9b5c39;
+  --hx-card-clay: #b1603c;
+  --hx-card-clay-lt: #d29970;
+  --hx-card-clay-dk: #83412b;
+  --hx-card-kiln: #b05a39;
+  --hx-card-kiln-lt: #cf855e;
+  --hx-card-kiln-dk: #8a442b;
+  --hx-card-hole: #361d16;
+  --hx-card-fire: #dfa145;
+  --hx-card-fire-lt: #dfd497;
+  --hx-card-smoke: #d9dde4;
+  --hx-card-brick: #a5482d;
+  --hx-card-brick-lt: #c46d48;
+  --hx-card-brick-dk: #7f3621;
+  --hx-card-pasture: #85b45b;
+  --hx-card-pasture-lt: #9fc27a;
+  --hx-card-pasture-dk: #538939;
+  --hx-card-wool: #f1e9d8;
+  --hx-card-wool-sh: #c7beb0;
+  --hx-card-face: #373030;
+  --hx-card-petal: #df8da2;
+  --hx-card-fence: #ad7f52;
+  --hx-card-post: #8d613a;
+  --hx-card-fields: #d4b152;
+  --hx-card-fields-lt: #d9c27a;
+  --hx-card-fields-dk: #ac852c;
+  --hx-card-wheat: #cca23d;
+  --hx-card-wheat-lt: #dcc57d;
+  --hx-card-wheat-dk: #9f7620;
+  --hx-card-band: #9f5b20;
+  --hx-card-mill: #d7cebb;
+  --hx-card-mill-sh: #c4b599;
+  --hx-card-roof: #ac4c39;
+  --hx-card-sail: #dfdbd5;
+  --hx-card-sail-ln: #b19f7f;
+  --hx-card-mountains: #9696a2;
+  --hx-card-mountains-lt: #adaeb7;
+  --hx-card-mountains-dk: #61616f;
+  --hx-card-alpine: #95a486;
+  --hx-card-rock: #7a8393;
+  --hx-card-rock-lt: #b6bbc4;
+  --hx-card-rock-dk: #5a6273;
+  --hx-card-snow: #f3f1ea;
+  --hx-card-snow-sh: #bcc5d2;
+  --hx-card-gem: #3a9ebb;
+  --hx-card-gem-lt: #93cfdb;
+  --hx-card-coral: #cb573d;
+  --hx-card-coral-lt: #df8970;
+  --hx-card-coral-dk: #943f2d;
+  --hx-card-gold: #d4a132;
+  --hx-card-gold-lt: #dfc57d;
+  --hx-card-gold-dk: #a1731d;
+  --hx-card-knight: #7b61d5;
+  --hx-card-knight-lt: #9784da;
+  --hx-card-knight-dk: #513ba5;
+  --hx-card-knight-sky: #694ec2;
+  --hx-card-knight-wall: #5842af;
+  --hx-card-vp: #d2a742;
+  --hx-card-vp-lt: #d9c07d;
+  --hx-card-vp-dk: #9f781d;
+  --hx-card-vp-sky: #d4ad4d;
+  --hx-card-prog: #47947e;
+  --hx-card-prog-lt: #77b09e;
+  --hx-card-prog-dk: #2a6a59;
+  --hx-card-prog-sky: #4d9883;
+  --hx-card-path: #cfba8d;
+  --hx-card-path-dk: #ac905e;
+  --hx-card-sign: #be925d;
+  --hx-card-sign-lt: #d4b384;
+  --hx-card-wicker: #ba8b50;
+  --hx-card-wicker-lt: #d3b07f;
+  --hx-card-wicker-dk: #885c30;
+  --hx-card-back: #c4502f;
+  --hx-card-back-dk: #8f3520;
+  --hx-card-back-ln: #f3cdb8;
+}
+
+.hx-card {
+  display: block;
+  overflow: visible;
+}
+
+.hx-card *,
+.hx-glyph * {
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.hx-card text {
+  font-family: var(--font-display);
+}
+
+.hx-card-name {
+  font-weight: 600;
+  fill: var(--hx-card-ink);
+}
+
+.hx-card-effect {
+  font-weight: 500;
+  fill: var(--hx-card-muted);
+}
+
+/* Small cards (a phone hand, about 44 px wide) drop the scene and the words
+   for their colour and a big glyph. */
+.hx-card .hx-mini-face,
+.hx-card.hx-mini .hx-full-face {
+  display: none;
+}
+
+.hx-card.hx-mini .hx-mini-face {
+  display: inline;
+}
+
+.hx-cf-ink {
+  fill: var(--hx-card-ink);
+}
+
+.hx-cf-muted {
+  fill: var(--hx-card-muted);
+}
+
+.hx-cf-paper {
+  fill: var(--hx-card-paper);
+}
+
+.hx-cf-edge {
+  fill: var(--hx-card-edge);
+}
+
+.hx-cf-shadow {
+  fill: var(--hx-card-shadow);
+}
+
+.hx-cf-glint {
+  fill: var(--hx-card-glint);
+}
+
+.hx-cf-sky {
+  fill: var(--hx-card-sky);
+}
+
+.hx-cf-sky-haze {
+  fill: var(--hx-card-sky-haze);
+}
+
+.hx-cf-sun {
+  fill: var(--hx-card-sun);
+}
+
+.hx-cf-cloud {
+  fill: var(--hx-card-cloud);
+}
+
+.hx-cf-far {
+  fill: var(--hx-card-far);
+}
+
+.hx-cf-far-clay {
+  fill: var(--hx-card-far-clay);
+}
+
+.hx-cf-forest {
+  fill: var(--hx-card-forest);
+}
+
+.hx-cf-forest-lt {
+  fill: var(--hx-card-forest-lt);
+}
+
+.hx-cf-forest-dk {
+  fill: var(--hx-card-forest-dk);
+}
+
+.hx-cf-pine {
+  fill: var(--hx-card-pine);
+}
+
+.hx-cf-pine-2 {
+  fill: var(--hx-card-pine-2);
+}
+
+.hx-cf-pine-dk {
+  fill: var(--hx-card-pine-dk);
+}
+
+.hx-cf-pine-lt {
+  fill: var(--hx-card-pine-lt);
+}
+
+.hx-cf-tree {
+  fill: var(--hx-card-tree);
+}
+
+.hx-cf-tree-dk {
+  fill: var(--hx-card-tree-dk);
+}
+
+.hx-cf-tree-lt {
+  fill: var(--hx-card-tree-lt);
+}
+
+.hx-cf-trunk {
+  fill: var(--hx-card-trunk);
+}
+
+.hx-cf-trunk-dk {
+  fill: var(--hx-card-trunk-dk);
+}
+
+.hx-cf-trunk-lt {
+  fill: var(--hx-card-trunk-lt);
+}
+
+.hx-cf-log {
+  fill: var(--hx-card-log);
+}
+
+.hx-cf-handle {
+  fill: var(--hx-card-handle);
+}
+
+.hx-cf-steel {
+  fill: var(--hx-card-steel);
+}
+
+.hx-cf-grass {
+  fill: var(--hx-card-grass);
+}
+
+.hx-cf-grass-dk {
+  fill: var(--hx-card-grass-dk);
+}
+
+.hx-cf-hills {
+  fill: var(--hx-card-hills);
+}
+
+.hx-cf-hills-lt {
+  fill: var(--hx-card-hills-lt);
+}
+
+.hx-cf-hills-dk {
+  fill: var(--hx-card-hills-dk);
+}
+
+.hx-cf-clay {
+  fill: var(--hx-card-clay);
+}
+
+.hx-cf-clay-lt {
+  fill: var(--hx-card-clay-lt);
+}
+
+.hx-cf-clay-dk {
+  fill: var(--hx-card-clay-dk);
+}
+
+.hx-cf-kiln {
+  fill: var(--hx-card-kiln);
+}
+
+.hx-cf-kiln-lt {
+  fill: var(--hx-card-kiln-lt);
+}
+
+.hx-cf-kiln-dk {
+  fill: var(--hx-card-kiln-dk);
+}
+
+.hx-cf-hole {
+  fill: var(--hx-card-hole);
+}
+
+.hx-cf-fire {
+  fill: var(--hx-card-fire);
+}
+
+.hx-cf-fire-lt {
+  fill: var(--hx-card-fire-lt);
+}
+
+.hx-cf-smoke {
+  fill: var(--hx-card-smoke);
+}
+
+.hx-cf-brick {
+  fill: var(--hx-card-brick);
+}
+
+.hx-cf-brick-lt {
+  fill: var(--hx-card-brick-lt);
+}
+
+.hx-cf-brick-dk {
+  fill: var(--hx-card-brick-dk);
+}
+
+.hx-cf-pasture {
+  fill: var(--hx-card-pasture);
+}
+
+.hx-cf-pasture-lt {
+  fill: var(--hx-card-pasture-lt);
+}
+
+.hx-cf-pasture-dk {
+  fill: var(--hx-card-pasture-dk);
+}
+
+.hx-cf-wool {
+  fill: var(--hx-card-wool);
+}
+
+.hx-cf-wool-sh {
+  fill: var(--hx-card-wool-sh);
+}
+
+.hx-cf-face {
+  fill: var(--hx-card-face);
+}
+
+.hx-cf-petal {
+  fill: var(--hx-card-petal);
+}
+
+.hx-cf-fence {
+  fill: var(--hx-card-fence);
+}
+
+.hx-cf-post {
+  fill: var(--hx-card-post);
+}
+
+.hx-cf-fields {
+  fill: var(--hx-card-fields);
+}
+
+.hx-cf-fields-lt {
+  fill: var(--hx-card-fields-lt);
+}
+
+.hx-cf-fields-dk {
+  fill: var(--hx-card-fields-dk);
+}
+
+.hx-cf-wheat {
+  fill: var(--hx-card-wheat);
+}
+
+.hx-cf-wheat-lt {
+  fill: var(--hx-card-wheat-lt);
+}
+
+.hx-cf-wheat-dk {
+  fill: var(--hx-card-wheat-dk);
+}
+
+.hx-cf-band {
+  fill: var(--hx-card-band);
+}
+
+.hx-cf-mill {
+  fill: var(--hx-card-mill);
+}
+
+.hx-cf-mill-sh {
+  fill: var(--hx-card-mill-sh);
+}
+
+.hx-cf-roof {
+  fill: var(--hx-card-roof);
+}
+
+.hx-cf-sail {
+  fill: var(--hx-card-sail);
+}
+
+.hx-cf-sail-ln {
+  fill: var(--hx-card-sail-ln);
+}
+
+.hx-cf-mountains {
+  fill: var(--hx-card-mountains);
+}
+
+.hx-cf-mountains-lt {
+  fill: var(--hx-card-mountains-lt);
+}
+
+.hx-cf-mountains-dk {
+  fill: var(--hx-card-mountains-dk);
+}
+
+.hx-cf-alpine {
+  fill: var(--hx-card-alpine);
+}
+
+.hx-cf-rock {
+  fill: var(--hx-card-rock);
+}
+
+.hx-cf-rock-lt {
+  fill: var(--hx-card-rock-lt);
+}
+
+.hx-cf-rock-dk {
+  fill: var(--hx-card-rock-dk);
+}
+
+.hx-cf-snow {
+  fill: var(--hx-card-snow);
+}
+
+.hx-cf-snow-sh {
+  fill: var(--hx-card-snow-sh);
+}
+
+.hx-cf-gem {
+  fill: var(--hx-card-gem);
+}
+
+.hx-cf-gem-lt {
+  fill: var(--hx-card-gem-lt);
+}
+
+.hx-cf-coral {
+  fill: var(--hx-card-coral);
+}
+
+.hx-cf-coral-lt {
+  fill: var(--hx-card-coral-lt);
+}
+
+.hx-cf-coral-dk {
+  fill: var(--hx-card-coral-dk);
+}
+
+.hx-cf-gold {
+  fill: var(--hx-card-gold);
+}
+
+.hx-cf-gold-lt {
+  fill: var(--hx-card-gold-lt);
+}
+
+.hx-cf-gold-dk {
+  fill: var(--hx-card-gold-dk);
+}
+
+.hx-cf-knight {
+  fill: var(--hx-card-knight);
+}
+
+.hx-cf-knight-lt {
+  fill: var(--hx-card-knight-lt);
+}
+
+.hx-cf-knight-dk {
+  fill: var(--hx-card-knight-dk);
+}
+
+.hx-cf-knight-sky {
+  fill: var(--hx-card-knight-sky);
+}
+
+.hx-cf-knight-wall {
+  fill: var(--hx-card-knight-wall);
+}
+
+.hx-cf-vp {
+  fill: var(--hx-card-vp);
+}
+
+.hx-cf-vp-lt {
+  fill: var(--hx-card-vp-lt);
+}
+
+.hx-cf-vp-dk {
+  fill: var(--hx-card-vp-dk);
+}
+
+.hx-cf-vp-sky {
+  fill: var(--hx-card-vp-sky);
+}
+
+.hx-cf-prog {
+  fill: var(--hx-card-prog);
+}
+
+.hx-cf-prog-lt {
+  fill: var(--hx-card-prog-lt);
+}
+
+.hx-cf-prog-dk {
+  fill: var(--hx-card-prog-dk);
+}
+
+.hx-cf-prog-sky {
+  fill: var(--hx-card-prog-sky);
+}
+
+.hx-cf-path {
+  fill: var(--hx-card-path);
+}
+
+.hx-cf-path-dk {
+  fill: var(--hx-card-path-dk);
+}
+
+.hx-cf-sign {
+  fill: var(--hx-card-sign);
+}
+
+.hx-cf-sign-lt {
+  fill: var(--hx-card-sign-lt);
+}
+
+.hx-cf-wicker {
+  fill: var(--hx-card-wicker);
+}
+
+.hx-cf-wicker-lt {
+  fill: var(--hx-card-wicker-lt);
+}
+
+.hx-cf-wicker-dk {
+  fill: var(--hx-card-wicker-dk);
+}
+
+.hx-cf-back {
+  fill: var(--hx-card-back);
+}
+
+.hx-cf-back-dk {
+  fill: var(--hx-card-back-dk);
+}
+
+.hx-cf-back-ln {
+  fill: var(--hx-card-back-ln);
+}
+
+.hx-cs-ink {
+  stroke: var(--hx-card-ink);
+}
+
+.hx-cs-edge {
+  stroke: var(--hx-card-edge);
+}
+
+.hx-cs-paper {
+  stroke: var(--hx-card-paper);
+}
+
+.hx-cs-glint {
+  stroke: var(--hx-card-glint);
+}
+
+.hx-cs-pine-lt {
+  stroke: var(--hx-card-pine-lt);
+}
+
+.hx-cs-trunk-dk {
+  stroke: var(--hx-card-trunk-dk);
+}
+
+.hx-cs-trunk-lt {
+  stroke: var(--hx-card-trunk-lt);
+}
+
+.hx-cs-handle {
+  stroke: var(--hx-card-handle);
+}
+
+.hx-cs-grass {
+  stroke: var(--hx-card-grass);
+}
+
+.hx-cs-grass-dk {
+  stroke: var(--hx-card-grass-dk);
+}
+
+.hx-cs-clay-lt {
+  stroke: var(--hx-card-clay-lt);
+}
+
+.hx-cs-clay-dk {
+  stroke: var(--hx-card-clay-dk);
+}
+
+.hx-cs-kiln-lt {
+  stroke: var(--hx-card-kiln-lt);
+}
+
+.hx-cs-kiln-dk {
+  stroke: var(--hx-card-kiln-dk);
+}
+
+.hx-cs-brick-lt {
+  stroke: var(--hx-card-brick-lt);
+}
+
+.hx-cs-face {
+  stroke: var(--hx-card-face);
+}
+
+.hx-cs-fence {
+  stroke: var(--hx-card-fence);
+}
+
+.hx-cs-wheat {
+  stroke: var(--hx-card-wheat);
+}
+
+.hx-cs-wheat-dk {
+  stroke: var(--hx-card-wheat-dk);
+}
+
+.hx-cs-wheat-lt {
+  stroke: var(--hx-card-wheat-lt);
+}
+
+.hx-cs-fields-lt {
+  stroke: var(--hx-card-fields-lt);
+}
+
+.hx-cs-fields-dk {
+  stroke: var(--hx-card-fields-dk);
+}
+
+.hx-cs-sail-ln {
+  stroke: var(--hx-card-sail-ln);
+}
+
+.hx-cs-rock {
+  stroke: var(--hx-card-rock);
+}
+
+.hx-cs-steel {
+  stroke: var(--hx-card-steel);
+}
+
+.hx-cs-gold {
+  stroke: var(--hx-card-gold);
+}
+
+.hx-cs-gold-lt {
+  stroke: var(--hx-card-gold-lt);
+}
+
+.hx-cs-coral {
+  stroke: var(--hx-card-coral);
+}
+
+.hx-cs-coral-lt {
+  stroke: var(--hx-card-coral-lt);
+}
+
+.hx-cs-coral-dk {
+  stroke: var(--hx-card-coral-dk);
+}
+
+.hx-cs-path-dk {
+  stroke: var(--hx-card-path-dk);
+}
+
+.hx-cs-sign-lt {
+  stroke: var(--hx-card-sign-lt);
+}
+
+.hx-cs-wicker {
+  stroke: var(--hx-card-wicker);
+}
+
+.hx-cs-wicker-lt {
+  stroke: var(--hx-card-wicker-lt);
+}
+
+.hx-cs-wicker-dk {
+  stroke: var(--hx-card-wicker-dk);
+}
+
+.hx-cs-back-ln {
+  stroke: var(--hx-card-back-ln);
+}
+
+.hx-cs-forest-dk {
+  stroke: var(--hx-card-forest-dk);
+}
+
+.hx-cs-hills-dk {
+  stroke: var(--hx-card-hills-dk);
+}
+
+.hx-cs-pasture-dk {
+  stroke: var(--hx-card-pasture-dk);
+}
+
+.hx-cs-mountains-dk {
+  stroke: var(--hx-card-mountains-dk);
+}
+
+.hx-cs-knight-dk {
+  stroke: var(--hx-card-knight-dk);
+}
+
+.hx-cs-vp-dk {
+  stroke: var(--hx-card-vp-dk);
+}
+
+.hx-cs-prog-dk {
+  stroke: var(--hx-card-prog-dk);
+}

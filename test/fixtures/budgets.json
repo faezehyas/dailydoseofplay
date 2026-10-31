@@ -48,6 +48,10 @@
       "modules": 49,
       "bytes": 398182
     },
+    "hexlands": {
+      "modules": 54,
+      "bytes": 619635
+    },
     "ludo": {
       "modules": 39,
       "bytes": 278343
@@ -178,6 +182,17 @@
     "hearts/rules.js": 14975,
     "hearts/settings.js": 2113,
     "hearts/sounds.js": 3476,
+    "hexlands/art.js": 30977,
+    "hexlands/board.js": 4848,
+    "hexlands/card-art.js": 35347,
+    "hexlands/how-to-play.js": 5700,
+    "hexlands/main.js": 67965,
+    "hexlands/pieces.js": 12291,
+    "hexlands/robot.js": 22602,
+    "hexlands/rules.js": 34876,
+    "hexlands/settings.js": 1106,
+    "hexlands/sounds.js": 15583,
+    "hexlands/tiles.js": 44726,
     "home.js": 6752,
     "ludo/art.js": 11914,
     "ludo/board-view.js": 16020,

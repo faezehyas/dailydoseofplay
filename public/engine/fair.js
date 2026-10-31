@@ -231,6 +231,10 @@ export class SharedRandom {
   // send(k, value) must deliver { k, value } to every peer's receive().
   // Resolves to a PRNG function all peers share for this draw.
   async draw(send) {
+    return rngFromBytes(await this.seed(send));
+  }
+  // The draw's seed bytes, so the same PRNG can be rebuilt later (rngFromBytes).
+  async seed(send) {
     if (!this.verifiers) throw new FairPlayError("peer chain not set");
     const k = ++this.k;
     const values = [];
@@ -245,6 +249,6 @@ export class SharedRandom {
       await this.verifiers.get(seat).accept(k, theirs[i]);
       values[seat] = theirs[i];
     }
-    return rngFromBytes(await sha256(`ddp-draw:${k}:${values.join(":")}`));
+    return sha256(`ddp-draw:${k}:${values.join(":")}`);
   }
 }

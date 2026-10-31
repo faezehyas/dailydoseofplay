@@ -128,6 +128,14 @@ const GAMES = {
     const choose = (st, me, rng, face) => chooseMove(st, me, rng, face, { level: "hard" });
     return { config, players: 4, robot: (s) => startRobot(s, { rules: makeRules(config, 4), choose, delay: () => 0 }) };
   },
+  hexlands: async () => {
+    const { makeRules, DEFAULT_CONFIG } = await import("../public/hexlands/rules.js");
+    const { chooseMove, startRobot } = await import("../public/hexlands/robot.js");
+    // Four players to 10: the most cards held, shown, traded and stolen.
+    const config = { ...DEFAULT_CONFIG, moveSeconds: 60 };
+    const choose = (st, me, rng, face) => chooseMove(st, me, rng, face, { level: "hard" });
+    return { config, players: 4, robot: (s) => startRobot(s, { rules: makeRules(config, 4), choose, delay: () => 0 }) };
+  },
   "dots-and-boxes": async () => {
     const { makeRules, DEFAULT_CONFIG } = await import("../public/dots-and-boxes/rules.js");
     const { startRobot } = await import("../public/dots-and-boxes/robot.js");

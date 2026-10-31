@@ -1,7 +1,7 @@
 # Architecture
 
 Daily Dose of Play is a free site of browser games for two or more players,
-and playing never needs an account (Chutes and Ladders, Ludo, Crazy Eights, Go Fish and Hearts seat up to four). One small Node server
+and playing never needs an account (Chutes and Ladders, Ludo, Crazy Eights, Go Fish, Hearts and Hexlands seat up to four). One small Node server
 on Wasmer Edge serves the pages and introduces players to each other. The games
 themselves run browser to browser over WebRTC DataChannels: with more than
 two players, every guest connects to the room creator's browser, which
@@ -133,6 +133,10 @@ flowchart TB
     g_motion["motion.js"]
     g_pick["pick.js<br>Checkers only"]
     g_board_view["board-view.js<br>Ludo only"]
+    g_board["board.js<br>Hexlands only"]
+    g_tiles["tiles.js<br>Hexlands only"]
+    g_pieces["pieces.js<br>Hexlands only"]
+    g_card_art["card-art.js<br>Hexlands only"]
   end
   subgraph engine ["Engine: public/engine/"]
     e_boot["boot.js<br>static pages"]
@@ -261,6 +265,11 @@ flowchart TB
   g_robot --> e_cards_melds
   g_robot --> e_cards_paced_robot
   g_robot --> e_rng
+  g_board --> e_rng
+  g_tiles --> g_board
+  g_tiles --> g_card_art
+  g_pieces --> g_board
+  g_rules --> g_board
   g_robot --> e_robot_pace
   g_robot --> e_session
   g_robot --> e_turn_match
@@ -995,7 +1004,7 @@ its largest message, with four players and a 108-card deck, is 3063 (a part
 of a `shuffle`); Crazy Eights' (four players, 52 cards) is about the same,
 3063 to 3065 as reshuffles add digits to the round number, Go Fish's
 3063, Gin Rummy's 3064 to 3065 (two players, the deck shuffled again every
-hand) and Hearts' 3064 (four players, a game to 50). A pass's sealed cards go
+hand), Hearts' 3064 (four players, a game to 50) and Hexlands' 3064 (four players, the development cards' shuffle). A pass's sealed cards go
 in a `seal` message of about 704 characters (three cards, four players).
 
 **Why a pre-negotiated channel.** With the default in-band handshake, the
@@ -1173,7 +1182,7 @@ the lobby cards:
 | Lobby, invite, waiting room | 520 px | all |
 | Game, `layout: "narrow"` | 520 px | Tic Tac Toe, Connect 4, Chess, Checkers |
 | Game, `layout: "medium"` | 640 px | Gomoku, Backgammon |
-| Game, `layout: "wide"` (the default) | 980 px | Sea Battle, Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts |
+| Game, `layout: "wide"` (the default) | 980 px | Sea Battle, Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts, Hexlands |
 
 Below that width the column is the page's width less its 16 px gutters. A
 game's own top-level box has no `max-width`, so it fills `#game`. The default
@@ -1298,10 +1307,10 @@ Checkers, the last checker borne off in Backgammon, the last ship sunk in
 Sea Battle (once its shell lands), the pawn on 100 in Chutes and Ladders,
 the last box in Dots and Boxes, the winner's tokens home in Ludo, the
 winners' books in Go Fish, the winner's melds on the table in Gin Rummy, and the
-winner's pill and tricks in Hearts. The
+winner's pill and tricks in Hearts, and the winner's buildings in Hexlands. The
 chimes (`chimes.js`) are one melody, a C-major pentatonic jingle, in a
 timbre that fits the game's pieces (`flavour`): `wood` for Chess, Checkers,
-Backgammon and Ludo; `paper` for Tic Tac Toe, Gomoku, Dots and Boxes and Gin Rummy;
+Backgammon, Ludo and Hexlands; `paper` for Tic Tac Toe, Gomoku, Dots and Boxes and Gin Rummy;
 `plastic` for Connect 4; `bell` for Chutes and Ladders and Hearts; `water` (a bubble
 under the bell) for Sea Battle and Go Fish. They are synthesized, at the `fanfare`
 level, and follow the mute toggle. With `prefers-reduced-motion` only the
@@ -1431,7 +1440,8 @@ rank, an 8 naming the suit, drawing, going out), Go Fish (asking for a rank,
 Go fish and a lucky catch, a book, the most books wins), Gin Rummy (sets and
 runs, drawing and discarding, deadwood, knocking, gin) and Hearts (following
 suit, passing three cards, the queen of spades, breaking hearts, shooting the
-moon). Sea Battle's runs in the page with both fleets fixed and
+moon) and Hexlands (settling, rolling for resources, roads and settlements,
+cities and development cards, the robber and knights, trading and winning). Sea Battle's runs in the page with both fleets fixed and
 known to it, firing through `rules.js` alone; `match.js` and its
 commitments don't come into it. The card games' run on
 `cards/lesson-deck.js`: fixed hands and a deck whose every card is known, so
@@ -1516,7 +1526,7 @@ checks that no game opens its own audio context or output.
 | `icon.svg` | Card art for the home page (16:10) |
 | `preview.svg` | Optional: the tile's short animated preview (see **Tile previews**) |
 | `tutorial.js`, `lessons.js` | Optional: the tutorial (see **Tutorials**). `lessons.js` is its lessons as data; `tutorial.js` exports them with the adapter the engine plays them through, and `main.js` passes `tutorial: () => import("./tutorial.js")`. |
-| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo; Chutes and Ladders, with its spinner and its pawns' hops, climbs and slides), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces, Gomoku's grid and point names, Checkers' crown, Dots and Boxes' paper, lines and boxes, Backgammon's cells, checkers and dice, Sea Battle's boards, ships, ship dragging and the shells' flight and landing; Crazy Eights' pace, discard pile, suit badge, an 8's burst and suit picker; Go Fish's seats, books, ask and the motion of asking, fishing and books; Gin Rummy's table with its melds, buttons, lay-offs and score card; Hearts' table with its seats, trick, pass and tally) |
+| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo; Chutes and Ladders, with its spinner and its pawns' hops, climbs and slides), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces, Gomoku's grid and point names, Checkers' crown, Dots and Boxes' paper, lines and boxes, Backgammon's cells, checkers and dice, Sea Battle's boards, ships, ship dragging and the shells' flight and landing; Crazy Eights' pace, discard pile, suit badge, an 8's burst and suit picker; Go Fish's seats, books, ask and the motion of asking, fishing and books; Gin Rummy's table with its melds, buttons, lay-offs and score card; Hearts' table with its seats, trick, pass and tally; Hexlands' island table, spots, hand, bank, points tokens, discard parts and the motion the tutorial shares) |
 | `motion.js` | Optional: the move motion the view shares with the tutorial, with its sounds (Chess's slide and capture and its drag, Backgammon's checker flights and drag, Dots and Boxes' pencil strokes and boxes) |
 | `pick.js`, `board-view.js` | Checkers' picking of a move square by square (and one tap for a whole multi-jump); Ludo's token motion, rolling die and move choices. Both shared by the view and the tutorial. |
 
@@ -1527,9 +1537,9 @@ that started the room, and has no dealer. `engine/card-match.js` does it with
 mental poker: every player holds a share of the deck's key, and a card can
 only be read with every share. With three or more players, a modified host
 can still read a hand (see **A modified host** below). The rules contract is
-at the top of that file; Crazy Eights, Go Fish, Gin Rummy and Hearts use it
-(see **Crazy Eights in depth**, **Go Fish in depth**, **Gin Rummy in depth**
-and **Hearts in depth**).
+at the top of that file; Crazy Eights, Go Fish, Gin Rummy, Hearts and Hexlands
+use it (see **Crazy Eights in depth**, **Go Fish in depth**, **Gin Rummy in
+depth**, **Hearts in depth** and **Hexlands in depth**).
 
 **How a match runs.** Every message carries `m`, as in `TurnMatch`.
 
@@ -1546,6 +1556,10 @@ and **Hearts in depth**).
    and sends the result with a proof that it is still the same cards
    (`shuffle`). Every other seat checks the proof before taking it as the
    deck; then seat 1 shuffles, and so on. Nobody knows the final order.
+   Rules may set `openFaces` k: the cards 0 to k − 1 skip the shuffle and
+   start face up, first in `deck.cards`, so dealing or showing them costs
+   no cryptography until a `deck.shuffle()` hides them. Every browser makes
+   the same face-up deck, and the shuffled rest still carries its proof.
 3. **Dealing and opening.** The rules call `deck.deal(slot, seat)` or
    `deck.open(slot)`. For a deal, every other seat sends its share of that
    card with a proof (`shares`); the receiver adds its own, which it never
@@ -1576,6 +1590,7 @@ and **Hearts in depth**).
 | A shuffle that swaps, copies or drops a card, or one passed off as another seat's | At once: the proof fails, and the match stops naming the shuffler. |
 | A wrong share, or a share for another card | At once: its proof fails. |
 | Showing a card that isn't in your hand, or moving out of turn | At once, like any illegal move. |
+| In a step: opening a move other than the one committed to, choosing twice, or opening before everyone chose | At once, naming the mover. |
 | Passing a card with a bad sealed share, or a share for another card | At once, by its receiver, who stops the match naming the giver; then the two of them settle it (below). If the receiver kept quiet, in the audit. |
 | Saying a good sealed card is bad | When the giver and the receiver reveal their seal keys after the match stops: everyone opens the envelope and names the receiver. |
 | Breaking a rule that depends on a hidden card ("draw only if nothing plays") | In the audit, where `deck.face()` returns every face, so the rule throws. The result stands; the audit only reports. |
@@ -1633,6 +1648,35 @@ library). Either side's private key opens it, nobody else's.
 A card that is already open changes hands with `deck.deal()`, which Go Fish
 uses to hand over cards an answer shows; `deck.deal()` refuses a hidden card
 in a hand.
+
+**Rolls.** A move the rules mark with `needsRandom(state, move)` gets a
+shared draw as `applyMove`'s `rng`, like dice in `TurnMatch`. Everyone
+reveals their part of the draw only once the move has arrived, so its mover
+can't try moves until a roll suits them. The draw's seed is kept with the
+move, and the audit replays the roll from it. A match sets up `1 + draws`
+draws (default 256): who starts, then the rolls. One roll too many stops the
+match. A move that uses `rng` without saying so is refused in its mover's
+browser, and breaks the rules if sent anyway. `newState` gets the rest of the
+draw that picked who starts, for anything random everyone sees from the
+start, such as a board.
+
+**Steps.** When `rules.movers(state)` names seats, each of them owes one move
+at once, in any order, and `state.turn` is ignored. A mover's browser checks
+its move alone, then sends only a commitment to it, a SHA-256 of a salt, the
+match, the seat and the move (`commit {c}`). Once every mover has committed,
+each one sends its move, salt and shares (`open {move, salt, sh}`), and the
+moves apply in seat order with one `settle()` after the last. Messages reach
+everyone in the hub's order, and nobody opens before seeing every commitment,
+so an open that arrives before every commit is a cheat. This leans on the
+group delivering one order to everyone, as the star does (see **Groups**): a
+transport without it would need to hold early messages back instead. A
+modified host could reorder messages to make an honest mover look early, the
+same power it already has to forge moves (see **A modified host**). Nobody,
+the host included, sees a choice before making their own. Since each move is checked
+before the others are known, the rules must make every mover's move legal
+whatever the others chose, for example by letting each one touch only its own
+hand. A step's moves can't roll. `match.step.commits[seat]` is set once that
+seat has chosen, so a view can show who it's waiting for.
 
 **A modified host, with three or more players.** Every message goes through
 the host's browser (see **Groups**), and messages aren't signed. A modified
@@ -1709,7 +1753,7 @@ table's pieces and motion, the robots' pacing and the leaving notice. A game
 builds its own layout from those pieces, keeps its own rules, robot and
 special moments, and links `cards/cards.css` after `theme.css`. Each part
 carries the class `pc-<part>` for the shared styles and `<prefix>-<part>`
-(`ce-` for Crazy Eights, `gf-` for Go Fish, `gr-` for Gin Rummy, `hr-` for Hearts) for the
+(`ce-` for Crazy Eights, `gf-` for Go Fish, `gr-` for Gin Rummy, `hr-` for Hearts, `hx-` for Hexlands) for the
 game's own styles and tests.
 
 **Sizes.** A card is 66 bytes, a share 131. A shuffle message is 66 bytes a
@@ -2922,6 +2966,126 @@ and a fanfare for the moon. A win or a loss plays the result chimes in their
 
 **Leaving.** The shared notice (`engine/cards/leave-notice.js`), with each
 player's points.
+
+## Hexlands in depth
+
+Hexlands is a game of settling an island of 19 hexes for three or four
+players, the first to 10 points winning, on `CardMatch` (see **Card games**).
+It is the first card game with dice (see **Rolls**) and steps (see
+**Steps**). Every resource card is a real card in the deck, so the hands are
+hidden as at a real table: what you collect is public, as it is when a real
+bank pays out, and a robber's steal is known only to the thief and the
+victim.
+
+**The board** (`board.js`): pointy-top hexes in rows of 3, 4, 5, 4 and 3;
+hexes, their 54 corners and 72 edges are numbered in reading order of their
+position. The 9 harbours sit on fixed coastal edges, a harbour every 3, 3
+and 4 edges round the coast. `newState` lays the board out from its `rng`
+(see **Rolls**): terrain (4 forest, 3 hills, 4 pasture, 4 fields, 3
+mountains, a desert), the 18 number tokens with no 6 or 8 next to another,
+and the harbours' kinds (four 3:1, one 2:1 for each resource). Resources are
+wood, brick, wool, grain and ore, `0` to `4`; the desert is `5`.
+
+**The deck**: 120 faces. Faces 0–94 are resources, `face / 19` (rounded down)
+being the resource, 19 of each. Faces 95–119 are development cards: 14
+knights (95–108), 5 victory points (109–113), 2 road building (114–115), 2
+year of plenty (116–117) and 2 monopoly (118–119).
+
+**Hidden cards as moves.**
+
+- **The bank.** The rules set `openFaces: 95` (see **How a match runs**): the
+  resource cards start face up and unshuffled, so `newState` sorts them into
+  the bank by resource, and only the 25 development cards are shuffled, into
+  the hidden development pile. Play starts about a second after the keys.
+- **Paying out** deals face-up bank cards (`deck.deal()`), which costs no
+  cryptography: everyone sees what you collect, as at a real table.
+- **Spending.** A move names the slots it pays with, and shows them
+  (`reveals()`), so every cost is checked live. Spent cards go back to the
+  bank, face up. Discards on a 7, trades and Monopoly show their cards the
+  same way.
+- **Stealing.** The robber's move shuffles the victim's hand
+  (`deck.shuffle()`), deals the first of the new slots to the thief and the
+  rest back to the victim. Nobody chose which card that is, the thief alone
+  sees it, and the victim, who knows what they had, can tell what's gone.
+  The cards in a hand after a steal are hidden until they are spent.
+- **Development cards** are dealt hidden from the pile and shown when played.
+  Victory point cards stay hidden until their holder shows them to win.
+- **Monopoly** is a step: every other player shows all their cards of the
+  named resource, which go to the player. Holding one back is a lie only the
+  audit can see, as in Hearts, and it names the liar.
+- **Big payments.** A move shows at most 16 hidden cards (see **Sizes**), so
+  a discard or Monopoly give of more hidden cards than that goes in parts.
+
+The state never depends on a hidden face: a hand is a list of slots, and
+what a seat knows of its own comes from `match.face()`.
+
+**The state** (`rules.js`):
+
+| Field | |
+|---|---|
+| `players`, `first`, `turn`, `winner`, `moves`, `target` | As in every card game; `target` is the points to win (10, or 8 in a short game) |
+| `board` | `{ terrain[19], numbers[19], harbours: [{ edge, kind }], desert }`, from `layoutBoard()`; `kind` is a resource or `-1` for 3:1 |
+| `robber` | The hex it stands on |
+| `phase` | `"setup"`, `"roll"`, `"discard"`, `"robber"`, `"main"`, `"answer"`, `"partner"`, `"monopoly"` or `"over"` |
+| `setup` | `{ order: seats in snake order, i, corner }`: who places next, and the settlement their road must touch (`-1` before it's placed) |
+| `buildings` | By corner: `null` or `{ p, city }` |
+| `roads` | By edge: the seat, or `-1` |
+| `pieces` | By seat: `{ roads, settlements, cities }` still to place, from 15, 5 and 4 |
+| `hands` | By seat: the slots of its resource cards |
+| `devs` | By seat: the slots of its development cards, hidden |
+| `bought` | The development cards bought this turn, which can't be played until the next |
+| `devPlayed` | Whether this turn's one development card has been played |
+| `rolled` | Whether the dice were rolled this turn (a development card may come first) |
+| `knights`, `shown` | By seat: knights played, and the faces of every development card it has shown |
+| `bank` | By resource: the slots of its face-up cards |
+| `devPile` | The slots of the development pile, top first |
+| `offers` | Trade offers made this turn: at most 3 (`MAX_OFFERS`) |
+| `dice` | The last roll, `[a, b]`, or `null` |
+| `discards` | By seat: cards it still owes after a 7 (a discard may be paid in parts) |
+| `trade` | `null`, or `{ from, give: [slots], want: [5 counts], answers: by seat, null, false or the slots offered }` |
+| `monopoly` | `null`, or `{ p, resource, given: by seat [slots given so far], owes: by seat, whether it still has to give }` |
+| `freeRoads` | Roads left to place from road building |
+| `longest`, `army` | `{ p, size }`: who holds longest road (5 or more) and largest army (3 knights or more); `{ p: -1, size: 0 }` for nobody |
+
+**A turn as moves.**
+
+| Phase | Who moves | Moves |
+|---|---|---|
+| `setup` | `setup.order[setup.i]`: each seat, then back in reverse | `{ settle: corner }`, then `{ road: edge }` touching it. The second settlement collects one card for each hex it touches. |
+| `roll` | `turn` | `{ roll: true }` (rolls, see **Rolls**), or one development card first (`{ play: slot, ... }` as in `main`); with free roads from road building, `{ road: edge }` before the roll |
+| `discard` | A step: every seat holding more than 7 resource cards | `{ discard: [slots] }`: half its cards rounded down, in one move, or in parts of at least 16 (`MAX_SHOWN`) when more are owed, the seat moving again in the next step until it has paid |
+| `robber` | `turn` | `{ robber: hex, steal: seat }`: a seat with a building on that hex and a card, or `-1` when there's none |
+| `main` | `turn` | `{ road: edge, pay }`, `{ settle: corner, pay }`, `{ city: corner, pay }`, `{ buy: true, pay }`, `{ play: slot, ... }` (a development card, before or after the roll: a knight; road building; year of plenty with `take: [r, r]`; monopoly with `resource`), `{ bank: [slots], take: r }` (4:1, or a harbour's rate), `{ offer: [slots], want: [5 counts] }` (3 a turn at most), `{ claim: [slots] }` (show victory point cards to win), `{ end: true }`; with free roads pending, only `{ road: edge }` or `{ claim }` |
+| `answer` | A step: every seat but the offerer | `{ accept: [slots] }` (the cards wanted, shown) or `{ decline: true }` |
+| `partner` | The offerer | `{ partner: seat }` (one who accepted), or `-1` to call it off |
+| `monopoly` | A step: every seat but the player | `{ give: [slots] }`, every card it holds of the resource; or a part of at least 16 with `more: true`, the rest in the next step |
+
+`pay` is the slots paid with; with free roads from road building a road has
+none. Production on a roll pays each settlement 1 and each city 2 cards of
+its hexes' terrain, except under the robber; if the bank runs short of a
+resource for more than one player, nobody gets it. A 7 pays nothing: the
+discards come first, then the robber. A seat wins on its own turn the moment
+its points (1 a settlement, 2 a city, 2 for longest road and largest army, 1
+a victory point card shown) reach `target`; points showing on the board win
+at once, and hidden victory point cards are shown with `claim`, which the
+view and the robots do as soon as they would win.
+
+**The view.** Each player's points sit in a token in their pill, like the
+island's number tokens, instead of the score row. The sea, boats and windmill
+move when the island is drawn and when your turn starts, then rest (no
+endless loops). `robot.js` is loaded only when a robot or the clock needs it,
+so a friend joining a room doesn't download it.
+
+**Events** (`applyMove()` returns them, for the view):
+`build { p, kind, at, free, pay }` (kind `road`, `settlement` or `city`),
+`gain { p, slots }` (the second settlement's cards), `roll { p, dice }`,
+`produce { roll, gains: by seat [slots], short: [resources nobody got], partial: [resources the only taker got part of] }`,
+`discard { p, slots }`, `robber { p, hex }`, `steal { thief, victim, slot }`,
+`buy { p, slot, pay }`, `play { p, kind, slot }`, `plenty { p, slots }`,
+`monopoly { p, resource, given: by seat [slots] }`, `bank { p, gave, got }`,
+`offer { p, give, want }`, `answer { p, accept }` (the slots, or `false`), `trade { from, to, gave,
+got }`, `nodeal { p }`, `longest { p, size }`, `army { p, size }`,
+`turn { p }`, `claim { p, slots }`, `over { winner, points }` (`points`: everyone's public points).
 
 ## Differences from the reference (wasmerio/edge-multiplayer-games)
 

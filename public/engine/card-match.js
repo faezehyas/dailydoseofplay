@@ -6,12 +6,22 @@
 //
 // A rules module provides:
 //   deckSize                              1 to 200; a card's face is 0..deckSize-1
-//   newState(first, players, deck)        -> state with state.turn and state.winner (-1 while playing).
-//                                            deck.cards: the shuffled deck's slots, top first.
-//   applyMove(state, player, move, deck)  -> events[]; mutates state; throws RuleError if illegal
+//   openFaces                             -> optional; faces 0..openFaces-1 start face up and unshuffled
+//                                            (no cryptography until a deck.shuffle()); default 0
+//   newState(first, players, deck, rng)   -> state with state.turn and state.winner (-1 while playing).
+//                                            deck.cards: the open cards in face order, then the shuffled
+//                                            deck's slots, top first.
+//   applyMove(state, player, move, deck, rng) -> events[]; mutates state; throws RuleError if illegal
 //   reveals(state, player, move)          -> optional; the cards from the player's hand the move shows
 //   settle(state, deck)                   -> optional; events[]; after newState and each move, once
 //                                            their cards are dealt, and again while it deals more
+//   needsRandom(state, move)              -> optional; true if the move rolls, i.e. uses applyMove's rng
+//   draws                                 -> optional; the most rolls one match may make (default 256)
+//   movers(state)                         -> optional; the seats that each owe a move at once (a step),
+//                                            else none and state.turn moves
+// A step's moves are committed to unseen, then shown, and apply in seat order
+// with one settle after the last. Each must be legal whatever the others
+// chose, and can't roll. match.step.commits[seat] is set once that seat chose.
 // The deck those calls get (a slot is a card's place; a shuffle makes new ones):
 //   deck.face(slot)        its face if every player can see it, else null; every face in the audit
 //   deck.owner(slot)       the seat holding it, or -1
@@ -24,16 +34,17 @@
 // won't match; a rule that needs a hidden face throws only when it is known.
 //
 // Messages (all carry m): hello {tip, key, seal}, draw {k, v}, shuffle {k, i, n, d},
-// shares {k, i, n, d}, seal {k, i, n, d}, move {move, sh}, audit {key, seal},
+// shares {k, i, n, d}, seal {k, i, n, d}, move {move, sh}, commit {c}, open {move, salt, sh}, audit {key, seal},
 // abort {reason, about, dispute}, unseal {key}.
 // takeover(seat): a robot takes the seat of a player who left (see "Leaving"
 // in ARCHITECTURE.md). Every card needs that player's key, which left with
 // them, so the match stops and the robot plays from the next one.
 import { Emitter } from "./channel.js";
-import { SharedRandom, FairPlayError } from "./fair.js";
+import { SharedRandom, FairPlayError, commit, verifyCommit } from "./fair.js";
 import { matchRouter } from "./session.js";
 import { robotPause, robotRng } from "./robot-pace.js";
-import { RuleError } from "./turn-match.js";
+import { rngFromBytes } from "./rng.js";
+import { RuleError, noRandom } from "./turn-match.js";
 import { deckService, DeckError, MAX_DECK, HELLO_BYTES, SECRET_BYTES, SHARE_BYTES } from "./deck-service.js";
 import { toBase64, fromBase64 } from "./base64.js";
 import { sealKeys, sealPublic, revealedKey, seal, unseal, sealedBytes, SealError, SEAL_PUBLIC_BYTES, SEAL_SECRET_BYTES } from "./seal.js";
@@ -152,6 +163,8 @@ export class CardMatch extends Emitter {
   constructor({ send, me, rules, m = 1, players = 2, from = null }) {
     super();
     if (!(rules.deckSize >= 1 && rules.deckSize <= MAX_DECK)) throw new Error(`deckSize must be 1 to ${MAX_DECK}`);
+    const open = rules.openFaces ?? 0;
+    if (!(Number.isInteger(open) && open >= 0 && open <= rules.deckSize)) throw new Error("openFaces must be 0 to deckSize");
     this.send = (msg) => send({ ...msg, m });
     this.me = me;
     this.players = players;
@@ -171,13 +184,14 @@ export class CardMatch extends Emitter {
     this.dispute = null; // a receiver's word that a sealed card is bad, until we reach its step
     this.disputing = false; // stopped over a sealed card: its two players reveal their seal keys
     this.seals = { seal, unseal }; // tests swap these
-    this.log = []; // { player, move } for the audit
+    this.log = []; // { player, move, seed } or a step's { step: [{ player, move }] }, for the audit
+    this.step = null; // { movers, commits: [by seat], opens: [by seat], mine }
     this.k = 0; // deck steps (shuffles and share rounds), counted alike everywhere
     this.inbox = new Map(); // key -> { value, from }
     this.ahead = []; // by seat: how many of its messages the inbox holds
     this.waiters = new Map();
     this.seen = new Set();
-    this.srReady = SharedRandom.create(1); // one draw: who starts
+    this.srReady = SharedRandom.create(rules.needsRandom ? 1 + (rules.draws ?? 256) : 1); // who starts, then the rolls
     this.queue = Promise.resolve();
     if (from) this.phase = "aborted";
     else this.#enqueue(() => this.#setup());
@@ -196,7 +210,11 @@ export class CardMatch extends Emitter {
   }
 
   canMove() {
-    return this.phase === "playing" && this.state.turn === this.me && !this.working;
+    return this.phase === "playing" && this.#owes(this.me) && !this.working;
+  }
+
+  #owes(seat) {
+    return this.step ? this.step.movers.includes(seat) && !this.step.commits[seat] : this.state.turn === seat;
   }
 
   // The face of a slot, if I know it: open to all, dealt or passed to me (or by me), or any card once the audit has passed.
@@ -207,7 +225,10 @@ export class CardMatch extends Emitter {
   // Validate locally, then send and apply. Illegal moves emit "invalid".
   play(move) {
     return this.#enqueue(async () => {
-      if (this.phase !== "playing" || this.state.turn !== this.me) return this.emit("invalid", "not your turn");
+      if (this.phase !== "playing" || !this.#owes(this.me)) return this.emit("invalid", "not your turn");
+      // As the others will read it, so the commitment matches.
+      if (this.step) move = JSON.parse(JSON.stringify(move ?? null));
+      const rolls = !this.step && this.rules.needsRandom?.(this.state, move);
       let shown;
       try {
         shown = this.#reveals(this.state, this.me, move);
@@ -219,16 +240,26 @@ export class CardMatch extends Emitter {
             return s && (s.open || set.has(id)) ? s.face : null;
           },
         );
-        this.rules.applyMove(structuredClone(this.state), this.me, move, table);
+        this.rules.applyMove(structuredClone(this.state), this.me, move, table, rolls ? () => 0 : noRandom);
       } catch (err) {
         if (err?.name === "RuleError") return this.emit("invalid", err.message);
         throw err;
       }
       // I hold every share still missing from each card I show: my own, and any sealed to me.
       const shares = shown.flatMap((id) => this.#missing(id).map((s) => this.slots[id].shares[s]));
-      this.send({ t: "move", move, sh: shares.map(toBase64) });
+      const sh = shares.map(toBase64);
+      if (this.step) return this.#commit(move, sh);
+      this.send({ t: "move", move, sh });
       await this.#apply(this.me, move, shown, shares);
     });
+  }
+
+  async #commit(move, sh) {
+    const { commitment, salt } = await commit({ m: this.m, seat: this.me, move });
+    this.step.mine = { move, salt, sh };
+    this.step.commits[this.me] = commitment;
+    this.send({ t: "commit", c: commitment });
+    await this.#openIfAll();
   }
 
   receive(msg, from) {
@@ -423,17 +454,25 @@ export class CardMatch extends Emitter {
       else this.sealPks[s] = await sealPublic(hellos[s].seal).catch(() => Promise.reject(new Cheat("sent a key that doesn't check out: bad seal key", s)));
     }
     sr.setPeers(hellos.map((h) => h.tip), this.me);
-    const rng = await sr.draw((k, v) => this.send({ t: "draw", k, v }));
+    this.startSeed = await sr.seed((k, v) => this.send({ t: "draw", k, v }));
+    const rng = rngFromBytes(this.startSeed);
     this.first = Math.floor(rng() * this.players);
 
-    const cards = await this.#shuffleRound(await this.#job("newDeck", this.rules.deckSize));
+    // newDeck's cards are face up, card i face i, until a shuffle hides them.
+    const open = this.rules.openFaces ?? 0;
+    const deck = await this.#job("newDeck", this.rules.deckSize);
+    const cards = open < deck.length ? await this.#shuffleRound(deck.slice(open)) : [];
     const table = this.#liveTable();
-    table.cards = cards.map((card) => this.slots.push({ ...newSlot(), card }) - 1);
-    this.state = this.rules.newState(this.first, this.players, table);
+    table.cards = [
+      ...deck.slice(0, open).map((card, face) => this.slots.push({ ...newSlot(), card, open: true, face, pub: this.#seats(-1) }) - 1),
+      ...cards.map((card) => this.slots.push({ ...newSlot(), card }) - 1),
+    ];
+    this.state = this.rules.newState(this.first, this.players, table, rng);
     await this.#runOps(table.ops);
     await this.#settle();
     this.phase = "playing";
     this.busy = null;
+    this.#nextStep();
     this.emit("start", { first: this.first });
     this.#checkOver();
   }
@@ -663,28 +702,90 @@ export class CardMatch extends Emitter {
   }
 
   async #handle(msg, from) {
-    if (msg.t !== "move") throw new Cheat(`sent an unknown message ${String(msg.t).slice(0, 20)}`, from);
+    if (!["move", "commit", "open"].includes(msg.t)) throw new Cheat(`sent an unknown message ${String(msg.t).slice(0, 20)}`, from);
     if (this.phase !== "playing") throw new Cheat("moved outside play", from);
-    if (this.state.turn !== from) throw new Cheat("moved out of turn", from);
+    if (msg.t === "move") {
+      if (this.step || this.state.turn !== from) throw new Cheat("moved out of turn", from);
+      const { shown, shares } = this.#parse(from, msg.move, msg.sh);
+      return this.#apply(from, msg.move, shown, shares);
+    }
+    const step = this.step;
+    if (!step?.movers.includes(from)) throw new Cheat("moved out of turn", from);
+    if (msg.t === "commit") {
+      if (step.commits[from]) throw new Cheat("chose twice", from);
+      if (typeof msg.c !== "string" || !/^[0-9a-f]{64}$/.test(msg.c)) throw new Cheat("sent a malformed commit", from);
+      step.commits[from] = msg.c;
+      return this.#openIfAll();
+    }
+    if (step.opens[from]) throw new Cheat("showed its choice twice", from);
+    if (step.movers.some((s) => !step.commits[s])) throw new Cheat("showed its choice before everyone chose", from);
+    if (!(await verifyCommit(step.commits[from], { m: this.m, seat: from, move: msg.move }, msg.salt))) throw new Cheat("showed a choice other than the one it committed to", from);
+    step.opens[from] = { move: msg.move, sh: msg.sh };
+    await this.#applyIfAll();
+  }
+
+  async #openIfAll() {
+    const { movers, commits, mine, opens } = this.step;
+    if (!mine || opens[this.me] || movers.some((s) => !commits[s])) return;
+    this.send({ t: "open", move: mine.move, salt: mine.salt, sh: mine.sh });
+    opens[this.me] = mine;
+    await this.#applyIfAll();
+  }
+
+  async #applyIfAll() {
+    const { movers, opens } = this.step;
+    if (movers.some((s) => !opens[s])) return;
+    const moves = movers.map((player) => ({ player, move: opens[player].move }));
+    for (const { player, move } of moves) {
+      const { shown, shares } = this.#parse(player, move, opens[player].sh);
+      await this.#move(player, move, shown, shares, noRandom);
+    }
+    this.log.push({ step: structuredClone(moves) });
+    await this.#settled();
+  }
+
+  // The cards a move shows and the shares it carries for them.
+  #parse(player, move, sh) {
     let shown;
     try {
-      shown = this.#reveals(this.state, from, msg.move);
+      shown = this.#reveals(this.state, player, move);
     } catch (err) {
-      if (err?.name === "RuleError") throw new Cheat(`broke the rules: ${err.message}`, from);
+      if (err?.name === "RuleError") throw new Cheat(`broke the rules: ${err.message}`, player);
       throw err;
     }
-    let shares;
     try {
-      if (!Array.isArray(msg.sh) || msg.sh.length !== shown.reduce((n, id) => n + this.#missing(id).length, 0)) throw new TypeError();
-      shares = msg.sh.map((d) => bytes(d, { exact: SHARE_BYTES }));
+      if (!Array.isArray(sh) || sh.length !== shown.reduce((n, id) => n + this.#missing(id).length, 0)) throw new TypeError();
+      return { shown, shares: sh.map((d) => bytes(d, { exact: SHARE_BYTES })) };
     } catch {
-      throw new Cheat("sent a move without the shares for the cards it shows", from);
+      throw new Cheat("sent a move without the shares for the cards it shows", player);
     }
-    await this.#apply(from, msg.move, shown, shares);
+  }
+
+  async #apply(player, move, shown, shares) {
+    let seed = null;
+    if (this.rules.needsRandom?.(this.state, move)) {
+      const sr = await this.srReady;
+      seed = await sr.seed((k, v) => this.send({ t: "draw", k, v }));
+    }
+    await this.#move(player, move, shown, shares, seed ? rngFromBytes(seed) : noRandom);
+    this.log.push({ player, move: structuredClone(move), seed });
+    await this.#settled();
+  }
+
+  async #settled() {
+    await this.#settle();
+    this.busy = null;
+    this.#checkOver();
+    this.#nextStep();
+  }
+
+  #nextStep() {
+    const movers = this.phase === "playing" ? (this.rules.movers?.(this.state) ?? []) : [];
+    this.step = movers.length ? { movers: [...movers].sort((a, b) => a - b), commits: [], opens: [] } : null;
   }
 
   // shares: for each card shown, one for every seat whose share isn't public yet.
-  async #apply(player, move, shown, shares) {
+  async #move(player, move, shown, shares, rng) {
     let next = 0;
     for (const id of shown) {
       const slot = this.slots[id];
@@ -699,17 +800,13 @@ export class CardMatch extends Emitter {
     const table = this.#liveTable();
     let events;
     try {
-      events = this.rules.applyMove(this.state, player, move, table);
+      events = this.rules.applyMove(this.state, player, move, table, rng);
     } catch (err) {
       if (err?.name === "RuleError") throw new Cheat(`broke the rules: ${err.message}`, player);
       throw err;
     }
-    this.log.push({ player, move: structuredClone(move) });
     this.emit("events", { player, move, events });
     await this.#runOps(table.ops);
-    await this.#settle();
-    this.busy = null;
-    this.#checkOver();
   }
 
   #checkOver() {
@@ -770,21 +867,28 @@ export class CardMatch extends Emitter {
       }
     };
     const start = table();
-    start.cards = faces.slice(0, this.rules.deckSize).map(() => slots.push({ owner: -1, open: false, gone: false }) - 1);
+    const open = this.rules.openFaces ?? 0;
+    start.cards = faces.slice(0, this.rules.deckSize).map((_, i) => slots.push({ owner: -1, open: i < open, gone: false }) - 1);
+    const rng = rngFromBytes(this.startSeed);
+    rng(); // who starts
     let state;
     try {
-      state = this.rules.newState(this.first, this.players, start);
+      state = this.rules.newState(this.first, this.players, start, rng);
       settle();
     } catch (err) {
       return { ok: false, reason: `the deal broke the rules: ${err.message}` };
     }
-    for (const { player, move } of this.log) {
+    for (const entry of this.log) {
+      let seat;
       try {
-        for (const id of this.rules.reveals?.(state, player, move) ?? []) slots[id].open = true;
-        this.rules.applyMove(state, player, move, table());
+        for (const { player, move, seed } of entry.step ?? [entry]) {
+          seat = player;
+          for (const id of this.rules.reveals?.(state, player, move) ?? []) slots[id].open = true;
+          this.rules.applyMove(state, player, move, table(), seed ? rngFromBytes(seed) : noRandom);
+        }
         settle();
       } catch (err) {
-        return { ok: false, reason: `broke the rules: ${err.message}`, seat: player };
+        return { ok: false, reason: `broke the rules: ${err.message}`, seat };
       }
     }
     if (JSON.stringify(state) !== JSON.stringify(this.state)) return { ok: false, reason: "the game plays out differently with every card known" };

@@ -125,6 +125,15 @@
       "maxPlayers": 4,
       "description": "Pass three, duck the queen of spades, or shoot the moon. Lowest score wins. Nobody deals, nobody peeks.",
       "credits": [{ "github": "maminrayej" }]
+    },
+    {
+      "slug": "hexlands",
+      "name": "Hexlands",
+      "status": "ready",
+      "players": "3–4 players",
+      "maxPlayers": 4,
+      "description": "Roll, trade and build your way across the island. First to 10 points wins. Nobody deals, nobody peeks.",
+      "credits": [{ "github": "maminrayej" }]
     }
   ]
 }
