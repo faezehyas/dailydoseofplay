@@ -1,0 +1,648 @@
+/* Hexlands' island (tiles.js): the Storybook palette. Day is warm paper and
+   sunlit water; night is a moonlit island, cooler and deeper, where windows,
+   the kiln and the lighthouse glow (--hx-night shows those lights). Shades
+   of a colour are mixed towards --hx-light or --hx-shade. */
+:root {
+  --hx-ink: #3a2e28;
+  --hx-light: #fff6df;
+  --hx-shade: #2a1a10;
+  --hx-shadow: #2a1a10;
+  --hx-white: #ffffff;
+  --hx-tile-hi: #ffffff;
+  --hx-night: none;
+  --hx-glint: #ffffff;
+  --hx-glint-o: 0.55;
+  --hx-frame: #f3e3bd;
+  --hx-sea-deep: #6db3c2;
+  --hx-sea: #86c6cd;
+  --hx-shallow-1: #9fd3d3;
+  --hx-shallow-2: #b9e2db;
+  --hx-sea-line: #d2efe9;
+  --hx-wave: #e4f6f2;
+  --hx-foam: #f6fcf8;
+  --hx-sand: #f1d8a0;
+  --hx-sand-dk: #e2bf80;
+  --hx-path: #e7cd95;
+  --hx-forest: #69a552;
+  --hx-hills: #e19c66;
+  --hx-pasture: #96cc62;
+  --hx-fields: #f2c957;
+  --hx-mountains: #aaa9b4;
+  --hx-desert: #f0d397;
+  --hx-trunk: #7a4e2c;
+  --hx-pine: #479350;
+  --hx-pine-dk: #2c6a3c;
+  --hx-pine-lt: #7cc163;
+  --hx-fir: #2f7a4f;
+  --hx-fir-dk: #1f5a3a;
+  --hx-fir-lt: #5fae6c;
+  --hx-leaf: #4f9a45;
+  --hx-leaf-dk: #357a38;
+  --hx-leaf-lt: #8fcf6a;
+  --hx-leaf2: #78b04a;
+  --hx-leaf2-dk: #4f8a35;
+  --hx-leaf2-lt: #b4dc78;
+  --hx-apple: #e0483a;
+  --hx-flower: #ffffff;
+  --hx-flower-2: #ffd0dc;
+  --hx-flower-mid: #f6c23e;
+  --hx-log: #a8703f;
+  --hx-log-end: #e8c48f;
+  --hx-steel: #c9d2dc;
+  --hx-stem: #f4ead6;
+  --hx-cap: #e0483a;
+  --hx-wool: #fffaf0;
+  --hx-wool-dk: #e6dccb;
+  --hx-face: #3b3330;
+  --hx-fence: #c08a55;
+  --hx-post: #a2703f;
+  --hx-hills-grass: #8c9a4a;
+  --hx-clay: #c6774a;
+  --hx-clay-lt: #eaa874;
+  --hx-clay-dk: #9e5a36;
+  --hx-pit-water: #7fb9c0;
+  --hx-kiln: #c8643a;
+  --hx-kiln-lt: #ec9566;
+  --hx-chimney: #9c4a2a;
+  --hx-smoke: #ffffff;
+  --hx-mouth: #3a1d12;
+  --hx-glow: #ffb648;
+  --hx-glow-core: #fff1a8;
+  --hx-lamp: #ffc95e;
+  --hx-window: #6b4a32;
+  --hx-brick: #bb4f2c;
+  --hx-brick-top: #df7a4c;
+  --hx-brick-side: #8f3a1f;
+  --hx-fields-young: #c8cf5c;
+  --hx-track: #d9a957;
+  --hx-wheat: #e9b73f;
+  --hx-wheat-lt: #fbe08a;
+  --hx-wheat-dk: #c08a26;
+  --hx-tie: #b5651d;
+  --hx-mill: #f6ead2;
+  --hx-mill-dk: #e0cfae;
+  --hx-mill-roof: #c4533a;
+  --hx-sail: #fffaf0;
+  --hx-sail-line: #c9b48c;
+  --hx-rock-lt: #d2d2d8;
+  --hx-rock-dk: #82848f;
+  --hx-snow: #ffffff;
+  --hx-snow-dk: #d9e3ef;
+  --hx-meadow: #9db07c;
+  --hx-meadow-dk: #8aa86a;
+  --hx-meadow-tuft: #5f8a45;
+  --hx-gem: #4fb8d6;
+  --hx-gem-lt: #a6ecf7;
+  --hx-wood: #8a5a34;
+  --hx-wood-lt: #c18d58;
+  --hx-rail: #6b6f7a;
+  --hx-dune-dk: #dcae6a;
+  --hx-cactus: #5fa358;
+  --hx-cactus-dk: #3f7f43;
+  --hx-cactus-lt: #86c47a;
+  --hx-blossom: #ff8fa0;
+  --hx-palm: #5fa358;
+  --hx-palm-trunk: #b9844f;
+  --hx-palm-ring: #8a5a34;
+  --hx-bone: #fbf3df;
+  --hx-oasis-sand: #e9c98a;
+  --hx-water: #6fc0cc;
+  --hx-water-lt: #bfeaf0;
+  --hx-reed: #4f8a42;
+  --hx-camel: #cf9d5e;
+  --hx-tile-lift: 16%;
+  --hx-tile-dip: 12%;
+  --hx-hull: #a7683c;
+  --hx-hull-lt: #d89a62;
+  --hx-sail-2: #ff8a6b;
+  --hx-flag: #e8603f;
+  --hx-whale: #4d899d;
+  --hx-whale-ink: #2e5f6c;
+  --hx-compass-ink: #3b6f7c;
+  --hx-tower: #fffaf0;
+  --hx-badge: #fffaf0;
+  --hx-res-0: #3f8a4a;
+  --hx-res-1: #c0522e;
+  --hx-res-2: #7fb04a;
+  --hx-res-3: #d9a227;
+  --hx-res-4: #6d7a8c;
+  --hx-res-any: #a08f7c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --hx-ink: #17131c;
+    --hx-light: #d6e4ff;
+    --hx-shade: #05070f;
+    --hx-shadow: #03050c;
+    --hx-white: #eef3ff;
+    --hx-tile-hi: #cfe0ff;
+    --hx-night: inline;
+    --hx-glint: #fff1c4;
+    --hx-glint-o: 0.8;
+    --hx-frame: #2a3142;
+    --hx-sea-deep: #0b2233;
+    --hx-sea: #123248;
+    --hx-shallow-1: #184457;
+    --hx-shallow-2: #1f5565;
+    --hx-sea-line: #33707c;
+    --hx-wave: #4a8994;
+    --hx-foam: #9fd0d0;
+    --hx-sand: #b9a681;
+    --hx-sand-dk: #948363;
+    --hx-path: #a4916e;
+    --hx-forest: #467c4d;
+    --hx-hills: #b06e50;
+    --hx-pasture: #6e9a58;
+    --hx-fields: #c9a54e;
+    --hx-mountains: #7a8496;
+    --hx-desert: #c2b08a;
+    --hx-trunk: #563b2c;
+    --hx-pine: #2e6646;
+    --hx-pine-dk: #1a4331;
+    --hx-pine-lt: #5c9a70;
+    --hx-fir: #225a44;
+    --hx-fir-dk: #143a2d;
+    --hx-fir-lt: #4f8f6c;
+    --hx-leaf: #3a7149;
+    --hx-leaf-dk: #255437;
+    --hx-leaf-lt: #6ea476;
+    --hx-leaf2: #58884a;
+    --hx-leaf2-dk: #3c6638;
+    --hx-leaf2-lt: #8db87a;
+    --hx-apple: #c4473e;
+    --hx-flower: #dfe6f2;
+    --hx-flower-2: #d9b3c6;
+    --hx-flower-mid: #d8b44a;
+    --hx-log: #7c5638;
+    --hx-log-end: #bfa07a;
+    --hx-steel: #a8b4c4;
+    --hx-stem: #d6d0c4;
+    --hx-cap: #bf4a40;
+    --hx-wool: #e4e6ea;
+    --hx-wool-dk: #b2b6c0;
+    --hx-face: #221e27;
+    --hx-fence: #8b6a4c;
+    --hx-post: #74573c;
+    --hx-hills-grass: #6c7a48;
+    --hx-clay: #97573f;
+    --hx-clay-lt: #bf7d5d;
+    --hx-clay-dk: #6c3c2c;
+    --hx-pit-water: #3f7a88;
+    --hx-kiln: #9e4f37;
+    --hx-kiln-lt: #c27556;
+    --hx-chimney: #73372a;
+    --hx-smoke: #aab6cc;
+    --hx-mouth: #120806;
+    --hx-glow: #ffb244;
+    --hx-glow-core: #fff3b0;
+    --hx-lamp: #ffc65a;
+    --hx-window: #ffd36e;
+    --hx-brick: #984531;
+    --hx-brick-top: #b86a4c;
+    --hx-brick-side: #682d1f;
+    --hx-fields-young: #a8ab55;
+    --hx-track: #a88a52;
+    --hx-wheat: #c9a043;
+    --hx-wheat-lt: #e6d08c;
+    --hx-wheat-dk: #93702c;
+    --hx-tie: #86501f;
+    --hx-mill: #d3cfc6;
+    --hx-mill-dk: #a29e98;
+    --hx-mill-roof: #93463a;
+    --hx-sail: #e2e2e0;
+    --hx-sail-line: #8c8780;
+    --hx-rock-lt: #a7b0c2;
+    --hx-rock-dk: #566074;
+    --hx-snow: #eef4ff;
+    --hx-snow-dk: #b4c3dc;
+    --hx-meadow: #62795e;
+    --hx-meadow-dk: #566e52;
+    --hx-meadow-tuft: #3f5c3e;
+    --hx-gem: #5fd2ee;
+    --hx-gem-lt: #c8f6ff;
+    --hx-wood: #6a4831;
+    --hx-wood-lt: #8c6747;
+    --hx-rail: #525866;
+    --hx-dune-dk: #a98f62;
+    --hx-cactus: #4a8551;
+    --hx-cactus-dk: #2e5d39;
+    --hx-cactus-lt: #73a878;
+    --hx-blossom: #d97a8c;
+    --hx-palm: #4a8551;
+    --hx-palm-trunk: #8c6a4a;
+    --hx-palm-ring: #5e4330;
+    --hx-bone: #d9d5ca;
+    --hx-oasis-sand: #a99572;
+    --hx-water: #3c8fa2;
+    --hx-water-lt: #a5dbe6;
+    --hx-reed: #3d6b45;
+    --hx-camel: #9c7b55;
+    --hx-tile-lift: 24%;
+    --hx-tile-dip: 22%;
+    --hx-hull: #734c33;
+    --hx-hull-lt: #9a7050;
+    --hx-sail-2: #c97a66;
+    --hx-flag: #d9674c;
+    --hx-whale: #2b5c70;
+    --hx-whale-ink: #0b1c26;
+    --hx-compass-ink: #0b1c26;
+    --hx-tower: #e2e4ea;
+    --hx-badge: #f2e7cc;
+    --hx-res-0: #4f9a5a;
+    --hx-res-1: #c7623e;
+    --hx-res-2: #8bbf55;
+    --hx-res-3: #d9a62a;
+    --hx-res-4: #8592a6;
+    --hx-res-any: #a08f7c;
+  }
+}
+
+:root[data-theme="dark"] {
+  --hx-ink: #17131c;
+  --hx-light: #d6e4ff;
+  --hx-shade: #05070f;
+  --hx-shadow: #03050c;
+  --hx-white: #eef3ff;
+  --hx-tile-hi: #cfe0ff;
+  --hx-night: inline;
+  --hx-glint: #fff1c4;
+  --hx-glint-o: 0.8;
+  --hx-frame: #2a3142;
+  --hx-sea-deep: #0b2233;
+  --hx-sea: #123248;
+  --hx-shallow-1: #184457;
+  --hx-shallow-2: #1f5565;
+  --hx-sea-line: #33707c;
+  --hx-wave: #4a8994;
+  --hx-foam: #9fd0d0;
+  --hx-sand: #b9a681;
+  --hx-sand-dk: #948363;
+  --hx-path: #a4916e;
+  --hx-forest: #467c4d;
+  --hx-hills: #b06e50;
+  --hx-pasture: #6e9a58;
+  --hx-fields: #c9a54e;
+  --hx-mountains: #7a8496;
+  --hx-desert: #c2b08a;
+  --hx-trunk: #563b2c;
+  --hx-pine: #2e6646;
+  --hx-pine-dk: #1a4331;
+  --hx-pine-lt: #5c9a70;
+  --hx-fir: #225a44;
+  --hx-fir-dk: #143a2d;
+  --hx-fir-lt: #4f8f6c;
+  --hx-leaf: #3a7149;
+  --hx-leaf-dk: #255437;
+  --hx-leaf-lt: #6ea476;
+  --hx-leaf2: #58884a;
+  --hx-leaf2-dk: #3c6638;
+  --hx-leaf2-lt: #8db87a;
+  --hx-apple: #c4473e;
+  --hx-flower: #dfe6f2;
+  --hx-flower-2: #d9b3c6;
+  --hx-flower-mid: #d8b44a;
+  --hx-log: #7c5638;
+  --hx-log-end: #bfa07a;
+  --hx-steel: #a8b4c4;
+  --hx-stem: #d6d0c4;
+  --hx-cap: #bf4a40;
+  --hx-wool: #e4e6ea;
+  --hx-wool-dk: #b2b6c0;
+  --hx-face: #221e27;
+  --hx-fence: #8b6a4c;
+  --hx-post: #74573c;
+  --hx-hills-grass: #6c7a48;
+  --hx-clay: #97573f;
+  --hx-clay-lt: #bf7d5d;
+  --hx-clay-dk: #6c3c2c;
+  --hx-pit-water: #3f7a88;
+  --hx-kiln: #9e4f37;
+  --hx-kiln-lt: #c27556;
+  --hx-chimney: #73372a;
+  --hx-smoke: #aab6cc;
+  --hx-mouth: #120806;
+  --hx-glow: #ffb244;
+  --hx-glow-core: #fff3b0;
+  --hx-lamp: #ffc65a;
+  --hx-window: #ffd36e;
+  --hx-brick: #984531;
+  --hx-brick-top: #b86a4c;
+  --hx-brick-side: #682d1f;
+  --hx-fields-young: #a8ab55;
+  --hx-track: #a88a52;
+  --hx-wheat: #c9a043;
+  --hx-wheat-lt: #e6d08c;
+  --hx-wheat-dk: #93702c;
+  --hx-tie: #86501f;
+  --hx-mill: #d3cfc6;
+  --hx-mill-dk: #a29e98;
+  --hx-mill-roof: #93463a;
+  --hx-sail: #e2e2e0;
+  --hx-sail-line: #8c8780;
+  --hx-rock-lt: #a7b0c2;
+  --hx-rock-dk: #566074;
+  --hx-snow: #eef4ff;
+  --hx-snow-dk: #b4c3dc;
+  --hx-meadow: #62795e;
+  --hx-meadow-dk: #566e52;
+  --hx-meadow-tuft: #3f5c3e;
+  --hx-gem: #5fd2ee;
+  --hx-gem-lt: #c8f6ff;
+  --hx-wood: #6a4831;
+  --hx-wood-lt: #8c6747;
+  --hx-rail: #525866;
+  --hx-dune-dk: #a98f62;
+  --hx-cactus: #4a8551;
+  --hx-cactus-dk: #2e5d39;
+  --hx-cactus-lt: #73a878;
+  --hx-blossom: #d97a8c;
+  --hx-palm: #4a8551;
+  --hx-palm-trunk: #8c6a4a;
+  --hx-palm-ring: #5e4330;
+  --hx-bone: #d9d5ca;
+  --hx-oasis-sand: #a99572;
+  --hx-water: #3c8fa2;
+  --hx-water-lt: #a5dbe6;
+  --hx-reed: #3d6b45;
+  --hx-camel: #9c7b55;
+  --hx-tile-lift: 24%;
+  --hx-tile-dip: 22%;
+  --hx-hull: #734c33;
+  --hx-hull-lt: #9a7050;
+  --hx-sail-2: #c97a66;
+  --hx-flag: #d9674c;
+  --hx-whale: #2b5c70;
+  --hx-whale-ink: #0b1c26;
+  --hx-compass-ink: #0b1c26;
+  --hx-tower: #e2e4ea;
+  --hx-badge: #f2e7cc;
+  --hx-res-0: #4f9a5a;
+  --hx-res-1: #c7623e;
+  --hx-res-2: #8bbf55;
+  --hx-res-3: #d9a62a;
+  --hx-res-4: #8592a6;
+  --hx-res-any: #a08f7c;
+}
+
+/* Objects take a warm ink outline; hx-l-* classes are strokes only. Widths
+   come from the markup, so these rules set colours, never widths. */
+.hx-o { stroke: var(--hx-ink); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+[class*="hx-l-"] { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.hx-ink { fill: var(--hx-ink); }
+.hx-l-ink { stroke: var(--hx-ink); }
+.hx-white { fill: var(--hx-white); }
+.hx-sh { fill: var(--hx-shadow); }
+
+/* Tiles */
+.hx-rim { fill: none; stroke-width: 2.6; }
+.hx-tile-hi { fill: none; stroke: var(--hx-tile-hi); stroke-width: 1.6; opacity: 0.22; }
+.hx-forest-hi { stop-color: color-mix(in srgb, var(--hx-forest), var(--hx-light) var(--hx-tile-lift)); }
+.hx-forest-mid { stop-color: var(--hx-forest); }
+.hx-forest-lo { stop-color: color-mix(in srgb, var(--hx-forest), var(--hx-shade) var(--hx-tile-dip)); }
+.hx-forest-rim { stroke: color-mix(in srgb, var(--hx-forest), var(--hx-shade) 40%); }
+.hx-hills-hi { stop-color: color-mix(in srgb, var(--hx-hills), var(--hx-light) var(--hx-tile-lift)); }
+.hx-hills-mid { stop-color: var(--hx-hills); }
+.hx-hills-lo { stop-color: color-mix(in srgb, var(--hx-hills), var(--hx-shade) var(--hx-tile-dip)); }
+.hx-hills-rim { stroke: color-mix(in srgb, var(--hx-hills), var(--hx-shade) 40%); }
+.hx-pasture-hi { stop-color: color-mix(in srgb, var(--hx-pasture), var(--hx-light) var(--hx-tile-lift)); }
+.hx-pasture-mid { stop-color: var(--hx-pasture); }
+.hx-pasture-lo { stop-color: color-mix(in srgb, var(--hx-pasture), var(--hx-shade) var(--hx-tile-dip)); }
+.hx-pasture-rim { stroke: color-mix(in srgb, var(--hx-pasture), var(--hx-shade) 40%); }
+.hx-fields-hi { stop-color: color-mix(in srgb, var(--hx-fields), var(--hx-light) var(--hx-tile-lift)); }
+.hx-fields-mid { stop-color: var(--hx-fields); }
+.hx-fields-lo { stop-color: color-mix(in srgb, var(--hx-fields), var(--hx-shade) var(--hx-tile-dip)); }
+.hx-fields-rim { stroke: color-mix(in srgb, var(--hx-fields), var(--hx-shade) 40%); }
+.hx-mountains-hi { stop-color: color-mix(in srgb, var(--hx-mountains), var(--hx-light) var(--hx-tile-lift)); }
+.hx-mountains-mid { stop-color: var(--hx-mountains); }
+.hx-mountains-lo { stop-color: color-mix(in srgb, var(--hx-mountains), var(--hx-shade) var(--hx-tile-dip)); }
+.hx-mountains-rim { stroke: color-mix(in srgb, var(--hx-mountains), var(--hx-shade) 40%); }
+.hx-desert-hi { stop-color: color-mix(in srgb, var(--hx-desert), var(--hx-light) var(--hx-tile-lift)); }
+.hx-desert-mid { stop-color: var(--hx-desert); }
+.hx-desert-lo { stop-color: color-mix(in srgb, var(--hx-desert), var(--hx-shade) var(--hx-tile-dip)); }
+.hx-desert-rim { stroke: color-mix(in srgb, var(--hx-desert), var(--hx-shade) 40%); }
+
+/* Forest */
+.hx-forest-clear { fill: color-mix(in srgb, var(--hx-forest), var(--hx-light) 20%); }
+.hx-forest-dk { fill: color-mix(in srgb, var(--hx-forest), var(--hx-shade) 30%); }
+.hx-l-forest-tuft { stroke: color-mix(in srgb, var(--hx-forest), var(--hx-shade) 25%); }
+.hx-trunk { fill: var(--hx-trunk); }
+.hx-pine { fill: var(--hx-pine); }
+.hx-pine-dk { fill: var(--hx-pine-dk); }
+.hx-pine-lt { fill: none; stroke: var(--hx-pine-lt); }
+.hx-fir { fill: var(--hx-fir); }
+.hx-fir-dk { fill: var(--hx-fir-dk); }
+.hx-fir-lt { fill: none; stroke: var(--hx-fir-lt); }
+.hx-leaf { fill: var(--hx-leaf); }
+.hx-leaf-dk { fill: var(--hx-leaf-dk); }
+.hx-leaf-lt { fill: var(--hx-leaf-lt); }
+.hx-leaf2 { fill: var(--hx-leaf2); }
+.hx-leaf2-dk { fill: var(--hx-leaf2-dk); }
+.hx-leaf2-lt { fill: var(--hx-leaf2-lt); }
+.hx-apple { fill: var(--hx-apple); }
+.hx-log { fill: var(--hx-log); }
+.hx-log-end { fill: var(--hx-log-end); }
+.hx-l-log { stroke: var(--hx-log); }
+.hx-axe { fill: none; }
+.hx-blade { fill: var(--hx-steel); }
+.hx-stem { fill: var(--hx-stem); }
+.hx-cap { fill: var(--hx-cap); }
+
+/* Hills */
+.hx-hills-lt { fill: color-mix(in srgb, var(--hx-hills), var(--hx-light) 14%); }
+.hx-hills-dk { fill: color-mix(in srgb, var(--hx-hills), var(--hx-shade) 8%); }
+.hx-l-hills-tuft { stroke: var(--hx-hills-grass); }
+.hx-clay { fill: var(--hx-clay); }
+.hx-clay-dk { fill: var(--hx-clay-dk); }
+.hx-l-clay-lt { stroke: var(--hx-clay-lt); }
+.hx-l-clay-dk { stroke: var(--hx-clay-dk); }
+.hx-pit-water { fill: var(--hx-pit-water); }
+.hx-kiln { fill: var(--hx-kiln); }
+.hx-l-kiln-lt { stroke: var(--hx-kiln-lt); }
+.hx-chimney { fill: var(--hx-chimney); }
+.hx-l-chimney { stroke: var(--hx-chimney); }
+.hx-smoke { fill: var(--hx-smoke); }
+.hx-mouth { fill: var(--hx-mouth); }
+.hx-glow { fill: var(--hx-glow); }
+.hx-glow-core { fill: var(--hx-glow-core); }
+.hx-brick { fill: var(--hx-brick); }
+.hx-brick-top { fill: var(--hx-brick-top); }
+.hx-brick-side { fill: var(--hx-brick-side); }
+.hx-barrow { fill: var(--hx-wood-lt); }
+.hx-wheel { fill: var(--hx-trunk); }
+
+/* Pasture */
+.hx-pasture-lt { fill: color-mix(in srgb, var(--hx-pasture), var(--hx-light) 16%); }
+.hx-pasture-dk { fill: color-mix(in srgb, var(--hx-pasture), var(--hx-shade) 8%); }
+.hx-l-pasture-line { stroke: color-mix(in srgb, var(--hx-pasture), var(--hx-shade) 12%); }
+.hx-l-pasture-tuft { stroke: color-mix(in srgb, var(--hx-pasture), var(--hx-shade) 28%); }
+.hx-flower { fill: var(--hx-flower); }
+.hx-flower-2 { fill: var(--hx-flower-2); }
+.hx-flower-mid { fill: var(--hx-flower-mid); }
+.hx-wool { fill: var(--hx-wool); }
+.hx-wool-dk { fill: var(--hx-wool-dk); }
+.hx-face { fill: var(--hx-face); }
+.hx-l-fence { stroke: var(--hx-fence); }
+.hx-post { fill: var(--hx-post); }
+
+/* Fields */
+.hx-wheat-a-bg { fill: var(--hx-fields); }
+.hx-wheat-a-row { fill: color-mix(in srgb, var(--hx-fields), var(--hx-shade) 11%); }
+.hx-wheat-a-stalk { fill: none; stroke: color-mix(in srgb, var(--hx-fields), var(--hx-shade) 18%); }
+.hx-wheat-a-ear { fill: color-mix(in srgb, var(--hx-fields), var(--hx-light) 40%); }
+.hx-wheat-b-bg { fill: color-mix(in srgb, var(--hx-fields), var(--hx-light) 26%); }
+.hx-wheat-b-row { fill: color-mix(in srgb, var(--hx-fields), var(--hx-light) 6%); }
+.hx-wheat-b-stalk { fill: none; stroke: color-mix(in srgb, var(--hx-fields), var(--hx-shade) 12%); }
+.hx-wheat-b-ear { fill: color-mix(in srgb, var(--hx-fields), var(--hx-light) 55%); }
+.hx-wheat-c-bg { fill: var(--hx-fields-young); }
+.hx-wheat-c-row { fill: color-mix(in srgb, var(--hx-fields-young), var(--hx-shade) 12%); }
+.hx-wheat-c-stalk { fill: none; stroke: color-mix(in srgb, var(--hx-fields-young), var(--hx-shade) 20%); }
+.hx-wheat-c-ear { fill: color-mix(in srgb, var(--hx-fields-young), var(--hx-light) 35%); }
+.hx-l-track { stroke: var(--hx-track); }
+.hx-l-track-lt { stroke: color-mix(in srgb, var(--hx-track), var(--hx-light) 45%); }
+.hx-wheat { fill: var(--hx-wheat); }
+.hx-wheat-lt { fill: var(--hx-wheat-lt); }
+.hx-wheat-dk { fill: var(--hx-wheat-dk); }
+.hx-l-wheat { stroke: var(--hx-wheat); }
+.hx-l-wheat-lt { stroke: var(--hx-wheat-lt); }
+.hx-l-wheat-dk { stroke: var(--hx-wheat-dk); }
+.hx-tie { fill: var(--hx-tie); }
+.hx-mill { fill: var(--hx-mill); }
+.hx-mill-dk { fill: var(--hx-mill-dk); }
+.hx-mill-roof { fill: var(--hx-mill-roof); }
+.hx-door { fill: var(--hx-trunk); }
+.hx-sail { fill: var(--hx-sail); }
+.hx-l-sail { stroke: var(--hx-sail-line); }
+
+/* Mountains */
+.hx-mountains-dk { fill: color-mix(in srgb, var(--hx-mountains), var(--hx-shade) 18%); }
+.hx-meadow { fill: var(--hx-meadow); }
+.hx-meadow-dk { fill: var(--hx-meadow-dk); }
+.hx-l-mountains-tuft { stroke: var(--hx-meadow-tuft); }
+.hx-rock-lt { fill: var(--hx-rock-lt); }
+.hx-rock-dk { fill: var(--hx-rock-dk); }
+.hx-l-rock { stroke: color-mix(in srgb, var(--hx-mountains), var(--hx-shade) 22%); }
+.hx-snow { fill: var(--hx-snow); }
+.hx-snow-dk { fill: var(--hx-snow-dk); }
+.hx-gem { fill: var(--hx-gem); }
+.hx-gem-lt { fill: var(--hx-gem-lt); }
+.hx-timber { fill: var(--hx-wood); }
+.hx-l-timber { stroke: var(--hx-wood); }
+.hx-l-rail { stroke: var(--hx-rail); }
+.hx-cart { fill: var(--hx-wood); }
+
+/* Desert */
+.hx-dune-lt { fill: color-mix(in srgb, var(--hx-desert), var(--hx-light) 45%); }
+.hx-dune-dk { fill: var(--hx-dune-dk); }
+.hx-l-dune { stroke: color-mix(in srgb, var(--hx-dune-dk), var(--hx-shade) 12%); }
+.hx-cactus { fill: var(--hx-cactus); }
+.hx-l-cactus { stroke: var(--hx-cactus); }
+.hx-l-cactus-dk { stroke: var(--hx-cactus-dk); }
+.hx-l-cactus-lt { stroke: var(--hx-cactus-lt); }
+.hx-blossom { fill: var(--hx-blossom); }
+.hx-palm { fill: var(--hx-palm); }
+.hx-l-palm-trunk { stroke: var(--hx-palm-trunk); }
+.hx-l-palm-ring { stroke: var(--hx-palm-ring); }
+.hx-bone { fill: var(--hx-bone); }
+.hx-l-bone { stroke: var(--hx-bone); }
+.hx-oasis-sand { fill: var(--hx-oasis-sand); }
+.hx-water { fill: var(--hx-water); }
+.hx-water-lt { fill: var(--hx-water-lt); }
+.hx-l-reed { stroke: var(--hx-reed); }
+.hx-camel { fill: var(--hx-camel); }
+.hx-l-camel { stroke: var(--hx-camel); }
+.hx-l-camel-lt { stroke: color-mix(in srgb, var(--hx-camel), var(--hx-light) 40%); }
+
+/* Lights that only show at night */
+.hx-halo { fill: url(#hx-halo); display: var(--hx-night); }
+.hx-halo-in { stop-color: var(--hx-lamp); stop-opacity: 0.6; }
+.hx-halo-out { stop-color: var(--hx-lamp); stop-opacity: 0; }
+.hx-beam { fill: url(#hx-beam); display: var(--hx-night); opacity: 0.45; }
+.hx-window { fill: var(--hx-window); }
+
+/* Sea */
+.hx-sea-mid { stop-color: var(--hx-sea); }
+.hx-sea-deep { stop-color: var(--hx-sea-deep); }
+.hx-l-wave { stroke: var(--hx-wave); opacity: 0.75; }
+.hx-ripple { opacity: 0.5; }
+.hx-l-glint { stroke: var(--hx-glint); opacity: var(--hx-glint-o); }
+.hx-l-band-line { stroke: var(--hx-sea-line); }
+.hx-l-band-faint { stroke: var(--hx-sea-line); opacity: 0.5; }
+.hx-l-band-1 { stroke: var(--hx-shallow-1); }
+.hx-l-band-2 { stroke: var(--hx-shallow-2); }
+.hx-band-2 { fill: var(--hx-shallow-2); }
+.hx-l-foam { stroke: var(--hx-foam); }
+.hx-l-sand { stroke: var(--hx-sand); }
+.hx-l-sand-dk { stroke: var(--hx-sand-dk); }
+.hx-sand { fill: var(--hx-sand); }
+.hx-sand-dk { fill: var(--hx-sand-dk); }
+.hx-path { fill: var(--hx-path); }
+.hx-frame { fill: none; stroke: var(--hx-frame); stroke-width: 6; }
+.hx-compass { stroke: var(--hx-compass-ink); stroke-linejoin: round; }
+.hx-l-compass { stroke: var(--hx-sea-line); }
+.hx-compass-a { fill: var(--hx-foam); }
+.hx-compass-b { fill: var(--hx-sea-line); }
+.hx-compass-n { fill: var(--hx-flag); }
+.hx-compass-n2 { fill: color-mix(in srgb, var(--hx-flag), var(--hx-shade) 25%); }
+.hx-compass-text { fill: var(--hx-foam); stroke: none; font: 600 14px var(--font-display, sans-serif); }
+.hx-whale-ink { stroke: var(--hx-whale-ink); stroke-linejoin: round; stroke-linecap: round; }
+.hx-whale { fill: var(--hx-whale); }
+.hx-whale-eye { fill: var(--hx-whale-ink); }
+.hx-l-whale-lt { stroke: color-mix(in srgb, var(--hx-whale), var(--hx-light) 30%); }
+.hx-l-spout { stroke: var(--hx-foam); }
+.hx-l-gull { stroke: var(--hx-ink); opacity: 0.6; }
+.hx-fish { fill: color-mix(in srgb, var(--hx-sea-deep), var(--hx-shade) 14%); opacity: 0.55; }
+.hx-tower { fill: var(--hx-tower); }
+.hx-tower-band { fill: var(--hx-flag); }
+.hx-tower-roof { fill: var(--hx-mill-roof); }
+.hx-hull { fill: var(--hx-hull); }
+.hx-l-hull-lt { stroke: var(--hx-hull-lt); }
+.hx-sail-2 { fill: var(--hx-sail-2); }
+.hx-flag { fill: var(--hx-flag); }
+
+/* Harbours. A narrow board (the screen adds .hx-narrow) gets bigger badges. */
+.hx-l-wood { stroke: var(--hx-wood); stroke-linecap: butt; }
+.hx-l-wood-lt { stroke: var(--hx-wood-lt); }
+.hx-wood { fill: var(--hx-wood); }
+.hx-badge { fill: var(--hx-badge); stroke: var(--hx-ink); }
+.hx-ring { fill: none; }
+.hx-ring-0 { stroke: var(--hx-res-0); }
+.hx-ring-1 { stroke: var(--hx-res-1); }
+.hx-ring-2 { stroke: var(--hx-res-2); }
+.hx-ring-3 { stroke: var(--hx-res-3); }
+.hx-ring-4 { stroke: var(--hx-res-4); }
+.hx-ring-any { stroke: var(--hx-res-any); }
+.hx-badge-text { fill: var(--hx-ink); font: 700 17px var(--font-display, sans-serif); }
+.hx-badge-small { font-size: 9.5px; }
+.hx-narrow .hx-badge-art { transform: scale(1.5); }
+
+/* Motion: slow, small, and only on a few elements; the waves change in steps
+   so the sea repaints twice a second at most. .hx-still stops it all. */
+@media (prefers-reduced-motion: no-preference) {
+  .hx-board:not(.hx-still) .hx-w1 { animation: hx-shimmer 7s steps(14) infinite alternate; }
+  .hx-board:not(.hx-still) .hx-w2 { animation: hx-shimmer 7s steps(14) -3.5s infinite alternate; }
+  .hx-board:not(.hx-still) .hx-bob { transform-box: fill-box; transform-origin: 50% 100%; animation: hx-bob 5s ease-in-out infinite; }
+  .hx-board:not(.hx-still) .hx-bob-1 { animation-delay: -1.7s; }
+  .hx-board:not(.hx-still) .hx-bob-2 { animation-delay: -3.4s; }
+  .hx-board:not(.hx-still) .hx-spin { transform-box: fill-box; transform-origin: center; animation: hx-spin 30s linear infinite; }
+  .hx-board:not(.hx-still) .hx-spout { animation: hx-spout 9s ease-in-out infinite; }
+}
+
+@keyframes hx-shimmer {
+  from { opacity: 0.3; }
+  to { opacity: 0.85; }
+}
+
+@keyframes hx-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-2.5px) rotate(2deg); }
+}
+
+@keyframes hx-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes hx-spout {
+  0%, 55%, 100% { opacity: 0; }
+  65%, 85% { opacity: 1; }
+}
