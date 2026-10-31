@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { KnownDeck, settleAll } from "../../test/fixtures/known-deck.js";
+import { KnownDeck } from "../../test/fixtures/known-deck.js";
 import { rngFromSeed } from "../engine/rng.js";
 import { HEXES, CORNERS, EDGES, WOOD, BRICK, WOOL, GRAIN, ORE, DESERT, ANY } from "./board.js";
 import {
   makeRules,
   normalizeConfig,
+  MAX_OFFERS,
   DEFAULT_CONFIG,
   COSTS,
   resourceOf,
@@ -34,19 +35,30 @@ const dice = (a, b) => {
   return () => vs.shift();
 };
 
-// A game on a deck in face order, dealt and sorted, in setup.
+// The deck as CardMatch gives it (openFaces): the resources open in face
+// order, then the development cards shuffled.
+function openDeck(seed) {
+  const rng = rngFromSeed(seed);
+  const devs = Array.from({ length: 25 }, (_, i) => 95 + i);
+  for (let i = devs.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [devs[i], devs[j]] = [devs[j], devs[i]];
+  }
+  const deck = new KnownDeck([...Array(95).keys(), ...devs], seed);
+  for (let s = 0; s < 95; s++) deck.slots[s].open = true;
+  return deck;
+}
+
+// A game in setup.
 function game({ players = 3, first = 0, config = {}, seed = "deck" } = {}) {
-  const deck = new KnownDeck([...Array(120).keys()], seed);
+  const deck = openDeck(seed);
   const rules = makeRules(config, players);
   const st = rules.newState(first, players, deck, rngFromSeed(seed));
-  settleAll(rules, st, deck);
   const face = (s) => deck.slots[s].face;
   // A move as CardMatch makes it: the cards it shows open first.
   const move = (p, m, rng) => {
     for (const id of rules.reveals(st, p, m)) deck.slots[id].open = true;
-    const events = rules.applyMove(st, p, m, deck, rng);
-    settleAll(rules, st, deck);
-    return events;
+    return rules.applyMove(st, p, m, deck, rng);
   };
   const give = (p, ...rs) =>
     rs.map((r) => {
@@ -107,13 +119,14 @@ function path(from, k, avoid = new Set()) {
   return { corners, edges: corners.slice(1).map((c, i) => edgeBetween(corners[i], c)) };
 }
 
-test("the deal: every card opened, the resources sorted into the bank, the development cards hidden again", () => {
+test("the start: the open resources sorted into the bank, the development cards the hidden pile", () => {
   const g = game({ players: 4, first: 2 });
   const { st, deck } = g;
+  assert.equal(makeRules({}, 4).openFaces, 95);
   assert.deepEqual(st.bank.map((b) => b.length), [19, 19, 19, 19, 19]);
   st.bank.forEach((b, r) => b.forEach((s) => assert.equal(resourceOf(g.face(s)), r)));
-  assert.equal(st.devPile.length, 25);
-  for (const s of st.devPile) assert.ok(s >= 120 && !deck.slots[s].open, "a new, hidden slot");
+  assert.deepEqual(st.devPile, deck.cards.slice(95));
+  for (const s of st.devPile) assert.ok(!deck.slots[s].open, "hidden");
   assert.deepEqual(st.devPile.map((s) => devKind(g.face(s))).sort(), [...Array(14).fill("knight"), ...Array(2).fill("monopoly"), ...Array(2).fill("plenty"), ...Array(2).fill("road"), ...Array(5).fill("vp")].sort());
   assert.deepEqual([st.phase, st.turn, st.setup.order], ["setup", 2, [2, 3, 0, 1, 1, 0, 3, 2]]);
   assert.equal(st.board.terrain[st.robber], DESERT);
@@ -518,9 +531,36 @@ test("trading: an offer, answered by everyone at once, and a partner picked from
   move(1, { accept: [wood[0]] });
   assert.deepEqual(move(0, { partner: -1 }), [{ type: "nodeal", p: 0 }]);
   assert.deepEqual(st.hands[0], ore);
-  // Nobody able to accept: over at once.
+  // Nobody able to accept: over at once (on a new turn: that was the third offer).
+  st.offers = 0;
   const ask = move(0, { offer: [ore[0]], want: [0, 0, 0, 3, 0] });
   assert.deepEqual(ask.at(-1), { type: "nodeal", p: 0 });
+});
+
+test("at most three trade offers a turn: the fourth is refused and not listed, and the next turn starts again", () => {
+  const g = main(game());
+  const { st, move } = g;
+  g.give(0, WOOD, WOOD, WOOD, WOOD);
+  const offer = () => ({ offer: [g.cards(0, WOOD)[0]], want: [0, 0, 0, 0, 1] });
+  assert.equal(MAX_OFFERS, 3);
+  for (let i = 0; i < MAX_OFFERS; i++) {
+    assert.ok(legalMoves(st, 0, g.face).some(has("offer")));
+    assert.deepEqual(move(0, offer()).at(-1), { type: "nodeal", p: 0 }, "nobody holds a card to accept with");
+  }
+  assert.equal(st.offers, 3);
+  const moves = legalMoves(st, 0, g.face);
+  assert.ok(!moves.some(has("offer")), "no fourth offer listed");
+  assert.ok(moves.some(has("bank")), "the bank still trades");
+  const before = structuredClone(st);
+  throwsRule(() => move(0, offer()), /at most 3 trade offers a turn/);
+  assert.deepEqual(st, before);
+  move(0, { end: true });
+  assert.equal(st.offers, 0);
+  move(1, { roll: true }, dice(1, 1));
+  g.give(1, BRICK);
+  assert.ok(legalMoves(st, 1, g.face).some(has("offer")));
+  move(1, { offer: g.cards(1, BRICK), want: [1, 0, 0, 0, 0] });
+  assert.equal(st.offers, 1);
 });
 
 test("longest road: 5 or more, a tie keeps it, a longer road takes it", () => {
@@ -722,11 +762,10 @@ test("garbage moves and fields are refused with a RuleError and change nothing",
 
 // Plays a whole game with random legal moves on a known deck; each(state) after every move.
 function playOut({ players, seed, blind = false, each = () => {} }) {
-  const deck = new KnownDeck(shuffledDeck(seed), seed);
+  const deck = openDeck(seed);
   deck.blind = blind;
   const rules = makeRules({}, players);
   const st = rules.newState(0, players, deck, rngFromSeed(seed));
-  settleAll(rules, st, deck);
   const rng = rngFromSeed(`${seed} moves`);
   const roll = rngFromSeed(`${seed} dice`);
   for (let n = 0; st.winner === -1; n++) {
@@ -738,19 +777,8 @@ function playOut({ players, seed, blind = false, each = () => {} }) {
       for (const id of rules.reveals(st, p, move)) deck.slots[id].open = true;
       rules.applyMove(st, p, move, deck, rules.needsRandom(st, move) ? roll : undefined);
     }
-    settleAll(rules, st, deck);
   }
   return st;
-}
-
-function shuffledDeck(seed) {
-  const rng = rngFromSeed(seed);
-  const faces = [...Array(120).keys()];
-  for (let i = faces.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [faces[i], faces[j]] = [faces[j], faces[i]];
-  }
-  return faces;
 }
 
 // Random legal moves, leaning towards building so a game ends.

@@ -1,9 +1,9 @@
 // Hexlands over the real card engine: a robot in each seat of a localRoom(),
-// each running its own CardMatch, opening the deck, hiding the development
-// cards again, stealing through a shuffle and auditing at the end. Every seat
-// ends on the same state, the audit passes, no seat ever knows a card that
-// isn't open or its own, a steal is seen only by the thief and the victim,
-// and a lie or a forged move is caught and names the cheat.
+// each running its own CardMatch, the resources open from the start and only
+// the development cards shuffled, stealing through a shuffle and auditing at
+// the end. Every seat ends on the same state, the audit passes, no seat ever
+// knows a card that isn't open or its own, a steal is seen only by the thief
+// and the victim, and a lie or a forged move is caught and names the cheat.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { localRoom } from "../engine/room.js";

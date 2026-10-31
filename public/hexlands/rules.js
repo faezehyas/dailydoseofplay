@@ -1,12 +1,12 @@
 // Hexlands rules for CardMatch (engine/card-match.js): three or four players
 // settle an island, the first to `target` points on their own turn winning.
 // Every resource and development card is a card of the 120-card deck. The
-// deck is opened at the start, sorted into a face-up bank, and the development
-// cards shuffled again into a hidden pile. Cards paid out are dealt face up;
-// cards spent are shown (reveals()) and go back to the bank; a steal shuffles
-// the victim's hand and deals one card to the thief. Discards on a 7, answers
-// to a trade and Monopoly are steps (movers()). See "Hexlands in depth" in
-// ARCHITECTURE.md.
+// resources start face up (openFaces), sorted into the bank, and only the
+// development cards are shuffled, into a hidden pile. Cards paid out are
+// dealt face up; cards spent are shown (reveals()) and go back to the bank; a
+// steal shuffles the victim's hand and deals one card to the thief. Discards
+// on a 7, answers to a trade and Monopoly are steps (movers()). See "Hexlands
+// in depth" in ARCHITECTURE.md.
 import { RuleError } from "../engine/turn-match.js";
 import { HEXES, CORNERS, EDGES, DESERT, ANY, RESOURCES, layoutBoard } from "./board.js";
 
@@ -50,6 +50,7 @@ export const COSTS = {
 };
 export const PIECES = { roads: 15, settlements: 5, cities: 4 };
 export const HAND_LIMIT = 7;
+export const MAX_OFFERS = 3; // trade offers a turn
 export const LONGEST_MIN = 5;
 export const ARMY_MIN = 3;
 
@@ -282,6 +283,7 @@ function devPlays(state, me, face) {
 function trades(state, me, face) {
   const out = [];
   const hand = state.hands[me];
+  const offers = state.offers < MAX_OFFERS;
   for (const r of RESOURCES) {
     const mine = hand.filter((s) => resourceOf(face(s)) === r);
     if (!mine.length) continue;
@@ -289,7 +291,7 @@ function trades(state, me, face) {
     for (const take of RESOURCES) {
       if (take === r) continue;
       if (mine.length >= rate && state.bank[take].length) out.push({ bank: mine.slice(0, rate), take });
-      out.push({ offer: [mine[0]], want: RESOURCES.map((x) => (x === take ? 1 : 0)) });
+      if (offers) out.push({ offer: [mine[0]], want: RESOURCES.map((x) => (x === take ? 1 : 0)) });
     }
   }
   return out;
@@ -616,6 +618,7 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
 
   function offer(state, p, move, deck, events) {
     const { offer: give, want } = move;
+    if (state.offers >= MAX_OFFERS) throw new RuleError(`at most ${MAX_OFFERS} trade offers a turn`);
     checkHand(state, p, give, "offer");
     if (!give.length) throw new RuleError("offer at least one card");
     if (!isCounts(want) || !sum(want)) throw new RuleError("want: 5 counts, at least one card");
@@ -624,6 +627,7 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
     const asked = sum(want);
     // A seat without enough cards can't accept.
     state.trade = { from: p, give: give.slice(), want: want.slice(), answers: seatsOf(state).map((q) => (q === p || state.hands[q].length < asked ? false : null)) };
+    state.offers++;
     state.phase = "answer";
     events.push({ type: "offer", p, give: give.slice(), want: want.slice() });
     if (!movers(state).length) endAnswers(state, events);
@@ -698,18 +702,21 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
     state.rolled = false;
     state.devPlayed = false;
     state.bought = [];
+    state.offers = 0;
     state.phase = "roll";
     events.push({ type: "turn", p: state.turn });
   }
 
   return {
     deckSize: DECK_SIZE,
+    openFaces: FIRST_DEV, // the resources: the bank is face up
     draws: DRAWS,
 
     newState(first, players, deck, rng) {
       if (players !== n) throw new RuleError(`these rules are for ${n} players`);
       const board = layoutBoard(rng);
-      for (const s of deck.cards) deck.open(s);
+      const bank = RESOURCES.map(() => []);
+      for (const s of deck.cards.slice(0, FIRST_DEV)) bank[resourceOf(deck.face(s))].push(s);
       const order = seatsOf({ players: n }).map((k) => (first + k) % n);
       const seats = () => Array.from({ length: n }, () => []);
       return {
@@ -721,7 +728,7 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
         target: c.target,
         board,
         robber: board.desert,
-        phase: "deal",
+        phase: "setup",
         setup: { order: [...order, ...order.slice().reverse()], i: 0, corner: -1 },
         buildings: Array(CORNERS.length).fill(null),
         roads: Array(EDGES.length).fill(-1),
@@ -729,12 +736,13 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
         hands: seats(),
         devs: seats(),
         bought: [],
+        offers: 0,
         devPlayed: false,
         rolled: false,
         knights: Array(n).fill(0),
         shown: seats(),
-        bank: RESOURCES.map(() => []),
-        devPile: deck.cards.slice(), // the whole deck, face up, until settle() sorts it
+        bank,
+        devPile: deck.cards.slice(FIRST_DEV),
         dice: null,
         discards: Array(n).fill(0),
         trade: null,
@@ -743,23 +751,6 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
         longest: { p: -1, size: 0 },
         army: { p: -1, size: 0 },
       };
-    },
-
-    // The deck was opened by newState: resources to the bank, development cards hidden again.
-    settle(state, deck) {
-      if (state.phase !== "deal") return [];
-      const devs = [];
-      for (const s of state.devPile) {
-        const f = deck.face(s);
-        if (f === null) throw new Error("the deck isn't open yet");
-        const r = resourceOf(f);
-        if (r >= 0) state.bank[r].push(s);
-        else devs.push(s);
-      }
-      state.devPile = deck.shuffle(devs);
-      state.phase = "setup";
-      state.turn = state.setup.order[0];
-      return [{ type: "dealt" }];
     },
 
     reveals,
