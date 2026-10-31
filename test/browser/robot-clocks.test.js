@@ -25,6 +25,7 @@ const GAMES = [
   ["go-fish", "gf", "moveSeconds", 15],
   ["gin-rummy", "gr", "moveSeconds", 15],
   ["hearts", "hr", "moveSeconds", 15],
+  ["hexlands", "hx", "moveSeconds", 30],
 ];
 
 async function setup(t) {
