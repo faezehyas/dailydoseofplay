@@ -78,6 +78,7 @@ function cloud(x, y, s) {
     `</g>`
   );
 }
+const birds = (x, y) => path(`M${pt(x, y)}q1.6 -1.8 3.2 0q1.6 -1.8 3.2 0M${pt(x + 7, y - 4)}q1.3 -1.5 2.6 0q1.3 -1.5 2.6 0`, "", ink(0.9));
 // A rolling hill line across the window, filled down to the bottom.
 const hill = (w, y, bumps, fill, extra = "") => {
   let d = `M-2 ${n(y)}`;
@@ -242,6 +243,12 @@ function logs(x, y, s) {
   }
   return o;
 }
+function mine(x, y, s) {
+  let o = path(`M${pt(x - 6 * s, y)}V${n(y - 7 * s)}Q${pt(x, y - 12 * s)} ${pt(x + 6 * s, y - 7 * s)}V${n(y)}Z`, "hole", ink(1.1));
+  o += rect(x - 7.4 * s, y - 9 * s, 2.4 * s, 9 * s, 0.5, "handle", ink(1)) + rect(x + 5 * s, y - 9 * s, 2.4 * s, 9 * s, 0.5, "handle", ink(1));
+  o += rect(x - 8.6 * s, y - 11 * s, 17.2 * s, 2.6 * s, 0.6, "handle", ink(1));
+  return o + path(`M${pt(x - 9 * s, y + 0.6)}H${n(x + 9 * s)}`, "", line("trunk-dk", 1));
+}
 function cart(x, y, s) {
   let o = shadow(x, y + 0.6, 11 * s, 0.22);
   o += path(`M${pt(x - 9 * s, y - 13 * s)}L${pt(x + 9 * s, y - 13 * s)}L${pt(x + 7 * s, y - 4 * s)}L${pt(x - 7 * s, y - 4 * s)}Z`, "handle", ink(1.3));
@@ -314,6 +321,7 @@ const SCENES = [
     sky(W, 64) +
     sun(18, 16, 5.6) +
     cloud(46, 12, 0.6) +
+    birds(30, 30) +
     hill(W, 50, [5, 8, 4], "far") +
     hill(W, 56, [4, 7, 3], "fields-lt") +
     windmill(64, 56, 1.15) +
@@ -329,9 +337,10 @@ const SCENES = [
     cloud(16, 14, 0.7) +
     peak(64, 58, 50, 42) +
     peak(28, 62, 56, 50) +
+    birds(70, 16) +
     hill(W, 62, [3, 4, 2], "mountains-lt") +
-    hill(W, 70, [2, 4, 3], "mountains") +
-    rock(46, 70, 1) +
+    mine(52, 66, 0.95) +
+    hill(W, 70, [2, 4, 3], "alpine") +
     rock(82, 76, 0.8, "rock") +
     tuft(30, 74, 1, "grass-dk") +
     tuft(54, 86, 1, "grass-dk") +
@@ -540,7 +549,7 @@ const DEV_ICONS = {
   knight: () => shieldAndSword(0.98),
   vp: () => crown(1.05),
   road: () => signpost(0.9),
-  plenty: () => group("translate(-5 2) scale(.84)", horn()),
+  plenty: () => group("translate(-4 2) scale(.76)", horn()),
   monopoly: () => group("translate(0 -4)", magnet(1.05)),
 };
 

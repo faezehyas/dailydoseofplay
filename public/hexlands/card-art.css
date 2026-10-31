@@ -73,6 +73,7 @@
   --hx-card-mountains: #aaa9b4;
   --hx-card-mountains-lt: #c5c5cd;
   --hx-card-mountains-dk: #6c6b79;
+  --hx-card-alpine: #a9b994;
   --hx-card-rock: #8a93a3;
   --hx-card-rock-lt: #cfd4dc;
   --hx-card-rock-dk: #646d7e;
@@ -183,6 +184,7 @@
     --hx-card-mountains: #9696a2;
     --hx-card-mountains-lt: #adaeb7;
     --hx-card-mountains-dk: #61616f;
+    --hx-card-alpine: #95a486;
     --hx-card-rock: #7a8393;
     --hx-card-rock-lt: #b6bbc4;
     --hx-card-rock-dk: #5a6273;
@@ -293,6 +295,7 @@
   --hx-card-mountains: #9696a2;
   --hx-card-mountains-lt: #adaeb7;
   --hx-card-mountains-dk: #61616f;
+  --hx-card-alpine: #95a486;
   --hx-card-rock: #7a8393;
   --hx-card-rock-lt: #b6bbc4;
   --hx-card-rock-dk: #5a6273;
@@ -645,6 +648,10 @@
 
 .hx-cf-mountains-dk {
   fill: var(--hx-card-mountains-dk);
+}
+
+.hx-cf-alpine {
+  fill: var(--hx-card-alpine);
 }
 
 .hx-cf-rock {
