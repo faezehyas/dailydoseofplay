@@ -15,14 +15,13 @@ import { playerBar, thinkingDots } from "../engine/players.js";
 import { resultPanel } from "../engine/result.js";
 import { celebrate } from "../engine/celebrate.js";
 import { cardTable } from "../engine/cards/table.js";
-import { humanPause } from "../engine/cards/paced-robot.js";
+import { humanPause, startPacedRobot } from "../engine/cards/paced-robot.js";
 import { robotPause } from "../engine/robot-pace.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
-import { HEXES, CORNERS, EDGES, RESOURCES, DESERT } from "./board.js";
+import { HEXES, CORNERS, RESOURCES, DESERT } from "./board.js";
 import { roadSvg, settlementSvg, citySvg, robberSvg } from "./pieces.js";
-import { makeRules, normalizeConfig, forcedMove, COSTS, resourceOf, devKind, counts, payment, legalCorners, legalEdges, legalCities, robberHexes, victims, tradeRate, points, discardCount, playable, MAX_OFFERS, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
-import { PACE, RES_NAMES, DEV_NAMES, plural, listOf, countWords, hexWords, cornerWords, edgeWords, glyphEl, cardEl, cardsRow, production, hexTable } from "./art.js";
-import { chooseMove, startRobot, timeoutMove } from "./robot.js";
+import { makeRules, normalizeConfig, forcedMove, COSTS, resourceOf, devKind, counts, payment, legalCorners, legalEdges, legalCities, robberHexes, victims, tradeRate, points, discardCount, playable, MAX_OFFERS, MAX_SHOWN, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
+import { PACE, RES_NAMES, DEV_NAMES, DEV_WORDS, plural, listOf, countWords, hexWords, cornerWords, edgeWords, glyphEl, chipEl, cardEl, cardsRow, hexTable, pointsToken, viewOf, drawNote, tableMotion, discardParts } from "./art.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
 import { howToPlay } from "./how-to-play.js";
@@ -42,7 +41,12 @@ let screenBusy = () => false;
 const sum = (c) => c.reduce((a, b) => a + b, 0);
 const zero = () => [0, 0, 0, 0, 0];
 
+// robot.js, loaded once a robot plays or a clock runs: a guest needs neither.
+let brain = null;
+const loadBrain = () => import("./robot.js").then((mod) => (brain = mod));
+
 function robotDelay(st, move) {
+  if (!brain) return -1;
   return humanPause(screenBusy, () => {
     const think = Math.random() * 500;
     if (move?.give) return ROBOT_PACE.give;
@@ -66,9 +70,14 @@ startGameShell({
   maxPlayers: MAX_PLAYERS,
   createRobot: (session) => {
     const config = settings.get();
-    return startRobot(session, {
+    loadBrain();
+    // As robot.js's startRobot(), started at once so it hears every message;
+    // it waits (and plans again: the key changes) until its brain has loaded.
+    return startPacedRobot(session, {
       rules: makeRules(config, session.players.length),
-      choose: (st, me, rng, face) => chooseMove(st, me, rng, face, { level: config.level }),
+      key: (st) => `${st.moves}:${!!brain}`,
+      choose: (st, me, rng, face) => brain?.chooseMove(st, me, rng, face, { level: config.level }) ?? null,
+      fallback: (st, me, face) => brain?.timeoutMove(st, me, face) ?? null,
       delay: (st, me, move) => robotDelay(st, move),
     });
   },
@@ -103,12 +112,13 @@ function mountGame(session, root, shell) {
   let previous = null; // the match before a rematch, whose verdict may still be on its way
   let lastVerdict = "";
   let finalPoints = null;
-  let lastSettlement = seats.map(() => -1);
+  let freeRoads = 0; // roads from road building still to show as free
   // Your choices on the way to a move.
   let mode = null; // in your main phase: null, "road", "settlement", "city", "trade", "plenty" or "monopoly"
   let tradeTab = "bank";
   let robberPick = null; // a hex picked for the robber, while you choose whom to rob
   let pick = { discard: zero(), give: zero(), want: zero(), plenty: zero(), bankGive: -1, bankTake: -1 };
+  let discardRest = null; // a discard paid in parts: the cards still picked for the next part
   let devSlot = null; // the development card being played
   let spotInfo = null; // the spot pointed at, for the placement guidance
   let fresh = zero(); // cards you just gained, lit up in your hand
@@ -127,7 +137,8 @@ function mountGame(session, root, shell) {
   // ---------- layout ----------
   const bar = playerBar(session, { onLeave: () => shell.leave(), classes: (p) => `p-${p}` });
   const notes = seats.map((p) => el("span", { class: "hx-note" }));
-  bar.update({ badges: seats.map(() => el("span", { class: "dot", "aria-hidden": "true" })), notes });
+  const vps = seats.map(() => pointsToken());
+  bar.update({ badges: vps.map((v) => v.node), notes });
   const pillOf = (p) => bar.node.querySelector(`.pb-who.p-${p}`);
   const status = el("p", { class: table.cls("status"), id: "hx-status", role: "status", "aria-live": "polite", tabindex: "-1" });
 
@@ -140,9 +151,7 @@ function mountGame(session, root, shell) {
   });
   const rectOf = (node) => (node ? table.rectIn(node) : null);
   const seatRect = (p) => (p === me ? rectOf(art.handBox) : rectOf(pillOf(p)));
-  const resRect = (p, r) => (p === me && r >= 0 ? art.pileRect(r) : seatRect(p));
   const devRect = (p) => (p === me ? rectOf(art.handBox.querySelector(".hx-dev-row:not([hidden])") ?? art.handBox) : seatRect(p));
-  const bankRect = (r) => art.bankChipRect(r);
 
   const timerFill = el("span");
   const timerText = el("span", { class: "mono" });
@@ -167,7 +176,7 @@ function mountGame(session, root, shell) {
     { class: "hexlands pc-game", dataset: { you: me === 0 ? "a" : me === 1 ? "b" : "", seat: me } },
     bar.node,
     status,
-    el("div", { class: "hx-main" }, el("div", { class: "hx-board-col" }, art.boardWrap), art.bankBox, actions, handBox, logBox),
+    el("div", { class: "hx-main" }, el("div", { class: "hx-board-col" }, art.boardWrap, art.bankBox), actions, handBox, logBox),
     configLine,
     note,
     result.node,
@@ -176,29 +185,6 @@ function mountGame(session, root, shell) {
   root.append(rootBox);
 
   // ---------- the table as drawn ----------
-  const viewFromState = (st) => ({
-    buildings: st.buildings.map((b) => b && { ...b }),
-    roads: st.roads.slice(),
-    robber: st.robber,
-    hands: st.hands.map((h) => h.slice()),
-    devs: st.devs.map((d) => d.slice()),
-    knights: st.knights.slice(),
-    shown: st.shown.map((s) => s.slice()),
-    longest: { ...st.longest },
-    army: { ...st.army },
-    bank: st.bank.map((b) => b.length),
-    devPile: st.devPile.length,
-    dice: st.dice ? st.dice.slice() : null,
-  });
-  // Points showing on the table: buildings, the two awards and point cards shown.
-  function shownPoints(v, p) {
-    let n = 0;
-    for (const b of v.buildings) if (b?.p === p) n += b.city ? 2 : 1;
-    if (v.longest.p === p) n += 2;
-    if (v.army.p === p) n += 2;
-    return n + v.shown[p].filter((f) => devKind(f) === "vp").length;
-  }
-  const hiddenPoints = (slots) => slots.filter((s) => devKind(faceOf(s)) === "vp").length;
   const myCounts = (slots = view?.hands[me] ?? []) => counts(slots, faceOf);
 
   // ---------- whose decision it is ----------
@@ -214,7 +200,7 @@ function mountGame(session, root, shell) {
     const d = decision();
     return mine(d) && match.canMove() && !autoMoveFor() ? d.phase : null;
   }
-  // A move nobody chooses: the rules' forced move, showing point cards to win, or calling off an offer nobody took.
+  // A move nobody chooses: the rules' forced move, or showing point cards to win.
   function autoMoveFor() {
     const st = match.state;
     const forced = forcedMove(st, me, faceOf);
@@ -224,7 +210,6 @@ function mountGame(session, root, shell) {
       const need = st.target - points(st, me);
       if (vp.length && need > 0 && vp.length >= need) return { claim: vp.slice(0, need) };
     }
-    if (st.phase === "partner" && st.turn === me && st.trade && !seats.some((p) => Array.isArray(st.trade.answers[p]))) return { partner: -1 };
     return null;
   }
 
@@ -233,80 +218,41 @@ function mountGame(session, root, shell) {
   function replayed(idle) {
     if (idle) {
       current = null;
-      if (match?.state) view = viewFromState(match.state);
+      if (match?.state) view = viewOf(match.state);
       for (const robot of window.ddp.robots || []) robot.poke?.();
     }
     render();
   }
 
-  // Cards with faces (open to all) fly; with null faces, backs fly.
-  const keysOf = (slots) => slots.map((s) => {
-    const r = resourceOf(faceOf(s));
-    return r === null || r < 0 ? "back" : r;
+  const motion = tableMotion(art, table, {
+    view: () => view,
+    face: faceOf,
+    me,
+    seatRect,
+    draw: () => render(),
+    sound: play,
+    gained: (p, slots) => {
+      if (p !== me) return;
+      for (const s of slots) {
+        const r = resourceOf(faceOf(s));
+        if (r >= 0) fresh[r]++;
+      }
+    },
   });
-  const removeSlots = (p, slots) => (view.hands[p] = view.hands[p].filter((s) => !slots.includes(s)));
-  const toBank = (slots) => slots.forEach((s) => {
-    const r = resourceOf(faceOf(s));
-    if (r >= 0) view.bank[r]++;
-  });
-  const fromBank = (slots) => slots.forEach((s) => {
-    const r = resourceOf(faceOf(s));
-    if (r >= 0) view.bank[r] = Math.max(0, view.bank[r] - 1);
-  });
-  const gainFresh = (p, slots) => {
-    if (p !== me) return;
-    for (const s of slots) {
-      const r = resourceOf(faceOf(s));
-      if (r >= 0) fresh[r]++;
-    }
-  };
-  // Cards paid from p's hand go to the bank.
-  async function spend(p, slots, g, k) {
-    if (!slots?.length) return;
-    const keys = keysOf(slots);
-    removeSlots(p, slots);
-    render();
-    await art.flyMany(keys, (i) => resRect(p, keys[i]), (i) => bankRect(keys[i] === "back" ? 0 : keys[i]), { g, k, ms: PACE.fly * 0.8, gap: 50 });
-    toBank(slots);
-  }
-  // Cards from the bank to p.
-  async function collect(p, slots, from, g, k) {
-    const keys = keysOf(slots);
-    await art.flyMany(keys, from ?? ((i) => bankRect(keys[i] === "back" ? 0 : keys[i])), (i) => resRect(p, keys[i]), { g, k });
-    if (!live(g)) return;
-    fromBank(slots);
-    view.hands[p].push(...slots);
-    gainFresh(p, slots);
-    render();
-  }
+  const { keysOf, resRect, remove: removeSlots, spend, collect, gained } = motion;
 
   async function animate(ev, g) {
     const k = table.pace();
     current = ev;
     const st = match.state;
     if (ev.type === "build") {
-      const from = ev.kind === "road" ? joinedEnd(ev.at, ev.p) : -1;
-      if (!ev.free) await spend(ev.p, ev.pay, g, k);
-      if (!live(g)) return;
-      if (ev.kind === "road") view.roads[ev.at] = ev.p;
-      else view.buildings[ev.at] = { p: ev.p, city: ev.kind === "city" };
-      if (ev.kind === "settlement") lastSettlement[ev.p] = ev.at;
-      render();
-      play(`build-${ev.kind}`);
-      if (ev.kind === "road") art.growRoad(ev.at, from, { g, k });
-      else art.popBuilding(ev.at, { g, k });
-      addLog({ player: ev.p, text: `${nameOf(ev.p)} ${verb(ev.p, "builds")} a ${BUILD_NAMES[ev.kind]}${ev.free && st.phase !== "setup" && ev.kind === "road" ? " (free)" : ""}` });
-      await wait((ev.kind === "road" ? PACE.road : PACE.build) * k, g);
+      // Free roads after setup come from road building.
+      const free = ev.kind === "road" && ev.free && freeRoads > 0;
+      if (free) freeRoads--;
+      await motion.build(ev, g, k);
+      addLog({ player: ev.p, text: `${nameOf(ev.p)} ${verb(ev.p, "builds")} a ${BUILD_NAMES[ev.kind]}${free ? " (free)" : ""}` });
     } else if (ev.type === "gain") {
-      // The second settlement collects from each land it touches.
-      const corner = lastSettlement[ev.p];
-      const from = (i) => {
-        const r = resourceOf(faceOf(ev.slots[i]));
-        const hex = CORNERS[corner]?.hexes.find((h) => st.board.terrain[h] === r);
-        return hex === undefined ? art.centreRect() : art.hexRect(hex);
-      };
-      ev.slots.forEach((s) => play("gain", { r: resourceOf(faceOf(s)) }));
-      await collect(ev.p, ev.slots, from, g, k);
+      await motion.collectSecond(ev.p, ev.slots, st.board, g, k);
       addLog({ player: ev.p, cards: counts(ev.slots, faceOf), text: `${nameOf(ev.p)} ${verb(ev.p, "collects")} ${countWords(counts(ev.slots, faceOf))}` });
     } else if (ev.type === "roll") {
       fresh = zero();
@@ -337,7 +283,7 @@ function mountGame(session, root, shell) {
       if (!live(g)) return;
       play("buy");
       view.devPile = Math.max(0, view.devPile - 1);
-      await art.flyCard(ev.p === me && devKind(faceOf(ev.slot)) ? devKind(faceOf(ev.slot)) : "back", bankRect("dev"), devRect(ev.p), { g, ms: PACE.fly * k, fade: ev.p !== me });
+      await art.flyCard(ev.p === me && devKind(faceOf(ev.slot)) ? devKind(faceOf(ev.slot)) : "back", art.bankChipRect("dev"), devRect(ev.p), { g, ms: PACE.fly * k, fade: ev.p !== me });
       if (!live(g)) return;
       view.devs[ev.p].push(ev.slot);
       render();
@@ -347,12 +293,12 @@ function mountGame(session, root, shell) {
       const face = faceOf(ev.slot);
       if (face !== null) view.shown[ev.p].push(face);
       if (ev.kind === "knight") view.knights[ev.p]++;
+      if (ev.kind === "road") freeRoads = 2;
       render();
       play(ev.kind === "knight" ? "knight" : "progress");
       addLog({ player: ev.p, kind: "dev", text: `${nameOf(ev.p)} ${verb(ev.p, "plays")} ${ev.kind === "knight" ? "a knight" : DEV_NAMES[ev.kind].toLowerCase()}` });
       await art.moment({ text: DEV_NAMES[ev.kind], p: ev.p, card: ev.kind, from: devRect(ev.p), g, k });
     } else if (ev.type === "claim") {
-      // Hidden victory points, shown to win.
       view.devs[ev.p] = view.devs[ev.p].filter((s) => !ev.slots.includes(s));
       view.shown[ev.p].push(...ev.slots.map(faceOf).filter((f) => f !== null));
       render();
@@ -369,7 +315,6 @@ function mountGame(session, root, shell) {
       play("trade");
       await spend(ev.p, ev.gave, g, k);
       if (!live(g)) return;
-      // One card back (a slot), or a list of them.
       const got = [].concat(ev.got);
       await collect(ev.p, got, null, g, k);
       addLog({ player: ev.p, kind: "trade", text: `${nameOf(ev.p)} ${verb(ev.p, "trades")} ${countWords(counts(ev.gave, faceOf))} for ${countWords(counts(got, faceOf))} with the bank` });
@@ -391,6 +336,7 @@ function mountGame(session, root, shell) {
     } else if (ev.type === "turn") {
       fresh = zero();
       robbed = -1;
+      if (ev.p === me) art.breathe(g);
       addLog({ player: ev.p, kind: "turn", text: ev.p === me ? "Your turn" : `${nameOf(ev.p)}'s turn` });
     } else if (ev.type === "over") {
       finalPoints = ev.points;
@@ -400,40 +346,15 @@ function mountGame(session, root, shell) {
     await wait(PACE.between * k, g);
   }
 
-  // Which end of a new road joins p's own pieces: it draws in from there.
-  function joinedEnd(edge, p) {
-    const e = EDGES[edge];
-    const own = (c) => view.buildings[c]?.p === p || CORNERS[c].edges.some((o) => o !== edge && view.roads[o] === p);
-    return own(e.a) ? e.a : e.b;
-  }
-
-  // A roll pays out: the numbers' hexes light up (the robber's stays dark),
-  // then each building's cards fly from its hex to its owner.
   async function produce(ev, g, k) {
-    const st = match.state;
-    const flights = production(st.board, view.robber, view.buildings, ev.roll, ev.short);
-    const hexes = HEXES.filter((h) => st.board.numbers[h.id] === ev.roll).map((h) => h.id);
-    art.glowHexes(hexes.filter((h) => h !== view.robber), { g, k });
-    art.glowHexes(hexes.filter((h) => h === view.robber), { g, k, cls: "blocked" });
-    await wait(PACE.glow * 0.45 * k, g);
-    const jobs = [];
-    let i = 0;
-    for (const f of flights) {
-      for (let n = 0; n < f.n; n++) {
-        const delay = i++ * PACE.flyGap * k;
-        jobs.push(wait(delay, g).then(() => (play("gain", { r: f.r }), art.flyCard(f.r, art.hexRect(f.hex), resRect(f.p, f.r), { g, ms: PACE.fly * k }))));
-      }
-    }
-    await Promise.all(jobs);
+    await motion.produce(ev, match.state.board, g, k);
     if (!live(g)) return;
-    ev.gains.forEach((slots, p) => {
-      fromBank(slots);
-      view.hands[p].push(...slots);
-      gainFresh(p, slots);
-    });
-    render();
     const got = seats.filter((p) => ev.gains[p]?.length);
     for (const r of ev.short ?? []) addLog({ kind: "short", text: `The bank is short of ${RES_NAMES[r]}: nobody gets any` });
+    for (const r of ev.partial ?? []) {
+      const p = seats.find((q) => counts(ev.gains[q], faceOf)[r] > 0);
+      if (p !== undefined) addLog({ kind: "short", text: `The bank runs short of ${RES_NAMES[r]}: ${nameOf(p)} ${verb(p, "gets")} what was left` });
+    }
     if (!got.length) addLog({ text: `${ev.roll}: nobody collects` });
     for (const p of got) addLog({ player: p, cards: counts(ev.gains[p], faceOf), text: `${nameOf(p)} ${verb(p, "gets")} ${countWords(counts(ev.gains[p], faceOf))}` });
   }
@@ -444,7 +365,9 @@ function mountGame(session, root, shell) {
     const { thief, victim, slot } = ev;
     const face = thief === me ? faceOf(slot) : null;
     const before = victim === me ? mySnapshot : null;
-    if (view.hands[victim].length) view.hands[victim] = view.hands[victim].slice(0, -1);
+    // The victim's hand comes back shuffled, in the slots after the thief's
+    // card (deck.shuffle() makes them in a row): its faces arrive like a deal.
+    view.hands[victim] = view.hands[victim].slice(1).map((_, i) => slot + 1 + i);
     robbed = victim;
     render();
     play("steal");
@@ -484,13 +407,12 @@ function mountGame(session, root, shell) {
     if (!live(g)) return;
     const all = ev.given.flat();
     view.hands[ev.p].push(...all);
-    gainFresh(ev.p, all);
+    gained(ev.p, all);
     render();
     const from = seats.filter((q) => ev.given[q]?.length).map((q) => `${ev.given[q].length} from ${q === me ? "you" : nameOf(q)}`);
     addLog({ player: ev.p, kind: "dev", text: `${nameOf(ev.p)} ${verb(ev.p, "takes")} every ${RES_NAMES[ev.resource]}: ${all.length}${from.length ? ` (${listOf(from)})` : ""}` });
   }
 
-  // A trade between players: each side's cards cross to the other.
   async function swap(ev, g, k) {
     const { from, to, gave, got } = ev;
     play("trade");
@@ -503,8 +425,8 @@ function mountGame(session, root, shell) {
     if (!live(g)) return;
     view.hands[to].push(...gave);
     view.hands[from].push(...got);
-    gainFresh(to, gave);
-    gainFresh(from, got);
+    gained(to, gave);
+    gained(from, got);
     render();
     addLog({ player: from, kind: "trade", text: `${nameOf(from)} ${verb(from, "trades")} ${countWords(counts(gave, faceOf))} with ${to === me ? "you" : nameOf(to)} for ${countWords(counts(got, faceOf))}` });
   }
@@ -563,6 +485,7 @@ function mountGame(session, root, shell) {
   const slotsOf = (r, n, hand = st().hands[me]) => hand.filter((s) => resourceOf(faceOf(s)) === r).slice(0, n);
   const pickSlots = (c) => c.flatMap((n, r) => slotsOf(r, n));
   const costPay = (kind) => payment(st().hands[me], faceOf, COSTS[kind]);
+  const discardMove = () => discardParts(st().hands[me], pick.discard, faceOf, (x) => !!match.slots[x]?.open, MAX_SHOWN);
   function send(move) {
     mode = null;
     robberPick = null;
@@ -584,8 +507,8 @@ function mountGame(session, root, shell) {
       }
       return send({ robber: id, steal: vs[0] ?? -1 });
     }
+    if (s.freeRoads > 0 && (s.phase === "main" || s.phase === "roll")) return send({ road: id });
     if (s.phase !== "main") return;
-    if (s.freeRoads > 0) return send({ road: id });
     const build = mode;
     const pay = costPay(build);
     if (!pay) {
@@ -629,7 +552,7 @@ function mountGame(session, root, shell) {
     if (myChoice() === "main" && !st().freeRoads) send({ end: true });
   }
   function roll() {
-    if (myChoice() === "roll") send({ roll: true });
+    if (myChoice() === "roll" && !st().freeRoads) send({ roll: true });
   }
 
   // R rolls, E ends your turn, Esc steps back.
@@ -648,17 +571,23 @@ function mountGame(session, root, shell) {
   addEventListener("keydown", onKey);
 
   // ---------- the action panel ----------
-  // Rebuilt only when what it shows changes; focus stays on the control with the same id.
-  let panelHtml = "";
+  // Rebuilt only when what it shows changes (panelKey() names everything
+  // panelNodes() reads); focus stays on the control with the same id.
+  let shownKey = "";
+  function panelKey() {
+    const s = match?.state;
+    if (!s || ended || match.phase !== "playing" || !view) return `${ended}:${match?.phase}`;
+    const d = decision();
+    return JSON.stringify([m, s.moves, s.phase, s.turn, s.freeRoads, table.pending > 0, d?.movers, match.step?.commits?.map(Boolean), match.canMove(), myChoice(), mode, tradeTab, pick, robberPick, devSlot, spotInfo, myCounts(s.hands[me]), s.devs[me].map(faceOf), view.bank, view.hands.map((h) => h.length)]);
+  }
   function renderActions() {
+    const key = panelKey();
+    if (key === shownKey) return;
+    shownKey = key;
     const nodes = panelNodes();
-    const box = el("div", {}, nodes);
-    const html = box.innerHTML;
     actions.hidden = !nodes.length;
-    if (html === panelHtml) return;
-    panelHtml = html;
     const focused = panel.contains(document.activeElement) ? document.activeElement.id : null;
-    panel.replaceChildren(...box.childNodes);
+    panel.replaceChildren(...nodes);
     if (focused) (document.getElementById(focused) ?? panel.querySelector("button:not([disabled])") ?? status).focus({ preventScroll: true });
   }
 
@@ -677,7 +606,7 @@ function mountGame(session, root, shell) {
         el(
           "div",
           { class: `hx-stepper r-${r} ${values[r] ? "on" : ""}` },
-          cardEl(r, "mini", { mini: true }),
+          chipEl(r),
           el("span", { class: "hx-step-n mono", "aria-hidden": "true" }, String(values[r])),
           el(
             "span",
@@ -690,7 +619,6 @@ function mountGame(session, root, shell) {
     );
   }
 
-  // A row of five resource buttons: pick one.
   function resourceButtons(name, { selected = -1, disabled = () => false, note = () => "", onPick, label }) {
     return el(
       "div",
@@ -788,15 +716,24 @@ function mountGame(session, root, shell) {
         else out.push(title("Place a road", "Next to the settlement you just placed."), hint("Tap a glowing path."));
       } else out.push(title(busy ? turnTitle : `${nameOf(s.turn)} ${s.turn === me ? "are" : "is"} placing`, "Everyone places two settlements and two roads, then the first turn starts."));
     } else if (s.phase === "roll") {
-      if (choice) {
-        const knights = s.devs[me].filter((x) => devPlayable(x) && devKind(faceOf(x)) === "knight");
-        out.push(title("Your turn"), el("div", { class: "hx-row" }, btn("hx-roll", "Roll the dice", roll, { cls: "primary big", aria: "Roll the dice (R)" }), knights.length ? btn("hx-knight-first", "Play a knight first", () => playDev(knights[0])) : null));
+      if (choice && s.freeRoads > 0) out.push(...freeRoadNodes(s));
+      else if (choice && (mode === "plenty" || mode === "monopoly")) out.push(...devPicker());
+      else if (choice) {
+        // One button per kind of development card you may play before rolling.
+        const kinds = [...new Map(playable(s, me, faceOf).map((x) => [devKind(faceOf(x)), x])).entries()];
+        out.push(
+          title("Your turn", kinds.length ? "Roll, or play a development card first." : ""),
+          el("div", { class: "hx-row" }, btn("hx-roll", "Roll the dice", roll, { cls: "primary big", aria: "Roll the dice (R)" })),
+          kinds.length ? el("div", { class: "hx-row hx-first", role: "group", "aria-label": "Before you roll" }, kinds.map(([kind, slot]) => btn(`hx-${kind}-first`, "", () => playDev(slot), { cls: "hx-first-btn", aria: `Play ${kind === "knight" ? "a knight" : DEV_NAMES[kind].toLowerCase()} first: ${DEV_WORDS[kind]}`, children: [cardEl(kind, "hx-first-card", { face: "mini" }), el("span", {}, kind === "knight" ? "Knight first" : `${DEV_NAMES[kind]} first`)] }))) : null,
+        );
       } else out.push(title(busy ? turnTitle : `${nameOf(s.turn)} ${verb(s.turn, "rolls")} next`), buildGrid(s, false));
     } else if (s.phase === "discard") {
       const owe = discardCount(s, me);
       if (choice) {
         const have = myCounts(s.hands[me]);
         const n = sum(pick.discard);
+        const parts = n === owe ? discardMove() : null;
+        const label = n !== owe ? `${n} of ${owe} chosen` : parts.rest ? `Discard ${parts.slots.length} now, ${owe - parts.slots.length} next` : `Discard ${owe}`;
         out.push(
           title(`Discard ${plural(owe, "card")}`, `A seven: everyone holding more than 7 gives back half.`),
           steppers("discard", pick.discard, have.map((h) => Math.min(h, owe)), (r, dlt) => {
@@ -804,7 +741,8 @@ function mountGame(session, root, shell) {
             pick.discard[r] += dlt;
             render();
           }, { legend: "Give back" }),
-          el("div", { class: "hx-row" }, btn("hx-discard", n === owe ? `Discard ${owe}` : `${n} of ${owe} chosen`, () => send({ discard: pickSlots(pick.discard) }), { cls: "primary", disabled: n !== owe })),
+          el("div", { class: "hx-row" }, btn("hx-discard", label, () => sendDiscard(), { cls: "primary", disabled: n !== owe })),
+          parts?.rest ? hint(`A move shows at most ${MAX_SHOWN} cards nobody else has seen, so these go in two parts.`) : null,
         );
       }
       const waiting = (d?.movers ?? []).filter((p) => p !== me);
@@ -822,24 +760,12 @@ function mountGame(session, root, shell) {
       } else out.push(title(busy ? turnTitle : `${nameOf(s.turn)} ${verb(s.turn, "moves")} the robber`));
     } else if (s.phase === "main") {
       if (!choice) out.push(title(turnTitle), buildGrid(s, false));
-      else if (s.freeRoads > 0) out.push(title(`Road building: ${plural(s.freeRoads, "free road")} to place`), hint("Tap a glowing path."));
+      else if (s.freeRoads > 0) out.push(...freeRoadNodes(s));
       else if (mode === "road" || mode === "settlement" || mode === "city") {
         out.push(title(`Build a ${BUILD_NAMES[mode]}`, mode === "city" ? "Tap one of your settlements to make it a city." : `Tap a glowing ${mode === "road" ? "path" : "corner"}.`), cardsRow(COSTS[mode]), mode === "settlement" ? spotLine(s) : null, btn("hx-cancel", "Cancel", () => setMode(null), { cls: "small", aria: "Cancel (Esc)" }));
       } else if (mode === "trade") out.push(...tradeNodes(s));
-      else if (mode === "plenty") {
-        const n = sum(pick.plenty);
-        out.push(
-          title("Year of plenty", "Take any two cards from the bank."),
-          steppers("plenty", pick.plenty, view.bank.map((b) => Math.min(b, 2)), (r, dlt) => {
-            if (dlt > 0 && sum(pick.plenty) >= 2) return;
-            pick.plenty[r] += dlt;
-            render();
-          }, { legend: "Take" }),
-          el("div", { class: "hx-row" }, btn("hx-plenty", n === 2 ? "Take them" : `${n} of 2 chosen`, () => send({ play: devSlot, take: pick.plenty.flatMap((c, r) => Array(c).fill(r)) }), { cls: "primary", disabled: n !== 2 }), btn("hx-back", "Back", () => setMode(null))),
-        );
-      } else if (mode === "monopoly") {
-        out.push(title("Monopoly", "Name a resource: everyone else gives you all of theirs."), resourceButtons("mono", { label: "Name a resource", onPick: (r) => send({ play: devSlot, resource: r }) }), btn("hx-back", "Back", () => setMode(null), { cls: "small" }));
-      } else {
+      else if (mode === "plenty" || mode === "monopoly") out.push(...devPicker());
+      else {
         out.push(
           title("Your turn", "Build, trade, play a development card, or end your turn."),
           buildGrid(s, true),
@@ -862,7 +788,34 @@ function mountGame(session, root, shell) {
     } else if (s.phase === "monopoly") {
       out.push(title(`${nameOf(s.monopoly.p)} ${verb(s.monopoly.p, "names")} ${RES_NAMES[s.monopoly.resource]}`, s.monopoly.p === me ? "Everyone hands theirs over." : "Everyone hands theirs over: yours go for you."));
     }
-    return out.filter(Boolean);
+    // Something always shows, so the panel keeps its place while events play.
+    const nodes = out.filter(Boolean);
+    return nodes.length ? nodes : [title(turnTitle)];
+  }
+
+  function freeRoadNodes(s) {
+    return [title(`Road building: ${plural(s.freeRoads, "free road")} to place`, s.phase === "roll" ? "Then roll the dice." : ""), hint("Tap a glowing path.")];
+  }
+
+  // Year of plenty's two cards, or Monopoly's resource: before or after the roll.
+  function devPicker() {
+    if (mode === "monopoly") return [title("Monopoly", "Name a resource: everyone else gives you all of theirs."), resourceButtons("mono", { label: "Name a resource", onPick: (r) => send({ play: devSlot, resource: r }) }), btn("hx-back", "Back", () => setMode(null), { cls: "small" })];
+    const n = sum(pick.plenty);
+    return [
+      title("Year of plenty", "Take any two cards from the bank."),
+      steppers("plenty", pick.plenty, view.bank.map((b) => Math.min(b, 2)), (r, dlt) => {
+        if (dlt > 0 && sum(pick.plenty) >= 2) return;
+        pick.plenty[r] += dlt;
+        render();
+      }, { legend: "Take" }),
+      el("div", { class: "hx-row" }, btn("hx-plenty", n === 2 ? "Take them" : `${n} of 2 chosen`, () => send({ play: devSlot, take: pick.plenty.flatMap((c, r) => Array(c).fill(r)) }), { cls: "primary", disabled: n !== 2 }), btn("hx-back", "Back", () => setMode(null))),
+    ];
+  }
+
+  function sendDiscard() {
+    const { slots, rest } = discardMove();
+    discardRest = rest;
+    send({ discard: slots });
   }
 
   // Trading: with the bank at your rates, or an offer to everyone.
@@ -915,8 +868,9 @@ function mountGame(session, root, shell) {
     const edges = (label) => ({ kind: "edge", ids: legalEdges(s, me), ghost: (e) => roadSvg(e, me), words: words.edge, label });
     if (s.phase === "setup") return s.setup.corner === -1 ? { kind: "corner", ids: legalCorners(s, me), ghost: (c) => settlementSvg(c, me), words: words.corner, label: "Corners for a settlement" } : edges("Paths for a road");
     if (s.phase === "robber") return { kind: "hex", ids: robberPick === null ? robberHexes(s) : [robberPick], chosen: robberPick, ghost: robberPick === null ? robberSvg : null, words: words.hex, label: "Hexes for the robber" };
+    if (s.freeRoads > 0 && (s.phase === "main" || s.phase === "roll")) return edges("Paths for a road");
     if (s.phase !== "main") return null;
-    if (s.freeRoads > 0 || mode === "road") return edges("Paths for a road");
+    if (mode === "road") return edges("Paths for a road");
     if (mode === "settlement") return { kind: "corner", ids: legalCorners(s, me), ghost: (c) => settlementSvg(c, me), words: words.corner, label: "Corners for a settlement" };
     if (mode === "city") return { kind: "corner", ids: legalCities(s, me), ghost: (c) => citySvg(c, me), words: (c) => `your settlement, ${cornerWords(s.board, c)}`, label: "Settlements to make a city" };
     return null;
@@ -961,10 +915,17 @@ function mountGame(session, root, shell) {
       const placing = s.setup.corner === -1 ? "a settlement" : "a road";
       return turn === me ? (choice ? `Place ${placing}.` : "…") : `${nameOf(turn)} is placing ${placing}…`;
     }
-    if (s.phase === "roll") return turn === me ? (choice ? "Your turn: roll the dice." : "…") : `${nameOf(turn)}'s turn…`;
+    if (s.phase === "roll") {
+      if (turn !== me) return `${nameOf(turn)}'s turn…`;
+      if (!choice) return "…";
+      if (s.freeRoads > 0) return `Place a free road (${s.freeRoads} left), then roll.`;
+      if (mode === "plenty") return "Year of plenty: take any two cards.";
+      if (mode === "monopoly") return "Monopoly: name a resource.";
+      return "Your turn: roll the dice.";
+    }
     if (s.phase === "discard") {
       if (choice) return `A seven! Discard ${plural(discardCount(s, me), "card")}.`;
-      return `Waiting for ${listOf(d.movers.map(nameOf))} to discard…`;
+      return d.movers.length ? `Waiting for ${listOf(d.movers.map(nameOf))} to discard…` : "Everyone has chosen what to discard…";
     }
     if (s.phase === "robber") return turn === me ? (robberPick === null ? "Move the robber: tap a hex." : "Choose whom to steal from.") : `${nameOf(turn)} is moving the robber…`;
     if (s.phase === "main") {
@@ -988,26 +949,7 @@ function mountGame(session, root, shell) {
   }
 
   function renderNotes() {
-    seats.forEach((p) => {
-      const n = view.hands[p].length;
-      const devs = view.devs[p].length;
-      const parts = [
-        ["cards", n, plural(n, "card")],
-        ["devs", devs, plural(devs, "development card")],
-      ];
-      if (view.knights[p]) parts.push(["knights", view.knights[p], plural(view.knights[p], "knight")]);
-      const label = [...parts.map((x) => x[2]), view.longest.p === p ? "longest road" : "", view.army.p === p ? "largest army" : "", robbed === p ? "robbed this turn" : ""].filter(Boolean).join(", ");
-      const key = `${label}`;
-      if (notes[p].dataset.key === key) return;
-      notes[p].dataset.key = key;
-      notes[p].setAttribute("aria-label", label);
-      notes[p].replaceChildren(
-        ...parts.map(([kind, v]) => el("span", { class: `hx-n ${kind}`, "aria-hidden": "true" }, el("i", {}), String(v))),
-        view.longest.p === p ? el("span", { class: "hx-award road", title: `Longest road (${view.longest.size})`, "aria-hidden": "true" }) : "",
-        view.army.p === p ? el("span", { class: "hx-award army", title: `Largest army (${view.army.size})`, "aria-hidden": "true" }) : "",
-        robbed === p ? el("span", { class: "hx-robbed", title: "Robbed this turn", "aria-hidden": "true" }) : "",
-      );
-    });
+    seats.forEach((p) => drawNote(notes[p], view, p, { robbed: robbed === p }));
   }
 
   function renderBoard() {
@@ -1024,7 +966,7 @@ function mountGame(session, root, shell) {
     art.bankBox.hidden = !view || starting;
     if (!view) return;
     art.drawPieces(view);
-    art.drawDice(view.dice, { dim: !!s && s.phase !== "roll" && s.phase !== "produce" && current?.type !== "roll" && !(s.phase === "main" && !s.rolled) && s.phase !== "main" });
+    art.drawDice(view.dice, { dim: !!s && s.phase !== "roll" && s.phase !== "main" && current?.type !== "roll" });
     art.drawBank(view.bank, view.devPile);
   }
 
@@ -1046,20 +988,25 @@ function mountGame(session, root, shell) {
     const phase = ended ? "ended" : match?.phase || "setup";
     rootBox.dataset.phase = phase;
     shell.setInProgress?.(phase === "starting" || phase === "playing");
-    if (s && !view && !table.pending) view = viewFromState(s);
+    if (s && !view && !table.pending) view = viewOf(s);
     // A decision that has passed takes its half-made choices with it.
     const choice = myChoice();
-    if (choice !== "main") mode = null;
+    if (choice !== "main" && !(choice === "roll" && (mode === "plenty" || mode === "monopoly"))) mode = null;
     if (choice !== "robber") robberPick = null;
+    if (s?.phase !== "discard") discardRest = null;
     if (choice !== "discard") pick.discard = zero();
+    else if (discardRest) {
+      pick.discard = discardRest;
+      discardRest = null;
+    }
     if (view) {
       bar.update({
         turn: phase === "playing" && s ? (current?.p ?? s.turn) : -1,
         thinking: current || match?.busy ? -1 : thinkingSeat(),
-        score: { wins: seats.map((p) => shownPoints(view, p)) },
         checked: match?.checked ?? [],
       });
       renderNotes();
+      vps.forEach((v, p) => v.set(points(view, p), !fast()));
     } else bar.update({ checked: match?.checked ?? [] });
     renderBoard();
     renderHand();
@@ -1103,7 +1050,9 @@ function mountGame(session, root, shell) {
     clearTimeout(autoTimer);
     const ms = move.decline ? robotPause(DECLINE_MS[0] + Math.random() * (DECLINE_MS[1] - DECLINE_MS[0])) : fast() ? 0 : AUTO_MS;
     autoTimer = setTimeout(() => {
-      if (live(g) && mine() && match.canMove() && `${m}:${match.state.moves}:${match.state.phase}` === key) match.play(autoMoveFor() ?? move);
+      if (live(g) && mine() && match.canMove() && `${m}:${match.state.moves}:${match.state.phase}` === key) return match.play(autoMoveFor() ?? move);
+      // Not now (the screen or the deck is busy): the next render schedules it again.
+      if (autoKey === key) autoKey = "";
     }, ms);
   }
 
@@ -1140,10 +1089,10 @@ function mountGame(session, root, shell) {
     const d = decision();
     if (!d || timer.hidden) return;
     const left = deadline - performance.now();
-    if (mine(d) && left <= 0 && timedOut !== deadlineKey && myChoice()) {
+    if (mine(d) && left <= 0 && timedOut !== deadlineKey && brain && myChoice()) {
       timedOut = deadlineKey;
       // A stalled player would hold up the game: a sensible move is made for them.
-      const move = timeoutMove(match.state, me, (slot) => match.face(slot));
+      const move = brain.timeoutMove(match.state, me, (slot) => match.face(slot));
       if (!move) return;
       toast(move.end ? "Time's up: your turn ended" : move.roll ? "Time's up: rolled for you" : "Time's up: a move was made for you");
       send(move);
@@ -1233,6 +1182,7 @@ function mountGame(session, root, shell) {
     deadlineKey = "";
     timedOut = "";
     shownFor = null;
+    shownKey = "";
     lastVerdict = "";
     finalPoints = null;
     mode = null;
@@ -1240,8 +1190,10 @@ function mountGame(session, root, shell) {
     devSlot = null;
     fresh = zero();
     robbed = -1;
-    lastSettlement = seats.map(() => -1);
+    freeRoads = 0;
+    motion.reset();
     pick = { discard: zero(), give: zero(), want: zero(), plenty: zero(), bankGive: -1, bankTake: -1 };
+    discardRest = null;
     art.clearBoard();
     logList.replaceChildren();
     const opponents = listOf(seats.filter((p) => p !== me).map((p) => session.players[p].name));
@@ -1291,6 +1243,7 @@ function mountGame(session, root, shell) {
     if (config) return;
     config = normalizeConfig(c);
     rules = makeRules(config, count);
+    if (config.moveSeconds) loadBrain();
     configLine.textContent = describeConfig(config);
     newMatch();
   }

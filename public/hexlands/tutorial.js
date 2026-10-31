@@ -6,10 +6,10 @@
 import { el } from "../engine/shell.js";
 import { RuleError } from "../engine/turn-match.js";
 import { cardTable } from "../engine/cards/table.js";
-import { HEXES, CORNERS, EDGES, RESOURCES, DESERT } from "./board.js";
+import { HEXES, CORNERS, EDGES, RESOURCES } from "./board.js";
 import { roadSvg, settlementSvg, citySvg, robberSvg } from "./pieces.js";
-import { makeRules, COSTS, PIECES, DECK_SIZE, FIRST_DEV, resourceOf, devKind, counts, payment, legalCorners, legalEdges, legalCities, robberHexes, victims, tradeRate, roadLength, playable, movers } from "./rules.js";
-import { PACE, RES_NAMES, DEV_NAMES, plural, listOf, countWords, hexWords, cornerWords, edgeWords, glyphEl, cardsRow, production, hexTable } from "./art.js";
+import { makeRules, COSTS, PIECES, DECK_SIZE, FIRST_DEV, resourceOf, devKind, counts, payment, legalCorners, legalEdges, legalCities, robberHexes, victims, tradeRate, roadLength, playable, movers, points } from "./rules.js";
+import { PACE, RES_NAMES, DEV_NAMES, DEV_WORDS, plural, listOf, countWords, hexWords, cornerWords, edgeWords, glyphEl, cardEl, cardsRow, hexTable, pointsToken, viewOf, drawNote, tableMotion } from "./art.js";
 import { play as sound } from "./sounds.js";
 import { BOARD, cards } from "./lessons.js";
 
@@ -167,7 +167,6 @@ export function board() {
   let give = -1;
   let get = -1;
   let fresh = zero();
-  let lastSettlement = SEATS.map(() => -1);
   let moveFn = () => {};
 
   const art = hexTable(table, { onSpot: (kind, id) => chooseSpot(kind, id), onSpotFocus: () => {} });
@@ -210,21 +209,16 @@ export function board() {
 
   // ---------- the players ----------
   const notes = SEATS.map(() => el("span", { class: "hx-note" }));
+  const vps = SEATS.map(() => pointsToken());
   const pills = SEATS.map((p) =>
     el(
       "span",
       { class: `pb-who ${p ? "theirs" : "mine"} p-${p}` },
-      el("span", { class: "pb-badge" }, el("span", { class: "dot", "aria-hidden": "true" })),
+      el("span", { class: "pb-badge" }, vps[p].node),
       el("span", { class: "pb-label" }, el("span", { class: "pb-name" }, NAMES[p]), el("small", { class: "pb-note" }, notes[p])),
     ),
   );
-  const scores = SEATS.map(() => el("dd"));
-  const bar = el(
-    "div",
-    { class: "player-bar many" },
-    el("div", { class: "pb-top" }, el("div", { class: "pb-players" }, pills)),
-    el("dl", { class: "pb-score", "aria-label": "Points" }, SEATS.map((p) => el("div", { class: `${p ? "theirs" : "mine"} p-${p}` }, el("dt", {}, NAMES[p]), scores[p]))),
-  );
+  const bar = el("div", { class: "player-bar many" }, el("div", { class: "pb-top" }, el("div", { class: "pb-players" }, pills)));
 
   // ---------- the controls, made once so a lit one stays lit ----------
   const btn = (id, label, onclick, cls = "") => el("button", { class: `btn ${cls}`, type: "button", id, onclick: () => !moving && onclick() }, label);
@@ -233,8 +227,17 @@ export function board() {
   const title = el("div", { class: "hx-panel-title" }, titleText, titleSmall);
   const rollBtn = btn("hx-roll", "Roll the dice", () => roll(), "primary big");
   rollBtn.setAttribute("aria-label", "Roll the dice (R)");
-  const knightBtn = btn("hx-knight-first", "Play a knight first", () => playDev(knightSlot()));
-  const rollRow = el("div", { class: "hx-row" }, rollBtn, knightBtn);
+  // The development cards a lesson may play before the roll, as in the game.
+  const firstBtns = Object.fromEntries(
+    ["knight", "road"].map((kind) => {
+      const b = btn(`hx-${kind}-first`, "", () => playDev(firstSlot(kind)), "hx-first-btn");
+      b.setAttribute("aria-label", `Play ${kind === "knight" ? "a knight" : DEV_NAMES[kind].toLowerCase()} first: ${DEV_WORDS[kind]}`);
+      b.append(cardEl(kind, "hx-first-card", { face: "mini" }), el("span", {}, kind === "knight" ? "Knight first" : `${DEV_NAMES[kind]} first`));
+      return [kind, b];
+    }),
+  );
+  const rollRow = el("div", { class: "hx-row" }, rollBtn);
+  const firstRow = el("div", { class: "hx-row hx-first", role: "group", "aria-label": "Before you roll" }, Object.values(firstBtns));
   const builds = Object.fromEntries(["road", "settlement", "city", "dev"].map((kind) => [kind, btn(`hx-build-${kind}`, "", () => (kind === "dev" ? buy() : setMode(kind)), "hx-build")]));
   const buildGrid = el("div", { class: "hx-builds", role: "group", "aria-label": "Build" }, Object.values(builds));
   const tradeBtn = btn("hx-trade", "Trade…", () => setMode("trade"));
@@ -264,41 +267,17 @@ export function board() {
   ];
   const victimsRow = el("div", { class: "hx-row hx-victims" });
   const hint = el("p", { class: "hx-panel-hint" });
-  const panel = el("div", { class: "hx-panel", id: "hx-panel" }, title, rollRow, buildGrid, costRow, mainRow, ...tradeParts, victimsRow, hint);
+  const panel = el("div", { class: "hx-panel", id: "hx-panel" }, title, rollRow, firstRow, buildGrid, costRow, mainRow, ...tradeParts, victimsRow, hint);
   const actions = el("section", { class: "hx-actions", id: "hx-actions", "aria-label": "Your move" }, panel);
 
   const node = el(
     "div",
     { class: "hexlands pc-game", dataset: { you: "a", seat: 0 } },
     bar,
-    el("div", { class: "hx-main" }, el("div", { class: "hx-board-col" }, art.boardWrap), art.bankBox, actions, el("section", { class: "hx-hand-box", "aria-label": "Your cards" }, art.handBox)),
+    el("div", { class: "hx-main" }, el("div", { class: "hx-board-col" }, art.boardWrap, art.bankBox), actions, el("section", { class: "hx-hand-box", "aria-label": "Your cards" }, art.handBox)),
     table.flyLayer,
   );
   new ResizeObserver(() => art.svg.classList.toggle("hx-narrow", art.svg.getBoundingClientRect().width < 420)).observe(art.boardWrap);
-
-  // ---------- the table as drawn ----------
-  const viewOf = (st) => ({
-    turn: st.turn,
-    buildings: st.buildings.map((b) => b && { ...b }),
-    roads: st.roads.slice(),
-    robber: st.robber,
-    hands: st.hands.map((h) => h.slice()),
-    devs: st.devs.map((d) => d.slice()),
-    knights: st.knights.slice(),
-    shown: st.shown.map((s) => s.slice()),
-    longest: { ...st.longest },
-    army: { ...st.army },
-    bank: st.bank.map((b) => b.length),
-    devPile: st.devPile.length,
-    dice: st.dice ? st.dice.slice() : null,
-  });
-  function shownPoints(p) {
-    let n = 0;
-    for (const b of view.buildings) if (b?.p === p) n += b.city ? 2 : 1;
-    if (view.longest.p === p) n += 2;
-    if (view.army.p === p) n += 2;
-    return n + view.shown[p].filter((f) => devKind(f) === "vp").length;
-  }
 
   // Your decision now (the phase), or null.
   function choice() {
@@ -307,7 +286,7 @@ export function board() {
     return (step.length ? step.includes(0) : state.turn === 0) ? state.phase : null;
   }
   const have = () => counts(state.hands[0], face);
-  const knightSlot = () => playable(state, 0, face).find((s) => devKind(s) === "knight");
+  const firstSlot = (kind) => playable(state, 0, face).find((s) => devKind(s) === kind);
 
   // ---------- your moves ----------
   const send = (move) => moveFn(move);
@@ -324,8 +303,8 @@ export function board() {
       }
       return send({ robber: id, steal: vs[0] ?? -1 });
     }
+    if (state.freeRoads && (c === "main" || c === "roll")) return send({ road: id });
     if (c !== "main") return;
-    if (state.freeRoads) return send({ road: id });
     const pay = payment(state.hands[0], face, COSTS[mode]) ?? undefined;
     if (mode === "road") send({ road: id, pay });
     else if (mode === "settlement") send({ settle: id, pay });
@@ -339,7 +318,7 @@ export function board() {
     if (mode === "road" || mode === "settlement" || mode === "city") art.focusSpots();
     else if (mode === "trade") gives.find((x) => !x.b.disabled)?.b.focus();
   }
-  const roll = () => choice() === "roll" && send({ roll: true });
+  const roll = () => choice() === "roll" && !state.freeRoads && send({ roll: true });
   const endTurn = () => choice() === "main" && !state.freeRoads && send({ end: true });
   const buy = () => choice() === "main" && send({ buy: true, pay: payment(state.hands[0], face, COSTS.dev) ?? undefined });
   function playDev(slot) {
@@ -367,20 +346,8 @@ export function board() {
   function drawBar() {
     SEATS.forEach((p) => {
       pills[p].classList.toggle("active", (current?.p ?? view.turn) === p);
-      scores[p].textContent = String(shownPoints(p));
-      const n = view.hands[p].length;
-      const d = view.devs[p].length;
-      const parts = [["cards", n, plural(n, "card")], ["devs", d, plural(d, "development card")]];
-      if (view.knights[p]) parts.push(["knights", view.knights[p], plural(view.knights[p], "knight")]);
-      const label = [...parts.map((x) => x[2]), view.longest.p === p ? "longest road" : "", view.army.p === p ? "largest army" : ""].filter(Boolean).join(", ");
-      if (notes[p].dataset.key === label) return;
-      notes[p].dataset.key = label;
-      notes[p].setAttribute("aria-label", label);
-      notes[p].replaceChildren(
-        ...parts.map(([kind, v]) => el("span", { class: `hx-n ${kind}`, "aria-hidden": "true" }, el("i", {}), String(v))),
-        view.longest.p === p ? el("span", { class: "hx-award road", title: `Longest road (${view.longest.size})`, "aria-hidden": "true" }) : "",
-        view.army.p === p ? el("span", { class: "hx-award army", title: `Largest army (${view.army.size})`, "aria-hidden": "true" }) : "",
-      );
+      vps[p].set(points(view, p), !still());
+      drawNote(notes[p], view, p);
     });
   }
 
@@ -392,7 +359,8 @@ export function board() {
     let spec = null;
     if (c === "setup") spec = state.setup.corner === -1 ? corners : edges("Paths for a road");
     else if (c === "robber") spec = { kind: "hex", ids: robberPick === null ? robberHexes(state) : [robberPick], chosen: robberPick, ghost: robberPick === null ? robberSvg : null, words: hexSpotWords, label: "Hexes for the robber" };
-    else if (c === "main" && (state.freeRoads || mode === "road")) spec = edges("Paths for a road");
+    else if ((c === "main" || c === "roll") && state.freeRoads) spec = edges("Paths for a road");
+    else if (c === "main" && mode === "road") spec = edges("Paths for a road");
     else if (c === "main" && mode === "settlement") spec = corners;
     else if (c === "main" && mode === "city") spec = { kind: "corner", ids: legalCities(state, 0), ghost: (id) => citySvg(id, 0), words: (id) => `your settlement, ${cornerWords(BOARD, id)}`, label: "Settlements to make a city" };
     art.drawSpots(spec?.kind ?? null, spec?.ids ?? [], spec ?? {});
@@ -410,7 +378,7 @@ export function board() {
 
   // Shows the controls for the decision at hand, hiding the rest.
   function show(...parts) {
-    for (const part of [rollRow, buildGrid, costRow, mainRow, ...tradeParts, victimsRow, hint]) part.hidden = !parts.includes(part);
+    for (const part of [rollRow, firstRow, buildGrid, costRow, mainRow, ...tradeParts, victimsRow, hint]) part.hidden = !parts.includes(part);
   }
   function setTitle(text, small = "") {
     titleText.textContent = text;
@@ -445,10 +413,16 @@ export function board() {
       hint.textContent = state.setup.corner === -1 ? "Tap a glowing corner. More dots under a number means it's rolled more often." : "Tap a glowing path.";
       return show(hint);
     }
+    if (c === "roll" && state.freeRoads) {
+      setTitle(`Road building: ${plural(state.freeRoads, "free road")} to place`, "Then roll the dice.");
+      hint.textContent = "Tap a glowing path.";
+      return show(hint);
+    }
     if (c === "roll") {
-      setTitle("Your turn");
-      knightBtn.hidden = knightSlot() === undefined;
-      return show(rollRow);
+      const kinds = Object.keys(firstBtns).filter((kind) => firstSlot(kind) !== undefined);
+      setTitle("Your turn", kinds.length ? "Roll, or play a development card first." : "");
+      for (const [kind, b] of Object.entries(firstBtns)) b.hidden = !kinds.includes(kind);
+      return show(rollRow, ...(kinds.length ? [firstRow] : []));
     }
     if (c === "robber") {
       if (robberPick === null) {
@@ -522,56 +496,15 @@ export function board() {
   // ---------- motion: main.js's, for the events a lesson has ----------
   const rectOf = (n) => (n ? table.rectIn(n) : null);
   const seatRect = (p) => (p === 0 ? rectOf(art.handBox) : rectOf(pills[p]));
-  const resRect = (p, r) => (p === 0 && r >= 0 ? art.pileRect(r) : seatRect(p));
   const devRect = (p) => (p === 0 ? rectOf(art.handBox.querySelector(".hx-dev-row:not([hidden])") ?? art.handBox) : seatRect(p));
-  const gainFresh = (p, slots) => p === 0 && slots.forEach((s) => fresh[resourceOf(s)]++);
-
-  async function spend(p, slots, g) {
-    if (!slots?.length) return;
-    const keys = slots.map(resourceOf);
-    view.hands[p] = view.hands[p].filter((s) => !slots.includes(s));
-    draw();
-    await art.flyMany(keys, (i) => resRect(p, keys[i]), (i) => art.bankChipRect(keys[i]), { g, ms: PACE.fly * 0.8, gap: 50 });
-    keys.forEach((r) => view.bank[r]++);
-  }
-  async function collect(p, slots, from, g) {
-    const keys = slots.map(resourceOf);
-    await art.flyMany(keys, from ?? ((i) => art.bankChipRect(keys[i])), (i) => resRect(p, keys[i]), { g });
-    if (!live(g)) return;
-    keys.forEach((r) => (view.bank[r] = Math.max(0, view.bank[r] - 1)));
-    view.hands[p].push(...slots);
-    gainFresh(p, slots);
-    draw();
-  }
-  function joinedEnd(edge, p) {
-    const e = EDGES[edge];
-    const own = (c) => view.buildings[c]?.p === p || CORNERS[c].edges.some((o) => o !== edge && view.roads[o] === p);
-    return own(e.a) ? e.a : e.b;
-  }
+  const motion = tableMotion(art, table, { view: () => view, face, me: 0, seatRect, draw: () => draw(), sound, gained: (p, slots) => p === 0 && slots.forEach((s) => fresh[resourceOf(s)]++) });
+  const { resRect, spend, collect, gained } = motion;
 
   async function animate(ev, g) {
     current = ev;
-    if (ev.type === "build") {
-      const from = ev.kind === "road" ? joinedEnd(ev.at, ev.p) : -1;
-      if (!ev.free) await spend(ev.p, ev.pay, g);
-      if (!live(g)) return;
-      if (ev.kind === "road") view.roads[ev.at] = ev.p;
-      else view.buildings[ev.at] = { p: ev.p, city: ev.kind === "city" };
-      if (ev.kind === "settlement") lastSettlement[ev.p] = ev.at;
-      draw();
-      sound(`build-${ev.kind}`);
-      if (ev.kind === "road") art.growRoad(ev.at, from, { g });
-      else art.popBuilding(ev.at, { g });
-      await wait(ev.kind === "road" ? PACE.road : PACE.build, g);
-    } else if (ev.type === "gain") {
-      const corner = lastSettlement[ev.p];
-      const from = (i) => {
-        const hex = CORNERS[corner]?.hexes.find((h) => BOARD.terrain[h] === resourceOf(ev.slots[i]) && BOARD.terrain[h] !== DESERT);
-        return hex === undefined ? art.centreRect() : art.hexRect(hex);
-      };
-      ev.slots.forEach((s) => sound("gain", { r: resourceOf(s) }));
-      await collect(ev.p, ev.slots, from, g);
-    } else if (ev.type === "roll") {
+    if (ev.type === "build") await motion.build(ev, g);
+    else if (ev.type === "gain") await motion.collectSecond(ev.p, ev.slots, BOARD, g);
+    else if (ev.type === "roll") {
       fresh = zero();
       sound("roll");
       draw();
@@ -580,22 +513,7 @@ export function board() {
       view.dice = ev.dice.slice();
       if (ev.dice[0] + ev.dice[1] === 7) art.say(art.boardWrap, ev.p, "Seven!", g);
     } else if (ev.type === "produce") {
-      const hexes = HEXES.filter((h) => BOARD.numbers[h.id] === ev.roll).map((h) => h.id);
-      art.glowHexes(hexes.filter((h) => h !== view.robber), { g });
-      art.glowHexes(hexes.filter((h) => h === view.robber), { g, cls: "blocked" });
-      await wait(PACE.glow * 0.45, g);
-      let i = 0;
-      const jobs = production(BOARD, view.robber, view.buildings, ev.roll, ev.short).flatMap((f) =>
-        Array.from({ length: f.n }, () => wait(i++ * PACE.flyGap, g).then(() => (sound("gain", { r: f.r }), art.flyCard(f.r, art.hexRect(f.hex), resRect(f.p, f.r), { g })))),
-      );
-      await Promise.all(jobs);
-      if (!live(g)) return;
-      ev.gains.forEach((slots, p) => {
-        slots.forEach((s) => (view.bank[resourceOf(s)] = Math.max(0, view.bank[resourceOf(s)] - 1)));
-        view.hands[p].push(...slots);
-        gainFresh(p, slots);
-      });
-      draw();
+      await motion.produce(ev, BOARD, g);
     } else if (ev.type === "robber") {
       const from = view.robber;
       view.robber = ev.hex;
@@ -611,7 +529,7 @@ export function board() {
       await art.flyCard(ev.thief === 0 ? r : "back", victimAt === undefined ? seatRect(ev.victim) : art.cornerRect(victimAt), resRect(ev.thief, r), { g, ms: PACE.steal, fade: ev.thief !== 0 });
       if (!live(g)) return;
       view.hands[ev.thief].push(ev.slot);
-      gainFresh(ev.thief, [ev.slot]);
+      gained(ev.thief, [ev.slot]);
       draw();
     } else if (ev.type === "buy") {
       await spend(ev.p, ev.pay, g);

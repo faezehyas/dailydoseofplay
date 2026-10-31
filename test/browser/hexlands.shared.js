@@ -8,13 +8,14 @@ export const state = (page) => page.evaluate(() => window.ddp.match.state);
 // the buttons of the action panel. A choice two taps long (a build, then its
 // spot) keeps its move between ticks. Moves the page makes for you (Monopoly's
 // give, showing point cards to win) are the page's. hold: phases left to the
-// test (free roads are still placed); hoard: end every turn and turn down every offer, so cards pile up.
+// test (free roads are still placed); hoard: end every turn and turn down every offer, so cards pile up;
+// devFirst: buy every development card you can, and play one before each roll when you may.
 // window.__hxPlayed counts each kind of move played, window.__hxDirect any
 // the controls couldn't make.
-export function autoplay(page, { level = "medium", hold = [], hoard = false } = {}) {
-  return page.evaluate(async ({ level, hold, hoard }) => {
+export function autoplay(page, { level = "medium", hold = [], hoard = false, devFirst = false } = {}) {
+  return page.evaluate(async ({ level, hold, hoard, devFirst }) => {
     const { chooseMove } = await import("/hexlands/robot.js");
-    const { resourceOf, devKind, counts } = await import("/hexlands/rules.js");
+    const { resourceOf, devKind, counts, playable, legalEdges, payment, COSTS } = await import("/hexlands/rules.js");
     clearInterval(window.__autoplay);
     window.__hxPlayed ??= {};
     window.__hxDirect ??= [];
@@ -39,6 +40,20 @@ export function autoplay(page, { level = "medium", hold = [], hoard = false } = 
       return true;
     };
     const kindOf = (move) => Object.keys(move).find((k) => !["pay", "ms", "take", "want", "steal", "resource"].includes(k));
+    // devFirst's moves: a development card before the roll, and every one you can buy.
+    const early = (st, me, face) => {
+      if (st.phase === "roll" && !st.freeRoads) {
+        const slot = playable(st, me, face)[0];
+        const dev = slot === undefined ? null : devKind(face(slot));
+        if (!dev || (dev === "road" && !legalEdges(st, me).length)) return null;
+        if (dev === "monopoly") return { play: slot, resource: 2 };
+        if (dev !== "plenty") return { play: slot };
+        const r = [0, 1, 2, 3, 4].find((x) => st.bank[x].length >= 2);
+        return r === undefined ? null : { play: slot, take: [r, r] };
+      }
+      if (st.phase === "main" && !st.freeRoads && st.devPile.length && payment(st.hands[me], face, COSTS.dev)) return { buy: true };
+      return null;
+    };
     const tick = () => {
       const m = window.ddp.match;
       if (!m || m.phase !== "playing" || !$(".hexlands.my-turn")) return;
@@ -47,7 +62,7 @@ export function autoplay(page, { level = "medium", hold = [], hoard = false } = 
       const face = (s) => m.face(s);
       const key = `${m.m}:${st.moves}:${st.phase}`;
       const hoarded = hoard && (st.phase === "answer" ? { decline: true } : st.phase === "main" && !st.freeRoads ? { end: true } : null);
-      if (plan?.key !== key) plan = { key, move: hoarded || chooseMove(st, m.me, Math.random, face, { level }), tries: 0 };
+      if (plan?.key !== key) plan = { key, move: hoarded || (devFirst && early(st, m.me, face)) || chooseMove(st, m.me, Math.random, face, { level }), tries: 0 };
       const { move } = plan;
       const kind = kindOf(move);
       if (++plan.tries > 25) {
@@ -56,7 +71,10 @@ export function autoplay(page, { level = "medium", hold = [], hoard = false } = 
         plan.tries = -1e9;
         return m.play(move);
       }
-      if (plan.tries === 1) window.__hxPlayed[`${st.phase}:${kind}`] = (window.__hxPlayed[`${st.phase}:${kind}`] ?? 0) + 1;
+      if (plan.tries === 1) {
+        const name = `${st.phase}:${kind}${kind === "play" ? `:${devKind(face(move.play))}` : ""}`;
+        window.__hxPlayed[name] = (window.__hxPlayed[name] ?? 0) + 1;
+      }
       const cardsFor = (slots) => counts(slots, face);
       if (st.phase === "setup") return spot(move.settle ?? move.road);
       if (move.roll) return click("#hx-roll");
@@ -80,7 +98,7 @@ export function autoplay(page, { level = "medium", hold = [], hoard = false } = 
         const dev = devKind(face(move.play));
         if (dev === "plenty" && $("#hx-plenty")) return stepTo("plenty", [0, 1, 2, 3, 4].map((r) => move.take.filter((t) => t === r).length)) && click("#hx-plenty");
         if (dev === "monopoly" && $("#hx-mono-0")) return click(`#hx-mono-${move.resource}`);
-        if (dev === "knight" && click("#hx-knight-first")) return;
+        if (click(`#hx-${dev}-first`)) return;
         return click(`.hx-dev.playable[data-kind="${dev}"]`);
       }
       if (move.bank || move.offer) {
@@ -97,7 +115,7 @@ export function autoplay(page, { level = "medium", hold = [], hoard = false } = 
       }
     };
     window.__autoplay = setInterval(tick, 40);
-  }, { level, hold, hoard });
+  }, { level, hold, hoard, devFirst });
 }
 export const stopAutoplay = (page) => page.evaluate(() => clearInterval(window.__autoplay));
 

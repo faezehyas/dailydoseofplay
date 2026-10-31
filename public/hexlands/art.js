@@ -11,6 +11,7 @@ import { HEXES, CORNERS, EDGES, RESOURCE_NAMES, TERRAIN_NAMES, DESERT, ANY, pips
 import { VIEWBOX, defsSvg, seaSvg, terrainSvg, harbourSvg } from "./tiles.js";
 import { tokenSvg, roadSvg, settlementSvg, citySvg, robberSvg, spotSvg, diceSvg } from "./pieces.js";
 import { resourceGlyph, resourceCard, devCard, cardBack } from "./card-art.js";
+import { resourceOf } from "./rules.js";
 
 export const PACE = { dice: 640, glow: 900, fly: 560, flyGap: 70, build: 420, road: 380, hop: 620, steal: 720, trade: 640, badge: 900, reveal: 1300, between: 160, bubble: 900, moment: 900, rise: 34 };
 export const RES_NAMES = RESOURCE_NAMES;
@@ -59,15 +60,20 @@ export function glyphEl(r, cls = "") {
   node.innerHTML = `<svg viewBox="0 0 24 24" focusable="false">${resourceGlyph(r)}</svg>`;
   return node;
 }
+// A resource as a small coloured tile with its glyph: a card too small for its picture.
+export function chipEl(r) {
+  return el("span", { class: `hx-chip r-${r}`, "aria-hidden": "true" }, glyphEl(r));
+}
 const cardCache = new Map();
 // A card face (an <svg> from card-art.js) in a span, sized by CSS. key: a
-// resource 0-4, a development kind, or "back"; mini: the small face, its
-// colour and a big glyph, for cards too small for their scene.
-export function cardEl(key, cls = "", { mini = false } = {}) {
-  if (!cardCache.has(key)) cardCache.set(key, typeof key === "number" ? resourceCard(key) : key === "back" ? cardBack() : devCard(key));
+// resource 0-4, a development kind, or "back"; face: "full" (its scene and
+// words), "mini" (its colour and a big glyph, for cards too small for their
+// scene) or "both", for a card that switches with its size (setMini).
+export function cardEl(key, cls = "", { face = "both" } = {}) {
+  const id = `${key}:${face}`;
+  if (!cardCache.has(id)) cardCache.set(id, typeof key === "number" ? resourceCard(key, { face }) : key === "back" ? cardBack({ face }) : devCard(key, { face }));
   const node = el("span", { class: `hx-cardbox ${typeof key === "number" ? `r-${key}` : `d-${key}`} ${cls}`, "aria-hidden": "true" });
-  node.innerHTML = cardCache.get(key);
-  if (mini) setMini(node, true);
+  node.innerHTML = cardCache.get(id);
   return node;
 }
 const setMini = (node, on) => node.querySelector("svg")?.classList.toggle("hx-mini", on);
@@ -80,16 +86,193 @@ export function cardsRow(c, { have = null, cls = "" } = {}) {
   return row;
 }
 
-// Which cards a roll pays and from where: [{ hex, p, r, n }] for every building on a producing hex.
-export function production(board, robber, buildings, roll, short = []) {
+// A seat's points showing on the table, in its pill: a cream token ringed in
+// its colour, like the island's numbers. set(n, bump) bumps it when it grows.
+export function pointsToken() {
+  const num = el("b", {}, "0");
+  const words = el("span", { class: "sr-only" }, " points");
+  const node = el("span", { class: "hx-vp", title: "0 points" }, num, words);
+  function set(n, bump = false) {
+    const was = Number(num.textContent);
+    if (was === n) return;
+    num.textContent = String(n);
+    words.textContent = n === 1 ? " point" : " points";
+    node.title = plural(n, "point");
+    if (bump && n > was) node.animate([{ transform: "scale(1)" }, { transform: "scale(1.45)", offset: 0.4 }, { transform: "scale(1)" }], { duration: 520, easing: "cubic-bezier(.34,1.56,.64,1)" });
+  }
+  return { node, set };
+}
+
+// A discard of the 5 counts picked from hand: { slots, rest }. Cards everyone
+// has seen go first, since a move shows at most `max` hidden ones (a steal
+// hides the victim's hand); more hidden than that go in parts: the seen ones
+// and `max` hidden now, and rest, the counts still to pay next. open(slot):
+// whether everyone has seen it.
+export function discardParts(hand, picked, face, open, max) {
+  const sorted = hand.slice().sort((a, b) => open(b) - open(a));
+  const slots = picked.flatMap((n, r) => sorted.filter((s) => resourceOf(face(s)) === r).slice(0, n));
+  const hidden = slots.filter((s) => !open(s));
+  if (hidden.length <= max) return { slots, rest: null };
+  const part = slots.filter((s) => open(s) || hidden.indexOf(s) < max);
+  const sent = [0, 1, 2, 3, 4].map((r) => part.filter((s) => resourceOf(face(s)) === r).length);
+  return { slots: part, rest: picked.map((n, r) => n - sent[r]) };
+}
+
+// The table as the screen draws it: the state as it stood before the events
+// still playing out. Its fields are the state's, so rules.points() reads it.
+export const viewOf = (st) => ({
+  turn: st.turn,
+  buildings: st.buildings.map((b) => b && { ...b }),
+  roads: st.roads.slice(),
+  robber: st.robber,
+  hands: st.hands.map((h) => h.slice()),
+  devs: st.devs.map((d) => d.slice()),
+  knights: st.knights.slice(),
+  shown: st.shown.map((s) => s.slice()),
+  longest: { ...st.longest },
+  army: { ...st.army },
+  bank: st.bank.map((b) => b.length),
+  devPile: st.devPile.length,
+  dice: st.dice ? st.dice.slice() : null,
+});
+
+// A seat's note in its pill (node, a .hx-note): its cards, development cards,
+// knights and awards, and the robber's mask when it was robbed this turn.
+export function drawNote(node, view, p, { robbed = false } = {}) {
+  const n = view.hands[p].length;
+  const devs = view.devs[p].length;
+  const parts = [
+    ["cards", n, plural(n, "card")],
+    ["devs", devs, plural(devs, "development card")],
+  ];
+  if (view.knights[p]) parts.push(["knights", view.knights[p], plural(view.knights[p], "knight")]);
+  const label = [...parts.map((x) => x[2]), view.longest.p === p ? "longest road" : "", view.army.p === p ? "largest army" : "", robbed ? "robbed this turn" : ""].filter(Boolean).join(", ");
+  if (node.dataset.key === label) return;
+  node.dataset.key = label;
+  node.setAttribute("aria-label", label);
+  node.replaceChildren(
+    ...parts.map(([kind, v]) => el("span", { class: `hx-n ${kind}`, "aria-hidden": "true" }, el("i", {}), String(v))),
+    view.longest.p === p ? el("span", { class: "hx-award road", title: `Longest road (${view.longest.size})`, "aria-hidden": "true" }) : "",
+    view.army.p === p ? el("span", { class: "hx-award army", title: `Largest army (${view.army.size})`, "aria-hidden": "true" }) : "",
+    robbed ? el("span", { class: "hx-robbed", title: "Robbed this turn", "aria-hidden": "true" }) : "",
+  );
+}
+
+// Which cards a roll pays and from where: [{ hex, p, r, n }] for every
+// building on a producing hex. got: by seat, the 5 counts it was paid, which
+// caps the flights when the bank ran short (nobody, or only the one taker, gets them).
+export function production(board, robber, buildings, roll, got = null) {
+  const left = got?.map((c) => c.slice());
   const out = [];
   for (const h of HEXES) {
     if (board.numbers[h.id] !== roll || h.id === robber) continue;
     const r = board.terrain[h.id];
-    if (short.includes(r)) continue;
-    for (const c of h.corners) if (buildings[c]) out.push({ hex: h.id, p: buildings[c].p, r, n: buildings[c].city ? 2 : 1 });
+    for (const c of h.corners) {
+      const b = buildings[c];
+      if (!b) continue;
+      const n = Math.min(b.city ? 2 : 1, left ? left[b.p][r] : Infinity);
+      if (left) left[b.p][r] -= n;
+      if (n > 0) out.push({ hex: h.id, p: b.p, r, n });
+    }
   }
   return out;
+}
+
+// How the view and the tutorial move cards and pieces as events play out.
+// art: hexTable()'s; view(): the table as drawn; face(slot): its face, or null
+// while hidden; me: your seat; seatRect(p): where a seat's cards go; draw():
+// redraw; sound(name, options); gained(p, slots): cards a seat just got.
+export function tableMotion(art, { live, wait }, { view, face, me, seatRect, draw, sound, gained }) {
+  const lastSettlement = new Map(); // seat -> corner, for the second settlement's cards
+  // Cards with faces fly face up; the rest as backs.
+  const keysOf = (slots) => slots.map((s) => {
+    const r = resourceOf(face(s));
+    return r < 0 ? "back" : r;
+  });
+  const resRect = (p, r) => (p === me && r >= 0 ? art.pileRect(r) : seatRect(p));
+  const bankRect = (key) => art.bankChipRect(key === "back" ? 0 : key);
+  const bankBy = (slots, d) => slots.forEach((s) => {
+    const r = resourceOf(face(s));
+    if (r >= 0) view().bank[r] = Math.max(0, view().bank[r] + d);
+  });
+  const remove = (p, slots) => (view().hands[p] = view().hands[p].filter((s) => !slots.includes(s)));
+
+  // Cards paid from p's hand: they leave it at once and fly to the bank.
+  async function spend(p, slots, g, k = 1) {
+    if (!slots?.length) return;
+    const keys = keysOf(slots);
+    remove(p, slots);
+    draw();
+    await art.flyMany(keys, (i) => resRect(p, keys[i]), (i) => bankRect(keys[i]), { g, k, ms: PACE.fly * 0.8, gap: 50 });
+    bankBy(slots, 1);
+  }
+  // Cards from the bank (or from(i), a rect) to p: they join the hand as they land.
+  async function collect(p, slots, from, g, k = 1) {
+    const keys = keysOf(slots);
+    await art.flyMany(keys, from ?? ((i) => bankRect(keys[i])), (i) => resRect(p, keys[i]), { g, k });
+    if (!live(g)) return;
+    bankBy(slots, -1);
+    view().hands[p].push(...slots);
+    gained(p, slots);
+    draw();
+  }
+  // The second settlement's cards come from the lands it touches.
+  function collectSecond(p, slots, board, g, k = 1) {
+    const corner = lastSettlement.get(p);
+    const from = (i) => {
+      const r = resourceOf(face(slots[i]));
+      const hex = CORNERS[corner]?.hexes.find((h) => board.terrain[h] === r);
+      return hex === undefined ? art.centreRect() : art.hexRect(hex);
+    };
+    slots.forEach((s) => sound("gain", { r: resourceOf(face(s)) }));
+    return collect(p, slots, from, g, k);
+  }
+
+  // Which end of a new road joins its owner's pieces: it draws in from there.
+  function joinedEnd(edge, p) {
+    const v = view();
+    const e = EDGES[edge];
+    const own = (c) => v.buildings[c]?.p === p || CORNERS[c].edges.some((o) => o !== edge && v.roads[o] === p);
+    return own(e.a) ? e.a : e.b;
+  }
+  async function build(ev, g, k = 1) {
+    const from = ev.kind === "road" ? joinedEnd(ev.at, ev.p) : -1;
+    if (!ev.free) await spend(ev.p, ev.pay, g, k);
+    if (!live(g)) return;
+    if (ev.kind === "road") view().roads[ev.at] = ev.p;
+    else view().buildings[ev.at] = { p: ev.p, city: ev.kind === "city" };
+    if (ev.kind === "settlement") lastSettlement.set(ev.p, ev.at);
+    draw();
+    sound(`build-${ev.kind}`);
+    if (ev.kind === "road") art.growRoad(ev.at, from, { g, k });
+    else art.popBuilding(ev.at, { g, k });
+    await wait((ev.kind === "road" ? PACE.road : PACE.build) * k, g);
+  }
+
+  // A roll pays out: the numbers' hexes light up (the robber's stays dark),
+  // then each building's cards fly from its hex to its owner.
+  async function produce(ev, board, g, k = 1) {
+    const v = view();
+    const hexes = HEXES.filter((h) => board.numbers[h.id] === ev.roll).map((h) => h.id);
+    art.glowHexes(hexes.filter((h) => h !== v.robber), { g, k });
+    art.glowHexes(hexes.filter((h) => h === v.robber), { g, k, cls: "blocked" });
+    await wait(PACE.glow * 0.45 * k, g);
+    let i = 0;
+    const got = ev.gains.map((slots) => [0, 1, 2, 3, 4].map((r) => slots.filter((s) => resourceOf(face(s)) === r).length));
+    const jobs = production(board, v.robber, v.buildings, ev.roll, got).flatMap((f) =>
+      Array.from({ length: f.n }, () => wait(i++ * PACE.flyGap * k, g).then(() => (sound("gain", { r: f.r }), art.flyCard(f.r, art.hexRect(f.hex), resRect(f.p, f.r), { g, ms: PACE.fly * k })))),
+    );
+    await Promise.all(jobs);
+    if (!live(g)) return;
+    ev.gains.forEach((slots, p) => {
+      bankBy(slots, -1);
+      view().hands[p].push(...slots);
+      gained(p, slots);
+    });
+    draw();
+  }
+
+  return { keysOf, resRect, remove, gained, spend, collect, collectSecond, build, produce, reset: () => lastSettlement.clear() };
 }
 
 // The order the island rises in: from the middle hex outwards, clockwise.
@@ -340,7 +523,7 @@ export function hexTable(table, { onSpot = () => {}, onSpotFocus = () => {} }) {
     if (fast() || !live(g) || !from || !to) return;
     if (delay) await wait(delay, g);
     if (!live(g)) return;
-    const node = cardEl(key, "hx-fly-card", { mini: width < 40 });
+    const node = cardEl(key, "hx-fly-card", { face: width < 40 ? "mini" : "full" });
     node.style.width = `${width}px`;
     flyLayer.append(node);
     const h = width * 1.4;
@@ -472,6 +655,16 @@ export function hexTable(table, { onSpot = () => {}, onSpotFocus = () => {} }) {
     harbourL.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, delay: RISE.length * PACE.rise, fill: "backwards" });
   }
 
+  // The sea's small motions (tiles.css: waves, boats, the windmill, the
+  // whale) play once when the island is drawn (style.css stops them looping);
+  // this plays them once more, so the island stirs when something happens.
+  function breathe(g) {
+    if (fast() || !live(g)) return;
+    svg.classList.add("hx-still");
+    svg.getBoundingClientRect();
+    svg.classList.remove("hx-still");
+  }
+
   // The deck in the middle of the island while every browser shuffles it (on), or away.
   let deckOn = false;
   let deckAnims = [];
@@ -499,7 +692,7 @@ export function hexTable(table, { onSpot = () => {}, onSpotFocus = () => {} }) {
   // A moment over the board, in a player's colour: "Largest army!", a development card shown.
   async function moment({ text, p, card = null, g, k = 1, from = null }) {
     if (fast() || !live(g)) return;
-    const node = el("div", { class: `hx-moment p-${p}` }, card !== null ? cardEl(card, "hx-moment-card") : null, el("span", { class: "words" }, text));
+    const node = el("div", { class: `hx-moment p-${p}` }, card !== null ? cardEl(card, "hx-moment-card", { face: "full" }) : null, el("span", { class: "words" }, text));
     flyLayer.append(node);
     const c = centreRect();
     node.style.left = `${c.x + c.w / 2}px`;
@@ -527,7 +720,8 @@ export function hexTable(table, { onSpot = () => {}, onSpotFocus = () => {} }) {
     const count = el("span", { class: "hx-count mono" }, "0");
     const plus = el("span", { class: "hx-plus mono", hidden: true });
     const name = el("span", { class: "hx-pile-name" }, RES_NAMES[r]);
-    const stack = el("span", { class: "hx-stack" }, el("span", { class: "hx-edge e2" }), el("span", { class: "hx-edge e1" }), cardEl(r));
+    // An empty pile keeps its place: a dashed outline round the resource's glyph.
+    const stack = el("span", { class: "hx-stack" }, el("span", { class: "hx-edge e2" }), el("span", { class: "hx-edge e1" }), cardEl(r), el("span", { class: "hx-slot" }, glyphEl(r)));
     const node = el("div", { class: `hx-pile r-${r}`, role: "img", dataset: { r } }, stack, count, plus, name);
     resRow.append(node);
     return { node, count, plus, stack };
@@ -540,10 +734,7 @@ export function hexTable(table, { onSpot = () => {}, onSpotFocus = () => {} }) {
   // fresh: 5 counts just gained (lit up); devs: [{ slot, kind, isNew, playable }];
   // onDev(slot) plays one; highlight: 5 counts picked (lifted) in a picker.
   function drawHand({ counts, unknown = 0, fresh = [0, 0, 0, 0, 0], devs = [], onDev = () => {}, lifted = null }) {
-    const mini = piles[0].stack.offsetWidth > 0 && piles[0].stack.offsetWidth < 46;
-    handBox.classList.toggle("mini", mini);
     piles.forEach((pile, r) => {
-      setMini(pile.stack, mini);
       const n = counts[r];
       pile.node.classList.toggle("empty", n === 0);
       pile.node.classList.toggle("fresh", fresh[r] > 0);
@@ -574,7 +765,7 @@ export function hexTable(table, { onSpot = () => {}, onSpotFocus = () => {} }) {
           const words = x.kind ? `${DEV_NAMES[x.kind]}${x.slots.length > 1 ? ` (${x.slots.length})` : ""}` : "A development card, arriving";
           const label = x.kind ? `${words}: ${DEV_WORDS[x.kind]}${x.isNew ? ". Bought this turn, so it can be played from your next turn" : ""}${x.playable ? ". Play it" : ""}` : words;
           const tag = x.playable ? "button" : "div";
-          const node = el(tag, { class: `hx-dev ${x.playable ? "playable" : ""} ${x.isNew ? "new" : ""}`, type: x.playable ? "button" : null, role: x.playable ? null : "img", "aria-label": label, title: label, dataset: { kind: x.kind ?? "" }, onclick: x.playable ? () => onDev(x.slots[0]) : null }, cardEl(x.kind ?? "back"), x.slots.length > 1 ? el("span", { class: "hx-count mono" }, `×${x.slots.length}`) : null, x.isNew ? el("span", { class: "hx-new" }, "New") : null);
+          const node = el(tag, { class: `hx-dev ${x.playable ? "playable" : ""} ${x.isNew ? "new" : ""}`, type: x.playable ? "button" : null, role: x.playable ? null : "img", "aria-label": label, title: label, dataset: { kind: x.kind ?? "" }, onclick: x.playable ? () => onDev(x.slots[0]) : null }, cardEl(x.kind ?? "back", "", { face: "full" }), x.slots.length > 1 ? el("span", { class: "hx-count mono" }, `×${x.slots.length}`) : null, x.isNew ? el("span", { class: "hx-new" }, "New") : null);
           return node;
         }),
       );
@@ -585,6 +776,14 @@ export function hexTable(table, { onSpot = () => {}, onSpotFocus = () => {} }) {
     handBox.setAttribute("aria-label", `Your hand: ${plural(total, "card")}${total ? `, ${countWords(counts)}` : ""}${devs.length ? `, and ${plural(devs.length, "development card")}` : ""}`);
   }
   const pileRect = (r) => rectIn(piles[r].stack);
+  // Cards narrower than 46 px show their small face.
+  new ResizeObserver(() => {
+    const w = piles[0].stack.offsetWidth;
+    const mini = w > 0 && w < 46;
+    if (handBox.classList.contains("mini") === mini) return;
+    handBox.classList.toggle("mini", mini);
+    piles.forEach((pile) => setMini(pile.stack, mini));
+  }).observe(handBox);
 
   // ---------- the bank ----------
   const bankChips = [0, 1, 2, 3, 4].map((r) => el("span", { class: `hx-bank-chip r-${r}`, dataset: { r } }, glyphEl(r), el("span", { class: "mono" }, "19")));
@@ -616,6 +815,7 @@ export function hexTable(table, { onSpot = () => {}, onSpotFocus = () => {} }) {
     drawDice,
     drawDeck,
     riseIsland,
+    breathe,
     drawHand,
     drawBank,
     pieceNode,

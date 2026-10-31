@@ -2,7 +2,9 @@
 // the robots' pace near 0, whole games against robots run with no animation
 // and no artificial wait, so only the deck's cryptography takes time (the
 // development pile's shuffle, every steal and the audit). Three players to
-// 10 and four players to 8, each played to the end and audited. Skips if
+// 10 and four players to 8, each played to the end and audited; then a game
+// where you buy every development card and play one before each roll you
+// can, through the roll's own buttons, pickers and free roads. Skips if
 // Playwright is missing.
 //
 //   npm run test:browser
@@ -13,7 +15,7 @@ import { state, autoplay, stopAutoplay, played, leaks, handShown, handHeld } fro
 
 const skip = skipWithoutPlaywright();
 
-async function fastGame({ srv, open, assertNoErrors }, name, settings) {
+async function fastGame({ srv, open, assertNoErrors }, name, settings, { devFirst = false } = {}) {
   const page = await open(name, { viewport: { width: 1366, height: 900 }, reducedMotion: "reduce", robotPace: 0.001, seed: name });
   await page.addInitScript((s) => {
     localStorage.setItem("ddp-hexlands-settings", JSON.stringify(s));
@@ -32,7 +34,7 @@ async function fastGame({ srv, open, assertNoErrors }, name, settings) {
     new MutationObserver((list) => list.forEach((r) => (window.flown += r.addedNodes.length))).observe(document.querySelector(".hx-fly"), { childList: true });
   });
   const t0 = Date.now();
-  await autoplay(page, { level: settings.level });
+  await autoplay(page, { level: settings.level, devFirst });
   await waitForState(page, (ddp) => ddp.match.phase === "over", undefined, { timeout: 400_000 });
   await stopAutoplay(page);
   const time = Date.now() - t0;
@@ -61,4 +63,8 @@ test("Hexlands with animations off and the robots at full speed: whole games are
   const four = await fastGame(run, "four", { level: "medium", players: 4, target: 8 });
   t.diagnostic(`four players: ${four.st.moves} moves in ${four.time} ms, won by ${four.st.winner}; ${JSON.stringify(four.autoplayed)}`);
   assert.equal(four.st.players, 4);
+  const devs = await fastGame(run, "devs-first", { level: "easy", players: 3, target: 10 }, { devFirst: true });
+  t.diagnostic(`development cards first: ${devs.st.moves} moves in ${devs.time} ms; ${JSON.stringify(devs.autoplayed)}`);
+  const before = Object.entries(devs.autoplayed.played).filter(([k]) => k.startsWith("roll:play:"));
+  assert.ok(before.length, "development cards played before the roll, through the page's controls");
 });
