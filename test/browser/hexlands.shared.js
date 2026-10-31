@@ -8,7 +8,7 @@ export const state = (page) => page.evaluate(() => window.ddp.match.state);
 // the buttons of the action panel. A choice two taps long (a build, then its
 // spot) keeps its move between ticks. Moves the page makes for you (Monopoly's
 // give, showing point cards to win) are the page's. hold: phases left to the
-// test; hoard: end every turn and turn down every offer, so cards pile up.
+// test (free roads are still placed); hoard: end every turn and turn down every offer, so cards pile up.
 // window.__hxPlayed counts each kind of move played, window.__hxDirect any
 // the controls couldn't make.
 export function autoplay(page, { level = "medium", hold = [], hoard = false } = {}) {
@@ -43,7 +43,7 @@ export function autoplay(page, { level = "medium", hold = [], hoard = false } = 
       const m = window.ddp.match;
       if (!m || m.phase !== "playing" || !$(".hexlands.my-turn")) return;
       const st = m.state;
-      if (hold.includes(st.phase)) return;
+      if (hold.includes(st.phase) && !st.freeRoads) return;
       const face = (s) => m.face(s);
       const key = `${m.m}:${st.moves}:${st.phase}`;
       const hoarded = hoard && (st.phase === "answer" ? { decline: true } : st.phase === "main" && !st.freeRoads ? { end: true } : null);
@@ -155,3 +155,23 @@ export const seatCards = (page) =>
     const shown = st.hands.map((_, p) => Number(document.querySelector(`.pb-who.p-${p} .hx-n.cards`)?.textContent));
     return { shown, held: st.hands.map((h) => h.length) };
   });
+
+// Keeps every line the page's log ("What happened") ever showed, in its last
+// wording (a card only you saw is named once its face arrives): the log
+// itself keeps the latest 60. logLines() reads them, oldest first.
+export function recordLog(page) {
+  return page.evaluate(() => {
+    const lines = [];
+    const update = () => {
+      for (const li of document.querySelectorAll("#hx-log li")) {
+        const line = lines.find((l) => l.node === li);
+        if (line) line.text = li.textContent;
+        else lines.push({ node: li, text: li.textContent });
+      }
+    };
+    window.__hxLog = lines;
+    new MutationObserver(update).observe(document.querySelector("#hx-log"), { childList: true, subtree: true, characterData: true });
+    update();
+  });
+}
+export const logLines = (page) => page.evaluate(() => window.__hxLog.map((l) => l.text));
