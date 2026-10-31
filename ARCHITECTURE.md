@@ -3073,7 +3073,7 @@ view and the robots do as soon as they would win.
 **Events** (`applyMove()` returns them, for the view):
 `build { p, kind, at, free, pay }` (kind `road`, `settlement` or `city`),
 `gain { p, slots }` (the second settlement's cards), `roll { p, dice }`,
-`produce { roll, gains: by seat [slots], short: [resources] }`,
+`produce { roll, gains: by seat [slots], short: [resources nobody got], partial: [resources the only taker got part of] }`,
 `discard { p, slots }`, `robber { p, hex }`, `steal { thief, victim, slot }`,
 `buy { p, slot, pay }`, `play { p, kind, slot }`, `plenty { p, slots }`,
 `monopoly { p, resource, given: by seat [slots] }`, `bank { p, gave, got }`,
