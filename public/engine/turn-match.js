@@ -25,7 +25,7 @@ export class RuleError extends Error {
   name = "RuleError";
 }
 
-const noRandom = () => {
+export const noRandom = () => {
   throw new RuleError("this move may not use randomness");
 };
 
