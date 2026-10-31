@@ -554,7 +554,7 @@ function mountGame(session, root, shell) {
       if (!text) continue;
       e.text = text;
       e.named = null;
-      e.node.replaceChildren(...logLine(e));
+      e.node.replaceChildren(...logLine(e).filter(Boolean));
     }
   }
 
