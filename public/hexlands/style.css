@@ -19,7 +19,10 @@
   --hx-glow-fill: #fff3b0;
   --hx-blocked-fill: #2a1d28;
   --hx-fresh: #ffd36b;
-  --hx-cw: 50px; /* a card in your hand */
+  --hx-edge-ink: #d2b78a; /* a panel's warm ink edge */
+  --hx-panel: linear-gradient(170deg, var(--hx-paper) 0%, var(--hx-paper) 45%, var(--hx-paper-2) 100%);
+  --hx-panel-shadow: 0 1px 0 rgb(255 255 255 / 70%) inset, 0 2px 0 var(--hx-rule), 0 8px 22px rgb(90 60 20 / 10%);
+  --hx-cw: 54px; /* a card in your hand */
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
@@ -28,55 +31,69 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .hexlands {
-    --hx-paper: #221f1b;
-    --hx-paper-2: #2b2621;
+    --hx-paper: #2a251f;
+    --hx-paper-2: #221e19;
     --hx-rule: #4a3f33;
-    --hx-ink-soft: #cdbfae;
+    --hx-ink-soft: #d8c8b2;
     --hx-frame: #8f7448;
     --hx-frame-2: #6e5634;
     --hx-sea-fill: #1b4553;
     --hx-glow-fill: #ffe9a0;
     --hx-blocked-fill: #000000;
+    --hx-edge-ink: #5e4c38;
+    --hx-panel-shadow: 0 1px 0 rgb(255 240 210 / 6%) inset, 0 2px 0 #15120f, 0 8px 22px rgb(0 0 0 / 35%);
   }
 }
 
 :root[data-theme="dark"] .hexlands {
-  --hx-paper: #221f1b;
-  --hx-paper-2: #2b2621;
+  --hx-paper: #2a251f;
+  --hx-paper-2: #221e19;
   --hx-rule: #4a3f33;
-  --hx-ink-soft: #cdbfae;
+  --hx-ink-soft: #d8c8b2;
   --hx-frame: #8f7448;
   --hx-frame-2: #6e5634;
   --hx-sea-fill: #1b4553;
   --hx-glow-fill: #ffe9a0;
   --hx-blocked-fill: #000000;
+  --hx-edge-ink: #5e4c38;
+  --hx-panel-shadow: 0 1px 0 rgb(255 240 210 / 6%) inset, 0 2px 0 #15120f, 0 8px 22px rgb(0 0 0 / 35%);
 }
 
 /* ---------- layout: the island, then the controls, your cards, the bank and the log ---------- */
 .hx-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "board" "actions" "hand" "bank" "log";
+  grid-template-areas: "board" "actions" "hand" "log";
   gap: 10px;
   align-items: start;
 }
 
-.hx-board-col { grid-area: board; min-width: 0; }
+/* The island with the bank tucked under it. */
+.hx-board-col {
+  grid-area: board;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
 .hx-actions { grid-area: actions; }
 .hx-hand-box { grid-area: hand; }
-.hx-bank { grid-area: bank; }
 .hx-log-box { grid-area: log; }
+
+/* Points live in each player's pill (.hx-vp), so the bar's score row would repeat the names. */
+.hexlands .pb-score {
+  display: none;
+}
 
 @media (min-width: 900px) {
   .hx-main {
-    grid-template-columns: minmax(0, 1fr) 318px;
-    grid-template-rows: auto auto 1fr auto;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-rows: auto auto minmax(0, 1fr);
     grid-template-areas:
       "board actions"
       "board hand"
-      "board log"
-      "bank log";
-    gap: 12px 16px;
+      "board log";
+    gap: 12px 18px;
   }
 
   .hx-log-box {
@@ -85,8 +102,14 @@
   }
 
   /* The whole island in view, with the bank under it. */
-  .hx-board-wrap {
-    max-width: max(480px, calc(100svh - 270px));
+  .hx-board-col {
+    --hx-board-max: max(480px, calc(100svh - 236px));
+  }
+
+  .hx-board-wrap,
+  .hx-board-col > .hx-bank {
+    width: 100%;
+    max-width: var(--hx-board-max);
     margin-inline: auto;
   }
 }
@@ -97,7 +120,7 @@
   position: relative;
   border-radius: 4.4%;
   background: var(--hx-sea-fill);
-  box-shadow: 0 0 0 3px var(--hx-frame), 0 0 0 5px var(--hx-frame-2), var(--shadow);
+  box-shadow: 0 0 0 3px var(--hx-frame), 0 0 0 5px var(--hx-frame-2), 0 10px 28px rgb(60 40 15 / 18%);
   container-type: inline-size;
 }
 
@@ -242,7 +265,7 @@
   line-height: 0;
 }
 
-.hx-cardbox svg {
+.hx-cardbox > svg {
   display: block;
   width: 100%;
   height: auto;
@@ -299,10 +322,11 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: 999px;
-  background: var(--hx-paper);
-  border: 1px solid var(--hx-rule);
+  background: var(--hx-panel);
+  border: 1.5px solid var(--hx-edge-ink);
+  box-shadow: var(--hx-panel-shadow);
   font-size: 0.85rem;
 }
 
@@ -321,10 +345,12 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 1px 7px 1px 3px;
+  padding: 1px 8px 1px 3px;
   border-radius: 999px;
-  background: var(--hx-paper-2);
+  background: var(--hx-paper);
+  box-shadow: inset 0 0 0 1px var(--hx-rule);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .hx-bank-chip.low {
@@ -336,11 +362,16 @@
 }
 
 /* ---------- your hand ---------- */
+.hx-hand-box,
+.hx-actions {
+  border-radius: 16px;
+  background: var(--hx-panel);
+  border: 1.5px solid var(--hx-edge-ink);
+  box-shadow: var(--hx-panel-shadow);
+}
+
 .hx-hand-box {
-  padding: 10px 10px 8px;
-  border-radius: var(--radius);
-  background: var(--hx-paper);
-  border: 1px solid var(--hx-rule);
+  padding: 12px 10px 8px;
 }
 
 .hx-hand {
@@ -400,9 +431,35 @@
   position: relative;
 }
 
-.hx-pile.empty .hx-stack {
-  opacity: 0.28;
-  filter: grayscale(0.6);
+.hx-slot {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  border-radius: 9%;
+  border: 2px dashed color-mix(in srgb, var(--hx-res) 55%, var(--hx-rule));
+  background: color-mix(in srgb, var(--hx-res) 9%, var(--hx-paper));
+}
+
+.hx-slot .hx-glyph {
+  width: 52%;
+  height: auto;
+  aspect-ratio: 1;
+  opacity: 0.55;
+}
+
+.hx-pile.r-0 { --hx-res: var(--hx-res-0, #3f8a4a); }
+.hx-pile.r-1 { --hx-res: var(--hx-res-1, #c0522e); }
+.hx-pile.r-2 { --hx-res: var(--hx-res-2, #7fb04a); }
+.hx-pile.r-3 { --hx-res: var(--hx-res-3, #d9a227); }
+.hx-pile.r-4 { --hx-res: var(--hx-res-4, #6d7a8c); }
+
+.hx-pile.empty .hx-stack > .hx-cardbox {
+  visibility: hidden;
+}
+
+.hx-pile.empty .hx-slot {
+  display: grid;
 }
 
 .hx-pile .hx-count {
@@ -422,8 +479,7 @@
 }
 
 .hx-pile.empty .hx-count {
-  background: var(--surface-2);
-  color: var(--muted);
+  display: none;
 }
 
 .hx-pile-name {
@@ -433,8 +489,12 @@
   text-transform: capitalize;
 }
 
+.hx-pile.empty .hx-pile-name {
+  opacity: 0.7;
+}
+
 /* Cards you just gained glow, with how many. */
-.hx-pile.fresh .hx-stack .hx-cardbox svg {
+.hx-pile.fresh .hx-stack .hx-cardbox > svg {
   filter: drop-shadow(0 0 5px var(--hx-fresh)) drop-shadow(0 0 2px var(--hx-fresh));
 }
 
@@ -479,9 +539,9 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--hx-rule);
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1.5px dashed var(--hx-rule);
 }
 
 .hx-dev-row[hidden] {
@@ -490,7 +550,7 @@
 
 .hx-dev {
   position: relative;
-  width: calc(var(--hx-cw) * 0.95);
+  width: calc(var(--hx-cw) * 1.05);
   padding: 0;
   border: 0;
   background: none;
@@ -504,9 +564,9 @@
   transition: transform var(--dur-fast) var(--ease-out);
 }
 
-.hx-dev.playable .hx-cardbox svg {
-  filter: drop-shadow(0 0 0 2px var(--accent)) drop-shadow(0 3px 6px rgb(40 25 10 / 30%));
-  outline: 3px solid var(--accent);
+.hx-dev.playable .hx-cardbox > svg {
+  filter: drop-shadow(0 3px 5px rgb(40 25 10 / 30%));
+  outline: 3px solid var(--mine, var(--accent));
   outline-offset: 1px;
 }
 
@@ -556,10 +616,6 @@
   display: grid;
   gap: 8px;
   padding: 12px;
-  border-radius: var(--radius);
-  background: var(--hx-paper);
-  border: 1px solid var(--hx-rule);
-  box-shadow: var(--shadow);
 }
 
 .hx-actions[hidden] {
@@ -568,7 +624,13 @@
 
 .hexlands.my-turn .hx-actions {
   border-color: var(--mine, var(--accent));
-  box-shadow: 0 0 0 2px var(--mine, var(--accent)), var(--shadow);
+  box-shadow: 0 0 0 2px var(--mine, var(--accent)), var(--hx-panel-shadow);
+}
+
+/* The page's buttons, on paper. */
+.hx-panel .btn:not(.primary, .hx-build.on) {
+  background: var(--hx-paper);
+  border-color: var(--hx-edge-ink);
 }
 
 .hx-panel {
@@ -704,9 +766,31 @@
   background: color-mix(in srgb, var(--hx-gold) 26%, var(--hx-paper));
 }
 
-.hx-stepper .hx-cardbox.mini {
-  width: min(34px, 100%);
+/* A resource as a small tile: its colour and glyph (art.js chipEl). */
+.hx-chip {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  aspect-ratio: 5 / 7;
+  border-radius: 6px;
+  background: linear-gradient(170deg, color-mix(in srgb, var(--hx-res) 70%, #fff), var(--hx-res));
+  box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 55%), 0 1px 2px rgb(40 25 10 / 25%);
 }
+
+.hx-chip .hx-glyph {
+  width: 76%;
+  height: auto;
+  aspect-ratio: 1;
+  padding: 2px;
+  border-radius: 50%;
+  background: #fffaf0;
+}
+
+.hx-chip.r-0 { --hx-res: var(--hx-res-0, #3f8a4a); }
+.hx-chip.r-1 { --hx-res: var(--hx-res-1, #c0522e); }
+.hx-chip.r-2 { --hx-res: var(--hx-res-2, #7fb04a); }
+.hx-chip.r-3 { --hx-res: var(--hx-res-3, #d9a227); }
+.hx-chip.r-4 { --hx-res: var(--hx-res-4, #6d7a8c); }
 
 .hx-step-n {
   font-size: 1.05rem;
@@ -795,7 +879,7 @@
 }
 
 .hx-tab.on {
-  background: var(--surface);
+  background: var(--hx-paper);
   color: var(--text);
   box-shadow: 0 1px 3px rgb(0 0 0 / 15%);
 }
@@ -1128,6 +1212,15 @@
   --seat-text: var(--c-ink);
 }
 
+.hexlands .result-panel {
+  background: var(--hx-paper);
+  border: 1.5px solid var(--hx-edge-ink);
+}
+
+.hexlands .result-places li {
+  background: var(--hx-paper-2);
+}
+
 .hx-sheet-box {
   max-height: min(34svh, 260px);
   overflow: auto;
@@ -1152,7 +1245,7 @@
 .hx-sheet thead th {
   position: sticky;
   top: 0;
-  background: var(--surface);
+  background: var(--hx-paper);
   font-size: 0.78rem;
   color: var(--muted);
   border-bottom: 1px solid var(--border);
@@ -1179,7 +1272,7 @@
 }
 
 .hx-sheet tbody tr:nth-child(even) {
-  background: var(--surface-2);
+  background: var(--hx-paper-2);
 }
 
 .hx-sheet .hidden-row td {
@@ -1188,7 +1281,7 @@
 
 .hx-sheet tfoot td,
 .hx-sheet tfoot th {
-  background: var(--surface);
+  background: var(--hx-paper);
   border-top: 1px solid var(--border);
   font-weight: 800;
   color: var(--text);
@@ -1232,6 +1325,73 @@
   color: var(--danger);
 }
 
+/* Development cards to play before the roll, each with its little card. */
+.hx-first {
+  gap: 6px;
+}
+
+.hx-first-btn.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 0;
+  padding: 5px 12px 5px 6px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+
+.hx-first-card {
+  width: 22px;
+  flex: none;
+}
+
+/* A seat's points, in its pill: a cream token ringed in its colour, like the island's numbers. */
+.hx-vp {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #fffdf6, #f3e2bd);
+  box-shadow: 0 0 0 2.5px var(--c), 0 1px 3px rgb(40 25 10 / 30%);
+  color: #3a2e28;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.hexlands .pb-who {
+  background: var(--hx-paper);
+  border-color: var(--hx-edge-ink);
+}
+
+.hexlands .pb-who.active {
+  border-color: var(--seat);
+}
+
+/* The log on paper. */
+.hexlands .hx-log li:not(.turn) {
+  background: var(--hx-paper);
+  border-color: var(--hx-rule);
+}
+
+/* The sea's small motions play once when the island is drawn and when your
+   turn comes (art.js breathe()), never on a loop: each ends where it rests. */
+@media (prefers-reduced-motion: no-preference) {
+  .hexlands .hx-board:not(.hx-still) :is(.hx-w1, .hx-w2, .hx-bob, .hx-spin, .hx-spout) {
+    animation-iteration-count: 1;
+    animation-fill-mode: both;
+  }
+
+  .hexlands .hx-board:not(.hx-still) .hx-spin {
+    animation-duration: 9s;
+    animation-timing-function: var(--ease-out);
+  }
+}
+
 /* ---------- phones: the island fills the width ---------- */
 @media (max-width: 600px) {
   .hexlands {
@@ -1241,6 +1401,28 @@
 
   .hx-board-col {
     margin-inline: -16px;
+  }
+
+  .hx-board-col > .hx-bank {
+    margin-inline: 16px;
+  }
+
+  /* While others play, the builds' costs wait for your turn: your cards stay near the island. */
+  .hexlands:not(.my-turn) .hx-builds {
+    display: none;
+  }
+
+  /* Four pills share two rows: a smaller token leaves the names their room. */
+  .hexlands .pb-who {
+    gap: 4px;
+  }
+
+  .hx-vp {
+    min-width: 21px;
+    height: 21px;
+    padding: 0 3px;
+    font-size: 0.8rem;
+    box-shadow: 0 0 0 2px var(--c), 0 1px 2px rgb(40 25 10 / 30%);
   }
 
   .hx-board-wrap {
@@ -1272,8 +1454,8 @@
     font-size: 1.08rem;
   }
 
-  .hx-stepper .hx-cardbox.mini {
-    width: min(28px, 100%);
+  .hx-chip {
+    width: 26px;
   }
 
   .hx-over .verdict small {
