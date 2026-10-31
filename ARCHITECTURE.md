@@ -1526,7 +1526,7 @@ checks that no game opens its own audio context or output.
 | `icon.svg` | Card art for the home page (16:10) |
 | `preview.svg` | Optional: the tile's short animated preview (see **Tile previews**) |
 | `tutorial.js`, `lessons.js` | Optional: the tutorial (see **Tutorials**). `lessons.js` is its lessons as data; `tutorial.js` exports them with the adapter the engine plays them through, and `main.js` passes `tutorial: () => import("./tutorial.js")`. |
-| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo; Chutes and Ladders, with its spinner and its pawns' hops, climbs and slides), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces, Gomoku's grid and point names, Checkers' crown, Dots and Boxes' paper, lines and boxes, Backgammon's cells, checkers and dice, Sea Battle's boards, ships, ship dragging and the shells' flight and landing; Crazy Eights' pace, discard pile, suit badge, an 8's burst and suit picker; Go Fish's seats, books, ask and the motion of asking, fishing and books; Gin Rummy's table with its melds, buttons, lay-offs and score card; Hearts' table with its seats, trick, pass and tally) |
+| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo; Chutes and Ladders, with its spinner and its pawns' hops, climbs and slides), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces, Gomoku's grid and point names, Checkers' crown, Dots and Boxes' paper, lines and boxes, Backgammon's cells, checkers and dice, Sea Battle's boards, ships, ship dragging and the shells' flight and landing; Crazy Eights' pace, discard pile, suit badge, an 8's burst and suit picker; Go Fish's seats, books, ask and the motion of asking, fishing and books; Gin Rummy's table with its melds, buttons, lay-offs and score card; Hearts' table with its seats, trick, pass and tally; Hexlands' island table, spots, hand, bank, points tokens, discard parts and the motion the tutorial shares) |
 | `motion.js` | Optional: the move motion the view shares with the tutorial, with its sounds (Chess's slide and capture and its drag, Backgammon's checker flights and drag, Dots and Boxes' pencil strokes and boxes) |
 | `pick.js`, `board-view.js` | Checkers' picking of a move square by square (and one tap for a whole multi-jump); Ludo's token motion, rolling die and move choices. Both shared by the view and the tutorial. |
 
@@ -3069,6 +3069,12 @@ its points (1 a settlement, 2 a city, 2 for longest road and largest army, 1
 a victory point card shown) reach `target`; points showing on the board win
 at once, and hidden victory point cards are shown with `claim`, which the
 view and the robots do as soon as they would win.
+
+**The view.** Each player's points sit in a token in their pill, like the
+island's number tokens, instead of the score row. The sea, boats and windmill
+move when the island is drawn and when your turn starts, then rest (no
+endless loops). `robot.js` is loaded only when a robot or the clock needs it,
+so a friend joining a room doesn't download it.
 
 **Events** (`applyMove()` returns them, for the view):
 `build { p, kind, at, free, pay }` (kind `road`, `settlement` or `city`),
