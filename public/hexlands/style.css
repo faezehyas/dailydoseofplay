@@ -1293,3 +1293,10 @@
     display: none;
   }
 }
+
+/* The tutorial: the lesson's words sit over the table, so the island is a little smaller. */
+@media (min-width: 900px) {
+  .tut-stage .hx-board-wrap {
+    max-width: max(420px, calc(100svh - 430px));
+  }
+}
