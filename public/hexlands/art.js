@@ -96,11 +96,10 @@ export function production(board, robber, buildings, roll, short = []) {
 const RISE = HEXES.slice().sort((a, b) => Math.hypot(a.x, a.y) - Math.hypot(b.x, b.y) || Math.atan2(a.y, a.x) - Math.atan2(b.y, b.x)).map((h) => h.id);
 
 // ---------- the table ----------
-// table: engine/cards/table.js (the queue, the fly layer, bubbles). me: your
-// seat. onSpot(kind, id) picks a highlighted spot; onSpotFocus(kind, id)
-// says which one is pointed at or focused (null when none). rects: { pill(p),
-// hand(r), bank(r), devPile() } give where cards go, as table.rectIn rects.
-export function hexTable(table, { me, onSpot = () => {}, onSpotFocus = () => {}, rects }) {
+// table: engine/cards/table.js (the queue, the fly layer, bubbles).
+// onSpot(kind, id) picks a highlighted spot; onSpotFocus(kind, id) says which
+// one is pointed at or focused (null when none).
+export function hexTable(table, { onSpot = () => {}, onSpotFocus = () => {} }) {
   const { live, fast, wait, flyLayer, rectIn } = table;
 
   // The island: one SVG in layers.
@@ -110,7 +109,7 @@ export function hexTable(table, { me, onSpot = () => {}, onSpotFocus = () => {},
   const svg = boardWrap.firstChild;
   const [seaL, terrainL, glowL, harbourL, tokenL, roadL, buildingL, robberL, ghostL, spotL] = LAYERS.map((l) => svg.querySelector(`.hx-layer-${l}`));
 
-  // The dice sit in the sea at the top left; the opening deck in the middle.
+  // The dice sit in the sea at the bottom right; the opening deck in the middle.
   const diceBox = el("div", { class: "hx-dice-box", id: "hx-dice", hidden: true, "aria-hidden": "true" });
   const diceArt = el("span", { class: "hx-dice-art" });
   const diceSum = el("span", { class: "hx-dice-sum mono" });
@@ -662,6 +661,5 @@ export function hexTable(table, { me, onSpot = () => {}, onSpotFocus = () => {},
     hopRobber,
     say,
     moment,
-    rects,
   };
 }

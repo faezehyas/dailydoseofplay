@@ -155,7 +155,7 @@
   flex-direction: row-reverse;
   align-items: center;
   gap: 2px;
-  width: clamp(70px, 19cqi, 150px);
+  width: clamp(88px, 22cqi, 160px);
   pointer-events: none;
 }
 
@@ -255,14 +255,6 @@
 
 .hx-deck-pile.on {
   opacity: 1;
-}
-
-.hx-deck-fly {
-  position: absolute;
-  top: 14px;
-  left: calc(50% - var(--w) / 2);
-  width: var(--w);
-  pointer-events: none;
 }
 
 /* ---------- cards ---------- */
@@ -1279,6 +1271,22 @@
 
   .hx-actions {
     padding: 10px;
+  }
+
+  .hx-bank {
+    gap: 3px;
+    padding: 5px 6px;
+    font-size: 0.78rem;
+  }
+
+  .hx-bank-chip {
+    padding: 1px 5px 1px 2px;
+    gap: 2px;
+  }
+
+  .hx-bank .hx-glyph {
+    width: 1.2em;
+    height: 1.2em;
   }
 
   .hx-panel-title strong {

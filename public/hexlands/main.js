@@ -128,7 +128,6 @@ function mountGame(session, root, shell) {
   const status = el("p", { class: table.cls("status"), id: "hx-status", role: "status", "aria-live": "polite", tabindex: "-1" });
 
   const art = hexTable(table, {
-    me,
     onSpot: (kind, id) => chooseSpot(kind, id),
     onSpotFocus: (kind, id) => {
       spotInfo = kind ? { kind, id } : null;
@@ -369,8 +368,10 @@ function mountGame(session, root, shell) {
       play("trade");
       await spend(ev.p, ev.gave, g, k);
       if (!live(g)) return;
-      await collect(ev.p, ev.got, null, g, k);
-      addLog({ player: ev.p, kind: "trade", text: `${nameOf(ev.p)} ${verb(ev.p, "trades")} ${countWords(counts(ev.gave, faceOf))} for ${countWords(counts(ev.got, faceOf))} with the bank` });
+      // One card back (a slot), or a list of them.
+      const got = [].concat(ev.got);
+      await collect(ev.p, got, null, g, k);
+      addLog({ player: ev.p, kind: "trade", text: `${nameOf(ev.p)} ${verb(ev.p, "trades")} ${countWords(counts(ev.gave, faceOf))} for ${countWords(counts(got, faceOf))} with the bank` });
     } else if (ev.type === "offer") {
       play("offer");
       art.say(pillOf(ev.p) ?? art.boardWrap, ev.p, "Trade?", g);
@@ -1071,10 +1072,9 @@ function mountGame(session, root, shell) {
     renderResult();
     setTabAlert(choice ? "Your turn" : null);
     if (choice) {
-      const key = `${m}:${s.moves}:${s.phase}`;
-      if (cuedTurn !== key && (s.phase === "roll" || s.phase === "setup" || s.phase === "discard" || s.phase === "answer" || s.phase === "partner") && cuedTurn.split(":")[1] !== String(s.moves)) {
-        play("turn");
-      }
+      // A chime when a decision comes to you; the moves of your own turn after the roll don't need one.
+      const key = `${m}:${s.moves}`;
+      if (cuedTurn !== key && ["setup", "roll", "discard", "answer", "partner"].includes(s.phase)) play("turn");
       cuedTurn = key;
     }
     autoMove();
@@ -1221,8 +1221,7 @@ function mountGame(session, root, shell) {
     }
     const pts = (p) => finalPoints?.[p] ?? points(s, p);
     const places = seats.slice().sort((a, b) => pts(b) - pts(a)).map((p) => ({ seat: p, note: plural(pts(p), "point") }));
-    const turns = Math.max(1, Math.ceil(s.moves / count / 4));
-    result.show({ winner: s.winner, reason: `${nameOf(s.winner)} reached ${s.target} points${turns ? "" : ""}.`, places, extra });
+    result.show({ winner: s.winner, reason: `${nameOf(s.winner)} reached ${s.target} points on ${s.winner === me ? "your" : "their"} own turn.`, places, extra });
   }
 
   // ---------- match lifecycle ----------
