@@ -6,8 +6,11 @@
 //
 // A rules module provides:
 //   deckSize                              1 to 200; a card's face is 0..deckSize-1
+//   openFaces                             -> optional; faces 0..openFaces-1 start face up and unshuffled
+//                                            (no cryptography until a deck.shuffle()); default 0
 //   newState(first, players, deck, rng)   -> state with state.turn and state.winner (-1 while playing).
-//                                            deck.cards: the shuffled deck's slots, top first.
+//                                            deck.cards: the open cards in face order, then the shuffled
+//                                            deck's slots, top first.
 //   applyMove(state, player, move, deck, rng) -> events[]; mutates state; throws RuleError if illegal
 //   reveals(state, player, move)          -> optional; the cards from the player's hand the move shows
 //   settle(state, deck)                   -> optional; events[]; after newState and each move, once
@@ -160,6 +163,8 @@ export class CardMatch extends Emitter {
   constructor({ send, me, rules, m = 1, players = 2, from = null }) {
     super();
     if (!(rules.deckSize >= 1 && rules.deckSize <= MAX_DECK)) throw new Error(`deckSize must be 1 to ${MAX_DECK}`);
+    const open = rules.openFaces ?? 0;
+    if (!(Number.isInteger(open) && open >= 0 && open <= rules.deckSize)) throw new Error("openFaces must be 0 to deckSize");
     this.send = (msg) => send({ ...msg, m });
     this.me = me;
     this.players = players;
@@ -453,9 +458,15 @@ export class CardMatch extends Emitter {
     const rng = rngFromBytes(this.startSeed);
     this.first = Math.floor(rng() * this.players);
 
-    const cards = await this.#shuffleRound(await this.#job("newDeck", this.rules.deckSize));
+    // newDeck's cards are face up, card i face i, until a shuffle hides them.
+    const open = this.rules.openFaces ?? 0;
+    const deck = await this.#job("newDeck", this.rules.deckSize);
+    const cards = open < deck.length ? await this.#shuffleRound(deck.slice(open)) : [];
     const table = this.#liveTable();
-    table.cards = cards.map((card) => this.slots.push({ ...newSlot(), card }) - 1);
+    table.cards = [
+      ...deck.slice(0, open).map((card, face) => this.slots.push({ ...newSlot(), card, open: true, face, pub: this.#seats(-1) }) - 1),
+      ...cards.map((card) => this.slots.push({ ...newSlot(), card }) - 1),
+    ];
     this.state = this.rules.newState(this.first, this.players, table, rng);
     await this.#runOps(table.ops);
     await this.#settle();
@@ -856,7 +867,8 @@ export class CardMatch extends Emitter {
       }
     };
     const start = table();
-    start.cards = faces.slice(0, this.rules.deckSize).map(() => slots.push({ owner: -1, open: false, gone: false }) - 1);
+    const open = this.rules.openFaces ?? 0;
+    start.cards = faces.slice(0, this.rules.deckSize).map((_, i) => slots.push({ owner: -1, open: i < open, gone: false }) - 1);
     const rng = rngFromBytes(this.startSeed);
     rng(); // who starts
     let state;
