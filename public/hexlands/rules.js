@@ -390,7 +390,7 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
     state.buildings[corner] = { p, city: false };
     state.pieces[p].settlements--;
     state.setup.corner = corner;
-    events.push({ type: "build", p, kind: "settlement", at: corner, free: true });
+    events.push({ type: "build", p, kind: "settlement", at: corner, free: true, pay: [] });
     if (state.setup.i < n) return;
     // The second settlement collects a card for each hex it touches.
     const slots = [];
@@ -407,7 +407,7 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
     if (!legalEdges(state, p).includes(move.road)) throw new RuleError("build your road next to the settlement you just placed");
     state.roads[move.road] = p;
     state.pieces[p].roads--;
-    events.push({ type: "build", p, kind: "road", at: move.road, free: true });
+    events.push({ type: "build", p, kind: "road", at: move.road, free: true, pay: [] });
     state.setup.corner = -1;
     state.setup.i++;
     if (state.setup.i < state.setup.order.length) {
