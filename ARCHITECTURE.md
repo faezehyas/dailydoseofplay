@@ -1576,6 +1576,7 @@ and **Hearts in depth**).
 | A shuffle that swaps, copies or drops a card, or one passed off as another seat's | At once: the proof fails, and the match stops naming the shuffler. |
 | A wrong share, or a share for another card | At once: its proof fails. |
 | Showing a card that isn't in your hand, or moving out of turn | At once, like any illegal move. |
+| In a step: opening a move other than the one committed to, choosing twice, or opening before everyone chose | At once, naming the mover. |
 | Passing a card with a bad sealed share, or a share for another card | At once, by its receiver, who stops the match naming the giver; then the two of them settle it (below). If the receiver kept quiet, in the audit. |
 | Saying a good sealed card is bad | When the giver and the receiver reveal their seal keys after the match stops: everyone opens the envelope and names the receiver. |
 | Breaking a rule that depends on a hidden card ("draw only if nothing plays") | In the audit, where `deck.face()` returns every face, so the rule throws. The result stands; the audit only reports. |
@@ -1633,6 +1634,31 @@ library). Either side's private key opens it, nobody else's.
 A card that is already open changes hands with `deck.deal()`, which Go Fish
 uses to hand over cards an answer shows; `deck.deal()` refuses a hidden card
 in a hand.
+
+**Rolls.** A move the rules mark with `needsRandom(state, move)` gets a
+shared draw as `applyMove`'s `rng`, like dice in `TurnMatch`. Everyone
+reveals their part of the draw only once the move has arrived, so its mover
+can't try moves until a roll suits them. The draw's seed is kept with the
+move, and the audit replays the roll from it. A match sets up `1 + draws`
+draws (default 256): who starts, then the rolls. One roll too many stops the
+match. A move that uses `rng` without saying so is refused in its mover's
+browser, and breaks the rules if sent anyway. `newState` gets the rest of the
+draw that picked who starts, for anything random everyone sees from the
+start, such as a board.
+
+**Steps.** When `rules.movers(state)` names seats, each of them owes one move
+at once, in any order, and `state.turn` is ignored. A mover's browser checks
+its move alone, then sends only a commitment to it, a SHA-256 of a salt, the
+match, the seat and the move (`commit {c}`). Once every mover has committed,
+each one sends its move, salt and shares (`open {move, salt, sh}`), and the
+moves apply in seat order with one `settle()` after the last. Messages reach
+everyone in the hub's order, and nobody opens before seeing every commitment,
+so an open that arrives before every commit is a cheat. Nobody, the host
+included, sees a choice before making their own. Since each move is checked
+before the others are known, the rules must make every mover's move legal
+whatever the others chose, for example by letting each one touch only its own
+hand. A step's moves can't roll. `match.step.commits[seat]` is set once that
+seat has chosen, so a view can show who it's waiting for.
 
 **A modified host, with three or more players.** Every message goes through
 the host's browser (see **Groups**), and messages aren't signed. A modified
