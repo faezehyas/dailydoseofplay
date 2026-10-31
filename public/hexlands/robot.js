@@ -24,6 +24,7 @@ import {
   tradeRate,
   points,
   roadLength,
+  discardPart,
   legalMoves,
   forcedMove,
   devKind,
@@ -279,7 +280,7 @@ function robberMove(ctx, legal) {
 function discardMove(ctx) {
   const { state, me, face, rng, level } = ctx;
   const hand = state.hands[me];
-  const n = state.discards[me];
+  const n = discardPart(state, me);
   if (level === "easy") {
     const left = hand.slice();
     return { discard: Array.from({ length: n }, () => left.splice(Math.floor(rng() * left.length), 1)[0]) };
@@ -409,6 +410,7 @@ function longestRoad(ctx, edges) {
 function rollMove(ctx, legal) {
   const claim = legal.find(has("claim"));
   if (claim) return claim;
+  if (ctx.state.freeRoads) return freeRoad(ctx, legal);
   return devPlay(ctx, legal) ?? { roll: true };
 }
 
@@ -517,7 +519,7 @@ export function timeoutMove(state, me, face) {
   const legal = legalMoves(state, me, face);
   const claim = legal.find(has("claim"));
   if (claim) return claim;
-  if (state.phase === "roll") return { roll: true };
+  if (state.phase === "roll" && !state.freeRoads) return { roll: true };
   if (state.phase === "main" && !state.freeRoads) return { end: true };
   if (state.phase === "answer") return { decline: true };
   return chooseChoice(state, me, () => 0.99, face, "hard");

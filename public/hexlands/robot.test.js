@@ -5,7 +5,7 @@ import { withSeededRandom, skipUnderCoverage } from "../../test/helpers.js";
 import { rngFromSeed } from "../engine/rng.js";
 import { localRoom } from "../engine/room.js";
 import { HEXES, CORNERS, EDGES, WOOD, BRICK, WOOL, GRAIN, ORE, DESERT } from "./board.js";
-import { makeRules, legalMoves, movers, resourceOf, devKind, points, discardCount, MAX_OFFERS } from "./rules.js";
+import { makeRules, legalMoves, movers, resourceOf, devKind, points, discardCount, MAX_OFFERS, MAX_SHOWN } from "./rules.js";
 import { chooseMove, timeoutMove, startRobot, LEVELS, cornerYield, roadTarget, seenHand } from "./robot.js";
 
 const LEVEL_NAMES = Object.keys(LEVELS);
@@ -170,8 +170,8 @@ test("discards keep the plan: the city's ore and grain stay", () => {
   const { st } = g;
   g.place(0, HEXES[9].corners[0]);
   g.give(0, ORE, ORE, ORE, GRAIN, GRAIN, WOOL, WOOL, WOOL, WOOL, WOOD);
-  st.phase = "discard";
   st.discards = [discardCount(st, 0), 0, 0];
+  st.phase = "discard";
   assert.equal(st.discards[0], 5);
   for (const level of ["medium", "hard"]) {
     const m = g.choose(level, 0);
@@ -334,6 +334,45 @@ test("the timer's move: roll, end the turn rather than spend, decline; elsewhere
   st.discards = [0, 0, 0];
   const r = timeoutMove(st, 0, view);
   assert.ok(legalMoves(st, 0, view).some((m) => m.robber === r.robber && m.steal === r.steal));
+});
+
+test("a discard or Monopoly give of more than 16 cards goes 16 at a time, and free roads before the roll come first", () => {
+  const g = position();
+  const { st } = g;
+  g.place(0, HEXES[9].corners[0]);
+  const hand = g.give(1, ...Array(18).fill(WOOL), ...Array(16).fill(GRAIN));
+  const view = g.deck.view(1);
+  st.phase = "discard";
+  st.discards = [0, 17, 0];
+  for (const level of LEVEL_NAMES) {
+    const m = g.choose(level, 1, `discard ${level}`);
+    assert.equal(new Set(m.discard).size, MAX_SHOWN, level);
+    assert.ok(m.discard.every((s) => hand.includes(s)), level);
+  }
+  assert.equal(timeoutMove(st, 1, view).discard.length, MAX_SHOWN);
+  st.discards = [0, 1, 0];
+  assert.equal(timeoutMove(st, 1, view).discard.length, 1);
+  // Monopoly on wool: 16, then the other 2.
+  Object.assign(st, { phase: "main", discards: [0, 0, 0] });
+  g.move(0, { play: g.dev(0, "monopoly"), resource: WOOL });
+  const first = chooseMove(st, 1, Math.random, view);
+  assert.deepEqual(timeoutMove(st, 1, view), first);
+  assert.deepEqual(g.resources(first.give), Array(MAX_SHOWN).fill(WOOL));
+  g.move(1, first);
+  assert.equal(first.more, true);
+  const rest = chooseMove(st, 1, Math.random, view);
+  assert.deepEqual([g.resources(rest.give), rest.more], [[WOOL, WOOL], undefined]);
+  g.move(1, rest);
+  assert.equal(st.phase, "main");
+  // Road building before the roll: the robot and the timer place the free roads, then roll.
+  Object.assign(st, { phase: "roll", rolled: false, devPlayed: false });
+  g.move(0, { play: g.dev(0, "road") });
+  for (const level of LEVEL_NAMES) assert.ok(has("road")(g.choose(level)), level);
+  const road = timeoutMove(st, 0, g.deck.view(0));
+  assert.ok(legalMoves(st, 0, g.deck.view(0)).some((m) => m.road === road.road));
+  g.move(0, road);
+  g.move(0, timeoutMove(st, 0, g.deck.view(0)));
+  assert.deepEqual([st.freeRoads, timeoutMove(st, 0, g.deck.view(0))], [0, { roll: true }]);
 });
 
 test("whole games at every level, 3 and 4 seats: always a legal move in a few ms, and a winner", { skip: skipUnderCoverage }, (t) => {

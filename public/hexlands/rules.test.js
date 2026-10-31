@@ -7,6 +7,7 @@ import {
   makeRules,
   normalizeConfig,
   MAX_OFFERS,
+  MAX_SHOWN,
   DEFAULT_CONFIG,
   COSTS,
   resourceOf,
@@ -21,6 +22,7 @@ import {
   tradeRate,
   points,
   discardCount,
+  discardPart,
   roadLength,
   legalMoves,
   forcedMove,
@@ -345,14 +347,83 @@ test("a 7 with nobody over 7 cards goes straight to the robber", () => {
   assert.deepEqual([g.st.phase, g.st.discards], ["robber", [0, 0, 0]]);
 });
 
-test("a knight before rolling, one development card a turn, none the turn it was bought", () => {
+test("a discard of more than 16 cards may go in parts of 16 or more, the seat a mover until it's paid", () => {
+  const split = () => {
+    const g = producing();
+    g.give(2, ...Array(17).fill(WOOD), ...Array(17).fill(BRICK));
+    g.hide(2);
+    g.give(0, ...Array(8).fill(GRAIN));
+    g.move(0, { roll: true }, dice(3, 4));
+    return g;
+  };
+  const g = split();
+  const { st, move } = g;
+  assert.deepEqual([st.phase, st.discards, movers(st)], ["discard", [4, 0, 17], [0, 2]]);
+  assert.deepEqual([discardCount(st, 2), discardPart(st, 0), discardPart(st, 2)], [17, 4, MAX_SHOWN]);
+  assert.deepEqual(legalMoves(st, 2, g.face), [{ discard: st.hands[2].slice(0, MAX_SHOWN) }]);
+  throwsRule(() => move(2, { discard: st.hands[2].slice(0, 15) }), /discard 17 cards, or at least 16 of them now and the rest next/);
+  throwsRule(() => move(0, { discard: st.hands[0].slice(0, 3) }), /^discard 4 cards$/);
+  // One step: both discard, and seat 2 still owes one.
+  move(0, { discard: st.hands[0].slice(0, 4) });
+  move(2, { discard: st.hands[2].slice(0, MAX_SHOWN) });
+  assert.deepEqual([st.phase, st.discards, movers(st), discardCount(st, 2)], ["discard", [0, 0, 1], [2], 1]);
+  throwsRule(() => move(0, { discard: [] }), /not your turn/);
+  move(2, legalMoves(st, 2, g.face)[0]);
+  assert.deepEqual([st.phase, st.hands[2].length], ["robber", 17]);
+  // The whole debt in one move is still a discard (CardMatch refuses it only with more than 16 hidden cards).
+  const whole = split();
+  whole.move(0, { discard: whole.st.hands[0].slice(0, 4) });
+  whole.move(2, { discard: whole.st.hands[2].slice(0, 17) });
+  assert.equal(whole.st.phase, "robber");
+});
+
+test("a Monopoly give of more than 16 cards may go in parts, more: true, and a card kept back is still caught", () => {
+  const monopoly = (wool, blind = false) => {
+    const g = main(game());
+    g.give(1, ...Array(wool).fill(WOOL), BRICK);
+    g.hide(1);
+    g.deck.blind = blind;
+    g.move(0, { play: g.dev(0, "monopoly"), resource: WOOL });
+    return g;
+  };
+  const g = monopoly(18);
+  const { st, move } = g;
+  const wool = g.cards(1, WOOL);
+  const part = { give: wool.slice(0, MAX_SHOWN), more: true };
+  assert.deepEqual(forcedMove(st, 1, g.face), part);
+  assert.deepEqual(legalMoves(st, 1, g.face), [part]);
+  throwsRule(() => move(1, { give: wool.slice(0, 15), more: true }), /at least 16/);
+  throwsRule(() => move(1, { give: wool.slice(0, 16), more: 1 }), /more: true/);
+  assert.deepEqual(move(1, part), []);
+  assert.deepEqual([st.phase, movers(st), st.monopoly.given[1].length], ["monopoly", [1], MAX_SHOWN]);
+  assert.deepEqual(forcedMove(st, 1, g.face), { give: wool.slice(MAX_SHOWN) });
+  const ev = move(1, { give: wool.slice(MAX_SHOWN) });
+  assert.deepEqual(ev, [{ type: "monopoly", p: 0, resource: WOOL, given: [[], wool, []] }]);
+  assert.deepEqual([st.phase, st.hands[0], st.hands[1].length], ["main", wool, 1]);
+  // Up to 16, and all of them in one move however many: no parts.
+  const e = monopoly(16);
+  assert.deepEqual(forcedMove(e.st, 1, e.face), { give: e.cards(1, WOOL) });
+  const all = monopoly(18);
+  all.move(1, { give: all.cards(1, WOOL) });
+  assert.equal(all.st.phase, "main");
+  // Cards held back past the first part: caught once every face is known.
+  const lie = (blind) => {
+    const l = monopoly(18, blind);
+    l.move(1, { give: l.cards(1, WOOL).slice(0, MAX_SHOWN), more: true });
+    return () => l.move(1, { give: [] });
+  };
+  lie(true)();
+  throwsRule(lie(false), /kept back/);
+});
+
+test("a development card before or after rolling, one a turn, none the turn it was bought", () => {
   const g = main(game());
   const { st, move } = g;
   Object.assign(st, { phase: "roll", rolled: false });
   const knight = g.dev(0, "knight");
   const road = g.dev(0, "road");
   const vp = g.dev(0, "vp");
-  throwsRule(() => move(0, { play: road }), /only a knight/);
+  throwsRule(() => move(0, { play: road }), /nowhere to build/);
   throwsRule(() => move(0, { play: vp }), /claim/);
   throwsRule(() => move(0, { play: st.bank[0][0] }), /from your hand/);
   const ev = move(0, { play: knight });
@@ -379,6 +450,63 @@ test("a knight before rolling, one development card a turn, none the turn it was
   assert.equal(st.devPile.length, 21);
   throwsRule(() => move(0, { play: slot }), /bought this turn|claim/);
   throwsRule(() => move(0, { play: road }), /nowhere to build/);
+});
+
+test("road building, year of plenty and monopoly before rolling, then the roll", () => {
+  const before = () => {
+    const g = main(game());
+    Object.assign(g.st, { phase: "roll", rolled: false });
+    place(g, 0, 20);
+    return g;
+  };
+  // Road building: the free roads first, then the roll.
+  const g = before();
+  const { st, move } = g;
+  g.give(0, WOOD, BRICK);
+  throwsRule(() => move(0, { road: legalEdges(st, 0)[0], pay: st.hands[0].slice() }), /roll before you build/);
+  const kinds = (m) => m.play !== undefined && devKind(g.face(m.play));
+  for (const kind of ["road", "plenty", "monopoly"]) g.dev(0, kind);
+  assert.deepEqual([...new Set(legalMoves(st, 0, g.face).map(kinds).filter(Boolean))].sort(), ["monopoly", "plenty", "road"]);
+  move(0, { play: st.devs[0].find((s) => devKind(g.face(s)) === "road") });
+  assert.deepEqual([st.phase, st.freeRoads], ["roll", 2]);
+  assert.deepEqual(legalMoves(st, 0, g.face), legalEdges(st, 0).map((e) => ({ road: e })));
+  throwsRule(() => move(0, { roll: true }, dice(1, 1)), /free roads first/);
+  move(0, { road: legalEdges(st, 0)[0] });
+  move(0, { road: legalEdges(st, 0)[0] });
+  assert.deepEqual([st.phase, st.freeRoads, st.pieces[0].roads, st.hands[0].length], ["roll", 0, 13, 2]);
+  throwsRule(() => move(0, { road: legalEdges(st, 0)[0] }), /roll before you build/);
+  assert.ok(!legalMoves(st, 0, g.face).some(has("play")), "one development card a turn");
+  move(0, { roll: true }, dice(1, 1));
+  assert.equal(st.phase, "main");
+  // Year of plenty: the cards, and still the roll to come.
+  const y = before();
+  const plenty = y.move(0, { play: y.dev(0, "plenty"), take: [ORE, ORE] });
+  assert.deepEqual(counts(plenty.find((e) => e.type === "plenty").slots, y.face), [0, 0, 0, 0, 2]);
+  assert.deepEqual([y.st.phase, y.st.devPlayed], ["roll", true]);
+  // Monopoly: back to the roll once everyone has given.
+  const m = before();
+  m.give(1, WOOL, WOOL, BRICK);
+  m.move(0, { play: m.dev(0, "monopoly"), resource: WOOL });
+  assert.equal(m.st.phase, "monopoly");
+  m.move(1, forcedMove(m.st, 1, m.face));
+  assert.deepEqual([m.st.phase, m.cards(0, WOOL).length, m.st.rolled], ["roll", 2, false]);
+  // Nobody to give: back to the roll at once.
+  const n = before();
+  n.move(0, { play: n.dev(0, "monopoly"), resource: ORE });
+  assert.equal(n.st.phase, "roll");
+});
+
+test("victory point cards win while free roads wait", () => {
+  const g = main(game({ config: { target: 8 } }));
+  const { st, move } = g;
+  [0, 4, 9].forEach((c) => place(g, 0, c, true));
+  place(g, 0, 20);
+  const vp = g.dev(0, "vp");
+  move(0, { play: g.dev(0, "road") });
+  assert.equal(st.freeRoads, 2);
+  assert.deepEqual(legalMoves(st, 0, g.face).filter(has("claim")), [{ claim: [vp] }]);
+  throwsRule(() => move(0, { end: true }), /free roads first/);
+  assert.deepEqual(move(0, { claim: [vp] }).at(-1), { type: "over", winner: 0, points: [8, 0, 0] });
 });
 
 test("road building: two free roads, nothing else until they're down, fewer if the pieces run out", () => {
@@ -788,8 +916,8 @@ function choose(state, me, rng, face) {
   const moves = legalMoves(state, me, face);
   const pick = (list) => list[Math.floor(rng() * list.length)];
   const of = (k) => moves.filter(has(k));
-  if (state.phase === "discard") return { discard: state.hands[me].filter(() => rng() < 0.5).concat(state.hands[me]).filter((s, i, a) => a.indexOf(s) === i).slice(0, state.discards[me]) };
-  if (state.phase === "roll") return of("claim")[0] ?? (of("play").length && rng() < 0.3 ? pick(of("play")) : { roll: true });
+  if (state.phase === "discard") return { discard: state.hands[me].filter(() => rng() < 0.5).concat(state.hands[me]).filter((s, i, a) => a.indexOf(s) === i).slice(0, discardPart(state, me)) };
+  if (state.phase === "roll" && !state.freeRoads) return of("claim")[0] ?? (of("play").length && rng() < 0.3 ? pick(of("play")) : { roll: true });
   if (state.phase === "answer") return of("accept").length && rng() < 0.5 ? of("accept")[0] : { decline: true };
   if (state.phase === "main" && !state.freeRoads) {
     for (const [k, p] of [["claim", 1], ["city", 1], ["settle", 1], ["buy", 0.8], ["play", 0.6], ["road", 0.6], ["bank", 0.6], ["offer", 0.1]]) {

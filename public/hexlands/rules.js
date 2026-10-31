@@ -53,6 +53,9 @@ export const HAND_LIMIT = 7;
 export const MAX_OFFERS = 3; // trade offers a turn
 export const LONGEST_MIN = 5;
 export const ARMY_MIN = 3;
+// CardMatch shows at most 16 hidden cards a move, so a discard or a Monopoly
+// give may also be paid in parts of at least this many, over several steps.
+export const MAX_SHOWN = 16;
 
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 const isIndex = (v, n) => Number.isInteger(v) && v >= 0 && v < n;
@@ -167,15 +170,18 @@ export function points(state, p) {
   return n + state.shown[p].filter((f) => devKind(f) === "vp").length;
 }
 
-// The cards p must give up on a 7.
-export const discardCount = (state, p) => (state.hands[p].length > HAND_LIMIT ? Math.floor(state.hands[p].length / 2) : 0);
+const owedOnSeven = (state, p) => (state.hands[p].length > HAND_LIMIT ? Math.floor(state.hands[p].length / 2) : 0);
+// The cards p must give up on a 7 (while discarding, the cards it still owes).
+export const discardCount = (state, p) => (state.phase === "discard" ? state.discards[p] : owedOnSeven(state, p));
+// A discard size that fits any hand: all it owes, or a first part of MAX_SHOWN.
+export const discardPart = (state, p) => Math.min(discardCount(state, p), MAX_SHOWN);
 
-// The development cards p may play now (victory points are shown with claim instead).
+// The development cards p may play now, before or after rolling (victory points are shown with claim instead).
 export function playable(state, p, face) {
   if (state.devPlayed || state.turn !== p || (state.phase !== "main" && state.phase !== "roll") || state.freeRoads) return [];
   return state.devs[p].filter((s) => {
     const kind = devKind(face(s));
-    return kind && kind !== "vp" && !state.bought.includes(s) && (state.phase === "main" || kind === "knight");
+    return kind && kind !== "vp" && !state.bought.includes(s);
   });
 }
 
@@ -184,14 +190,14 @@ export function movers(state) {
   if (state.winner !== -1) return [];
   if (state.phase === "discard") return seatsOf(state).filter((p) => state.discards[p] > 0);
   if (state.phase === "answer") return seatsOf(state).filter((p) => state.trade.answers[p] === null);
-  if (state.phase === "monopoly") return seatsOf(state).filter((p) => state.monopoly.given[p] === null);
+  if (state.phase === "monopoly") return seatsOf(state).filter((p) => state.monopoly.owes[p]);
   return [];
 }
 
 // The move kinds each phase takes; a move is the first of these keys it has.
 const KINDS = {
   setup: ["settle", "road"],
-  roll: ["roll", "play", "claim"],
+  roll: ["roll", "play", "road", "claim"],
   discard: ["discard"],
   robber: ["robber"],
   main: ["road", "settle", "city", "buy", "play", "bank", "offer", "claim", "end"],
@@ -222,7 +228,7 @@ export function legalMoves(state, me, face) {
   const hand = state.hands[me];
   if (step.length) {
     if (!step.includes(me)) return [];
-    if (state.phase === "discard") return [{ discard: hand.slice(0, state.discards[me]) }];
+    if (state.phase === "discard") return [{ discard: hand.slice(0, discardPart(state, me)) }];
     if (state.phase === "monopoly") return [forcedMove(state, me, face)].filter(Boolean);
     const pay = payment(hand, face, state.trade.want);
     return pay ? [{ accept: pay }, { decline: true }] : [{ decline: true }];
@@ -233,6 +239,7 @@ export function legalMoves(state, me, face) {
     case "setup":
       return state.setup.corner === -1 ? legalCorners(state, me).map((c) => ({ settle: c })) : legalEdges(state, me).map((e) => ({ road: e }));
     case "roll":
+      if (state.freeRoads) return [...legalEdges(state, me).map((e) => ({ road: e })), ...claim];
       return [{ roll: true }, ...devPlays(state, me, face), ...claim];
     case "robber":
       return robberHexes(state).flatMap((hex) => {
@@ -242,7 +249,7 @@ export function legalMoves(state, me, face) {
     case "partner":
       return [...seatsOf(state).filter((q) => Array.isArray(state.trade.answers[q])).map((q) => ({ partner: q })), { partner: -1 }];
     case "main":
-      if (state.freeRoads) return legalEdges(state, me).map((e) => ({ road: e }));
+      if (state.freeRoads) return [...legalEdges(state, me).map((e) => ({ road: e })), ...claim];
       return [...builds(state, me, face), ...devPlays(state, me, face), ...trades(state, me, face), ...claim, { end: true }];
   }
   return [];
@@ -303,14 +310,15 @@ function claimable(state, me, face) {
   return need > 0 && vps.length >= need ? [{ claim: vps.slice(0, need) }] : [];
 }
 
-// The move nobody chooses: Monopoly's give (every card of the resource), or
-// declining an offer you can't pay. null for a real choice.
+// The move nobody chooses: Monopoly's give (every card of the resource, more
+// than MAX_SHOWN in parts), or declining an offer you can't pay. null for a real choice.
 export function forcedMove(state, me, face) {
   if (!movers(state).includes(me)) return null;
   const hand = state.hands[me];
   if (state.phase === "monopoly") {
     if (hand.some((s) => face(s) === null)) return null;
-    return { give: hand.filter((s) => resourceOf(face(s)) === state.monopoly.resource) };
+    const give = hand.filter((s) => resourceOf(face(s)) === state.monopoly.resource);
+    return give.length > MAX_SHOWN ? { give: give.slice(0, MAX_SHOWN), more: true } : { give };
   }
   if (state.phase === "answer" && !payment(hand, face, state.trade.want)) return { decline: true };
   return null;
@@ -429,7 +437,7 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
     events.push({ type: "roll", p, dice: dice.slice() });
     const total = dice[0] + dice[1];
     if (total === 7) {
-      state.discards = seatsOf(state).map((q) => discardCount(state, q));
+      state.discards = seatsOf(state).map((q) => owedOnSeven(state, q));
       state.phase = state.discards.some((x) => x > 0) ? "discard" : "robber";
       return;
     }
@@ -467,10 +475,11 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
   function discard(state, p, move, deck, events) {
     const slots = move.discard;
     checkHand(state, p, slots, "discard");
-    if (slots.length !== state.discards[p]) throw new RuleError(`discard ${state.discards[p]} cards`);
+    const owe = state.discards[p];
+    if (slots.length !== owe && (owe <= MAX_SHOWN || slots.length < MAX_SHOWN || slots.length > owe)) throw new RuleError(`discard ${owe} cards${owe > MAX_SHOWN ? `, or at least ${MAX_SHOWN} of them now and the rest next` : ""}`);
     slots.forEach((s) => shownFace(deck, s));
     spend(state, p, slots, deck);
-    state.discards[p] = 0;
+    state.discards[p] -= slots.length;
     events.push({ type: "discard", p, slots: slots.slice() });
     if (!movers(state).length) state.phase = "robber";
   }
@@ -550,7 +559,6 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
     const face = shownFace(deck, slot);
     const kind = devKind(face);
     if (kind === "vp") throw new RuleError("victory point cards are shown with claim, to win");
-    if (state.phase === "roll" && kind !== "knight") throw new RuleError("only a knight can be played before rolling");
     const take = move.take;
     if (kind === "road" && !legalEdges(state, p).length) throw new RuleError("nowhere to build a road");
     if (kind === "plenty") {
@@ -572,7 +580,7 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
       events.push({ type: "plenty", p, slots: take.map((r) => payOut(state, p, r, deck)) });
     } else {
       // Seats without a card have nothing to give.
-      state.monopoly = { p, resource: move.resource, given: seatsOf(state).map((q) => (q === p || !state.hands[q].length ? [] : null)) };
+      state.monopoly = { p, resource: move.resource, given: seatsOf(state).map(() => []), owes: seatsOf(state).map((q) => q !== p && state.hands[q].length > 0) };
       state.phase = "monopoly";
       if (!movers(state).length) endMonopoly(state, events);
     }
@@ -582,16 +590,19 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
     const { resource, p: to } = state.monopoly;
     const slots = move.give;
     checkHand(state, p, slots, "give");
+    const last = move.more === undefined;
+    if (!last && (move.more !== true || slots.length < MAX_SHOWN)) throw new RuleError(`more: true, after at least ${MAX_SHOWN} cards`);
     if (!slots.every((s) => resourceOf(shownFace(deck, s)) === resource)) throw new RuleError("give only cards of the resource named");
     const set = new Set(slots);
     // The rest of the hand is hidden during play: this throws in the audit.
-    if (state.hands[p].some((s) => !set.has(s) && resourceOf(deck.face(s)) === resource)) throw new RuleError("kept back a card of the resource named by Monopoly");
+    if (last && state.hands[p].some((s) => !set.has(s) && resourceOf(deck.face(s)) === resource)) throw new RuleError("kept back a card of the resource named by Monopoly");
     state.hands[p] = state.hands[p].filter((s) => !set.has(s));
     for (const s of slots) {
       deck.deal(s, to);
       state.hands[to].push(s);
     }
-    state.monopoly.given[p] = slots.slice();
+    state.monopoly.given[p].push(...slots);
+    state.monopoly.owes[p] = !last;
     if (!movers(state).length) endMonopoly(state, events);
   }
 
@@ -599,7 +610,7 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
     const { p, resource, given } = state.monopoly;
     events.push({ type: "monopoly", p, resource, given: given.map((g) => g.slice()) });
     state.monopoly = null;
-    state.phase = "main";
+    state.phase = state.rolled ? "main" : "roll";
   }
 
   function bank(state, p, move, deck, events) {
@@ -763,7 +774,8 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
       if (step.length ? !step.includes(player) : state.turn !== player) throw new RuleError("not your turn");
       const kind = kindOf(state, move);
       if (!kind) throw new RuleError(`that move doesn't fit now (${state.phase})`);
-      if (state.phase === "main" && state.freeRoads && kind !== "road") throw new RuleError("build your free roads first");
+      if (state.freeRoads && kind !== "road" && kind !== "claim") throw new RuleError("build your free roads first");
+      if (state.phase === "roll" && kind === "road" && !state.freeRoads) throw new RuleError("roll before you build");
       const events = [];
       if (state.phase === "setup") {
         if (kind === "settle") setupSettle(state, player, move, deck, events);

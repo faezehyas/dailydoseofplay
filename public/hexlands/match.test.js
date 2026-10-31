@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { localRoom } from "../engine/room.js";
 import { startCardRobot } from "../engine/card-match.js";
 import { rngFromSeed } from "../engine/rng.js";
-import { makeRules, legalMoves, forcedMove, movers, resourceOf, victims } from "./rules.js";
+import { makeRules, legalMoves, forcedMove, movers, resourceOf, victims, discardCount, discardPart } from "./rules.js";
 import { withSeededRandom } from "../../test/helpers.js";
 
 const tick = () => new Promise((r) => setTimeout(r, 1));
@@ -36,9 +36,9 @@ function chooseRandom(state, me, rng, face) {
       const j = Math.floor(rng() * (i + 1));
       [hand[i], hand[j]] = [hand[j], hand[i]];
     }
-    return { discard: hand.slice(0, state.discards[me]) };
+    return { discard: hand.slice(0, discardPart(state, me)) };
   }
-  if (state.phase === "roll") return of("claim")[0] ?? (of("play").length && rng() < 0.3 ? pick(of("play")) : { roll: true });
+  if (state.phase === "roll" && !state.freeRoads) return of("claim")[0] ?? (of("play").length && rng() < 0.3 ? pick(of("play")) : { roll: true });
   if (state.phase === "answer") return of("accept").length && rng() < 0.5 ? of("accept")[0] : { decline: true };
   if (state.phase === "main" && !state.freeRoads) {
     for (const [k, p] of [["claim", 1], ["city", 1], ["settle", 1], ["buy", 0.8], ["play", 0.6], ["road", 0.6], ["bank", 0.6], ["offer", 0.05]]) {
@@ -60,9 +60,8 @@ function assertNoLeaks(match, held) {
 
 // choose(i, match) gives seat i's chooser, else chooseRandom; tap(i, session,
 // match) may change what a seat sends.
-async function play({ players, config = {}, choose = () => null, tap = () => {}, seed = "" }) {
+async function play({ players, config = {}, rules = makeRules(config, players), choose = () => null, tap = () => {}, seed = "" }) {
   const sessions = localRoom({ game: "hexlands", names: Array.from({ length: players }, (_, i) => `P${i}`), mode: "friend" });
-  const rules = makeRules(config, players);
   const robots = [];
   const t0 = Date.now();
   for (const [i, s] of sessions.entries()) {
@@ -82,10 +81,12 @@ async function play({ players, config = {}, choose = () => null, tap = () => {},
   // Setup until play starts, and each steal until every seat is idle again.
   const timing = { setup: 0, steals: [], game: 0 };
   const steals = [];
+  const events = [];
   let stealAt = 0;
   matches[0].on("start", () => (timing.setup = Date.now() - t0));
-  matches[0].on("events", ({ events }) => {
-    const found = events.filter((e) => e.type === "steal");
+  matches[0].on("events", (e) => {
+    events.push(...e.events);
+    const found = e.events.filter((e) => e.type === "steal");
     steals.push(...found);
     if (found.length) stealAt = Date.now();
   });
@@ -101,7 +102,7 @@ async function play({ players, config = {}, choose = () => null, tap = () => {},
     for (const r of robots) r.destroy();
   }
   timing.game = Date.now() - t0;
-  return { matches, checks, timing, steals };
+  return { matches, checks, timing, steals, events };
 }
 
 const median = (xs) => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0;
@@ -181,6 +182,57 @@ test("the audit names a player who kept back a card from Monopoly", { timeout: 9
       assert.equal(m.verdict.seat, LIAR);
       assert.match(m.verdict.reason, /kept back a card/);
     }
+  }),
+);
+
+test("a discard and a Monopoly give of more than 16 hidden cards go 16 a step, the seat owing again in the next", { timeout: 600_000 }, () =>
+  withSeededRandom("hexlands split", async () => {
+    // Once setup ends, as on a 7: the next seat holds 34 or more cards, all hidden as after a steal,
+    // the most it can of one resource, and the seat to move holds every development card.
+    const base = makeRules({ target: 8 }, 3);
+    const rules = {
+      ...base,
+      settle(state, deck) {
+        if (state.rig || state.phase !== "roll") return [];
+        const t = state.turn;
+        const v = (t + 1) % 3;
+        const [r, other] = [0, 1, 2, 3, 4].sort((a, b) => state.bank[b].length - state.bank[a].length);
+        const cards = [...state.bank[r].splice(0), ...state.bank[other].splice(-16)];
+        for (const s of cards) deck.deal(s, v);
+        const hand = deck.shuffle([...state.hands[v], ...cards]);
+        for (const s of hand) deck.deal(s, v);
+        state.hands[v] = hand;
+        for (const s of state.devPile) deck.deal(s, t);
+        state.devs[t].push(...state.devPile.splice(0));
+        state.discards = [0, 1, 2].map((q) => discardCount(state, q));
+        Object.assign(state, { phase: "discard", rolled: true, dice: [3, 4], rig: { r, v } });
+        return [];
+      },
+    };
+    const gives = new Set();
+    const choose = () => (st, me, rng, face) => {
+      const rig = st.rig;
+      if (rig && me === rig.v && st.phase === "discard") {
+        const hand = st.hands[me].slice().sort((a, b) => (resourceOf(face(a)) === rig.r) - (resourceOf(face(b)) === rig.r));
+        return { discard: hand.slice(0, discardPart(st, me)) };
+      }
+      if (rig && me === rig.v && st.phase === "monopoly") gives.add(st.moves);
+      const monopoly = rig && !movers(st).length && legalMoves(st, me, face).find((m) => m.resource === rig.r);
+      return monopoly || chooseRandom(st, me, rng, face);
+    };
+    const { matches, events } = await play({ players: 3, seed: "split", rules, choose });
+    for (const m of matches) {
+      assert.equal(m.phase, "over", m.abortReason);
+      assert.deepEqual(m.verdict, { ok: true });
+      assert.deepEqual(m.state, matches[0].state);
+    }
+    const { v } = matches[0].state.rig;
+    const [first, rest] = events.filter((e) => e.type === "discard" && e.p === v);
+    assert.equal(first.slots.length, 16);
+    assert.ok(rest.slots.length >= 1, "the rest in the next step");
+    const given = events.find((e) => e.type === "monopoly").given[v];
+    assert.ok(given.length >= 16, `gave ${given.length}`);
+    assert.ok(gives.size >= 2, "two steps of giving");
   }),
 );
 
