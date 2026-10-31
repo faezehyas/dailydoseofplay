@@ -1,7 +1,7 @@
 # Architecture
 
 Daily Dose of Play is a free site of browser games for two or more players,
-and playing never needs an account (Chutes and Ladders, Ludo, Crazy Eights, Go Fish and Hearts seat up to four). One small Node server
+and playing never needs an account (Chutes and Ladders, Ludo, Crazy Eights, Go Fish, Hearts and Hexlands seat up to four). One small Node server
 on Wasmer Edge serves the pages and introduces players to each other. The games
 themselves run browser to browser over WebRTC DataChannels: with more than
 two players, every guest connects to the room creator's browser, which
@@ -1004,7 +1004,7 @@ its largest message, with four players and a 108-card deck, is 3063 (a part
 of a `shuffle`); Crazy Eights' (four players, 52 cards) is about the same,
 3063 to 3065 as reshuffles add digits to the round number, Go Fish's
 3063, Gin Rummy's 3064 to 3065 (two players, the deck shuffled again every
-hand) and Hearts' 3064 (four players, a game to 50). A pass's sealed cards go
+hand), Hearts' 3064 (four players, a game to 50) and Hexlands' 3064 (four players, the development cards' shuffle). A pass's sealed cards go
 in a `seal` message of about 704 characters (three cards, four players).
 
 **Why a pre-negotiated channel.** With the default in-band handshake, the
@@ -1182,7 +1182,7 @@ the lobby cards:
 | Lobby, invite, waiting room | 520 px | all |
 | Game, `layout: "narrow"` | 520 px | Tic Tac Toe, Connect 4, Chess, Checkers |
 | Game, `layout: "medium"` | 640 px | Gomoku, Backgammon |
-| Game, `layout: "wide"` (the default) | 980 px | Sea Battle, Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts |
+| Game, `layout: "wide"` (the default) | 980 px | Sea Battle, Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts, Hexlands |
 
 Below that width the column is the page's width less its 16 px gutters. A
 game's own top-level box has no `max-width`, so it fills `#game`. The default
@@ -1307,10 +1307,10 @@ Checkers, the last checker borne off in Backgammon, the last ship sunk in
 Sea Battle (once its shell lands), the pawn on 100 in Chutes and Ladders,
 the last box in Dots and Boxes, the winner's tokens home in Ludo, the
 winners' books in Go Fish, the winner's melds on the table in Gin Rummy, and the
-winner's pill and tricks in Hearts. The
+winner's pill and tricks in Hearts, and the winner's buildings in Hexlands. The
 chimes (`chimes.js`) are one melody, a C-major pentatonic jingle, in a
 timbre that fits the game's pieces (`flavour`): `wood` for Chess, Checkers,
-Backgammon and Ludo; `paper` for Tic Tac Toe, Gomoku, Dots and Boxes and Gin Rummy;
+Backgammon, Ludo and Hexlands; `paper` for Tic Tac Toe, Gomoku, Dots and Boxes and Gin Rummy;
 `plastic` for Connect 4; `bell` for Chutes and Ladders and Hearts; `water` (a bubble
 under the bell) for Sea Battle and Go Fish. They are synthesized, at the `fanfare`
 level, and follow the mute toggle. With `prefers-reduced-motion` only the
@@ -1440,7 +1440,8 @@ rank, an 8 naming the suit, drawing, going out), Go Fish (asking for a rank,
 Go fish and a lucky catch, a book, the most books wins), Gin Rummy (sets and
 runs, drawing and discarding, deadwood, knocking, gin) and Hearts (following
 suit, passing three cards, the queen of spades, breaking hearts, shooting the
-moon). Sea Battle's runs in the page with both fleets fixed and
+moon) and Hexlands (settling, rolling for resources, roads and settlements,
+cities and development cards, the robber and knights, trading and winning). Sea Battle's runs in the page with both fleets fixed and
 known to it, firing through `rules.js` alone; `match.js` and its
 commitments don't come into it. The card games' run on
 `cards/lesson-deck.js`: fixed hands and a deck whose every card is known, so
@@ -1536,9 +1537,9 @@ that started the room, and has no dealer. `engine/card-match.js` does it with
 mental poker: every player holds a share of the deck's key, and a card can
 only be read with every share. With three or more players, a modified host
 can still read a hand (see **A modified host** below). The rules contract is
-at the top of that file; Crazy Eights, Go Fish, Gin Rummy and Hearts use it
-(see **Crazy Eights in depth**, **Go Fish in depth**, **Gin Rummy in depth**
-and **Hearts in depth**).
+at the top of that file; Crazy Eights, Go Fish, Gin Rummy, Hearts and Hexlands
+use it (see **Crazy Eights in depth**, **Go Fish in depth**, **Gin Rummy in
+depth**, **Hearts in depth** and **Hexlands in depth**).
 
 **How a match runs.** Every message carries `m`, as in `TurnMatch`.
 
@@ -1666,8 +1667,12 @@ match, the seat and the move (`commit {c}`). Once every mover has committed,
 each one sends its move, salt and shares (`open {move, salt, sh}`), and the
 moves apply in seat order with one `settle()` after the last. Messages reach
 everyone in the hub's order, and nobody opens before seeing every commitment,
-so an open that arrives before every commit is a cheat. Nobody, the host
-included, sees a choice before making their own. Since each move is checked
+so an open that arrives before every commit is a cheat. This leans on the
+group delivering one order to everyone, as the star does (see **Groups**): a
+transport without it would need to hold early messages back instead. A
+modified host could reorder messages to make an honest mover look early, the
+same power it already has to forge moves (see **A modified host**). Nobody,
+the host included, sees a choice before making their own. Since each move is checked
 before the others are known, the rules must make every mover's move legal
 whatever the others chose, for example by letting each one touch only its own
 hand. A step's moves can't roll. `match.step.commits[seat]` is set once that
@@ -1748,7 +1753,7 @@ table's pieces and motion, the robots' pacing and the leaving notice. A game
 builds its own layout from those pieces, keeps its own rules, robot and
 special moments, and links `cards/cards.css` after `theme.css`. Each part
 carries the class `pc-<part>` for the shared styles and `<prefix>-<part>`
-(`ce-` for Crazy Eights, `gf-` for Go Fish, `gr-` for Gin Rummy, `hr-` for Hearts) for the
+(`ce-` for Crazy Eights, `gf-` for Go Fish, `gr-` for Gin Rummy, `hr-` for Hearts, `hx-` for Hexlands) for the
 game's own styles and tests.
 
 **Sizes.** A card is 66 bytes, a share 131. A shuffle message is 66 bytes a
