@@ -1,0 +1,642 @@
+/* Hexlands' pieces (pieces.js): painted wooden toys with a warm ink outline
+   and a crisp white halo, so they stand out on every terrain. A piece's seat
+   colour is --c from its p-<seat> class (engine/cards/cards.css); its lit,
+   side and deep tones are mixed from it. */
+:root {
+  --hx-ink: #3a2e28;
+  --hx-halo: #ffffff;
+  --hx-shadow: #1a1008;
+  --hx-lit-mix: #fffbea;
+  --hx-dark-mix: #2a1a10;
+  --hx-token: #fff4dc;
+  --hx-token-ring: #d2b183;
+  --hx-num: #3a2e28;
+  --hx-red: #cf3a2c;
+  --hx-robber-hi: #77707f;
+  --hx-robber-mid: #3d3744;
+  --hx-robber-lo: #221e27;
+  --hx-robber-face: #17131a;
+  --hx-sack: #c69a62;
+  --hx-eye: #fff4c2;
+  --hx-die: #fffaf0;
+  --hx-die-side: #e3d3b4;
+  --hx-spot: #fffaf0;
+  --hx-spot-glow: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --hx-ink: #1a1310;
+    --hx-halo: #f6efe2;
+    --hx-shadow: #000000;
+    --hx-lit-mix: #fff6df;
+    --hx-dark-mix: #1c120b;
+      --hx-token: #f2e7cc;
+    --hx-token-ring: #b39467;
+    --hx-num: #2b211c;
+    --hx-red: #c43328;
+    --hx-robber-hi: #6c6676;
+    --hx-robber-mid: #332e3a;
+    --hx-robber-lo: #18151c;
+    --hx-robber-face: #0e0b10;
+    --hx-sack: #a98252;
+    --hx-eye: #ffe9a0;
+    --hx-die: #f4ecdc;
+    --hx-die-side: #c9b48e;
+    --hx-spot: #f6efe2;
+    --hx-spot-glow: #fff4d6;
+  }
+}
+
+:root[data-theme="dark"] {
+  --hx-ink: #1a1310;
+  --hx-halo: #f6efe2;
+  --hx-shadow: #000000;
+  --hx-lit-mix: #fff6df;
+  --hx-dark-mix: #1c120b;
+  --hx-token: #f2e7cc;
+  --hx-token-ring: #b39467;
+  --hx-num: #2b211c;
+  --hx-red: #c43328;
+  --hx-robber-hi: #6c6676;
+  --hx-robber-mid: #332e3a;
+  --hx-robber-lo: #18151c;
+  --hx-robber-face: #0e0b10;
+  --hx-sack: #a98252;
+  --hx-eye: #ffe9a0;
+  --hx-die: #f4ecdc;
+  --hx-die-side: #c9b48e;
+  --hx-spot: #f6efe2;
+  --hx-spot-glow: #fff4d6;
+}
+
+/* Pieces */
+.hx-piece {
+  --hx-lit: color-mix(in srgb, var(--c) 68%, var(--hx-lit-mix));
+  --hx-side: color-mix(in srgb, var(--c) 66%, var(--hx-dark-mix));
+  --hx-deep: color-mix(in srgb, var(--c) 40%, var(--hx-dark-mix));
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.hx-halo {
+  fill: var(--hx-halo);
+  stroke: var(--hx-halo);
+  stroke-width: 7;
+  stroke-linejoin: round;
+}
+
+.hx-shadow {
+  fill: var(--hx-shadow);
+  opacity: 0.28;
+}
+
+.hx-piece .hx-front {
+  fill: var(--c);
+  stroke: var(--hx-ink);
+  stroke-width: 1.7;
+}
+
+.hx-piece .hx-side {
+  fill: var(--hx-side);
+  stroke: var(--hx-ink);
+  stroke-width: 1.7;
+}
+
+.hx-piece .hx-roof {
+  fill: var(--hx-lit);
+  stroke: var(--hx-ink);
+  stroke-width: 1.7;
+}
+
+.hx-piece .hx-shine {
+  fill: none;
+  stroke: var(--hx-lit-mix);
+  stroke-width: 1.5;
+  opacity: 0.75;
+}
+
+.hx-piece .hx-glow {
+  fill: var(--hx-lit-mix);
+  opacity: 0.16;
+}
+
+.hx-door,
+.hx-window {
+  fill: var(--hx-deep);
+}
+
+.hx-pole {
+  stroke: var(--hx-ink);
+  stroke-width: 1.6;
+}
+
+.hx-flag {
+  fill: var(--hx-lit);
+  stroke: var(--hx-ink);
+  stroke-width: 1.3;
+}
+
+.hx-mark {
+  fill: var(--hx-deep);
+}
+
+.hx-mark-line {
+  fill: none;
+  stroke: var(--hx-deep);
+  stroke-width: 3;
+}
+
+/* Number tokens */
+.hx-token-face {
+  fill: var(--hx-token);
+  stroke: var(--hx-ink);
+  stroke-width: 2;
+}
+
+.hx-token-ring {
+  fill: none;
+  stroke: var(--hx-token-ring);
+  stroke-width: 1.4;
+}
+
+.hx-token-shine {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
+.hx-num {
+  font-family: var(--font-display);
+  fill: var(--hx-num);
+}
+
+.hx-pips {
+  fill: var(--hx-num);
+}
+
+.hx-hot .hx-num,
+.hx-hot .hx-pips {
+  fill: var(--hx-red);
+}
+
+.hx-token.hx-blocked {
+  opacity: 0.5;
+}
+
+/* The robber */
+.hx-rb-hi {
+  stop-color: var(--hx-robber-hi);
+}
+
+.hx-rb-mid {
+  stop-color: var(--hx-robber-mid);
+}
+
+.hx-rb-lo {
+  stop-color: var(--hx-robber-lo);
+}
+
+.hx-robber .hx-shadow {
+  opacity: 0.38;
+}
+
+.hx-rb-cloak {
+  fill: url(#hx-robber-cloak);
+  stroke: var(--hx-ink);
+  stroke-width: 1.9;
+  stroke-linejoin: round;
+}
+
+.hx-rb-fold {
+  fill: none;
+  stroke: var(--hx-robber-hi);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  opacity: 0.6;
+}
+
+.hx-rb-gleam {
+  fill: none;
+  stroke: var(--hx-robber-hi);
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+
+.hx-rb-sack {
+  fill: var(--hx-sack);
+  stroke: var(--hx-ink);
+  stroke-width: 1.7;
+}
+
+.hx-rb-strap {
+  fill: none;
+  stroke: color-mix(in srgb, var(--hx-sack) 60%, var(--hx-robber-lo));
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.hx-rb-brow {
+  fill: none;
+  stroke: var(--hx-robber-face);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.hx-rb-face {
+  fill: var(--hx-robber-face);
+}
+
+.hx-rb-mask {
+  fill: var(--hx-red);
+}
+
+.hx-rb-eye {
+  fill: var(--hx-eye);
+}
+
+/* Dice */
+.hx-dice {
+  overflow: visible;
+}
+
+.hx-die-face {
+  fill: var(--hx-die);
+  stroke: var(--hx-ink);
+  stroke-width: 1.8;
+}
+
+.hx-die-side {
+  fill: var(--hx-die-side);
+  stroke: var(--hx-ink);
+  stroke-width: 1.8;
+}
+
+.hx-die-shine {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.hx-die-pips,
+.hx-die-pips-alt {
+  fill: var(--hx-ink);
+}
+
+.hx-die-pips.hx-one,
+.hx-die-pips-alt.hx-one {
+  fill: var(--hx-red);
+}
+
+/* Spots: an invisible finger-sized hit shape over a pulsing marker. */
+.hx-spot {
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hx-hit {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.hx-spot-mark {
+  fill: var(--hx-spot);
+  stroke: var(--hx-ink);
+  stroke-width: 2.4;
+  opacity: 0.92;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.hx-spot-pulse {
+  fill: none;
+  stroke: var(--hx-spot-glow);
+  stroke-width: 5;
+  opacity: 0.7;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.hx-spot-bar {
+  fill: var(--hx-spot);
+  fill-opacity: 0.55;
+  stroke: var(--hx-spot);
+  stroke-width: 3;
+  stroke-dasharray: 8 5;
+}
+
+.hx-spot-hex .hx-spot-mark {
+  fill: none;
+  stroke: var(--hx-spot);
+  stroke-width: 5;
+  stroke-dasharray: 12 9;
+  opacity: 1;
+}
+
+.hx-spot-rim {
+  fill: none;
+  stroke: var(--hx-spot);
+  stroke-width: 4;
+  opacity: 0.9;
+}
+
+.hx-spot-hex .hx-hit {
+  fill: var(--hx-spot-glow);
+  fill-opacity: 0;
+}
+
+.hx-spot:hover .hx-spot-mark,
+.hx-spot:focus-visible .hx-spot-mark {
+  fill: var(--accent);
+  transform: scale(1.2);
+}
+
+.hx-spot-hex:hover .hx-spot-mark,
+.hx-spot-hex:focus-visible .hx-spot-mark {
+  fill: none;
+  stroke: var(--accent);
+}
+
+.hx-spot-hex:hover .hx-hit,
+.hx-spot-hex:focus-visible .hx-hit {
+  fill-opacity: 0.22;
+}
+
+.hx-spot:focus-visible .hx-spot-pulse {
+  stroke: var(--focus);
+  opacity: 1;
+}
+
+/* Motion: the screen toggles these classes. */
+@media (prefers-reduced-motion: no-preference) {
+  .hx-spot-pulse {
+    animation: hx-pulse 1.6s ease-in-out infinite;
+  }
+
+  .hx-spot-mark {
+    transition: transform var(--dur-fast) var(--ease-out), fill var(--dur-fast) var(--ease-out);
+  }
+
+  .hx-spot-hex .hx-hit {
+    transition: fill-opacity var(--dur-fast) var(--ease-out);
+  }
+
+  .hx-pop > .hx-art {
+    animation: hx-pop 460ms var(--ease-spring) both;
+    transform-box: fill-box;
+    transform-origin: 50% 85%;
+  }
+
+  .hx-road.hx-draw > .hx-art {
+    animation: hx-draw 360ms var(--ease-out) both;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .hx-hop .hx-rb-fig {
+    animation: hx-hop 560ms var(--ease-out) both;
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+  }
+
+  .hx-hop .hx-rb-shadow {
+    animation: hx-hop-shadow 560ms var(--ease-out) both;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .hx-token.hx-rolled > .hx-art {
+    animation: hx-rolled 620ms var(--ease-spring);
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .hx-rolling .hx-die-body {
+    animation: hx-tumble 700ms var(--ease-out) both;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .hx-rolling .hx-die + .hx-die .hx-die-body {
+    animation-name: hx-tumble-b;
+    animation-delay: 50ms;
+  }
+
+  .hx-rolling .hx-die-pips {
+    animation: hx-face-last 700ms both;
+  }
+
+  .hx-rolling .hx-die-pips-alt:nth-of-type(2) {
+    animation: hx-face-1 700ms both;
+  }
+
+  .hx-rolling .hx-die-pips-alt:nth-of-type(3) {
+    animation: hx-face-2 700ms both;
+  }
+
+  .hx-rolling .hx-die-pips-alt:nth-of-type(4) {
+    animation: hx-face-3 700ms both;
+  }
+}
+
+@keyframes hx-pulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.9;
+  }
+
+  70%,
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+@keyframes hx-pop {
+  0% {
+    transform: translateY(-26px) scale(0.3);
+    opacity: 0;
+  }
+
+  45% {
+    opacity: 1;
+  }
+
+  70% {
+    transform: translateY(0) scale(1.12, 0.9);
+  }
+
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes hx-draw {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+@keyframes hx-hop {
+  0% {
+    transform: translate(var(--hx-dx, 0px), var(--hx-dy, 0px));
+  }
+
+  45% {
+    transform: translate(calc(var(--hx-dx, 0px) * 0.5), calc(var(--hx-dy, 0px) * 0.5 - 70px)) scale(0.95, 1.06);
+  }
+
+  82% {
+    transform: translate(0, 0) scale(1.1, 0.88);
+  }
+
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes hx-hop-shadow {
+  0% {
+    transform: translate(var(--hx-dx, 0px), var(--hx-dy, 0px));
+  }
+
+  45% {
+    transform: translate(calc(var(--hx-dx, 0px) * 0.5), calc(var(--hx-dy, 0px) * 0.5)) scale(0.55);
+    opacity: 0.15;
+  }
+
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes hx-rolled {
+  0%,
+  100% {
+    transform: none;
+  }
+
+  40% {
+    transform: scale(1.22);
+  }
+}
+
+@keyframes hx-tumble {
+  0% {
+    transform: translate(-46px, -34px) rotate(-260deg) scale(0.7);
+  }
+
+  30% {
+    transform: translate(-16px, 0) rotate(-120deg) scale(1);
+  }
+
+  50% {
+    transform: translate(-4px, -12px) rotate(-30deg);
+  }
+
+  70% {
+    transform: translate(0, 0) rotate(8deg);
+  }
+
+  85% {
+    transform: rotate(-3deg);
+  }
+
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes hx-tumble-b {
+  0% {
+    transform: translate(-70px, -20px) rotate(220deg) scale(0.7);
+  }
+
+  32% {
+    transform: translate(-22px, 0) rotate(100deg) scale(1);
+  }
+
+  52% {
+    transform: translate(-6px, -10px) rotate(24deg);
+  }
+
+  72% {
+    transform: translate(0, 0) rotate(-7deg);
+  }
+
+  86% {
+    transform: rotate(2deg);
+  }
+
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes hx-face-last {
+  0%,
+  69% {
+    opacity: 0;
+  }
+
+  70%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes hx-face-1 {
+  0%,
+  22% {
+    opacity: 1;
+  }
+
+  23%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes hx-face-2 {
+  0%,
+  22% {
+    opacity: 0;
+  }
+
+  23%,
+  45% {
+    opacity: 1;
+  }
+
+  46%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes hx-face-3 {
+  0%,
+  45% {
+    opacity: 0;
+  }
+
+  46%,
+  69% {
+    opacity: 1;
+  }
+
+  70%,
+  100% {
+    opacity: 0;
+  }
+}
