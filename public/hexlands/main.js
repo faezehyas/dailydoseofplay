@@ -1106,7 +1106,7 @@ function mountGame(session, root, shell) {
   function renderTimer() {
     const secs = config?.moveSeconds || 0;
     const d = decision();
-    const ready = !!d && !match.busy;
+    const ready = !!d && !match.busy && d.movers.length > 0;
     const key = `${m}:${match?.state?.moves}:${match?.state?.phase}:${ready}`;
     timer.hidden = !secs || !ready || match.phase !== "playing";
     if (timer.hidden) return;
