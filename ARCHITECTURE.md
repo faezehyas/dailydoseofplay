@@ -134,6 +134,9 @@ flowchart TB
     g_pick["pick.js<br>Checkers only"]
     g_board_view["board-view.js<br>Ludo only"]
     g_board["board.js<br>Hexlands only"]
+    g_tiles["tiles.js<br>Hexlands only"]
+    g_pieces["pieces.js<br>Hexlands only"]
+    g_card_art["card-art.js<br>Hexlands only"]
   end
   subgraph engine ["Engine: public/engine/"]
     e_boot["boot.js<br>static pages"]
@@ -263,6 +266,10 @@ flowchart TB
   g_robot --> e_cards_paced_robot
   g_robot --> e_rng
   g_board --> e_rng
+  g_tiles --> g_board
+  g_tiles --> g_card_art
+  g_pieces --> g_board
+  g_rules --> g_board
   g_robot --> e_robot_pace
   g_robot --> e_session
   g_robot --> e_turn_match
@@ -1548,6 +1555,10 @@ and **Hearts in depth**).
    and sends the result with a proof that it is still the same cards
    (`shuffle`). Every other seat checks the proof before taking it as the
    deck; then seat 1 shuffles, and so on. Nobody knows the final order.
+   Rules may set `openFaces` k: the cards 0 to k − 1 skip the shuffle and
+   start face up, first in `deck.cards`, so dealing or showing them costs
+   no cryptography until a `deck.shuffle()` hides them. Every browser makes
+   the same face-up deck, and the shuffled rest still carries its proof.
 3. **Dealing and opening.** The rules call `deck.deal(slot, seat)` or
    `deck.open(slot)`. For a deal, every other seat sends its share of that
    card with a proof (`shares`); the receiver adds its own, which it never
@@ -2977,11 +2988,10 @@ year of plenty (116–117) and 2 monopoly (118–119).
 
 **Hidden cards as moves.**
 
-- **The bank.** The deck is shuffled by everyone before anyone knows where a
-  card is, so `newState` opens all 120, and the first `settle()` sorts the
-  resources into the bank, face up by resource, and sends the 25 development
-  cards through `deck.shuffle()`, which hides them again in a new order: the
-  development pile.
+- **The bank.** The rules set `openFaces: 95` (see **How a match runs**): the
+  resource cards start face up and unshuffled, so `newState` sorts them into
+  the bank by resource, and only the 25 development cards are shuffled, into
+  the hidden development pile. Play starts about a second after the keys.
 - **Paying out** deals face-up bank cards (`deck.deal()`), which costs no
   cryptography: everyone sees what you collect, as at a real table.
 - **Spending.** A move names the slots it pays with, and shows them
@@ -3009,7 +3019,7 @@ what a seat knows of its own comes from `match.face()`.
 | `players`, `first`, `turn`, `winner`, `moves`, `target` | As in every card game; `target` is the points to win (10, or 8 in a short game) |
 | `board` | `{ terrain[19], numbers[19], harbours: [{ edge, kind }], desert }`, from `layoutBoard()`; `kind` is a resource or `-1` for 3:1 |
 | `robber` | The hex it stands on |
-| `phase` | `"deal"`, `"setup"`, `"roll"`, `"discard"`, `"robber"`, `"main"`, `"answer"`, `"partner"`, `"monopoly"` or `"over"` |
+| `phase` | `"setup"`, `"roll"`, `"discard"`, `"robber"`, `"main"`, `"answer"`, `"partner"`, `"monopoly"` or `"over"` |
 | `setup` | `{ order: seats in snake order, i, corner }`: who places next, and the settlement their road must touch (`-1` before it's placed) |
 | `buildings` | By corner: `null` or `{ p, city }` |
 | `roads` | By edge: the seat, or `-1` |
@@ -3022,12 +3032,13 @@ what a seat knows of its own comes from `match.face()`.
 | `knights`, `shown` | By seat: knights played, and the faces of every development card it has shown |
 | `bank` | By resource: the slots of its face-up cards |
 | `devPile` | The slots of the development pile, top first |
+| `offers` | Trade offers made this turn: at most 3 (`MAX_OFFERS`) |
 | `dice` | The last roll, `[a, b]`, or `null` |
 | `discards` | By seat: cards it still owes after a 7 |
 | `trade` | `null`, or `{ from, give: [slots], want: [5 counts], answers: by seat, null, false or the slots offered }` |
 | `monopoly` | `null`, or `{ p, resource, given: by seat }` |
 | `freeRoads` | Roads left to place from road building |
-| `longest`, `army` | `{ p, size }`: who holds longest road (5 or more) and largest army (3 knights or more), `p` `-1` for nobody |
+| `longest`, `army` | `{ p, size }`: who holds longest road (5 or more) and largest army (3 knights or more); `{ p: -1, size: 0 }` for nobody |
 
 **A turn as moves.**
 
@@ -3037,7 +3048,7 @@ what a seat knows of its own comes from `match.face()`.
 | `roll` | `turn` | `{ roll: true }` (rolls, see **Rolls**), or a knight first |
 | `discard` | A step: every seat holding more than 7 cards | `{ discard: [slots] }`, half its cards rounded down |
 | `robber` | `turn` | `{ robber: hex, steal: seat }`: a seat with a building on that hex and a card, or `-1` when there's none |
-| `main` | `turn` | `{ road: edge, pay }`, `{ settle: corner, pay }`, `{ city: corner, pay }`, `{ buy: true, pay }`, `{ play: slot, ... }` (a knight; road building; year of plenty with `take: [r, r]`; monopoly with `resource`), `{ bank: [slots], take: r }` (4:1, or a harbour's rate), `{ offer: [slots], want: [5 counts] }`, `{ claim: [slots] }` (show victory point cards to win), `{ end: true }` |
+| `main` | `turn` | `{ road: edge, pay }`, `{ settle: corner, pay }`, `{ city: corner, pay }`, `{ buy: true, pay }`, `{ play: slot, ... }` (a knight; road building; year of plenty with `take: [r, r]`; monopoly with `resource`), `{ bank: [slots], take: r }` (4:1, or a harbour's rate), `{ offer: [slots], want: [5 counts] }` (3 a turn at most), `{ claim: [slots] }` (show victory point cards to win), `{ end: true }` |
 | `answer` | A step: every seat but the offerer | `{ accept: [slots] }` (the cards wanted, shown) or `{ decline: true }` |
 | `partner` | The offerer | `{ partner: seat }` (one who accepted), or `-1` to call it off |
 | `monopoly` | A step: every seat but the player | `{ give: [slots] }`, every card it holds of the resource |
@@ -3052,16 +3063,16 @@ a victory point card shown) reach `target`; points showing on the board win
 at once, and hidden victory point cards are shown with `claim`, which the
 view and the robots do as soon as they would win.
 
-**Events** (`applyMove()` and `settle()` return them, for the view):
-`dealt`, `build { p, kind, at, free }` (kind `road`, `settlement` or `city`),
+**Events** (`applyMove()` returns them, for the view):
+`build { p, kind, at, free, pay }` (kind `road`, `settlement` or `city`),
 `gain { p, slots }` (the second settlement's cards), `roll { p, dice }`,
 `produce { roll, gains: by seat [slots], short: [resources] }`,
 `discard { p, slots }`, `robber { p, hex }`, `steal { thief, victim, slot }`,
-`buy { p, slot }`, `play { p, kind, slot }`, `plenty { p, slots }`,
+`buy { p, slot, pay }`, `play { p, kind, slot }`, `plenty { p, slots }`,
 `monopoly { p, resource, given: by seat [slots] }`, `bank { p, gave, got }`,
-`offer { p, give, want }`, `answer { p, accept }`, `trade { from, to, gave,
+`offer { p, give, want }`, `answer { p, accept }` (the slots, or `false`), `trade { from, to, gave,
 got }`, `nodeal { p }`, `longest { p, size }`, `army { p, size }`,
-`turn { p }`, `over { winner, points }`.
+`turn { p }`, `claim { p, slots }`, `over { winner, points }` (`points`: everyone's public points).
 
 ## Differences from the reference (wasmerio/edge-multiplayer-games)
 
