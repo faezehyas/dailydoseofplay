@@ -705,8 +705,8 @@ function mountGame(session, root, shell) {
       const a = t.answers[p];
       const chose = match.step?.commits?.[p];
       const state = Array.isArray(a) ? "yes" : a === false ? "no" : chose ? "chose" : "waiting";
-      const word = { yes: "Deal", no: "No thanks", chose: "Answered", waiting: "Thinking" }[state];
-      return el("li", { class: `p-${p} ${state}` }, el("span", { class: "dot", "aria-hidden": "true" }), el("span", { class: "who" }, nameOf(p)), state === "waiting" ? thinkingDots() : null, el("span", { class: "ans" }, word));
+      const word = { yes: "Deal", no: "No thanks", chose: "Answered", waiting: p === me ? "Your answer?" : "Thinking" }[state];
+      return el("li", { class: `p-${p} ${state}` }, el("span", { class: "dot", "aria-hidden": "true" }), el("span", { class: "who" }, nameOf(p)), state === "waiting" && p !== me ? thinkingDots() : null, el("span", { class: "ans" }, word));
     });
     return el(
       "div",
