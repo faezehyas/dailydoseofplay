@@ -21,7 +21,7 @@ import { HEXES, CORNERS, EDGES, RESOURCES, DESERT } from "./board.js";
 import { roadSvg, settlementSvg, citySvg, robberSvg } from "./pieces.js";
 import { makeRules, normalizeConfig, forcedMove, COSTS, resourceOf, devKind, counts, payment, legalCorners, legalEdges, legalCities, robberHexes, victims, tradeRate, points, discardCount, playable, MAX_OFFERS, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
 import { PACE, RES_NAMES, DEV_NAMES, plural, listOf, countWords, hexWords, cornerWords, edgeWords, glyphEl, cardEl, cardsRow, production, hexTable } from "./art.js";
-import { chooseMove, startRobot } from "./robot.js";
+import { chooseMove, startRobot, timeoutMove } from "./robot.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
 import { howToPlay } from "./how-to-play.js";
@@ -1129,14 +1129,6 @@ function mountGame(session, root, shell) {
     }
   }
 
-  // Your time ran out: a sensible move is made for you (a stalled player would hold up the game).
-  function timeoutMove(s) {
-    if (s.phase === "roll") return { roll: true };
-    if (s.phase === "main" && !s.freeRoads) return { end: true };
-    if (s.phase === "answer") return { decline: true };
-    if (s.phase === "partner") return { partner: -1 };
-    return chooseMove(s, me, Math.random, (slot) => match.face(slot), { level: "medium" });
-  }
   function tick() {
     if (destroyed || !match || match.phase !== "playing" || !config?.moveSeconds) return;
     renderTimer();
@@ -1145,7 +1137,8 @@ function mountGame(session, root, shell) {
     const left = deadline - performance.now();
     if (mine(d) && left <= 0 && timedOut !== deadlineKey && myChoice()) {
       timedOut = deadlineKey;
-      const move = timeoutMove(match.state);
+      // A stalled player would hold up the game: a sensible move is made for them.
+      const move = timeoutMove(match.state, me, (slot) => match.face(slot));
       if (!move) return;
       toast(move.end ? "Time's up: your turn ended" : move.roll ? "Time's up: rolled for you" : "Time's up: a move was made for you");
       send(move);
