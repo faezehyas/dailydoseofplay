@@ -520,7 +520,7 @@ function mountGame(session, root, shell) {
     if (!live(g)) return;
     render();
     const badge = notes[ev.p].querySelector(longest ? ".hx-award.road" : ".hx-award.army");
-    badge?.animate([{ transform: "scale(.2) rotate(-30deg)", opacity: 0 }, { transform: "scale(1.5) rotate(8deg)", opacity: 1, offset: 0.6 }, { transform: "scale(1)" }], { duration: PACE.badge * k, easing: "cubic-bezier(.34,1.56,.64,1)" });
+    if (!fast()) badge?.animate([{ transform: "scale(.2) rotate(-30deg)", opacity: 0 }, { transform: "scale(1.5) rotate(8deg)", opacity: 1, offset: 0.6 }, { transform: "scale(1)" }], { duration: PACE.badge * k, easing: "cubic-bezier(.34,1.56,.64,1)" });
     addLog({ player: ev.p, kind: "award", text: `${nameOf(ev.p)} ${verb(ev.p, "takes")} the ${longest ? `longest road (${ev.size} roads)` : `largest army (${ev.size} knights)`}${was >= 0 && was !== ev.p ? ` from ${was === me ? "you" : nameOf(was)}` : ""}: 2 points` });
   }
 
