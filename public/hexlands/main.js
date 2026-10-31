@@ -16,6 +16,7 @@ import { resultPanel } from "../engine/result.js";
 import { celebrate } from "../engine/celebrate.js";
 import { cardTable } from "../engine/cards/table.js";
 import { humanPause } from "../engine/cards/paced-robot.js";
+import { robotPause } from "../engine/robot-pace.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { HEXES, CORNERS, EDGES, RESOURCES, DESERT } from "./board.js";
 import { roadSvg, settlementSvg, citySvg, robberSvg } from "./pieces.js";
@@ -30,6 +31,9 @@ import { howToPlay } from "./how-to-play.js";
 const ROBOT_PACE = { settle: 1500, road: 750, roll: 650, discard: 1500, robber: 1300, build: 900, trade: 1300, end: 750, answer: 1200, partner: 1000, give: 420, max: 2600 };
 // Your browser's own moves nobody chooses, after a short beat.
 const AUTO_MS = 600;
+// Turning down an offer you can't pay takes as long as a person's answer: an
+// instant one would tell the others about cards they can't see.
+const DECLINE_MS = [1200, 3000];
 const CLAIM_GRACE_MS = 6000; // past a player's time before we say their browser is quiet
 const LEVEL_NAME = { easy: "Easy", medium: "Medium", hard: "Hard" };
 const BUILD_NAMES = { road: "road", settlement: "settlement", city: "city" };
@@ -844,7 +848,7 @@ function mountGame(session, root, shell) {
       }
     } else if (s.phase === "answer") {
       const t = s.trade;
-      if (choice) {
+      if (choice || (mine(d) && match.canMove())) {
         const pay = payment(s.hands[me], faceOf, t.want);
         out.push(el("div", { class: "hx-row" }, btn("hx-accept", "Accept", () => send({ accept: pay }), { cls: "primary", disabled: !pay, title: pay ? null : "You don't have those cards" }), btn("hx-decline", "No thanks", () => send({ decline: true }))));
         if (!pay) out.push(hint("You don't have the cards they want."));
@@ -971,7 +975,7 @@ function mountGame(session, root, shell) {
       if (mode === "trade") return "Trade with the bank or the others.";
       return "Build, trade or end your turn.";
     }
-    if (s.phase === "answer") return choice ? `${nameOf(s.trade.from)} offers ${countWords(counts(s.trade.give, faceOf))} for ${countWords(s.trade.want)}.` : "Waiting for answers…";
+    if (s.phase === "answer") return choice || (mine(d) && match.canMove()) ? `${nameOf(s.trade.from)} offers ${countWords(counts(s.trade.give, faceOf))} for ${countWords(s.trade.want)}.` : "Waiting for answers…";
     if (s.phase === "partner") return turn === me ? (choice ? "Choose who to trade with." : "…") : `${nameOf(turn)} is choosing who to trade with…`;
     if (s.phase === "monopoly") return `${nameOf(s.monopoly.p)} ${verb(s.monopoly.p, "takes")} every ${RES_NAMES[s.monopoly.resource]}…`;
     return "…";
@@ -1097,9 +1101,10 @@ function mountGame(session, root, shell) {
     autoKey = key;
     const g = table.gen;
     clearTimeout(autoTimer);
+    const ms = move.decline ? robotPause(DECLINE_MS[0] + Math.random() * (DECLINE_MS[1] - DECLINE_MS[0])) : fast() ? 0 : AUTO_MS;
     autoTimer = setTimeout(() => {
       if (live(g) && mine() && match.canMove() && `${m}:${match.state.moves}:${match.state.phase}` === key) match.play(autoMoveFor() ?? move);
-    }, fast() ? 0 : AUTO_MS);
+    }, ms);
   }
 
   // ---------- the clock ----------
