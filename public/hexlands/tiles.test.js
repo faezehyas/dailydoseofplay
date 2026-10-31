@@ -7,6 +7,7 @@ import { resourceGlyph } from "./card-art.js";
 import { rngFromSeed } from "../engine/rng.js";
 
 const css = readFileSync(new URL("./tiles.css", import.meta.url), "utf8");
+const cardCss = readFileSync(new URL("./card-art.css", import.meta.url), "utf8"); // the harbour badges' glyphs
 const board = layoutBoard(rngFromSeed("tiles"));
 const KINDS = [ANY, ...RESOURCES];
 const terrains = TERRAIN_NAMES.flatMap((_, t) => HEXES.map((h) => terrainSvg(t, h)));
@@ -121,7 +122,7 @@ test("every class in the markup is styled or a hook for the screen", () => {
   const classes = new Set([...everything.join("").matchAll(/class="([^"]*)"/g)].flatMap((m) => m[1].split(" ")));
   for (const c of classes) {
     assert.match(c, /^hx-/);
-    if (!hooks.has(c)) assert.ok(css.includes(`.${c} `) || css.includes(`.${c},`), `.${c} is in tiles.css`);
+    if (!hooks.has(c) && !c.startsWith("hx-glyph-")) assert.ok([css, cardCss].some((sheet) => sheet.includes(`.${c} `) || sheet.includes(`.${c},`) || sheet.includes(`.${c}{`)), `.${c} is in tiles.css or card-art.css`);
   }
 });
 
