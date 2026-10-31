@@ -667,7 +667,7 @@ function mountGame(session, root, shell) {
   function steppers(name, values, max, onChange, { legend }) {
     return el(
       "fieldset",
-      { class: "hx-steppers", id: `hx-${name}` },
+      { class: "hx-steppers", id: `hx-${name}-pick` },
       el("legend", {}, `${legend}${sum(values) ? `: ${countWords(values)}` : ""}`),
       RESOURCES.map((r) =>
         el(
