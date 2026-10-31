@@ -6,7 +6,8 @@
 // placed with <use>. Detail on a hex varies by the hex's id and keeps clear of
 // the number token in its middle. Pure: no DOM, timers or Math.random.
 import { HEXES, CORNERS, EDGES, COAST, HARBOUR_EDGES, TERRAIN_NAMES, ANY } from "./board.js";
-import { resourceGlyph } from "./card-art.js";
+import { resourceGlyph, hexCorners } from "./card-art.js";
+import { rngFromSeed } from "../engine/rng.js";
 
 const R = 100;
 const HALF = 500;
@@ -31,19 +32,8 @@ const shadow = (x, y, rx, o = 0.22) => E("hx-sh", x, y, rx, rx * 0.34, flat({ op
 const use = (id, x, y, s = 1, flip = false) =>
   `<use href="#hx-${id}" transform="translate(${p(x, y)})${s !== 1 || flip ? ` scale(${n(flip ? -s : s)} ${n(s)})` : ""}"/>`;
 
-// mulberry32: the same hex always gets the same detail.
-function prng(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 const between = (rng, a, b) => a + (b - a) * rng();
 
-const hexPoints = (r) => Array.from({ length: 6 }, (_, i) => [r * Math.cos((Math.PI / 3) * i - Math.PI / 2), r * Math.sin((Math.PI / 3) * i - Math.PI / 2)]);
 function roundedPoly(pts, r) {
   return (
     pts
@@ -61,8 +51,8 @@ function roundedPoly(pts, r) {
   );
 }
 const TILE_R = 95.5;
-const HEX_D = roundedPoly(hexPoints(TILE_R), 9);
-const HEX_IN = roundedPoly(hexPoints(89), 7);
+const HEX_D = roundedPoly(hexCorners(TILE_R), 9);
+const HEX_IN = roundedPoly(hexCorners(89), 7);
 
 // ---------- placing things on a hex ----------
 // Inside the tile, `m` units in from its edge.
@@ -548,7 +538,7 @@ const ART = [forest, hills, pasture, fields, mountains, desert];
 export function terrainSvg(terrain, hex) {
   const h = typeof hex === "number" ? HEXES[hex] : hex;
   const name = TERRAIN_NAMES[terrain];
-  const { ground, items } = ART[terrain](prng(h.id * 7919 + terrain * 104729 + 1), h.id);
+  const { ground, items } = ART[terrain](rngFromSeed(`${name} ${h.id}`), h.id);
   const objects = items.sort((a, b) => a[0] - b[0]).map((i) => i[1]).join("");
   return (
     `<g class="hx-tile hx-${name}" transform="translate(${p(h.x * R, h.y * R)})">` +
@@ -631,7 +621,7 @@ function lighthouse([x, y]) {
 }
 
 export function seaSvg(board) {
-  const rng = prng(1 + (board?.terrain ?? []).reduce((s, t, i) => s * 7 + t + i, 0));
+  const rng = rngFromSeed(`sea ${board?.terrain ?? ""}`);
   const S = 2 * HALF;
   const busy = [
     [...DECOR.compass, 70], [...DECOR.whale, 50], [...DECOR.lighthouse, 70], [...DECOR.glints, 50],

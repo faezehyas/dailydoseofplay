@@ -6,12 +6,14 @@
 // can show any number of times on a page; the scene is clipped by a nested
 // <svg>. A card is 100 x 140 units, sized by CSS; with the class hx-mini (a
 // phone hand, about 44 px wide) it shows only its colour and a big glyph.
+// A card carries both faces so the class can switch them; { face: "full" } or
+// { face: "mini" } draws only that one (mini comes with the class) for a card
+// that never switches size: a mini face alone is 13 to 22 nodes, not up to 137.
 
 export const RESOURCE_TITLES = ["Wood", "Brick", "Wool", "Grain", "Ore"];
 const RES_KEYS = ["wood", "brick", "wool", "grain", "ore"];
 const FIELDS = ["forest", "hills", "pasture", "fields", "mountains"];
 
-export const DEV_KINDS = ["knight", "vp", "road", "plenty", "monopoly"];
 export const DEV_TEXT = {
   knight: { title: "Knight", effect: ["Move the robber", "and steal a card."] },
   vp: { title: "Victory Point", effect: ["Worth 1 point.", "Show it to win."] },
@@ -60,8 +62,9 @@ const tuft = (x, y, s, c = "grass") =>
 const flower = (x, y, c) => circle(x, y, 1.5, c) + circle(x, y, 0.6, "wheat");
 const roundedRect = (x, y, w, h, r) =>
   `M${pt(x + r, y)}H${n(x + w - r)}A${r} ${r} 0 0 1 ${pt(x + w, y + r)}V${n(y + h - r)}A${r} ${r} 0 0 1 ${pt(x + w - r, y + h)}H${n(x + r)}A${r} ${r} 0 0 1 ${pt(x, y + h - r)}V${n(y + r)}A${r} ${r} 0 0 1 ${pt(x + r, y)}Z`;
-const hexPath = (cx, cy, r) =>
-  "M" + Array.from({ length: 6 }, (_, i) => pt(cx + r * Math.cos((Math.PI / 3) * i - Math.PI / 2), cy + r * Math.sin((Math.PI / 3) * i - Math.PI / 2))).join("L") + "Z";
+// A pointy-topped hexagon's corners, clockwise from the top (the board's tiles use it too).
+export const hexCorners = (r, cx = 0, cy = 0) => Array.from({ length: 6 }, (_, i) => [cx + r * Math.cos((Math.PI / 3) * i - Math.PI / 2), cy + r * Math.sin((Math.PI / 3) * i - Math.PI / 2)]);
+const hexPath = (cx, cy, r) => "M" + hexCorners(r, cx, cy).map(([x, y]) => pt(x, y)).join("L") + "Z";
 
 // ---------- landscape pieces ----------
 // A sky that pales towards the horizon: thin veils of haze over a base colour.
@@ -573,12 +576,14 @@ function miniFace(field, emblem) {
     `</g>`
   );
 }
-const card = (cls, label, inner) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" class="hx-card ${cls}" viewBox="0 0 100 140" role="img" aria-label="${label}">${inner}</svg>`;
+const card = (cls, label, inner, face = "both") =>
+  `<svg xmlns="http://www.w3.org/2000/svg" class="hx-card ${cls}${face === "mini" ? " hx-mini" : ""}" viewBox="0 0 100 140" role="img" aria-label="${label}">${inner}</svg>`;
+// face: "both" (switched by hx-mini), "full" or "mini"; each face is drawn only when asked for.
+const faces = (face, full, mini) => frame() + (face === "mini" ? "" : full()) + (face === "full" ? "" : mini());
 
-export function resourceCard(r) {
+export function resourceCard(r, { face = "both" } = {}) {
   const field = FIELDS[r];
-  const full =
+  const full = () =>
     `<g class="hx-full-face">` +
     framed(6, 6, 88, 90, SCENES[r](), `${field}-dk`) +
     circle(50, 96, 14.5, "paper", ink(1.5)) +
@@ -586,23 +591,26 @@ export function resourceCard(r) {
     group("translate(38 84)", resourceGlyph(r)) +
     text(50, 127, 15, "hx-card-name", RESOURCE_TITLES[r]) +
     `</g>`;
-  return card(`hx-card-res hx-res-${RES_KEYS[r]}`, RESOURCE_TITLES[r], frame() + full + miniFace(field, group("translate(17 37) scale(2.75)", resourceGlyph(r))));
+  const mini = () => miniFace(field, group("translate(17 37) scale(2.75)", resourceGlyph(r)));
+  return card(`hx-card-res hx-res-${RES_KEYS[r]}`, RESOURCE_TITLES[r], faces(face, full, mini), face);
 }
 
-export function devCard(kind) {
+export function devCard(kind, { face = "both" } = {}) {
   const { title, effect } = DEV_TEXT[kind];
   const field = DEV_FIELD[kind] === "prog" ? "prog" : kind;
   const fit = title.length > 11 ? ' textLength="84" lengthAdjust="spacingAndGlyphs"' : "";
-  const full =
+  const full = () =>
     `<g class="hx-full-face">` +
     framed(6, 6, 88, 76, DEV_SCENES[kind](), `${field}-dk`) +
     text(50, 99, 13, "hx-card-name", title, fit) +
     effect.map((s, i) => text(50, 113 + i * 10.5, 8.4, "hx-card-effect", s)).join("") +
     `</g>`;
-  return card(`hx-card-dev hx-dev-${kind}`, `${title}: ${effect.join(" ")}`, frame() + full + miniFace(field, group("translate(50 70) scale(1.25)", DEV_ICONS[kind]())));
+  const mini = () => miniFace(field, group("translate(50 70) scale(1.25)", DEV_ICONS[kind]()));
+  return card(`hx-card-dev hx-dev-${kind}`, `${title}: ${effect.join(" ")}`, faces(face, full, mini), face);
 }
 
-export function cardBack() {
+// The back has one face for every size; face only sets the hx-mini class.
+export function cardBack({ face = "both" } = {}) {
   let lattice = "";
   for (let row = -1; row < 10; row++) for (let col = -1; col < 6; col++) lattice += hexPath(col * 19 + (row % 2 ? 9.5 : 0), row * 16.5, 10.4);
   const emblem =
@@ -620,5 +628,5 @@ export function cardBack() {
     path(roundedRect(6, 6, 88, 128, 6), "", line("back-ln", 1.5)) +
     path(roundedRect(9.5, 9.5, 81, 121, 4), "", line("back-ln", 0.8), op(0.6)) +
     emblem;
-  return card("hx-card-back", "A face-down card", inner);
+  return card("hx-card-back", "A face-down card", inner, face);
 }

@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { resourceGlyph, resourceCard, devCard, cardBack, RESOURCE_TITLES, DEV_KINDS, DEV_TEXT } from "./card-art.js";
+import { resourceGlyph, resourceCard, devCard, cardBack, RESOURCE_TITLES, DEV_TEXT } from "./card-art.js";
+import { DEV_KINDS } from "./rules.js";
 
 const read = (file) => readFileSync(new URL(file, import.meta.url), "utf8");
 const CSS = read("./card-art.css");
@@ -51,6 +52,31 @@ test("every card is well-formed, self-contained SVG with both layouts", () => {
       assert.match(svg, /class="hx-mini-face"/, `${what}: the small layout`);
     }
   }
+});
+
+test("a card can be drawn with only the face it shows", () => {
+  const nodes = (svg) => (svg.match(/<[a-z]/g) || []).length;
+  const kinds = [...RESOURCE_TITLES.map((title, r) => [title, (o) => resourceCard(r, o)]), ...DEV_KINDS.map((k) => [k, (o) => devCard(k, o)])];
+  for (const [what, draw] of kinds) {
+    const both = draw();
+    assert.equal(draw({ face: "both" }), both, `${what}: both faces by default`);
+    const full = draw({ face: "full" });
+    const mini = draw({ face: "mini" });
+    for (const svg of [full, mini]) {
+      assertWellFormed(svg, what);
+      assertSelfContained(svg, what);
+    }
+    assert.doesNotMatch(full, /hx-mini/, `${what}: the full face alone`);
+    assert.doesNotMatch(mini, /hx-full-face/, `${what}: the mini face alone`);
+    // Exactly what hx-mini shows of a two-faced card, and what it hides.
+    const fullFace = both.slice(both.indexOf('<g class="hx-full-face">'), both.indexOf('<g class="hx-mini-face">'));
+    const miniFace = both.slice(both.indexOf('<g class="hx-mini-face">'), -"</svg>".length);
+    assert.equal(mini, both.replace('" viewBox', ' hx-mini" viewBox').replace(fullFace, ""), `${what}: the two-faced card with hx-mini on, less its full face`);
+    assert.equal(full, both.replace(miniFace, ""), `${what}: the two-faced card less its mini face`);
+    assert.ok(nodes(mini) < nodes(both) / 2, `${what}: far fewer nodes (${nodes(mini)} of ${nodes(both)})`);
+  }
+  assert.equal(cardBack({ face: "mini" }), cardBack().replace('" viewBox', ' hx-mini" viewBox'), "the back has one face for every size");
+  assert.equal(cardBack({ face: "full" }), cardBack());
 });
 
 test("each resource and development card is drawn and named", () => {
