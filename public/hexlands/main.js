@@ -19,7 +19,7 @@ import { humanPause } from "../engine/cards/paced-robot.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { HEXES, CORNERS, EDGES, RESOURCES, DESERT } from "./board.js";
 import { roadSvg, settlementSvg, citySvg, robberSvg } from "./pieces.js";
-import { makeRules, normalizeConfig, forcedMove, COSTS, resourceOf, devKind, counts, payment, legalCorners, legalEdges, legalCities, robberHexes, victims, tradeRate, points, discardCount, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
+import { makeRules, normalizeConfig, forcedMove, COSTS, resourceOf, devKind, counts, payment, legalCorners, legalEdges, legalCities, robberHexes, victims, tradeRate, points, discardCount, playable, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
 import { PACE, RES_NAMES, DEV_NAMES, plural, listOf, countWords, hexWords, cornerWords, edgeWords, glyphEl, cardEl, cardsRow, production, hexTable } from "./art.js";
 import { chooseMove, startRobot } from "./robot.js";
 import { settings } from "./settings.js";
@@ -218,7 +218,8 @@ function mountGame(session, root, shell) {
     if (forced) return forced;
     if (!match.step && st.turn === me && (st.phase === "main" || st.phase === "roll")) {
       const vp = st.devs[me].filter((s) => devKind(faceOf(s)) === "vp");
-      if (vp.length && points(st, me) + vp.length >= st.target) return { claim: vp };
+      const need = st.target - points(st, me);
+      if (vp.length && need > 0 && vp.length >= need) return { claim: vp.slice(0, need) };
     }
     if (st.phase === "partner" && st.turn === me && st.trade && !seats.some((p) => Array.isArray(st.trade.answers[p]))) return { partner: -1 };
     return null;
@@ -285,7 +286,7 @@ function mountGame(session, root, shell) {
       addLog({ text: `The bank is sorted: 19 of each resource, and the ${plural(st.devPile.length, "development card")} shuffled face down.` });
     } else if (ev.type === "build") {
       const from = ev.kind === "road" ? joinedEnd(ev.at, ev.p) : -1;
-      if (!ev.free) await spend(ev.p, ev.move?.pay, g, k);
+      if (!ev.free) await spend(ev.p, ev.pay, g, k);
       if (!live(g)) return;
       if (ev.kind === "road") view.roads[ev.at] = ev.p;
       else view.buildings[ev.at] = { p: ev.p, city: ev.kind === "city" };
@@ -332,7 +333,7 @@ function mountGame(session, root, shell) {
     } else if (ev.type === "steal") {
       await steal(ev, g, k);
     } else if (ev.type === "buy") {
-      await spend(ev.p, ev.move?.pay, g, k);
+      await spend(ev.p, ev.pay, g, k);
       if (!live(g)) return;
       play("buy");
       view.devPile = Math.max(0, view.devPile - 1);
@@ -350,6 +351,14 @@ function mountGame(session, root, shell) {
       play(ev.kind === "knight" ? "knight" : "progress");
       addLog({ player: ev.p, kind: "dev", text: `${nameOf(ev.p)} ${verb(ev.p, "plays")} ${ev.kind === "knight" ? "a knight" : DEV_NAMES[ev.kind].toLowerCase()}` });
       await art.moment({ text: DEV_NAMES[ev.kind], p: ev.p, card: ev.kind, from: devRect(ev.p), g, k });
+    } else if (ev.type === "claim") {
+      // Hidden victory points, shown to win.
+      view.devs[ev.p] = view.devs[ev.p].filter((s) => !ev.slots.includes(s));
+      view.shown[ev.p].push(...ev.slots.map(faceOf).filter((f) => f !== null));
+      render();
+      play("progress");
+      addLog({ player: ev.p, kind: "dev", text: `${nameOf(ev.p)} ${verb(ev.p, "shows")} ${plural(ev.slots.length, "victory point card")}` });
+      await art.moment({ text: ev.slots.length > 1 ? `${ev.slots.length} victory points` : "Victory point", p: ev.p, card: "vp", from: devRect(ev.p), g, k });
     } else if (ev.type === "plenty") {
       ev.slots.forEach((s) => play("gain", { r: resourceOf(faceOf(s)) }));
       await collect(ev.p, ev.slots, null, g, k);
@@ -603,10 +612,8 @@ function mountGame(session, root, shell) {
   function devPlayable(slot) {
     const s = match?.state;
     const choice = myChoice();
-    if (!s || (choice !== "main" && choice !== "roll") || s.devPlayed || s.bought.includes(slot) || mode || s.freeRoads > 0) return false;
-    const kind = devKind(faceOf(slot));
-    if (!kind || kind === "vp") return false;
-    return choice === "main" || kind === "knight";
+    if (!s || (choice !== "main" && choice !== "roll") || mode) return false;
+    return playable(s, me, faceOf).includes(slot);
   }
 
   function setMode(next) {
@@ -668,7 +675,7 @@ function mountGame(session, root, shell) {
         el(
           "div",
           { class: `hx-stepper r-${r} ${values[r] ? "on" : ""}` },
-          cardEl(r, "mini"),
+          cardEl(r, "mini", { mini: true }),
           el("span", { class: "hx-step-n mono", "aria-hidden": "true" }, String(values[r])),
           el(
             "span",
@@ -1011,6 +1018,7 @@ function mountGame(session, root, shell) {
     const busy = match?.busy && match.phase !== "over" && !starting ? match.busy : null;
     table.renderBusy(starting ? null : busy, { starting, redraw: () => !destroyed && render() });
     if (starting && match.busy === "shuffling") table.shuffling(true);
+    art.bankBox.hidden = !view || starting || s?.phase === "deal";
     if (!view) return;
     art.drawPieces(view);
     art.drawDice(view.dice, { dim: !!s && s.phase !== "roll" && s.phase !== "produce" && current?.type !== "roll" && !(s.phase === "main" && !s.rolled) && s.phase !== "main" });

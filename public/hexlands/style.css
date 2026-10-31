@@ -335,6 +335,10 @@
   font-size: 0.85rem;
 }
 
+.hx-bank[hidden] {
+  display: none;
+}
+
 .hx-bank-title {
   font-family: var(--font-display);
   font-weight: 600;

@@ -60,13 +60,17 @@ export function glyphEl(r, cls = "") {
   return node;
 }
 const cardCache = new Map();
-// A card face (an <svg> from card-art.js) in a span, sized by CSS. key: a resource 0-4, a development kind, or "back".
-export function cardEl(key, cls = "") {
+// A card face (an <svg> from card-art.js) in a span, sized by CSS. key: a
+// resource 0-4, a development kind, or "back"; mini: the small face, its
+// colour and a big glyph, for cards too small for their scene.
+export function cardEl(key, cls = "", { mini = false } = {}) {
   if (!cardCache.has(key)) cardCache.set(key, typeof key === "number" ? resourceCard(key) : key === "back" ? cardBack() : devCard(key));
   const node = el("span", { class: `hx-cardbox ${typeof key === "number" ? `r-${key}` : `d-${key}`} ${cls}`, "aria-hidden": "true" });
   node.innerHTML = cardCache.get(key);
+  if (mini) setMini(node, true);
   return node;
 }
+const setMini = (node, on) => node.querySelector("svg")?.classList.toggle("hx-mini", on);
 // Glyphs in a row, one per card: "[wood][brick]" for a cost or an offer.
 export function cardsRow(c, { have = null, cls = "" } = {}) {
   const row = el("span", { class: `hx-cost ${cls}` });
@@ -111,7 +115,7 @@ export function hexTable(table, { me, onSpot = () => {}, onSpotFocus = () => {},
   const diceArt = el("span", { class: "hx-dice-art" });
   const diceSum = el("span", { class: "hx-dice-sum mono" });
   diceBox.append(diceArt, diceSum);
-  const deckPiles = el("div", { class: "hx-deck-piles" }, [0, 1, 2, 3, 4].map((r) => el("span", { class: `hx-deck-pile r-${r}` }, cardEl(r))));
+  const deckPiles = el("div", { class: "hx-deck-piles" }, [0, 1, 2, 3, 4].map((r) => el("span", { class: `hx-deck-pile r-${r}` }, cardEl(r, "", { mini: true }))));
   const deckStack = el("div", { class: "hx-deck-stack" }, [0, 1, 2, 3, 4].map(() => cardEl("back")));
   const deck = el("div", { class: "hx-deck", id: "hx-deck", hidden: true, "aria-hidden": "true" }, deckPiles, deckStack);
   boardWrap.append(diceBox, deck, table.busyChip);
@@ -338,7 +342,7 @@ export function hexTable(table, { me, onSpot = () => {}, onSpotFocus = () => {},
     if (fast() || !live(g) || !from || !to) return;
     if (delay) await wait(delay, g);
     if (!live(g)) return;
-    const node = cardEl(key, "hx-fly-card");
+    const node = cardEl(key, "hx-fly-card", { mini: width < 40 });
     node.style.width = `${width}px`;
     flyLayer.append(node);
     const h = width * 1.4;
@@ -484,34 +488,17 @@ export function hexTable(table, { me, onSpot = () => {}, onSpotFocus = () => {},
     deck.hidden = !mode;
     deck.dataset.mode = mode || "";
     if (!mode || fast()) return;
+    // The deck riffles while it is worked on: a loading indicator, so it runs only then.
     const d = tokenMs("slow") * 3.4;
-    if (mode === "shuffling") {
-      deckAnims = [...deckStack.children].map((c, i) => {
-        const side = i % 2 ? 1 : -1;
-        const out = `translate(${side * 62}%, ${-6 - i * 2}px) rotate(${side * 12}deg)`;
-        return c.animate([{ transform: `translate(0, ${-i * 2}px)` }, { transform: out, offset: 0.3 }, { transform: out, offset: 0.42 + i * 0.03 }, { transform: `translate(0, ${-i * 2}px)` }], { duration: d, iterations: Infinity, easing: easing("out") });
-      });
-    } else {
-      // Each beat a card turns up and slides onto its resource's pile: the cards really are being opened.
+    deckAnims = [...deckStack.children].map((c, i) => {
+      const side = i % 2 ? 1 : -1;
+      const out = `translate(${side * 62}%, ${-6 - i * 2}px) rotate(${side * 12}deg)`;
+      return c.animate([{ transform: `translate(0, ${-i * 2}px)` }, { transform: out, offset: 0.3 }, { transform: out, offset: 0.42 + i * 0.03 }, { transform: `translate(0, ${-i * 2}px)` }], { duration: d, iterations: Infinity, easing: easing("out") });
+    });
+    // While it's opened, the bank's piles light up in turn as their cards turn face up.
+    if (mode === "opening") {
       let r = 0;
-      const send = () => {
-        if (fast()) return;
-        const pile = deckPiles.children[r];
-        const card = cardEl(r, "hx-deck-fly");
-        deck.append(card);
-        const a = deckStack.getBoundingClientRect();
-        const b = pile.getBoundingClientRect();
-        const dx = b.left - a.left;
-        const dy = b.top - a.top;
-        card.animate([{ transform: "translate(0, 0) rotateY(90deg)" }, { transform: `translate(${dx * 0.4}px, ${dy * 0.4 - 18}px) rotateY(0deg)`, offset: 0.4 }, { transform: `translate(${dx}px, ${dy}px)` }], { duration: tokenMs("slow") * 2, easing: easing("out") }).finished.then(
-          () => card.remove(),
-          () => card.remove(),
-        );
-        pile.classList.add("on");
-        r = (r + 1) % 5;
-      };
-      send();
-      deckTimer = setInterval(send, 170);
+      deckTimer = setInterval(() => deckPiles.children[r++ % 5].classList.add("on"), 260);
     }
   }
 
@@ -579,7 +566,10 @@ export function hexTable(table, { me, onSpot = () => {}, onSpotFocus = () => {},
   // fresh: 5 counts just gained (lit up); devs: [{ slot, kind, isNew, playable }];
   // onDev(slot) plays one; highlight: 5 counts picked (lifted) in a picker.
   function drawHand({ counts, unknown = 0, fresh = [0, 0, 0, 0, 0], devs = [], onDev = () => {}, lifted = null }) {
+    const mini = piles[0].stack.offsetWidth > 0 && piles[0].stack.offsetWidth < 46;
+    handBox.classList.toggle("mini", mini);
     piles.forEach((pile, r) => {
+      setMini(pile.stack, mini);
       const n = counts[r];
       pile.node.classList.toggle("empty", n === 0);
       pile.node.classList.toggle("fresh", fresh[r] > 0);
