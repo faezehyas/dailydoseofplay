@@ -262,7 +262,7 @@ test("production: a settlement 1 and a city 2 of the hex's resource, none under 
   assert.deepEqual(ev[0], { type: "roll", p: 0, dice: [3, 3] });
   assert.equal(prod.roll, 6);
   assert.deepEqual(prod.gains.map((x) => x.length), [1, 2, 0]);
-  assert.deepEqual(prod.short, []);
+  assert.deepEqual([prod.short, prod.partial], [[], []]);
   assert.deepEqual(g.cards(1, WOOD), prod.gains[1]);
   assert.equal(g.st.bank[WOOD].length, 16);
   assert.deepEqual([g.st.phase, g.st.dice], ["main", [3, 3]]);
@@ -271,20 +271,26 @@ test("production: a settlement 1 and a city 2 of the hex's resource, none under 
   assert.deepEqual(r.move(0, { roll: true }, dice(3, 3)).find((e) => e.type === "produce").gains, [[], [], []]);
 });
 
-test("a bank short of a resource pays nobody, unless only one player wanted it", () => {
+test("a bank short of a resource pays nobody, unless only one player wanted it, who gets what's left", () => {
   const g = producing();
   g.give(2, ...Array(17).fill(WOOD)); // two left; three wanted
   const prod = g.move(0, { roll: true }, dice(3, 3)).find((e) => e.type === "produce");
   assert.deepEqual(prod.gains, [[], [], []]);
-  assert.deepEqual(prod.short, [WOOD]);
+  assert.deepEqual([prod.short, prod.partial], [[WOOD], []]);
   assert.equal(g.st.bank[WOOD].length, 2);
   const one = producing();
   one.st.buildings[HEXES[one.h].corners[0]] = null;
   one.give(2, ...Array(18).fill(WOOD)); // one left; the city wants two
   const solo = one.move(0, { roll: true }, dice(3, 3)).find((e) => e.type === "produce");
   assert.deepEqual(solo.gains.map((x) => x.length), [0, 1, 0]);
-  assert.deepEqual(solo.short, [WOOD]);
+  assert.deepEqual([solo.short, solo.partial], [[], [WOOD]]);
   assert.equal(one.st.bank[WOOD].length, 0);
+  const none = producing();
+  none.st.buildings[HEXES[none.h].corners[0]] = null;
+  none.give(2, ...Array(19).fill(WOOD)); // none left for the city
+  const empty = none.move(0, { roll: true }, dice(3, 3)).find((e) => e.type === "produce");
+  assert.deepEqual(empty.gains, [[], [], []]);
+  assert.deepEqual([empty.short, empty.partial], [[WOOD], []]);
 });
 
 test("a 7: everyone over 7 cards discards half at once, then the robber moves and steals", () => {

@@ -444,7 +444,8 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
   }
 
   // Each settlement 1 and city 2 of its hexes' terrain; a resource the bank
-  // can't pay in full goes to nobody, unless only one seat wanted it.
+  // can't pay in full goes to nobody (short), unless only one seat wanted it:
+  // that seat gets what's left (partial).
   function produce(state, total, deck, events) {
     const want = seatsOf(state).map(() => [0, 0, 0, 0, 0]);
     for (const h of HEXES) {
@@ -457,17 +458,22 @@ export function makeRules(config = DEFAULT_CONFIG, players = 4) {
     }
     const gains = seatsOf(state).map(() => []);
     const short = [];
+    const partial = [];
     for (const r of RESOURCES) {
       const takers = seatsOf(state).filter((q) => want[q][r] > 0);
       if (!takers.length) continue;
-      if (sum(takers.map((q) => want[q][r])) > state.bank[r].length) {
-        short.push(r);
-        if (takers.length > 1) continue;
-        want[takers[0]][r] = state.bank[r].length;
+      const left = state.bank[r].length;
+      if (sum(takers.map((q) => want[q][r])) > left) {
+        if (takers.length > 1 || !left) {
+          short.push(r);
+          continue;
+        }
+        partial.push(r);
+        want[takers[0]][r] = left;
       }
       for (const q of takers) for (let k = 0; k < want[q][r]; k++) gains[q].push(payOut(state, q, r, deck));
     }
-    events.push({ type: "produce", roll: total, gains, short });
+    events.push({ type: "produce", roll: total, gains, short, partial });
   }
 
   function discard(state, p, move, deck, events) {
