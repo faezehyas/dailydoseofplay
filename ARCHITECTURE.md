@@ -133,6 +133,7 @@ flowchart TB
     g_motion["motion.js"]
     g_pick["pick.js<br>Checkers only"]
     g_board_view["board-view.js<br>Ludo only"]
+    g_board["board.js<br>Hexlands only"]
   end
   subgraph engine ["Engine: public/engine/"]
     e_boot["boot.js<br>static pages"]
@@ -261,6 +262,7 @@ flowchart TB
   g_robot --> e_cards_melds
   g_robot --> e_cards_paced_robot
   g_robot --> e_rng
+  g_board --> e_rng
   g_robot --> e_robot_pace
   g_robot --> e_session
   g_robot --> e_turn_match
@@ -2948,6 +2950,118 @@ and a fanfare for the moon. A win or a loss plays the result chimes in their
 
 **Leaving.** The shared notice (`engine/cards/leave-notice.js`), with each
 player's points.
+
+## Hexlands in depth
+
+Hexlands is a game of settling an island of 19 hexes for three or four
+players, the first to 10 points winning, on `CardMatch` (see **Card games**).
+It is the first card game with dice (see **Rolls**) and steps (see
+**Steps**). Every resource card is a real card in the deck, so the hands are
+hidden as at a real table: what you collect is public, as it is when a real
+bank pays out, and a robber's steal is known only to the thief and the
+victim.
+
+**The board** (`board.js`): pointy-top hexes in rows of 3, 4, 5, 4 and 3;
+hexes, their 54 corners and 72 edges are numbered in reading order of their
+position. The 9 harbours sit on fixed coastal edges, a harbour every 3, 3
+and 4 edges round the coast. `newState` lays the board out from its `rng`
+(see **Rolls**): terrain (4 forest, 3 hills, 4 pasture, 4 fields, 3
+mountains, a desert), the 18 number tokens with no 6 or 8 next to another,
+and the harbours' kinds (four 3:1, one 2:1 for each resource). Resources are
+wood, brick, wool, grain and ore, `0` to `4`; the desert is `5`.
+
+**The deck**: 120 faces. Faces 0–94 are resources, `face / 19` (rounded down)
+being the resource, 19 of each. Faces 95–119 are development cards: 14
+knights (95–108), 5 victory points (109–113), 2 road building (114–115), 2
+year of plenty (116–117) and 2 monopoly (118–119).
+
+**Hidden cards as moves.**
+
+- **The bank.** The deck is shuffled by everyone before anyone knows where a
+  card is, so `newState` opens all 120, and the first `settle()` sorts the
+  resources into the bank, face up by resource, and sends the 25 development
+  cards through `deck.shuffle()`, which hides them again in a new order: the
+  development pile.
+- **Paying out** deals face-up bank cards (`deck.deal()`), which costs no
+  cryptography: everyone sees what you collect, as at a real table.
+- **Spending.** A move names the slots it pays with, and shows them
+  (`reveals()`), so every cost is checked live. Spent cards go back to the
+  bank, face up. Discards on a 7, trades and Monopoly show their cards the
+  same way.
+- **Stealing.** The robber's move shuffles the victim's hand
+  (`deck.shuffle()`), deals the first of the new slots to the thief and the
+  rest back to the victim. Nobody chose which card that is, the thief alone
+  sees it, and the victim, who knows what they had, can tell what's gone.
+  The cards in a hand after a steal are hidden until they are spent.
+- **Development cards** are dealt hidden from the pile and shown when played.
+  Victory point cards stay hidden until their holder shows them to win.
+- **Monopoly** is a step: every other player shows all their cards of the
+  named resource, which go to the player. Holding one back is a lie only the
+  audit can see, as in Hearts, and it names the liar.
+
+The state never depends on a hidden face: a hand is a list of slots, and
+what a seat knows of its own comes from `match.face()`.
+
+**The state** (`rules.js`):
+
+| Field | |
+|---|---|
+| `players`, `first`, `turn`, `winner`, `moves`, `target` | As in every card game; `target` is the points to win (10, or 8 in a short game) |
+| `board` | `{ terrain[19], numbers[19], harbours: [{ edge, kind }], desert }`, from `layoutBoard()`; `kind` is a resource or `-1` for 3:1 |
+| `robber` | The hex it stands on |
+| `phase` | `"deal"`, `"setup"`, `"roll"`, `"discard"`, `"robber"`, `"main"`, `"answer"`, `"partner"`, `"monopoly"` or `"over"` |
+| `setup` | `{ order: seats in snake order, i, corner }`: who places next, and the settlement their road must touch (`-1` before it's placed) |
+| `buildings` | By corner: `null` or `{ p, city }` |
+| `roads` | By edge: the seat, or `-1` |
+| `pieces` | By seat: `{ roads, settlements, cities }` still to place, from 15, 5 and 4 |
+| `hands` | By seat: the slots of its resource cards |
+| `devs` | By seat: the slots of its development cards, hidden |
+| `bought` | The development cards bought this turn, which can't be played until the next |
+| `devPlayed` | Whether this turn's one development card has been played |
+| `rolled` | Whether the dice were rolled this turn (a knight may come first) |
+| `knights`, `shown` | By seat: knights played, and the faces of every development card it has shown |
+| `bank` | By resource: the slots of its face-up cards |
+| `devPile` | The slots of the development pile, top first |
+| `dice` | The last roll, `[a, b]`, or `null` |
+| `discards` | By seat: cards it still owes after a 7 |
+| `trade` | `null`, or `{ from, give: [slots], want: [5 counts], answers: by seat, null, false or the slots offered }` |
+| `monopoly` | `null`, or `{ p, resource, given: by seat }` |
+| `freeRoads` | Roads left to place from road building |
+| `longest`, `army` | `{ p, size }`: who holds longest road (5 or more) and largest army (3 knights or more), `p` `-1` for nobody |
+
+**A turn as moves.**
+
+| Phase | Who moves | Moves |
+|---|---|---|
+| `setup` | `setup.order[setup.i]`: each seat, then back in reverse | `{ settle: corner }`, then `{ road: edge }` touching it. The second settlement collects one card for each hex it touches. |
+| `roll` | `turn` | `{ roll: true }` (rolls, see **Rolls**), or a knight first |
+| `discard` | A step: every seat holding more than 7 cards | `{ discard: [slots] }`, half its cards rounded down |
+| `robber` | `turn` | `{ robber: hex, steal: seat }`: a seat with a building on that hex and a card, or `-1` when there's none |
+| `main` | `turn` | `{ road: edge, pay }`, `{ settle: corner, pay }`, `{ city: corner, pay }`, `{ buy: true, pay }`, `{ play: slot, ... }` (a knight; road building; year of plenty with `take: [r, r]`; monopoly with `resource`), `{ bank: [slots], take: r }` (4:1, or a harbour's rate), `{ offer: [slots], want: [5 counts] }`, `{ claim: [slots] }` (show victory point cards to win), `{ end: true }` |
+| `answer` | A step: every seat but the offerer | `{ accept: [slots] }` (the cards wanted, shown) or `{ decline: true }` |
+| `partner` | The offerer | `{ partner: seat }` (one who accepted), or `-1` to call it off |
+| `monopoly` | A step: every seat but the player | `{ give: [slots] }`, every card it holds of the resource |
+
+`pay` is the slots paid with; with free roads from road building a road has
+none. Production on a roll pays each settlement 1 and each city 2 cards of
+its hexes' terrain, except under the robber; if the bank runs short of a
+resource for more than one player, nobody gets it. A 7 pays nothing: the
+discards come first, then the robber. A seat wins on its own turn the moment
+its points (1 a settlement, 2 a city, 2 for longest road and largest army, 1
+a victory point card shown) reach `target`; points showing on the board win
+at once, and hidden victory point cards are shown with `claim`, which the
+view and the robots do as soon as they would win.
+
+**Events** (`applyMove()` and `settle()` return them, for the view):
+`dealt`, `build { p, kind, at, free }` (kind `road`, `settlement` or `city`),
+`gain { p, slots }` (the second settlement's cards), `roll { p, dice }`,
+`produce { roll, gains: by seat [slots], short: [resources] }`,
+`discard { p, slots }`, `robber { p, hex }`, `steal { thief, victim, slot }`,
+`buy { p, slot }`, `play { p, kind, slot }`, `plenty { p, slots }`,
+`monopoly { p, resource, given: by seat [slots] }`, `bank { p, gave, got }`,
+`offer { p, give, want }`, `answer { p, accept }`, `trade { from, to, gave,
+got }`, `nodeal { p }`, `longest { p, size }`, `army { p, size }`,
+`turn { p }`, `over { winner, points }`.
 
 ## Differences from the reference (wasmerio/edge-multiplayer-games)
 
