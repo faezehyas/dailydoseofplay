@@ -1386,6 +1386,11 @@
     animation-fill-mode: both;
   }
 
+  /* The spots you may pick pulse a few times as they appear, then rest as a steady ring. */
+  .hexlands .hx-layer-spots .hx-spot-pulse {
+    animation-iteration-count: 3;
+  }
+
   .hexlands .hx-board:not(.hx-still) .hx-spin {
     animation-duration: 9s;
     animation-timing-function: var(--ease-out);
