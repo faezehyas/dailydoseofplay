@@ -59,8 +59,8 @@ function assertNoLeaks(match, held) {
 
 
 // choose(i, match) gives seat i's chooser, else chooseRandom; tap(i, session,
-// match) may change what a seat sends; watch(matches) runs before play.
-async function play({ players, config = {}, choose = () => null, tap = () => {}, watch = () => {}, seed = "" }) {
+// match) may change what a seat sends.
+async function play({ players, config = {}, choose = () => null, tap = () => {}, seed = "" }) {
   const sessions = localRoom({ game: "hexlands", names: Array.from({ length: players }, (_, i) => `P${i}`), mode: "friend" });
   const rules = makeRules(config, players);
   const robots = [];
@@ -95,7 +95,6 @@ async function play({ players, config = {}, choose = () => null, tap = () => {},
       stealAt = 0;
     }
   });
-  watch(matches);
   try {
     await until(() => matches.every(done));
   } finally {
@@ -137,13 +136,6 @@ test("three seats: the same state everywhere, a passing audit, steals seen only 
 
 test("four seats: the same state everywhere, a passing audit, steals seen only by the thief", { timeout: 600_000 }, (t) => withSeededRandom("hexlands 4", () => fullGame(t, 4, "four")));
 
-// Plays a move of a kind it can, preferring `prefer(moves)`.
-const leaning = (prefer) => (st, me, rng, face) => {
-  const moves = movers(st).length ? [] : legalMoves(st, me, face);
-  const pick = prefer(moves, st, me);
-  return pick ?? chooseRandom(st, me, rng, face);
-};
-
 test("the audit names a player who kept back a card from Monopoly", { timeout: 900_000 }, () =>
   withSeededRandom("hexlands monopoly", async () => {
     const LIAR = 1;
@@ -157,10 +149,11 @@ test("the audit names a player who kept back a card from Monopoly", { timeout: 9
       return slot === undefined ? -1 : resourceOf(m.face(slot));
     };
     // Everyone robs the liar, so its hand is hidden, and buys and plays Monopoly when it can.
-    const eager = leaning((moves) => {
+    const eager = (st, me, rng, face) => {
+      const moves = movers(st).length ? [] : legalMoves(st, me, face);
       const pick = (f) => moves.find(f);
-      return pick((m) => m.steal === LIAR) ?? pick((m) => m.resource === hiddenWith()) ?? pick(has("buy")) ?? null;
-    });
+      return pick((m) => m.steal === LIAR) ?? pick((m) => m.resource === hiddenWith()) ?? pick(has("buy")) ?? chooseRandom(st, me, rng, face);
+    };
     // It gives only the cards everyone can see.
     const liar = (match) => (st, me, rng, face) => {
       if (st.phase === "monopoly" && movers(st).includes(me)) {
