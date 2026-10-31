@@ -3008,6 +3008,8 @@ year of plenty (116–117) and 2 monopoly (118–119).
 - **Monopoly** is a step: every other player shows all their cards of the
   named resource, which go to the player. Holding one back is a lie only the
   audit can see, as in Hearts, and it names the liar.
+- **Big payments.** A move shows at most 16 hidden cards (see **Sizes**), so
+  a discard or Monopoly give of more hidden cards than that goes in parts.
 
 The state never depends on a hidden face: a hand is a list of slots, and
 what a seat knows of its own comes from `match.face()`.
@@ -3028,15 +3030,15 @@ what a seat knows of its own comes from `match.face()`.
 | `devs` | By seat: the slots of its development cards, hidden |
 | `bought` | The development cards bought this turn, which can't be played until the next |
 | `devPlayed` | Whether this turn's one development card has been played |
-| `rolled` | Whether the dice were rolled this turn (a knight may come first) |
+| `rolled` | Whether the dice were rolled this turn (a development card may come first) |
 | `knights`, `shown` | By seat: knights played, and the faces of every development card it has shown |
 | `bank` | By resource: the slots of its face-up cards |
 | `devPile` | The slots of the development pile, top first |
 | `offers` | Trade offers made this turn: at most 3 (`MAX_OFFERS`) |
 | `dice` | The last roll, `[a, b]`, or `null` |
-| `discards` | By seat: cards it still owes after a 7 |
+| `discards` | By seat: cards it still owes after a 7 (a discard may be paid in parts) |
 | `trade` | `null`, or `{ from, give: [slots], want: [5 counts], answers: by seat, null, false or the slots offered }` |
-| `monopoly` | `null`, or `{ p, resource, given: by seat }` |
+| `monopoly` | `null`, or `{ p, resource, given: by seat [slots given so far], owes: by seat, whether it still has to give }` |
 | `freeRoads` | Roads left to place from road building |
 | `longest`, `army` | `{ p, size }`: who holds longest road (5 or more) and largest army (3 knights or more); `{ p: -1, size: 0 }` for nobody |
 
@@ -3045,13 +3047,13 @@ what a seat knows of its own comes from `match.face()`.
 | Phase | Who moves | Moves |
 |---|---|---|
 | `setup` | `setup.order[setup.i]`: each seat, then back in reverse | `{ settle: corner }`, then `{ road: edge }` touching it. The second settlement collects one card for each hex it touches. |
-| `roll` | `turn` | `{ roll: true }` (rolls, see **Rolls**), or a knight first |
-| `discard` | A step: every seat holding more than 7 cards | `{ discard: [slots] }`, half its cards rounded down |
+| `roll` | `turn` | `{ roll: true }` (rolls, see **Rolls**), or one development card first (`{ play: slot, ... }` as in `main`); with free roads from road building, `{ road: edge }` before the roll |
+| `discard` | A step: every seat holding more than 7 resource cards | `{ discard: [slots] }`: half its cards rounded down, in one move, or in parts of at least 16 (`MAX_SHOWN`) when more are owed, the seat moving again in the next step until it has paid |
 | `robber` | `turn` | `{ robber: hex, steal: seat }`: a seat with a building on that hex and a card, or `-1` when there's none |
-| `main` | `turn` | `{ road: edge, pay }`, `{ settle: corner, pay }`, `{ city: corner, pay }`, `{ buy: true, pay }`, `{ play: slot, ... }` (a knight; road building; year of plenty with `take: [r, r]`; monopoly with `resource`), `{ bank: [slots], take: r }` (4:1, or a harbour's rate), `{ offer: [slots], want: [5 counts] }` (3 a turn at most), `{ claim: [slots] }` (show victory point cards to win), `{ end: true }` |
+| `main` | `turn` | `{ road: edge, pay }`, `{ settle: corner, pay }`, `{ city: corner, pay }`, `{ buy: true, pay }`, `{ play: slot, ... }` (a development card, before or after the roll: a knight; road building; year of plenty with `take: [r, r]`; monopoly with `resource`), `{ bank: [slots], take: r }` (4:1, or a harbour's rate), `{ offer: [slots], want: [5 counts] }` (3 a turn at most), `{ claim: [slots] }` (show victory point cards to win), `{ end: true }`; with free roads pending, only `{ road: edge }` or `{ claim }` |
 | `answer` | A step: every seat but the offerer | `{ accept: [slots] }` (the cards wanted, shown) or `{ decline: true }` |
 | `partner` | The offerer | `{ partner: seat }` (one who accepted), or `-1` to call it off |
-| `monopoly` | A step: every seat but the player | `{ give: [slots] }`, every card it holds of the resource |
+| `monopoly` | A step: every seat but the player | `{ give: [slots] }`, every card it holds of the resource; or a part of at least 16 with `more: true`, the rest in the next step |
 
 `pay` is the slots paid with; with free roads from road building a road has
 none. Production on a roll pays each settlement 1 and each city 2 cards of
