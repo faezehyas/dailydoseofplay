@@ -12,7 +12,7 @@ import { VIEWBOX, defsSvg, seaSvg, terrainSvg, harbourSvg } from "./tiles.js";
 import { tokenSvg, roadSvg, settlementSvg, citySvg, robberSvg, spotSvg, diceSvg } from "./pieces.js";
 import { resourceGlyph, resourceCard, devCard, cardBack } from "./card-art.js";
 
-export const PACE = { dice: 640, glow: 900, fly: 560, flyGap: 70, build: 420, road: 380, hop: 620, steal: 720, trade: 640, badge: 900, reveal: 1300, between: 160, bubble: 900, moment: 900, rise: 34, open: 900 };
+export const PACE = { dice: 640, glow: 900, fly: 560, flyGap: 70, build: 420, road: 380, hop: 620, steal: 720, trade: 640, badge: 900, reveal: 1300, between: 160, bubble: 900, moment: 900, rise: 34 };
 export const RES_NAMES = RESOURCE_NAMES;
 export const DEV_NAMES = { knight: "Knight", vp: "Victory point", road: "Road building", plenty: "Year of plenty", monopoly: "Monopoly" };
 export const DEV_WORDS = { knight: "move the robber and steal a card", vp: "1 point, kept hidden until it wins", road: "build two roads free", plenty: "take any two cards from the bank", monopoly: "every other player gives you all of one resource" };
@@ -109,14 +109,13 @@ export function hexTable(table, { onSpot = () => {}, onSpotFocus = () => {} }) {
   const svg = boardWrap.firstChild;
   const [seaL, terrainL, glowL, harbourL, tokenL, roadL, buildingL, robberL, ghostL, spotL] = LAYERS.map((l) => svg.querySelector(`.hx-layer-${l}`));
 
-  // The dice sit in the sea at the bottom right; the opening deck in the middle.
+  // The dice sit in the sea at the bottom right; the deck, while it's shuffled, in the middle.
   const diceBox = el("div", { class: "hx-dice-box", id: "hx-dice", hidden: true, "aria-hidden": "true" });
   const diceArt = el("span", { class: "hx-dice-art" });
   const diceSum = el("span", { class: "hx-dice-sum mono" });
   diceBox.append(diceArt, diceSum);
-  const deckPiles = el("div", { class: "hx-deck-piles" }, [0, 1, 2, 3, 4].map((r) => el("span", { class: `hx-deck-pile r-${r}` }, cardEl(r, "", { mini: true }))));
   const deckStack = el("div", { class: "hx-deck-stack" }, [0, 1, 2, 3, 4].map(() => cardEl("back")));
-  const deck = el("div", { class: "hx-deck", id: "hx-deck", hidden: true, "aria-hidden": "true" }, deckPiles, deckStack);
+  const deck = el("div", { class: "hx-deck", id: "hx-deck", hidden: true, "aria-hidden": "true" }, deckStack);
   boardWrap.append(diceBox, deck, table.busyChip);
 
   let board = null;
@@ -473,20 +472,16 @@ export function hexTable(table, { onSpot = () => {}, onSpotFocus = () => {} }) {
     harbourL.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, delay: RISE.length * PACE.rise, fill: "backwards" });
   }
 
-  // The deck in the middle of the island while it's shuffled ("shuffling"),
-  // opened card by card into the bank's five piles ("opening"), or away (null).
-  let deckMode = null;
+  // The deck in the middle of the island while every browser shuffles it (on), or away.
+  let deckOn = false;
   let deckAnims = [];
-  let deckTimer = null;
-  function drawDeck(mode) {
-    if (mode === deckMode) return;
-    deckMode = mode;
+  function drawDeck(on) {
+    if (on === deckOn) return;
+    deckOn = on;
     deckAnims.forEach((a) => a.cancel());
     deckAnims = [];
-    clearInterval(deckTimer);
-    deck.hidden = !mode;
-    deck.dataset.mode = mode || "";
-    if (!mode || fast()) return;
+    deck.hidden = !on;
+    if (!on || fast()) return;
     // The deck riffles while it is worked on: a loading indicator, so it runs only then.
     const d = tokenMs("slow") * 3.4;
     deckAnims = [...deckStack.children].map((c, i) => {
@@ -494,26 +489,6 @@ export function hexTable(table, { onSpot = () => {}, onSpotFocus = () => {} }) {
       const out = `translate(${side * 62}%, ${-6 - i * 2}px) rotate(${side * 12}deg)`;
       return c.animate([{ transform: `translate(0, ${-i * 2}px)` }, { transform: out, offset: 0.3 }, { transform: out, offset: 0.42 + i * 0.03 }, { transform: `translate(0, ${-i * 2}px)` }], { duration: d, iterations: Infinity, easing: easing("out") });
     });
-    // While it's opened, the bank's piles light up in turn as their cards turn face up.
-    if (mode === "opening") {
-      let r = 0;
-      deckTimer = setInterval(() => deckPiles.children[r++ % 5].classList.add("on"), 260);
-    }
-  }
-
-  // The bank is sorted: the piles fill, then the development cards are hidden again, back into a pile.
-  async function deckSettled(g) {
-    drawDeck(null);
-    if (fast() || !live(g)) return;
-    deck.hidden = false;
-    deck.dataset.mode = "done";
-    deckPiles.querySelectorAll(".hx-deck-pile").forEach((p) => p.classList.add("on"));
-    const piles = [...deckPiles.children];
-    await Promise.all(piles.map((p, i) => p.animate([{ transform: "scale(1)" }, { transform: "scale(1.15) translateY(-6px)", offset: 0.4 }, { transform: "scale(1)" }], { duration: tokenMs("slow") * 1.6, delay: i * 70, easing: easing("out") }).finished.catch(() => {})));
-    if (!live(g)) return;
-    await deck.animate([{ opacity: 1, transform: "translate(-50%, -50%) scale(1)" }, { opacity: 0, transform: "translate(-50%, -50%) scale(.85)" }], { duration: tokenMs("slow") * 1.5, easing: easing("out") }).finished.catch(() => {});
-    deck.hidden = true;
-    deckPiles.querySelectorAll(".hx-deck-pile").forEach((p) => p.classList.remove("on"));
   }
 
   // A word over a player's pill, or over the board.
@@ -640,7 +615,6 @@ export function hexTable(table, { onSpot = () => {}, onSpotFocus = () => {} }) {
     focusSpots,
     drawDice,
     drawDeck,
-    deckSettled,
     riseIsland,
     drawHand,
     drawBank,

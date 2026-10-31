@@ -19,7 +19,7 @@ import { humanPause } from "../engine/cards/paced-robot.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { HEXES, CORNERS, EDGES, RESOURCES, DESERT } from "./board.js";
 import { roadSvg, settlementSvg, citySvg, robberSvg } from "./pieces.js";
-import { makeRules, normalizeConfig, forcedMove, COSTS, resourceOf, devKind, counts, payment, legalCorners, legalEdges, legalCities, robberHexes, victims, tradeRate, points, discardCount, playable, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
+import { makeRules, normalizeConfig, forcedMove, COSTS, resourceOf, devKind, counts, payment, legalCorners, legalEdges, legalCities, robberHexes, victims, tradeRate, points, discardCount, playable, MAX_OFFERS, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
 import { PACE, RES_NAMES, DEV_NAMES, plural, listOf, countWords, hexWords, cornerWords, edgeWords, glyphEl, cardEl, cardsRow, production, hexTable } from "./art.js";
 import { chooseMove, startRobot } from "./robot.js";
 import { settings } from "./settings.js";
@@ -280,10 +280,7 @@ function mountGame(session, root, shell) {
     const k = table.pace();
     current = ev;
     const st = match.state;
-    if (ev.type === "dealt") {
-      await art.deckSettled(g);
-      addLog({ text: `The bank is sorted: 19 of each resource, and the ${plural(st.devPile.length, "development card")} shuffled face down.` });
-    } else if (ev.type === "build") {
+    if (ev.type === "build") {
       const from = ev.kind === "road" ? joinedEnd(ev.at, ev.p) : -1;
       if (!ev.free) await spend(ev.p, ev.pay, g, k);
       if (!live(g)) return;
@@ -893,11 +890,13 @@ function mountGame(session, root, shell) {
         hint("Four of a kind for one, or better at your harbours."),
       );
     } else {
-      const ok = sum(pick.give) > 0 && sum(pick.want) > 0 && pick.give.every((n, r) => !(n && pick.want[r]));
+      const capped = s.offers >= MAX_OFFERS;
+      const ok = !capped && sum(pick.give) > 0 && sum(pick.want) > 0 && pick.give.every((n, r) => !(n && pick.want[r]));
       out.push(
         steppers("give", pick.give, have, (r, dlt) => ((pick.give[r] += dlt), dlt > 0 && (pick.want[r] = 0), render()), { legend: "You give" }),
         steppers("want", pick.want, RESOURCES.map(() => 9), (r, dlt) => ((pick.want[r] += dlt), dlt > 0 && (pick.give[r] = 0), render()), { legend: "You want" }),
         el("div", { class: "hx-row" }, btn("hx-offer-send", "Offer to everyone", () => send({ offer: pickSlots(pick.give), want: pick.want.slice() }), { cls: "primary", disabled: !ok }), btn("hx-back", "Back", () => setMode(null))),
+        hint(capped ? `You've made ${MAX_OFFERS} offers this turn: that's the most.` : `Everyone answers at once; then you pick who to trade with. Up to ${MAX_OFFERS} offers a turn.`),
       );
     }
     return out;
@@ -930,7 +929,6 @@ function mountGame(session, root, shell) {
   // ---------- render ----------
   function describe(ev) {
     if (!ev) return null;
-    if (ev.type === "dealt") return "Sorting the bank…";
     if (ev.type === "roll") return `${nameOf(ev.p)} ${verb(ev.p, "rolls")}…`;
     if (ev.type === "produce") return `${ev.roll}! The bank pays out.`;
     if (ev.type === "robber") return `${nameOf(ev.p)} ${verb(ev.p, "moves")} the robber.`;
@@ -946,7 +944,7 @@ function mountGame(session, root, shell) {
     if (!match) return "Getting the room's settings…";
     const s = match.state;
     if (match.phase === "aborted") return "Match stopped.";
-    if (match.phase === "starting") return match.busy === "dealing" ? "Opening the deck: every card turns up with every browser's key…" : table.deckLine(match, nameOf);
+    if (match.phase === "starting") return table.deckLine(match, nameOf);
     const now = describe(current);
     if (now) return now;
     if (table.pending) return status.textContent || "…";
@@ -1015,11 +1013,11 @@ function mountGame(session, root, shell) {
       art.setBoard(s.board);
       if (starting) art.riseIsland(table.gen);
     }
-    if (current?.type !== "dealt") art.drawDeck(starting && !ended ? (match.busy === "dealing" ? "opening" : "shuffling") : null);
+    art.drawDeck(starting && !ended);
     const busy = match?.busy && match.phase !== "over" && !starting ? match.busy : null;
     table.renderBusy(starting ? null : busy, { starting, redraw: () => !destroyed && render() });
     if (starting && match.busy === "shuffling") table.shuffling(true);
-    art.bankBox.hidden = !view || starting || s?.phase === "deal";
+    art.bankBox.hidden = !view || starting;
     if (!view) return;
     art.drawPieces(view);
     art.drawDice(view.dice, { dim: !!s && s.phase !== "roll" && s.phase !== "produce" && current?.type !== "roll" && !(s.phase === "main" && !s.rolled) && s.phase !== "main" });
@@ -1308,7 +1306,7 @@ function mountGame(session, root, shell) {
     table.stop();
     clearTimeout(autoTimer);
     table.shuffling(false);
-    art.drawDeck(null);
+    art.drawDeck(false);
     const judged = match?.phase === "starting" && previous ? previous : match;
     leaveNotice({ root, session, seat: seatLeft, match: judged, prefix: "hx", game: "Hexlands", nameOf, facts: (s, p) => plural(points(s, p), "point") });
     render();
@@ -1333,7 +1331,7 @@ function mountGame(session, root, shell) {
     destroy() {
       destroyed = true;
       table.destroy();
-      art.drawDeck(null);
+      art.drawDeck(false);
       screenBusy = () => false;
       clearInterval(ticker);
       clearTimeout(autoTimer);
