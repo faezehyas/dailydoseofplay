@@ -116,6 +116,14 @@ Classic two-player gin: draw, discard, build sets and runs, then knock with 10 o
 Pass three cards, follow suit, duck the queen of spades, or take every heart and shoot the moon; the lowest score at 100 wins. The pass is sealed to its new holder, so nobody else can read it, not even the room creator's browser (short of a tampered one, the card games' one gap), and the audit catches anyone who didn't follow suit or led hearts too soon. Room settings for the game's length, passing, the moon, the jack of diamonds and a move timer; with three players the 2 of diamonds is left out; 2–3 robots at three levels; a four-colour deck.
 </td>
 </tr>
+<tr>
+<td width="50%" valign="top">
+<a href="https://www.dailydoseofplay.com/hexlands/"><img src="public/hexlands/icon.svg" width="320" alt=""></a><br>
+<b><a href="https://www.dailydoseofplay.com/hexlands/">Hexlands</a></b> · 3–4 players<br>
+Settle an island of 19 hexes laid out at random: roll for wood, brick, wool, grain and ore, trade with the bank, the harbours and each other, and build roads, settlements and cities; the robber steals on a 7, development cards bring knights, free roads, plenty and monopolies, and longest road and largest army are worth 2 points each; first to 10 wins. Every resource is a real hidden card with no dealer, as in the other card games: only the thief sees a stolen card, every roll is drawn by all the browsers after the move is sent, trade answers are sealed until all are in, and the audit catches anyone who held cards back from a Monopoly. Room settings for a game to 8 and a move timer; 2–3 robots at three levels.
+</td>
+<td width="50%" valign="top"></td>
+</tr>
 </table>
 
 More are coming; [GAMES.md](GAMES.md) has the backlog. Found a security
@@ -254,7 +262,7 @@ Who made each game, from the `credits` in `public/games.json`
 
 <!-- credits:start -->
 - [@Faezehyas](https://github.com/Faezehyas): Sea Battle, Tic Tac Toe, Connect 4, Gomoku, Chess, Checkers, Backgammon
-- [@maminrayej](https://github.com/maminrayej): Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts
+- [@maminrayej](https://github.com/maminrayej): Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts, Hexlands
 <!-- credits:end -->
 
 ## Credits and license
