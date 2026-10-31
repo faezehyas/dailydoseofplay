@@ -1,0 +1,1304 @@
+/* Hexlands view. Shared tokens come from /engine/theme.css and the card
+   table's (seat colours, status, log, fly layer) from /engine/cards/cards.css;
+   the island's art from tiles.css, pieces.css and card-art.css. Here: the
+   page's layout (the island beside your cards and the controls, stacked on a
+   phone), the island's frame, the dice, the opening deck, the bank, your
+   hand, the action panel and its pickers, the players' notes, the log, the
+   moments over the board and the points sheet. Storybook: warm paper, a soft
+   ink edge, rounded friendly shapes. */
+.hexlands {
+  --hx-paper: #fffaf0;
+  --hx-paper-2: #f6ecd8;
+  --hx-rule: #e6d6b8;
+  --hx-ink-soft: #6b5848;
+  --hx-frame: #f1d8a0;
+  --hx-frame-2: #e2bf80;
+  --hx-sea-fill: #86c6cd;
+  --hx-gold: #f2b53a;
+  --hx-gold-ink: #6b4a00;
+  --hx-glow-fill: #fff3b0;
+  --hx-blocked-fill: #2a1d28;
+  --hx-fresh: #ffd36b;
+  --hx-cw: 50px; /* a card in your hand */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  position: relative;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .hexlands {
+    --hx-paper: #221f1b;
+    --hx-paper-2: #2b2621;
+    --hx-rule: #4a3f33;
+    --hx-ink-soft: #cdbfae;
+    --hx-frame: #8f7448;
+    --hx-frame-2: #6e5634;
+    --hx-sea-fill: #1b4553;
+    --hx-glow-fill: #ffe9a0;
+    --hx-blocked-fill: #000000;
+  }
+}
+
+:root[data-theme="dark"] .hexlands {
+  --hx-paper: #221f1b;
+  --hx-paper-2: #2b2621;
+  --hx-rule: #4a3f33;
+  --hx-ink-soft: #cdbfae;
+  --hx-frame: #8f7448;
+  --hx-frame-2: #6e5634;
+  --hx-sea-fill: #1b4553;
+  --hx-glow-fill: #ffe9a0;
+  --hx-blocked-fill: #000000;
+}
+
+/* ---------- layout: the island, then the controls, your cards, the bank and the log ---------- */
+.hx-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "board" "actions" "hand" "bank" "log";
+  gap: 10px;
+  align-items: start;
+}
+
+.hx-board-col { grid-area: board; min-width: 0; }
+.hx-actions { grid-area: actions; }
+.hx-hand-box { grid-area: hand; }
+.hx-bank { grid-area: bank; }
+.hx-log-box { grid-area: log; }
+
+@media (min-width: 900px) {
+  .hx-main {
+    grid-template-columns: minmax(0, 1fr) 318px;
+    grid-template-rows: auto auto 1fr auto;
+    grid-template-areas:
+      "board actions"
+      "board hand"
+      "board log"
+      "bank log";
+    gap: 12px 16px;
+  }
+
+  .hx-log-box {
+    align-self: stretch;
+    min-height: 120px;
+  }
+
+  /* The whole island in view, with the bank under it. */
+  .hx-board-wrap {
+    max-width: max(480px, calc(100svh - 270px));
+    margin-inline: auto;
+  }
+}
+
+/* ---------- the island ---------- */
+/* The sea panel (tiles.js) is square with corners of 44 in 1000. */
+.hx-board-wrap {
+  position: relative;
+  border-radius: 4.4%;
+  background: var(--hx-sea-fill);
+  box-shadow: 0 0 0 3px var(--hx-frame), 0 0 0 5px var(--hx-frame-2), var(--shadow);
+  container-type: inline-size;
+}
+
+.hx-board {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font-display);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hx-board.picking .hx-layer-spots {
+  cursor: pointer;
+}
+
+/* A preview of the piece where you point. */
+.hx-layer-ghost {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.hx-layer-spots .hx-spot.chosen .hx-spot-mark {
+  fill: var(--hx-gold);
+}
+
+/* A roll's hexes light up; one under the robber darkens instead. */
+.hx-hexglow {
+  fill: var(--hx-glow-fill);
+  opacity: 0;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+}
+
+.hx-hexglow.blocked {
+  fill: var(--hx-blocked-fill);
+  mix-blend-mode: normal;
+}
+
+.hx-puff {
+  fill: none;
+  stroke: var(--hx-paper);
+  stroke-width: 5;
+  pointer-events: none;
+}
+
+/* The dice, in the sea's bottom right corner, with their sum. */
+.hx-dice-box {
+  position: absolute;
+  bottom: 1.6%;
+  right: 1.6%;
+  z-index: 2;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 2px;
+  width: clamp(70px, 19cqi, 150px);
+  pointer-events: none;
+}
+
+.hx-dice-art {
+  flex: 1;
+  min-width: 0;
+}
+
+.hx-dice-box[hidden] {
+  display: none;
+}
+
+.hx-dice-art,
+.hx-dice-art svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.hx-dice-sum {
+  flex: none;
+  min-width: 1.8em;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--hx-paper);
+  color: var(--text);
+  border: 2px solid var(--hx-frame-2);
+  font-family: var(--font-display);
+  font-size: clamp(0.85rem, 3.2cqi, 1.15rem);
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.35;
+}
+
+.hx-dice-sum:empty {
+  visibility: hidden;
+}
+
+.hx-dice-box.dim {
+  opacity: 0.6;
+}
+
+/* The deck in the middle of the island while it's shuffled and opened. */
+.hx-deck {
+  --w: clamp(34px, 9cqi, 64px);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 14px 18px 16px;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--hx-paper) 88%, transparent);
+  box-shadow: 0 10px 30px rgb(30 20 10 / 25%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.hx-deck[hidden] {
+  display: none;
+}
+
+.hx-deck-stack {
+  position: relative;
+  width: var(--w);
+  height: calc(var(--w) * 1.4);
+}
+
+.hx-deck-stack .hx-cardbox {
+  position: absolute;
+  inset: 0;
+}
+
+.hx-deck-stack .hx-cardbox:nth-child(2) { transform: translate(-1px, -2px); }
+.hx-deck-stack .hx-cardbox:nth-child(3) { transform: translate(-2px, -4px); }
+.hx-deck-stack .hx-cardbox:nth-child(4) { transform: translate(-3px, -6px); }
+.hx-deck-stack .hx-cardbox:nth-child(5) { transform: translate(-4px, -8px); }
+
+.hx-deck-piles {
+  order: 2;
+  display: grid;
+  grid-template-columns: repeat(5, calc(var(--w) * 0.62));
+  gap: 6px;
+}
+
+.hx-deck[data-mode="shuffling"] .hx-deck-piles {
+  display: none;
+}
+
+.hx-deck-pile {
+  width: calc(var(--w) * 0.62);
+  opacity: 0.18;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+
+.hx-deck-pile.on {
+  opacity: 1;
+}
+
+.hx-deck-fly {
+  position: absolute;
+  top: 14px;
+  left: calc(50% - var(--w) / 2);
+  width: var(--w);
+  pointer-events: none;
+}
+
+/* ---------- cards ---------- */
+.hx-cardbox {
+  display: block;
+  line-height: 0;
+}
+
+.hx-cardbox svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 9%;
+  filter: drop-shadow(0 1px 1.5px rgb(40 25 10 / 25%));
+}
+
+.hx-fly-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 8;
+  will-change: transform;
+  pointer-events: none;
+}
+
+/* A resource's glyph, a 24-unit box. */
+.hx-glyph {
+  display: inline-block;
+  flex: none;
+  width: 1.35em;
+  height: 1.35em;
+  vertical-align: middle;
+}
+
+.hx-glyph svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hx-cost {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  align-items: center;
+}
+
+.hx-cost .hx-glyph {
+  padding: 1px;
+  border-radius: 6px;
+  background: var(--hx-paper);
+  box-shadow: inset 0 0 0 1px var(--hx-rule);
+}
+
+.hx-cost .hx-glyph.missing {
+  opacity: 0.32;
+}
+
+/* ---------- the bank ---------- */
+.hx-bank {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--hx-paper);
+  border: 1px solid var(--hx-rule);
+  font-size: 0.85rem;
+}
+
+.hx-bank-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--hx-ink-soft);
+  margin-right: 2px;
+}
+
+.hx-bank-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px 1px 3px;
+  border-radius: 999px;
+  background: var(--hx-paper-2);
+  font-weight: 700;
+}
+
+.hx-bank-chip.low {
+  color: var(--danger, #c0392b);
+}
+
+.hx-bank-chip.dev .hx-cardbox {
+  width: 15px;
+}
+
+/* ---------- your hand ---------- */
+.hx-hand-box {
+  padding: 10px 10px 8px;
+  border-radius: var(--radius);
+  background: var(--hx-paper);
+  border: 1px solid var(--hx-rule);
+}
+
+.hx-hand {
+  display: grid;
+  gap: 8px;
+}
+
+.hx-res-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  justify-items: center;
+}
+
+.hx-res-row:has(.hx-unknown:not([hidden])) {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.hx-pile {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: 100%;
+  max-width: calc(var(--hx-cw) + 14px);
+}
+
+.hx-pile[hidden] {
+  display: none;
+}
+
+.hx-stack {
+  position: relative;
+  display: block;
+  width: min(100%, var(--hx-cw));
+  transition: transform var(--dur-med) var(--ease-out);
+}
+
+.hx-edge {
+  position: absolute;
+  inset: 0;
+  border-radius: 9%;
+  background: var(--hx-paper-2);
+  border: 1px solid var(--hx-rule);
+  visibility: hidden;
+}
+
+.hx-edge.e1 { transform: translate(3px, -3px); }
+.hx-edge.e2 { transform: translate(6px, -6px); }
+.hx-pile[data-n="2"] .e1,
+.hx-pile[data-n="3"] .e1,
+.hx-pile[data-n="3"] .e2 {
+  visibility: visible;
+}
+
+.hx-stack .hx-cardbox {
+  position: relative;
+}
+
+.hx-pile.empty .hx-stack {
+  opacity: 0.28;
+  filter: grayscale(0.6);
+}
+
+.hx-pile .hx-count {
+  position: absolute;
+  top: -6px;
+  right: -2px;
+  z-index: 2;
+  min-width: 1.6em;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.45;
+}
+
+.hx-pile.empty .hx-count {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.hx-pile-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--hx-ink-soft);
+  text-transform: capitalize;
+}
+
+/* Cards you just gained glow, with how many. */
+.hx-pile.fresh .hx-stack .hx-cardbox svg {
+  filter: drop-shadow(0 0 5px var(--hx-fresh)) drop-shadow(0 0 2px var(--hx-fresh));
+}
+
+.hx-plus {
+  position: absolute;
+  top: -6px;
+  left: -2px;
+  z-index: 2;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--hx-fresh);
+  color: #3a2e28;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.hx-plus[hidden] {
+  display: none;
+}
+
+/* Cards picked in a picker (to discard or offer) lift. */
+.hx-pile.lifted .hx-stack {
+  transform: translateY(-6px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hx-pile.fresh .hx-plus {
+    animation: hx-plus-in var(--dur-slow) var(--ease-spring);
+  }
+}
+
+@keyframes hx-plus-in {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+/* Development cards, alike ones together. */
+.hx-dev-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--hx-rule);
+}
+
+.hx-dev-row[hidden] {
+  display: none;
+}
+
+.hx-dev {
+  position: relative;
+  width: calc(var(--hx-cw) * 0.95);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+
+.hx-dev.playable {
+  cursor: pointer;
+  border-radius: 10px;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.hx-dev.playable .hx-cardbox svg {
+  filter: drop-shadow(0 0 0 2px var(--accent)) drop-shadow(0 3px 6px rgb(40 25 10 / 30%));
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.hx-dev.playable:hover,
+.hx-dev.playable:focus-visible {
+  transform: translateY(-4px);
+}
+
+.hx-dev:focus-visible {
+  outline: 3px solid var(--text);
+  outline-offset: 3px;
+}
+
+.hx-dev.new .hx-cardbox {
+  opacity: 0.7;
+}
+
+.hx-dev .hx-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.hx-new {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--hx-gold);
+  color: #3a2e28;
+  font-size: 0.65rem;
+  font-weight: 800;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/* ---------- the action panel ---------- */
+.hx-actions {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--hx-paper);
+  border: 1px solid var(--hx-rule);
+  box-shadow: var(--shadow);
+}
+
+.hx-actions[hidden] {
+  display: none;
+}
+
+.hexlands.my-turn .hx-actions {
+  border-color: var(--mine, var(--accent));
+  box-shadow: 0 0 0 2px var(--mine, var(--accent)), var(--shadow);
+}
+
+.hx-panel {
+  display: grid;
+  gap: 9px;
+}
+
+.hx-panel:empty {
+  display: none;
+}
+
+.hx-panel-title {
+  display: grid;
+  gap: 1px;
+}
+
+.hx-panel-title strong {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.hx-panel-title small,
+.hx-panel-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+
+.hx-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.hx-row > .btn {
+  flex: 1 1 auto;
+}
+
+.hx-panel .btn.big {
+  flex: 1 1 100%;
+}
+
+/* The four builds, with their costs. */
+.hx-builds {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.hx-build.btn {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: 3px;
+  min-height: 0;
+  padding: 7px 9px 6px;
+  border-radius: 12px;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.15;
+}
+
+.hx-build .hx-build-name {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.hx-build .hx-glyph {
+  width: 1.25em;
+  height: 1.25em;
+}
+
+.hx-build .hx-left {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.hx-build.can {
+  border-color: var(--mine, var(--accent));
+  box-shadow: inset 0 0 0 1px var(--mine, var(--accent));
+}
+
+.hx-build.on {
+  background: var(--mine, var(--accent));
+  color: var(--accent-ink);
+}
+
+.hx-build.on .hx-left {
+  color: inherit;
+}
+
+.hx-build:disabled {
+  opacity: 1;
+  color: var(--muted);
+  background: var(--hx-paper-2);
+}
+
+/* Steppers: a column per resource, its card, the count, one less and one more. */
+.hx-steppers {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.hx-steppers legend {
+  grid-column: 1 / -1;
+  padding: 0 0 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--hx-ink-soft);
+}
+
+.hx-stepper {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 5px 3px;
+  border-radius: 12px;
+  background: var(--hx-paper-2);
+}
+
+.hx-stepper.on {
+  background: color-mix(in srgb, var(--hx-gold) 26%, var(--hx-paper));
+}
+
+.hx-stepper .hx-cardbox.mini {
+  width: min(34px, 100%);
+}
+
+.hx-step-n {
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.hx-step-btns {
+  display: flex;
+  gap: 3px;
+}
+
+.hx-step-btns .btn {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Five resources to pick from (the bank's give and get, Monopoly). */
+.hx-res-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.hx-res-btn.btn {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  min-height: 0;
+  padding: 5px 2px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.hx-res-btn .hx-glyph {
+  width: 1.8em;
+  height: 1.8em;
+}
+
+.hx-res-btn .hx-res-name {
+  text-transform: capitalize;
+  font-weight: 700;
+}
+
+.hx-res-btn small {
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.hx-res-btn.on {
+  border-color: var(--mine, var(--accent));
+  box-shadow: inset 0 0 0 2px var(--mine, var(--accent));
+  background: color-mix(in srgb, var(--mine, var(--accent)) 16%, var(--hx-paper));
+}
+
+.hx-arrow {
+  margin: -2px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.hx-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--hx-paper-2);
+}
+
+.hx-tab {
+  flex: 1;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hx-tab.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 15%);
+}
+
+.hx-tab:focus-visible {
+  outline: 3px solid var(--text);
+  outline-offset: 1px;
+}
+
+/* Whom to rob, or trade with. */
+.hx-victim.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-color: var(--c);
+}
+
+.hx-victim small {
+  color: var(--muted);
+}
+
+.hx-victim.primary small {
+  color: inherit;
+}
+
+/* The spot pointed at while placing: its lands and numbers. */
+.hx-spot-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  min-height: 1.7em;
+}
+
+.hx-spot-hex {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px 1px 3px;
+  border-radius: 999px;
+  background: var(--hx-paper-2);
+  font-size: 0.85rem;
+}
+
+.hx-spot-hex b.hot {
+  color: var(--hx-red, #cf3a2c);
+}
+
+/* An offer between players, and the answers coming in. */
+.hx-offer {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--hx-paper-2);
+  border-left: 4px solid var(--c);
+}
+
+.hx-offer-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.hx-offer-line .for {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.hx-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.hx-answers li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hx-answers .dot {
+  width: 10px;
+  height: 10px;
+}
+
+.hx-answers .ans {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.hx-answers .yes .ans {
+  color: var(--ok, #2f8f4e);
+}
+
+.hx-answers .think {
+  --seat: var(--c);
+}
+
+/* The clock. */
+.hx-timer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.hx-timer[hidden] {
+  display: none;
+}
+
+.hx-timer .bar {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--hx-paper-2);
+  overflow: hidden;
+}
+
+.hx-timer .bar span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--c, var(--accent-2));
+  transform-origin: left;
+}
+
+.hx-timer.low {
+  color: var(--danger, #c0392b);
+}
+
+/* ---------- the players' notes: cards, development cards, knights, awards ---------- */
+.hx-note {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 7px;
+}
+
+.hx-n {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.hx-n i,
+.hx-award,
+.hx-robbed {
+  display: inline-block;
+  flex: none;
+  width: 11px;
+  height: 13px;
+  background: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
+
+.hx-n.cards i {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 13'%3E%3Crect x='.5' y='.5' width='10' height='12' rx='2' fill='none' stroke='black' stroke-width='1.4'/%3E%3Cpath d='M3 4h5M3 6.5h5M3 9h3' stroke='black' stroke-width='1.2'/%3E%3C/svg%3E");
+}
+
+.hx-n.devs i {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 13'%3E%3Crect x='.5' y='.5' width='10' height='12' rx='2' fill='none' stroke='black' stroke-width='1.4'/%3E%3Cpath d='M5.5 3l1 2.2 2.3.2-1.8 1.5.6 2.3-2.1-1.3-2.1 1.3.6-2.3L2.2 5.4l2.3-.2z' fill='black'/%3E%3C/svg%3E");
+}
+
+.hx-n.knights i {
+  width: 12px;
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 13'%3E%3Cpath d='M1 1.5h10v4.2C11 9.6 6 12.3 6 12.3S1 9.6 1 5.7z' fill='black'/%3E%3C/svg%3E");
+}
+
+.hx-award {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--hx-gold);
+  -webkit-mask: none;
+  mask: none;
+  box-shadow: inset 0 -2px 0 rgb(0 0 0 / 18%);
+  position: relative;
+}
+
+.hx-award::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  background: #3a2e28;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
+
+.hx-award.road {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M1 10L5 2M11 10L7 2' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M6 3.5v1.5M6 6.5v1.5M6 9.5v1' stroke='black' stroke-width='1.3' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.hx-award.army {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 2l8 8M10 2l-8 8' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3Cpath d='M1 7.5l3.5 3.5M11 7.5L7.5 11' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.hx-robbed {
+  width: 15px;
+  height: 9px;
+  color: var(--danger, #c0392b);
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 15 9'%3E%3Cpath fill-rule='evenodd' d='M1 2.5Q7.5-.5 14 2.5L13 7Q10 8.5 7.5 6 5 8.5 2 7zM3.4 4a1.2 1.2 0 1 0 2.4 0 1.2 1.2 0 1 0-2.4 0zM9.2 4a1.2 1.2 0 1 0 2.4 0 1.2 1.2 0 1 0-2.4 0z' fill='black'/%3E%3C/svg%3E");
+}
+
+/* ---------- the log ---------- */
+.hx-log-box {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+}
+
+.hx-side-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--hx-ink-soft);
+}
+
+.hx-log {
+  align-content: start;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
+  overscroll-behavior: contain;
+}
+
+@media (min-width: 900px) {
+  .hx-log {
+    max-height: none;
+    height: 100%;
+    min-height: 120px;
+    position: relative;
+  }
+
+  .hx-log-box {
+    max-height: 420px;
+  }
+}
+
+.hx-log li {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.hx-log li.turn {
+  background: transparent;
+  border: 0;
+  border-left: 0;
+  padding: 2px 4px 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--c-ink, var(--muted));
+}
+
+.hx-log li.seven,
+.hx-log li.award,
+.hx-log li.win {
+  font-weight: 700;
+}
+
+.hx-log-cards .hx-glyph {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+/* ---------- moments over the board ---------- */
+.hx-moment {
+  position: absolute;
+  z-index: 9;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: 90%;
+  pointer-events: none;
+  text-align: center;
+}
+
+.hx-moment .hx-moment-card {
+  width: clamp(70px, 14vw, 120px);
+  filter: drop-shadow(0 10px 18px rgb(30 20 10 / 35%));
+}
+
+.hx-moment .words {
+  display: inline-block;
+  padding: 5px 18px 7px;
+  border-radius: 18px;
+  background: var(--hx-paper);
+  border: 3px solid var(--c);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: clamp(1.3rem, 5vw, 2.1rem);
+  font-weight: 600;
+  line-height: 1.1;
+  box-shadow: 0 10px 30px rgb(30 20 10 / 30%);
+}
+
+/* The fly layer covers the whole game, so cards fly between the island, the bar and your hand. */
+.hexlands > .pc-fly {
+  border-radius: 0;
+  overflow: visible;
+}
+
+.hexlands .pc-bubble {
+  z-index: 9;
+}
+
+.hx-board-wrap > .pc-busy {
+  position: absolute;
+  bottom: 10px;
+  top: auto;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* ---------- game over: places, points and the verdict ---------- */
+.hexlands .result-places li {
+  --seat: var(--c);
+  --seat-text: var(--c-ink);
+}
+
+.hx-sheet-box {
+  max-height: min(34svh, 260px);
+  overflow: auto;
+  margin: 0 0 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.hx-sheet {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.hx-sheet th,
+.hx-sheet td {
+  padding: 3px 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.hx-sheet thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  font-size: 0.78rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.hx-sheet tbody th,
+.hx-sheet tfoot th {
+  text-align: left;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.hx-sheet .who {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  color: var(--c-ink);
+}
+
+.hx-sheet .who .dot {
+  width: 10px;
+  height: 10px;
+}
+
+.hx-sheet tbody tr:nth-child(even) {
+  background: var(--surface-2);
+}
+
+.hx-sheet .hidden-row td {
+  color: var(--muted);
+}
+
+.hx-sheet tfoot td,
+.hx-sheet tfoot th {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  font-weight: 800;
+  color: var(--text);
+}
+
+.hx-sheet tfoot td.best {
+  color: var(--ok);
+}
+
+.hx-carried {
+  display: block;
+  margin: -4px 0 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.hx-over .verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: 8px;
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.hx-over .verdict.ok {
+  color: var(--ok);
+}
+
+.hx-over .verdict small {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.hx-over .verdict.bad {
+  color: var(--danger);
+}
+
+/* ---------- phones: the island fills the width ---------- */
+@media (max-width: 600px) {
+  .hexlands {
+    --hx-cw: clamp(38px, 12vw, 54px);
+    gap: 8px;
+  }
+
+  .hx-board-col {
+    margin-inline: -16px;
+  }
+
+  .hx-board-wrap {
+    background: none;
+    box-shadow: none;
+  }
+
+  .hx-actions {
+    padding: 10px;
+  }
+
+  .hx-panel-title strong {
+    font-size: 1.08rem;
+  }
+
+  .hx-stepper .hx-cardbox.mini {
+    width: min(28px, 100%);
+  }
+
+  .hx-over .verdict small {
+    display: none;
+  }
+
+  .hx-sheet {
+    font-size: 0.78rem;
+  }
+
+  .hx-sheet th,
+  .hx-sheet td {
+    padding: 2px 5px;
+  }
+
+  .hx-sheet .who .dot {
+    display: none;
+  }
+}
