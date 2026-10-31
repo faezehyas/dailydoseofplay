@@ -6,7 +6,7 @@
 // how a highlight looks, in light and dark, with and without motion; and the
 // first lesson of Connect 4 (by keyboard), Gomoku, Checkers, Dots and Boxes,
 // Backgammon, Sea Battle, Chutes and Ladders, Ludo, Crazy Eights, Go Fish,
-// Gin Rummy and Hearts; and every lesson of every game, read from its
+// Gin Rummy, Hearts and Hexlands; and every lesson of every game, read from its
 // lessons.js and played through each step's expected move by keyboard.
 // Skips if Playwright is missing.
 //
@@ -372,6 +372,19 @@ test("Hearts' first lesson: the A♦ takes violet's diamond trick, then you lead
     },
   ]));
 
+test("Hexlands' first lesson: two settlements and their roads, the second collecting three cards", { skip, timeout: 60_000 }, (t) => {
+  const tap = (page, kind, id) => page.click(`.tut-stage .hx-spot[data-${kind}="${id}"]`);
+  return firstLesson(t, "hexlands", [
+    (page) => tap(page, "corner", 44),
+    (page) => tap(page, "edge", 63),
+    (page) => tap(page, "corner", 14),
+    async (page) => {
+      assert.deepEqual(await page.locator(".tut-stage .hx-pile[data-r] .hx-count").allTextContents(), ["1", "1", "1", "0", "0"], "wood, brick and wool collected");
+      await tap(page, "edge", 15);
+    },
+  ]);
+});
+
 // Runs the page's fake clock until fn(arg) holds in the page: the
 // tutorial's pauses between a move and the next step take no real time.
 async function until(page, fn, arg, why) {
@@ -486,6 +499,23 @@ const PLAY = {
     if (move.play !== undefined) return pressKey(slotCard(page, move.play));
     for (const slot of move.pass) await pressKey(slotCard(page, slot));
     await page.keyboard.press("p");
+  },
+  // The buttons roll, build, buy, trade and end the turn; a spot on the island takes Enter.
+  async hexlands(page, move) {
+    const spot = (kind, id) => pressKey(stage(page, `.hx-spot[data-${kind}="${id}"]`));
+    if (move.roll) return pressKey(stage(page, "#hx-roll"));
+    if (move.end) return pressKey(stage(page, "#hx-end"));
+    if (move.buy) return pressKey(stage(page, "#hx-build-dev"));
+    if (move.play !== undefined) return pressKey(stage(page, ".hx-dev.playable"));
+    if (move.robber !== undefined) return spot("hex", move.robber);
+    if (move.bank) {
+      for (const id of ["hx-trade", `hx-bank-give-${Math.floor(move.bank[0] / 19)}`, `hx-bank-take-${move.take}`, "hx-bank-trade"]) await pressKey(stage(page, `#${id}`));
+      return;
+    }
+    const [kind, build, id] = move.settle !== undefined ? ["corner", "settlement", move.settle] : move.city !== undefined ? ["corner", "city", move.city] : ["edge", "road", move.road];
+    const button = stage(page, `#hx-build-${build}`);
+    if (await button.isVisible()) await pressKey(button);
+    await spot(kind, id);
   },
 };
 
