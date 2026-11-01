@@ -3227,6 +3227,19 @@ one of `build`, `stage`, `discard` or `dig`):
 | `last` | `lastSeat` | The same, with its last card |
 | `dig` | `digger` | `{ dig: slot }` (a discard pile slot, built free) or `{ dig: -1 }` |
 
+**The robot** (`robot.js`) sees the public state (cities, stage counts,
+coins, tokens) and its own `face()`: its hand, the cards it held before
+passing them on (as a player remembers them) and, while digging, the
+discards. Easy builds what it can afford cheaply with some chance and sells
+when stuck; Medium weighs each outcome by points now, the resources its
+wonder and the next age need, chains, science sets, this age's war and
+coins; Hard estimates the final score of each outcome, counting every war
+still to fight, guilds against what neighbours will build, and stage
+effects, and it tucks or sells the card the next seat clearly wants. Over
+600 games, Hard wins 84–89% against Easy robots and about 60% against
+Medium ones; a choice takes well under 10 ms. A test reshuffles every card
+the robot couldn't have seen and checks its choice doesn't change.
+
 **Events** (`applyMove()` and `settle()` return them, for the view):
 `age { age }` (dealt), `build { p, slot, id, how, coins, bought: { left,
 right } }` (`how`: `"paid"`, `"chain"`, `"free"` or `"dig"`; `coins` paid to

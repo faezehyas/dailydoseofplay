@@ -136,6 +136,14 @@ const GAMES = {
     const choose = (st, me, rng, face) => chooseMove(st, me, rng, face, { level: "hard" });
     return { config, players: 4, robot: (s) => startRobot(s, { rules: makeRules(config, 4), choose, delay: () => 0 }) };
   },
+  stonecrown: async () => {
+    const { makeRules, DEFAULT_CONFIG } = await import("../public/stonecrown/rules.js");
+    const { chooseMove, startRobot } = await import("../public/stonecrown/robot.js");
+    // Four players on side B: the most cards passed each turn, and digs pass the whole discard pile.
+    const config = { ...DEFAULT_CONFIG, side: "B", moveSeconds: 60 };
+    const choose = (st, me, rng, face) => chooseMove(st, me, rng, face, { level: "hard" });
+    return { config, players: 4, robot: (s) => startRobot(s, { rules: makeRules(config, 4), choose, delay: () => 0 }) };
+  },
   "dots-and-boxes": async () => {
     const { makeRules, DEFAULT_CONFIG } = await import("../public/dots-and-boxes/rules.js");
     const { startRobot } = await import("../public/dots-and-boxes/robot.js");
