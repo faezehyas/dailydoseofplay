@@ -6,9 +6,10 @@
 // a wonder, coins fly, hands slide round, the war and the score sheet. The
 // art itself comes from card-art.js and pieces.js.
 import { el } from "../engine/shell.js";
+import { thinkingDots } from "../engine/players.js";
 import { easing } from "../engine/cards/table.js";
-import { CARDS, WONDERS, COLORS, RESOURCE_NAMES, SYMBOLS, RAW, GOODS, DISCARD_COINS, VICTORY } from "./cards.js";
-import { stagesOf, canBuild, canStage, production, shields, ROUNDS } from "./rules.js";
+import { CARDS, WONDERS, COLORS, RESOURCE_NAMES, SYMBOLS, RAW, GOODS, DISCARD_COINS, VICTORY, HAND } from "./cards.js";
+import { stagesOf, canBuild, canStage, production, shields, sideCoins, leftOf, rightOf, ROUNDS } from "./rules.js";
 import { cardSvg, cardBack, cardText, effectIcon, resourceIcon, scienceIcon, coinIcon, shieldIcon, pointsIcon, neighbourIcon, colourIcon } from "./card-art.js";
 import { wonderSvg, wonderMini, coinSvg, tokenSvg, tableSvg } from "./pieces.js";
 
@@ -682,12 +683,12 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, ageOf =
   }
 
   // Coins fly one after another: n of them, from one rect to another.
-  async function flyCoins(n, from, to, { g, ms = PACE.coin }) {
+  async function flyCoins(n, from, to, { g, ms = PACE.coin, delay = 0 }) {
     if (fast() || !live(g) || !from || !to || n <= 0) return;
     const pieces = n >= 3 ? [...Array(Math.floor(n / 3)).fill(3), ...Array(n % 3).fill(1)] : Array(n).fill(1);
     await Promise.all(
       pieces.slice(0, 6).map(async (v, i) => {
-        await wait(i * 70, g);
+        await wait(delay + i * 70, g);
         if (!live(g)) return;
         const node = coinPieceEl(v);
         node.classList.add("sc-fly-coin");
@@ -828,4 +829,448 @@ export function scoreSheet(scores, order, { me, nameOf, winners = [] }) {
     cells.forEach((tds, i) => tds.forEach((td, j) => (td.textContent = String(scores[order[j]][SCORE_ROWS[i][0]]))));
   }
   return { node, play };
+}
+
+// ---------- your move ----------
+// What the build and stage buttons would send, and their words. o: a card's
+// pickOptions() with its id and card; i: which of the cheapest ways to pay;
+// names: { left, right }.
+export function buildPlan(state, me, o, slot, i, names) {
+  const b = o.build;
+  if (b.chain) return { ok: true, move: moveFor("build", slot), label: "Build free", sub: `Chain from ${listOf(chainsFrom(o.card))}` };
+  // A card nobody can pay for that the wonder's free build can build: the free button does it.
+  if (o.free && !b.purchases.length) return { ok: false, label: "Build", sub: costWords(o.card.cost), why: "only free, with your wonder" };
+  if (!b.ok || !b.purchases.length) return { ok: false, label: WHY[b.why] ?? "Can't build", sub: b.why === "duplicate" ? "" : costWords(o.card.cost), why: whyWords(b.why, o.card) };
+  const p = b.purchases[i % b.purchases.length];
+  const side = sideCoins(state, me, p);
+  return { ok: true, move: moveFor("build", slot, p), label: "Build", sub: payWords({ bank: b.coins, ...side }, names) || "Free", buy: p, side, ways: b.purchases.length };
+}
+export function stagePlan(state, me, o, slot, i, names) {
+  const s = o.stage;
+  if (!s.ok) return { ok: false, label: s.why === "built" ? "Wonder finished" : "Can't afford", sub: s.stage ? `Stage ${ROMAN[s.n + 1]}: ${costWords(s.stage.cost)}` : "", why: whyWords(s.why) };
+  const p = s.purchases[i % s.purchases.length];
+  const side = sideCoins(state, me, p);
+  return { ok: true, move: moveFor("stage", slot, p), label: `Wonder stage ${ROMAN[s.n + 1]}`, sub: payWords(side, names) || "Free", buy: p, side, ways: s.purchases.length };
+}
+
+// What a screen reader hears a card in your hand can do now.
+export function handState(o, { dig = false, can = false } = {}) {
+  if (dig) return can ? "you can build it free" : "you already have it";
+  if (!o) return "";
+  if (o.build.chain) return "free through a chain";
+  if (o.build.ok && o.build.purchases.length) return "you can build it";
+  if (o.free) return "you can build it free with your wonder";
+  return WHY[o.build.why]?.toLowerCase() ?? "";
+}
+
+// The card picked: what it does, what it costs and how you'd pay, or why
+// you can't. b, s: its plans (null to show the card alone); onOther(kind)
+// steps to the next way to pay for a build or a stage.
+export function detailNodes(o, b, s, names, { onOther = () => {} } = {}) {
+  if (!o) return [];
+  const c = o.card;
+  const from = chainsFrom(c);
+  const other = (id, kind, ways, what) => el("button", { class: "btn sc-act small link", type: "button", id, "aria-label": `Other way to pay for ${what} (${ways} ways)`, onclick: () => onOther(kind) }, el("span", { class: "sc-act-words" }, el("span", { class: "lbl" }, "Other way to pay")));
+  const lines = [
+    el("div", { class: `sc-detail-head c-${c.color}` }, el("strong", { class: "sc-detail-name" }, c.name), effectEl(c), o.build.chain ? el("span", { class: "sc-badge chain" }, "chain") : null, o.free && !o.build.chain ? el("span", { class: "sc-badge free" }, "free build") : null),
+    el("p", { class: "sc-detail-fx" }, effectWords(c)),
+    el("p", { class: "sc-detail-cost" }, ...(costWords(c.cost) === "free" ? [el("span", { class: "k" }, "Free to build")] : [el("span", { class: "k" }, "Costs"), costEl(c.cost), el("span", {}, costWords(c.cost))]), from.length ? el("small", { class: "sc-chain-from" }, ` · free with ${listOf(from)}`) : null),
+    chainsTo(c).length ? el("p", { class: "sc-chain-to" }, `Makes ${listOf(chainsTo(c))} free later.`) : null,
+  ];
+  if (b) {
+    if (o.build.chain) lines.push(el("p", { class: "sc-detail-pay ok" }, `Free: you have ${listOf(from)}.`));
+    else if (b.ok) {
+      const buy = b.buy && buyWords(b.buy, names);
+      lines.push(el("p", { class: "sc-detail-pay ok" }, buy ? `${buy} for ${plural(b.side.left + b.side.right, "coin")}.` : c.cost.coins ? `Pay ${plural(c.cost.coins, "coin")} to the bank.` : "You make everything it needs."));
+      if (b.ways > 1) lines.push(other("sc-other", "build", b.ways, c.name));
+    } else if (o.free) lines.push(el("p", { class: "sc-detail-pay ok" }, "You can't pay for it, but your wonder's free build can build it."));
+    else lines.push(el("p", { class: "sc-detail-pay no" }, `${whyWords(o.build.why, c)}.`));
+  }
+  const stage = s && o.stage.stage;
+  if (stage) {
+    const words = s.ok && s.buy && buyWords(s.buy, names);
+    lines.push(el("p", { class: "sc-detail-stage" }, el("span", { class: "k" }, `Stage ${ROMAN[o.stage.n + 1]}`), costEl(stage.cost), el("span", { class: "sc-arrow" }, "→"), effectEl(stage), el("small", {}, ` ${effectWords(stage)}.${s.ok ? (words ? ` ${words} for ${plural(s.side.left + s.side.right, "coin")}.` : "") : ` ${whyWords(o.stage.why)}.`}`)));
+    if (s.ok && s.ways > 1) lines.push(other("sc-other-stage", "stage", s.ways, "the wonder stage"));
+  }
+  return lines.filter(Boolean);
+}
+
+// Your hand: a row of cards that turn over as their faces arrive. Arrows,
+// Home and End move along it; a click, Enter or Space picks a card
+// (onSelect(slot)).
+export function handView({ onSelect = () => {} } = {}) {
+  const title = el("span", { class: "sc-hand-title" });
+  const next = el("span", { class: "sc-hand-next" });
+  const node = el("div", { class: "sc-hand", id: "sc-hand", role: "group", "aria-label": "Your hand" });
+  const cards = new Map();
+  let focusSlot = null;
+  node.addEventListener("keydown", (e) => {
+    const btn = e.target.closest(".sc-hcard");
+    if (!btn) return;
+    const list = [...node.querySelectorAll(".sc-hcard")];
+    const i = list.indexOf(btn);
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Home: -i, End: list.length - 1 - i }[e.key];
+    if (step === undefined) return;
+    e.preventDefault();
+    const target = list[Math.max(0, Math.min(list.length - 1, i + step))];
+    focusSlot = Number(target.dataset.slot);
+    for (const b of list) b.tabIndex = b === target ? 0 : -1;
+    target.focus();
+  });
+  node.addEventListener("click", (e) => {
+    const btn = e.target.closest(".sc-hcard");
+    if (!btn) return;
+    focusSlot = Number(btn.dataset.slot);
+    onSelect(focusSlot);
+  });
+
+  // slots: the cards to show; idOf(slot): a face, or −1 while it is on its way;
+  // options(slot): its pickOptions() or null; choosing: you pick now; dig: the
+  // discards to dig through, legal the ones you may build; sel, picked: the
+  // card selected and the one you picked this turn; hidden(slot): in the air.
+  function draw({ slots, age, idOf, options = () => null, choosing = false, dig = false, legal = null, sel = null, picked = null, hidden = () => false, fast = true, title: words = "Your hand", next: nextWords = "", label }) {
+    const hadFocus = node.contains(document.activeElement) ? Number(document.activeElement.dataset.slot) : null;
+    for (const [slot, b] of cards) {
+      if (slots.includes(slot) && b.dataset.dig === String(dig)) continue;
+      b.remove();
+      cards.delete(slot);
+    }
+    slots.forEach((slot, i) => {
+      const id = idOf(slot);
+      let b = cards.get(slot);
+      if (!b) {
+        b = el("button", { class: "sc-hcard", type: "button", dataset: { slot, dig: String(dig) } }, turnCardEl(id, age, { down: id < 0 }));
+        b.firstChild.dataset.id = String(id);
+        cards.set(slot, b);
+      }
+      const turn = b.firstChild;
+      if (turn.dataset.id !== String(id)) {
+        turn.dataset.id = String(id);
+        turn.querySelector(".front").replaceChildren(cardEl(id >= 0 ? id : null, { age }));
+        turn.querySelector(".back").replaceChildren(cardEl(null, { age }));
+        // A face that has just arrived turns over in place.
+        if (id >= 0 && !fast) {
+          turn.classList.add("down");
+          void turn.offsetWidth;
+        }
+      }
+      turn.classList.toggle("down", id < 0);
+      const o = !dig && id >= 0 ? options(slot) : null;
+      const can = dig ? !!legal?.has(slot) : !!o && (o.build.ok || o.free);
+      const isSel = sel === slot;
+      const isPicked = picked === slot;
+      b.classList.toggle("sel", isSel);
+      b.classList.toggle("picked", isPicked);
+      b.classList.toggle("dim", picked !== null && !isPicked);
+      b.classList.toggle("can", can && choosing);
+      b.classList.toggle("chain", !!o?.build.chain);
+      b.style.opacity = hidden(slot) ? "0" : "";
+      b.setAttribute("aria-pressed", String(isSel));
+      const now = handState(o, { dig, can });
+      b.setAttribute("aria-label", id < 0 ? "A card, arriving" : `${cardWords(id)}${now ? ` Now: ${now}.` : ""}${isPicked ? " Picked." : ""}`);
+      b.style.setProperty("--i", String(i));
+      if (node.children[i] !== b) node.insertBefore(b, node.children[i] ?? null);
+    });
+    if (focusSlot === null || !cards.has(focusSlot)) focusSlot = slots[0] ?? null;
+    for (const [slot, b] of cards) b.tabIndex = slot === focusSlot ? 0 : -1;
+    if (hadFocus !== null && !cards.has(hadFocus) && focusSlot !== null) cards.get(focusSlot)?.focus({ preventScroll: true });
+    node.dataset.n = String(slots.length);
+    node.classList.toggle("choosing", choosing);
+    node.classList.toggle("digging", dig);
+    node.setAttribute("aria-label", label ?? (dig ? "The discards you can dig through" : `Your hand: ${plural(slots.length, "card")}`));
+    title.textContent = words;
+    next.textContent = nextWords;
+  }
+  function clear() {
+    cards.forEach((b) => b.remove());
+    cards.clear();
+  }
+  return { node, title, next, draw, clear, card: (slot) => cards.get(slot) ?? null };
+}
+
+// The buttons for the card you pick, made once so a lit (or focused) button
+// stays put: Build, Build free (the wonder's free build), Wonder stage, Sell
+// for 3, and while you dig, Build free and Build nothing. onAct(kind).
+export function actButtons({ onAct = () => {} } = {}) {
+  function make(kind, cls, icon = null) {
+    const lbl = el("span", { class: "lbl" });
+    const sub = el("small");
+    const b = el("button", { class: `btn sc-act ${cls}`, type: "button", id: `sc-${kind}`, hidden: true, onclick: () => !b.disabled && onAct(kind) }, icon, el("span", { class: "sc-act-words" }, lbl, sub));
+    const set = (label, small = null, { disabled = false, aria = null, extra = "" } = {}) => {
+      lbl.textContent = label;
+      sub.textContent = small ?? "";
+      sub.hidden = !small;
+      b.disabled = disabled;
+      b.className = `btn sc-act ${cls} ${extra}`.trim();
+      if (aria) b.setAttribute("aria-label", aria);
+      else b.removeAttribute("aria-label");
+    };
+    return { b, set };
+  }
+  const all = { build: make("build", "primary"), free: make("free", "primary free"), stage: make("stage", ""), sell: make("sell", "", coinEl(3)), dig: make("dig", "primary"), nothing: make("nothing", "") };
+  const node = el("div", { class: "sc-buttons", id: "sc-buttons", role: "group", "aria-label": "What to do with the card", hidden: true }, Object.values(all).map((x) => x.b));
+  function show(kinds) {
+    for (const [kind, x] of Object.entries(all)) x.b.hidden = !kinds.includes(kind);
+    node.dataset.n = String(kinds.length);
+    node.hidden = !kinds.length;
+    // Focus on a button that has just gone goes to the first one left.
+    const f = document.activeElement;
+    if (node.contains(f) && (f.hidden || f.disabled)) (node.querySelector("button:not([hidden]):not([disabled])") ?? node.closest(".stonecrown")?.querySelector("[role=status]"))?.focus({ preventScroll: true });
+  }
+  return {
+    node,
+    ...Object.fromEntries(Object.entries(all).map(([k, x]) => [k, x.b])),
+    // Nothing chosen yet: the buttons, waiting.
+    idle() {
+      all.build.set("Build", null, { disabled: true });
+      all.stage.set("Wonder stage", null, { disabled: true });
+      all.sell.set("Sell for 3", null, { disabled: true });
+      show(["build", "stage", "sell"]);
+    },
+    // A card chosen: build it (paid, by a chain, or with the wonder's free build), raise a stage with it, or sell it.
+    pick(o, b, s) {
+      const name = o.card.name;
+      all.build.set(b.label, b.sub, { disabled: !b.ok, extra: o.build.chain ? "chain" : "", aria: b.ok ? `${b.label} ${name}: ${b.sub} (B)` : `Can't build ${name}: ${b.why}` });
+      const free = o.free && !o.build.chain;
+      all.free.set("Build free", "Your wonder's free build this age", { aria: `Build ${name} free with your wonder's free build` });
+      all.stage.set(s.label, s.sub, { disabled: !s.ok, aria: s.ok ? `${s.label}, tucking ${name} face down: ${s.sub} (W)` : `Wonder stage: ${s.why}` });
+      all.sell.set("Sell for 3", null, { aria: `Sell ${name} face down for 3 coins (S)` });
+      show(free ? ["build", "free", "stage", "sell"] : ["build", "stage", "sell"]);
+    },
+    // Digging the discards: a card chosen (its name, and whether you may build it) or not yet.
+    dig(name, legal) {
+      all.dig.set("Build free", name ?? "Pick a card", { disabled: !legal, aria: name ? `Build ${name} free from the discards` : "Build free: pick a card first" });
+      all.nothing.set("Build nothing");
+      show(["dig", "nothing"]);
+    },
+    none: () => show([]),
+  };
+}
+
+// Who has chosen this turn: everyone's mark, ticked once they've picked (a
+// commitment, public). rows: [{ p, name, done, me }], or null to hide it.
+export function picksList() {
+  const node = el("ul", { class: "sc-picks", id: "sc-picks", "aria-label": "Who has picked", hidden: true });
+  function draw(rows) {
+    node.hidden = !rows;
+    node.replaceChildren(...(rows ?? []).map(({ p, name, done, me }) => el("li", { class: `p-${p} ${done ? "done" : ""}` }, seatMark(p), el("span", { class: "nm" }, name), el("span", { class: "sc-pick-state" }, done ? "✓ picked" : me ? "your pick" : "picking"), !done && !me ? thinkingDots() : null)));
+  }
+  return { node, draw };
+}
+
+// ---------- a turn's events, played out ----------
+// A turn's events as the screen plays them: each step's picks as one batch
+// (with the coins they earn), the seventh cards together, the rest as they are.
+export function batches(events) {
+  const out = [];
+  let batch = null;
+  for (const ev of events) {
+    const isPick = ev.type === "build" || ev.type === "stage" || (ev.type === "discard" && !ev.seventh);
+    if (isPick || (ev.type === "gain" && batch)) {
+      if (!batch) out.push((batch = { type: "picks", picks: [], gains: [] }));
+      (isPick ? batch.picks : batch.gains).push(ev);
+      continue;
+    }
+    batch = null;
+    if (ev.type === "discard" && out.at(-1)?.type === "sevenths") out.at(-1).list.push(ev);
+    else out.push(ev.type === "discard" ? { type: "sevenths", list: [ev] } : ev);
+  }
+  return out;
+}
+
+// The motion of the events both the game and the tutorial have: everyone's
+// picks, the hands passing, the seventh cards, the war and a new age. ctx:
+// me, seats; view(): the table as drawn, which this brings up to date as
+// things land; idOf(slot); handRect(slot) and handBox(), where your hand is;
+// leaving, arriving: your hand's slots in the air, revealing: seats whose
+// pick marks stay up, all Sets this fills and empties; draw(); sound(name,
+// opts, at); onTuck(slot, age) as a stage is built; said(kind, data) for a
+// log. k slows or speeds each step (1 is the normal pace).
+export function scMotion(table, art, ctx) {
+  const { live, fast } = table;
+  const { me, seats, view, idOf, handRect, leaving, arriving, revealing, draw, sound, onTuck = () => {}, said = () => {} } = ctx;
+  const n = seats.length;
+  const rectOf = (p, part, arg) => art.rectsOf(p)?.[part]?.(arg) ?? null;
+  const at = (ms) => (fast() ? 0 : ms / 1000);
+
+  // The builds turn face up together, then each card flies to its place (a
+  // city, under a wonder, the discard pile) a moment after the one before,
+  // with the coins it cost; the coins earned come in after.
+  async function picks(ev, g, k = 1) {
+    const v = view();
+    const list = ev.picks;
+    for (const x of list) if (x.p !== me) revealing.add(x.p);
+    draw();
+    const from = new Map(list.map((x) => [x.p, x.how === "dig" ? art.pileRect() : x.p === me ? handRect(x.slot) : rectOf(x.p, "pick")]));
+    sound("reveal");
+    revealing.clear();
+    draw();
+    await art.flipAll(list.filter((x) => x.p !== me && x.type === "build").map((x) => ({ id: x.id, age: v.age, rect: from.get(x.p) })), { g, ms: PACE.flip * k });
+    if (!live(g)) return;
+    // Every place measured before anything moves: a flight added to the page would make each measure lay it out again.
+    const plan = list.map((x) => {
+      const bought = x.bought ?? { left: 0, right: 0 };
+      const to = x.type === "build" ? rectOf(x.p, "city", CARDS[x.id].color) : x.type === "stage" ? rectOf(x.p, "wonder") : art.pileRect();
+      return { x, bought, to, coins: rectOf(x.p, "coins"), bank: art.bankRect(), left: bought.left ? rectOf(leftOf(v, x.p), "coins") : null, right: bought.right ? rectOf(rightOf(v, x.p), "coins") : null };
+    });
+    const flights = [];
+    plan.forEach(({ x, bought, to, coins, bank, left, right }, i) => {
+      const p = x.p;
+      const delay = i * PACE.flyGap * k;
+      const opts = { g, delay };
+      if (p === me && x.how !== "dig") leaving.add(x.slot);
+      v.coins[p] -= (x.coins ?? 0) + bought.left + bought.right;
+      if (x.coins) flights.push(art.flyCoins(x.coins, coins, bank, { ...opts, ms: PACE.coin * k }));
+      if (bought.left) flights.push(art.flyCoins(bought.left, coins, left, { ...opts, ms: PACE.coin * k }));
+      if (bought.right) flights.push(art.flyCoins(bought.right, coins, right, { ...opts, ms: PACE.coin * k }));
+      if (bought.left || bought.right) sound("trade", { n: bought.left + bought.right }, at(delay));
+      const start = from.get(p);
+      const mine = p === me ? idOf(x.slot) : -1;
+      if (x.type === "build") {
+        sound("build", { color: CARDS[x.id].color, how: x.how }, at(delay));
+        flights.push(art.flyCard(x.id, v.age, start, to, { ...opts, ms: PACE.fly * k, width: p === me ? null : 40 }).then(() => {
+          v.city[p].push({ slot: x.slot, id: x.id });
+          if (x.how === "dig") v.discard = v.discard.filter((s) => s !== x.slot);
+          draw();
+        }));
+      } else if (x.type === "stage") {
+        sound("stage", { n: x.n }, at(delay));
+        onTuck(x.slot, v.age);
+        flights.push(art.flyCard(mine, v.age, start, to, { ...opts, ms: PACE.stage * k, turn: mine >= 0 ? "down" : null, width: p === me ? null : 36 }).then(() => {
+          v.stages[p].push(x.slot);
+          draw();
+          art.bump(p === me ? art.boardBox : art.panels.get(p)?.node.querySelector(".sc-stage-dots"), p === me ? 1.04 : 1.25);
+        }));
+      } else {
+        sound("sell", {}, at(delay));
+        flights.push(art.flyCard(mine, v.age, start, to, { ...opts, ms: PACE.fly * k, turn: mine >= 0 ? "down" : null, width: 34 }).then(() => {
+          v.discard.push(x.slot);
+          draw();
+        }));
+      }
+      said("pick", x);
+      if (p === me) v.hands[me] = v.hands[me].filter((s) => s !== x.slot);
+    });
+    draw();
+    await Promise.all(flights);
+    if (!live(g)) return;
+    leaving.clear();
+    await gains(ev.gains, g, k);
+  }
+
+  // Coins coming in, together: sales and cards from the bank, purchases from the buyer.
+  async function gains(list, g, k) {
+    if (!list.length) return;
+    const v = view();
+    const plan = list.map((x) => ({ x, from: x.why === "trade" ? rectOf(x.from, "coins") : art.bankRect(), to: rectOf(x.p, "coins") }));
+    sound("coins", { n: list.reduce((a, x) => a + x.coins, 0) });
+    said("gains", list);
+    await Promise.all(plan.map(({ x, from, to }) => art.flyCoins(x.coins, from, to, { g, ms: PACE.coin * k }).then(() => {
+      v.coins[x.p] += x.coins;
+      draw();
+    })));
+  }
+
+  // Hands slide round: yours to one neighbour, the other's to you.
+  async function pass(ev, g, k = 1) {
+    const v = view();
+    const dir = ev.dir;
+    const to = dir > 0 ? art.around.left : art.around.right;
+    const from = dir > 0 ? art.around.right : art.around.left;
+    sound("pass", { dir });
+    if (!fast()) {
+      const toRect = rectOf(to, "seat");
+      const mine = v.hands[me].map((slot) => [slot, handRect(slot)]);
+      const others = seats.filter((q) => q !== me && q !== from && (q + dir + n) % n !== me).map((q) => [rectOf(q, "seat"), rectOf((q + dir + n) % n, "seat")]);
+      const flights = mine.map(([slot, r], i) => (leaving.add(slot), art.flyCard(idOf(slot), v.age, r, toRect, { g, ms: PACE.pass * k, delay: i * 40 * k, width: 44, fade: true })));
+      for (const [a, b] of others) flights.push(art.flyCard(null, v.age, a, b, { g, ms: PACE.pass * k, width: 30, fade: true }));
+      draw();
+      await Promise.all(flights);
+      if (!live(g)) return;
+    }
+    v.hands = seats.map((p) => v.hands[(p - dir + n) % n]);
+    v.round++;
+    leaving.clear();
+    v.hands[me].forEach((s) => arriving.add(s));
+    draw();
+    if (!fast()) {
+      const fromRect = rectOf(from, "seat");
+      const landing = v.hands[me].map((slot) => [slot, handRect(slot)]);
+      await Promise.all(landing.map(([slot, r], i) => art.flyCard(null, v.age, fromRect, r, { g, ms: PACE.pass * k, delay: i * 40 * k, width: 44 }).then(() => {
+        arriving.delete(slot);
+        draw();
+      })));
+    }
+    arriving.clear();
+    draw();
+    said("pass", { dir, from });
+  }
+
+  // The last card of each hand goes to the discard pile, face down.
+  async function sevenths(ev, g, k = 1) {
+    const v = view();
+    sound("sell");
+    const pile = art.pileRect();
+    const starts = ev.list.map((x) => (x.p === me ? handRect(x.slot) : rectOf(x.p, "seat")));
+    const flights = ev.list.map((x, i) => {
+      const id = x.p === me ? idOf(x.slot) : -1;
+      if (x.p === me) leaving.add(x.slot);
+      return art.flyCard(id, v.age, starts[i], pile, { g, ms: PACE.fly * k, turn: id >= 0 ? "down" : null, width: 34 });
+    });
+    draw();
+    await Promise.all(flights);
+    for (const x of ev.list) {
+      v.hands[x.p] = v.hands[x.p].filter((s) => s !== x.slot);
+      v.discard.push(x.slot);
+    }
+    leaving.clear();
+    draw();
+    said("sevenths", ev);
+  }
+
+  async function war(ev, g, k = 1) {
+    const v = view();
+    said("war", ev);
+    await art.war({
+      age: ev.age,
+      pairs: warPairs(ev.results),
+      strength: seats.map((p) => shields(v, p)),
+      g,
+      k,
+      sound,
+      onToken: (p, value) => {
+        v.tokens[p].push(value);
+        draw();
+      },
+    });
+  }
+
+  // A new age: its cards are dealt round the table from above your hand. hands: the new hands by seat.
+  async function deal(ev, hands, g, k = 1) {
+    const v = view();
+    v.age = ev.age;
+    v.round = 1;
+    v.phase = "pick";
+    if (hands) v.hands = hands.map((h) => h.slice());
+    v.hands[me].forEach((s) => arriving.add(s));
+    sound("deal", { age: ev.age });
+    said("age", ev);
+    draw();
+    if (!fast()) {
+      const box = table.rectIn(ctx.handBox());
+      const centre = { x: box.x + box.w / 2 - 20, y: box.y - 10, w: 40, h: 56 };
+      const seatRects = new Map(seats.filter((p) => p !== me).map((p) => [p, rectOf(p, "seat")]));
+      const cards = [];
+      for (let r = 0; r < HAND; r++) for (const p of seats) if (v.hands[p][r] !== undefined) cards.push({ p, slot: v.hands[p][r], to: p === me ? handRect(v.hands[p][r]) : seatRects.get(p) });
+      await Promise.all(cards.map(({ p, slot, to }, i) => art.flyCard(null, ev.age, centre, to, { g, ms: PACE.deal * k, delay: i * PACE.dealGap * k, width: p === me ? null : 30, fade: p !== me }).then(() => {
+        if (p !== me) return;
+        arriving.delete(slot);
+        draw();
+      })));
+    }
+    arriving.clear();
+    draw();
+  }
+
+  return { picks, pass, sevenths, war, deal };
 }

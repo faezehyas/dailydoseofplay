@@ -21,8 +21,8 @@ import { humanPause, startPacedRobot } from "../engine/cards/paced-robot.js";
 import { robotPause } from "../engine/robot-pace.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { CARDS, WONDERS, HAND } from "./cards.js";
-import { makeRules, normalizeConfig, forcedMove, legalMoves, designOf, passDir, stagesOf, shields, score, sideCoins, leftOf, rightOf, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
-import { PACE, ROMAN, plural, listOf, cardWords, effectWords, costWords, payWords, buyWords, moveFor, pickOptions, WHY, whyWords, warWords, warPairs, pairWords, resultWords, viewOf, turnWords, seatWords, chainsFrom, chainsTo, cardEl, turnCardEl, costEl, effectEl, coinEl, seatMark, cityDialog, tableEl, scTable, scoreSheet } from "./art.js";
+import { makeRules, normalizeConfig, forcedMove, legalMoves, designOf, passDir, stagesOf, shields, score, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
+import { PACE, ROMAN, plural, listOf, effectWords, payWords, moveFor, pickOptions, warWords, warPairs, pairWords, resultWords, viewOf, turnWords, seatWords, cardEl, coinEl, seatMark, cityDialog, tableEl, scTable, scMotion, batches, buildPlan, stagePlan, detailNodes, handView, actButtons, picksList, scoreSheet } from "./art.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
 import { howToPlay } from "./how-to-play.js";
@@ -103,9 +103,9 @@ function mountGame(session, root, shell) {
   // Your choices on the way to a move.
   let sel = null; // { slot, build: purchase index, stage: purchase index }
   let picked = null; // { key, slot, kind, id } once you have chosen this turn
-  let revealing = new Set(); // seats whose pick marks stay up while their picks turn over
-  let leaving = new Set(); // your hand's slots on their way out
-  let arriving = new Set(); // your hand's slots on their way in
+  const revealing = new Set(); // seats whose pick marks stay up while their picks turn over
+  const leaving = new Set(); // your hand's slots on their way out
+  const arriving = new Set(); // your hand's slots on their way in
 
   const table = cardTable({ prefix: "sc", play, animate: (ev, g) => animate(ev, g), done: (idle) => replayed(idle) });
   const { live, fast, wait } = table;
@@ -139,22 +139,20 @@ function mountGame(session, root, shell) {
   const top = el("div", { class: "sc-top", id: "sc-top" }, el("div", { class: "sc-top-age", role: "group", "aria-label": "Age and turn" }, ageBadge, el("span", { class: "sc-top-words" }, ageLine, turnLine)), passLine, acrossPill, art.bankBox, art.pile);
 
   // Your hand, the buttons for the card you pick, and what it would do.
-  const handHead = el("span", { class: "sc-hand-title" });
-  const handNext = el("span", { class: "sc-hand-next" });
-  const hand = el("div", { class: "sc-hand", id: "sc-hand", role: "group", "aria-label": "Your hand" });
+  const hand = handView({ onSelect: (slot) => select(slot) });
   const deck = el("div", { class: "sc-deck", hidden: true, "aria-hidden": "true" }, [0, 1, 2, 3, 4].map(() => el("span", { class: "sc-deck-card" })));
-  const picks = el("ul", { class: "sc-picks", id: "sc-picks", "aria-label": "Who has picked" });
+  const picks = picksList();
   const timerFill = el("span");
   const timerText = el("span", { class: "mono" });
   const timer = el("div", { class: "sc-timer", id: "sc-timer", hidden: true, role: "timer", "aria-label": "Time for the move" }, el("span", { class: "bar" }, timerFill), timerText);
-  const buttons = el("div", { class: "sc-buttons", id: "sc-buttons", role: "group", "aria-label": "What to do with the card" });
+  const buttons = actButtons({ onAct: (kind) => act(kind) });
   const detail = el("div", { class: "sc-detail", id: "sc-detail", "aria-live": "polite" });
   const handArea = el(
     "section",
     { class: "sc-hand-area", "aria-label": "Your move" },
-    el("div", { class: "sc-hand-head" }, el("h2", { class: "sc-title" }, handHead), handNext),
-    el("div", { class: "sc-hand-wrap" }, hand, deck, table.busyChip),
-    el("div", { class: "sc-side" }, timer, buttons, detail, picks),
+    el("div", { class: "sc-hand-head" }, el("h2", { class: "sc-title" }, hand.title), hand.next),
+    el("div", { class: "sc-hand-wrap" }, hand.node, deck, table.busyChip),
+    el("div", { class: "sc-side" }, timer, buttons.node, detail, picks.node),
   );
 
   const logList = el("ol", { class: table.cls("log"), id: "sc-log", role: "log", "aria-label": "What happened" });
@@ -208,9 +206,9 @@ function mountGame(session, root, shell) {
   function replayed(idle) {
     if (idle) {
       current = null;
-      revealing = new Set();
-      leaving = new Set();
-      arriving = new Set();
+      revealing.clear();
+      leaving.clear();
+      arriving.clear();
       if (match?.state) view = viewOf(match.state);
       for (const robot of window.ddp.robots || []) robot.poke?.();
     }
@@ -218,44 +216,37 @@ function mountGame(session, root, shell) {
   }
 
   // A step's picks arrive as one batch of events: they turn over and land together.
-  function enqueueAll(events) {
-    let batch = null;
-    let sevenths = null;
-    for (const ev of events) {
-      const isPick = ev.type === "build" || ev.type === "stage" || (ev.type === "discard" && !ev.seventh);
-      if (isPick || (ev.type === "gain" && batch)) {
-        if (!batch) table.enqueue((batch = { type: "picks", picks: [], gains: [] }));
-        (isPick ? batch.picks : batch.gains).push(ev);
-        continue;
-      }
-      batch = null;
-      if (ev.type === "discard") {
-        if (sevenths) sevenths.list.push(ev);
-        else table.enqueue((sevenths = { type: "sevenths", list: [ev] }));
-        continue;
-      }
-      sevenths = null;
-      table.enqueue(ev);
-    }
-  }
+  const enqueueAll = (events) => batches(events).forEach((ev) => table.enqueue(ev));
 
-  const rectOf = (p, part, arg) => art.rectsOf(p)?.[part]?.(arg) ?? null;
-  const handCard = (slot) => hand.querySelector(`[data-slot="${slot}"]`);
-  const handRect = (slot) => {
-    const b = handCard(slot);
-    return b ? table.rectIn(b) : rectOf(me, "pick");
-  };
+  const motion = scMotion(table, art, {
+    me,
+    seats,
+    view: () => view,
+    idOf,
+    handRect: (slot) => (hand.card(slot) ? table.rectIn(hand.card(slot)) : art.rectsOf(me).pick()),
+    handBox: () => hand.node,
+    leaving,
+    arriving,
+    revealing,
+    draw: () => render(),
+    sound: play,
+    onTuck: (slot, age) => tuckedAge.set(slot, age),
+    said,
+  });
 
   async function animate(ev, g) {
     const k = table.pace();
     current = ev;
     // The first deal comes before anything is drawn.
     if (!view) view = viewOf(match.state);
-    if (ev.type === "picks") await revealPicks(ev, g, k);
-    else if (ev.type === "age") await dealAge(ev, g, k);
-    else if (ev.type === "pass") await passHands(ev, g, k);
-    else if (ev.type === "sevenths") await sevenths(ev, g, k);
-    else if (ev.type === "war") await war(ev, g, k);
+    if (ev.type === "picks") await motion.picks(ev, g, k);
+    else if (ev.type === "age") {
+      sel = null;
+      const st = match.state;
+      await motion.deal(ev, st.age === ev.age && st.round === 1 ? st.hands : null, g, k);
+    } else if (ev.type === "pass") await motion.pass(ev, g, k);
+    else if (ev.type === "sevenths") await motion.sevenths(ev, g, k);
+    else if (ev.type === "war") await motion.war(ev, g, k);
     else if (ev.type === "last") {
       view.phase = "last";
       view.lastSeat = ev.p;
@@ -274,69 +265,36 @@ function mountGame(session, root, shell) {
     await wait(PACE.between * k, g);
   }
 
-  // Everyone's pick: the builds turn face up together, then each card flies
-  // to its place (a city, under a wonder, the discard pile) with the coins it
-  // cost, and the coins earned come in after.
-  async function revealPicks(ev, g, k) {
-    const list = ev.picks;
-    revealing = new Set(list.map((x) => x.p).filter((p) => p !== me));
-    render();
-    const from = new Map(list.map((x) => [x.p, x.p === me ? (x.how === "dig" ? art.pileRect() : handRect(x.slot)) : x.how === "dig" ? art.pileRect() : rectOf(x.p, "pick")]));
-    play("reveal");
-    const flips = list.filter((x) => x.p !== me && x.type === "build").map((x) => ({ id: x.id, age: view.age, rect: from.get(x.p) }));
-    revealing = new Set();
-    render();
-    await art.flipAll(flips, { g, ms: PACE.flip * k });
-    if (!live(g)) return;
-    const flights = [];
-    for (const x of list) {
+  // The log's line for each thing the table shows happening.
+  function said(kind, x) {
+    if (kind === "pick") {
       const p = x.p;
-      const start = from.get(p);
-      if (p === me && x.how !== "dig") leaving.add(x.slot);
-      const bought = x.bought ?? { left: 0, right: 0 };
-      const paid = (x.coins ?? 0) + bought.left + bought.right;
-      view.coins[p] -= paid;
-      if (x.coins) flights.push(art.flyCoins(x.coins, rectOf(p, "coins"), art.bankRect(), { g, ms: PACE.coin * k }));
-      if (bought.left) flights.push(art.flyCoins(bought.left, rectOf(p, "coins"), rectOf(leftOf(view, p), "coins"), { g, ms: PACE.coin * k }));
-      if (bought.right) flights.push(art.flyCoins(bought.right, rectOf(p, "coins"), rectOf(rightOf(view, p), "coins"), { g, ms: PACE.coin * k }));
-      if (bought.left || bought.right) play("trade", { n: bought.left + bought.right });
-      if (x.type === "build") {
-        const color = CARDS[x.id].color;
-        play("build", { color, how: x.how });
-        flights.push(art.flyCard(x.id, view.age, start, rectOf(p, "city", color), { g, ms: PACE.fly * k, width: p === me ? null : 40 }).then(() => {
-          view.city[p].push({ slot: x.slot, id: x.id });
-          if (x.how === "dig") view.discard = view.discard.filter((s) => s !== x.slot);
-          render();
-        }));
-        addLog({ player: p, kind: "build", text: buildWords(x) });
-      } else if (x.type === "stage") {
-        play("stage", { n: x.n });
-        const id = p === me ? idOf(x.slot) : -1;
-        tuckedAge.set(x.slot, view.age);
-        flights.push(art.flyCard(id, view.age, start, rectOf(p, "wonder"), { g, ms: PACE.stage * k, turn: p === me && id >= 0 ? "down" : null, width: p === me ? null : 36 }).then(() => {
-          view.stages[p].push(x.slot);
-          render();
-          art.bump(p === me ? art.boardBox : art.panels.get(p)?.node.querySelector(".sc-stage-dots"), p === me ? 1.04 : 1.25);
-        }));
+      if (x.type === "build") return addLog({ player: p, kind: "build", text: buildWords(x) });
+      if (x.type === "stage") {
         const stage = stagesOf(view, p)[x.n];
-        const tucked = p === me && idOf(x.slot) >= 0 ? `, tucking ${CARDS[idOf(x.slot)].name}` : "";
-        addLog({ player: p, kind: "stage", text: `${nameOf(p)} ${verb(p, "builds")} wonder stage ${ROMAN[x.n + 1]}${tucked}${stage ? `: ${effectWords(stage)}` : ""}${paidWords(p, 0, bought)}` });
-      } else {
-        play("sell");
         const id = p === me ? idOf(x.slot) : -1;
-        flights.push(art.flyCard(id, view.age, start, art.pileRect(), { g, ms: PACE.fly * k, turn: p === me && id >= 0 ? "down" : null, width: 34 }).then(() => {
-          view.discard.push(x.slot);
-          render();
-        }));
-        addLog({ player: p, kind: "sell", text: `${nameOf(p)} ${verb(p, "sells")} ${p === me && id >= 0 ? CARDS[id].name : "a card"} for 3 coins` });
+        return addLog({ player: p, kind: "stage", text: `${nameOf(p)} ${verb(p, "builds")} wonder stage ${ROMAN[x.n + 1]}${id >= 0 ? `, tucking ${CARDS[id].name}` : ""}${stage ? `: ${effectWords(stage)}` : ""}${paidWords(p, 0, x.bought)}` });
       }
-      if (p === me) view.hands[me] = view.hands[me].filter((s) => s !== x.slot);
+      const id = p === me ? idOf(x.slot) : -1;
+      return addLog({ player: p, kind: "sell", text: `${nameOf(p)} ${verb(p, "sells")} ${id >= 0 ? CARDS[id].name : "a card"} for 3 coins` });
     }
-    render();
-    await Promise.all(flights);
-    if (!live(g)) return;
-    leaving = new Set();
-    await gains(ev.gains, g, k);
+    if (kind === "gains") {
+      for (const g of x) {
+        if (g.why === "sale") continue;
+        const why = g.why === "trade" ? ` from ${nameIn(g.from)}` : g.why === "stage" ? " from the wonder" : " from the card";
+        addLog({ player: g.p, kind: "coins", text: `${nameOf(g.p)} ${verb(g.p, "gets")} ${plural(g.coins, "coin")}${why}` });
+      }
+    }
+    if (kind === "age") addLog({ kind: "age", text: `Age ${ROMAN[x.age]}: ${HAND} cards each${x.age === 3 ? ", with guilds" : ""}. Hands pass ${passDir(x.age) > 0 ? "left" : "right"}.` });
+    if (kind === "pass") addLog({ kind: "pass", text: `Hands pass ${x.dir > 0 ? "left" : "right"}: you get ${nameIn(x.from)}'s` });
+    if (kind === "sevenths") {
+      const mineGone = x.list.find((y) => y.p === me);
+      addLog({ kind: "sell", text: `Last cards discarded${mineGone && idOf(mineGone.slot) >= 0 ? ` (yours: ${CARDS[idOf(mineGone.slot)].name})` : ""}` });
+    }
+    if (kind === "war") {
+      addLog({ kind: "war", text: warWords(x.results, me, x.age, nameIn) });
+      for (const pair of warPairs(x.results)) if (!pair.includes(me)) addLog({ kind: "war", text: pairWords(pair, x.age, nameOf) });
+    }
   }
 
   function buildWords(x) {
@@ -348,143 +306,6 @@ function mountGame(session, root, shell) {
     const names = { left: nameIn((p + 1) % count), right: nameIn((p + count - 1) % count) };
     const words = payWords({ bank: coins, left: bought.left, right: bought.right }, names);
     return words ? ` (${words.replace(/^Pay/, p === me ? "paid" : "paying")})` : "";
-  }
-
-  // Coins coming in: sales and cards from the bank, purchases from the buyer.
-  async function gains(list, g, k) {
-    if (!list.length) return;
-    const flights = list.map((x) => {
-      const from = x.why === "trade" ? rectOf(x.from, "coins") : art.bankRect();
-      play("coins", { n: x.coins });
-      return art.flyCoins(x.coins, from, rectOf(x.p, "coins"), { g, ms: PACE.coin * k }).then(() => {
-        view.coins[x.p] += x.coins;
-        render();
-      });
-    });
-    for (const x of list) {
-      if (x.why === "sale") continue;
-      const why = x.why === "trade" ? ` from ${nameIn(x.from)}` : x.why === "stage" ? " from the wonder" : " from the card";
-      addLog({ player: x.p, kind: "coins", text: `${nameOf(x.p)} ${verb(x.p, "gets")} ${plural(x.coins, "coin")}${why}` });
-    }
-    await Promise.all(flights);
-  }
-
-  // A new age: its cards are dealt round the table from the deck.
-  async function dealAge(ev, g, k) {
-    view.age = ev.age;
-    view.round = 1;
-    view.phase = "pick";
-    const st = match.state;
-    if (st.age === ev.age && st.round === 1) view.hands = st.hands.map((h) => h.slice());
-    const mineNow = view.hands[me];
-    mineNow.forEach((s) => arriving.add(s));
-    sel = null;
-    play("deal", { age: ev.age });
-    addLog({ kind: "age", text: `Age ${ROMAN[ev.age]}: ${HAND} cards each${ev.age === 3 ? ", with guilds" : ""}. Hands pass ${passDir(ev.age) > 0 ? "left" : "right"}.` });
-    render();
-    if (!fast()) {
-      const deckRect = table.rectIn(hand);
-      const center = { x: deckRect.x + deckRect.w / 2 - 20, y: deckRect.y - 10, w: 40, h: 56 };
-      const jobs = [];
-      let i = 0;
-      for (let r = 0; r < HAND; r++) {
-        for (const p of seats) {
-          const slot = view.hands[p][r];
-          if (slot === undefined) continue;
-          const to = p === me ? handRect(slot) : rectOf(p, "seat");
-          jobs.push(wait(i++ * PACE.dealGap * k, g).then(async () => {
-            await art.flyCard(null, ev.age, center, to, { g, ms: PACE.deal * k, width: p === me ? null : 30, fade: p !== me });
-            if (p === me) {
-              arriving.delete(slot);
-              render();
-            }
-          }));
-        }
-      }
-      await Promise.all(jobs);
-    }
-    arriving = new Set();
-    render();
-  }
-
-  // Hands slide round: yours to one neighbour, the other's to you.
-  async function passHands(ev, g, k) {
-    const dir = ev.dir;
-    const to = dir > 0 ? around.left : around.right;
-    const from = dir > 0 ? around.right : around.left;
-    play("pass", { dir });
-    const flights = [];
-    if (!fast()) {
-      view.hands[me].forEach((slot, i) => {
-        const id = idOf(slot);
-        flights.push(art.flyCard(id, view.age, handRect(slot), rectOf(to, "seat"), { g, ms: PACE.pass * k, delay: i * 40 * k, width: 44, fade: true }));
-        leaving.add(slot);
-      });
-      for (const q of seats) {
-        if (q === me || q === from) continue;
-        const next = (q + dir + count) % count;
-        if (next === me) continue;
-        flights.push(art.flyCard(null, view.age, rectOf(q, "seat"), rectOf(next, "seat"), { g, ms: PACE.pass * k, width: 30, fade: true }));
-      }
-    }
-    render();
-    await Promise.all(flights);
-    if (!live(g)) return;
-    view.hands = seats.map((p) => view.hands[(p - dir + count) % count]);
-    view.round++;
-    sel = null;
-    leaving = new Set();
-    view.hands[me].forEach((s) => arriving.add(s));
-    render();
-    if (!fast()) {
-      await Promise.all(view.hands[me].map((slot, i) => art.flyCard(null, view.age, rectOf(from, "seat"), handRect(slot), { g, ms: PACE.pass * k, delay: i * 40 * k, width: 44 }).then(() => {
-        arriving.delete(slot);
-        render();
-      })));
-    }
-    arriving = new Set();
-    render();
-    addLog({ kind: "pass", text: `Hands pass ${dir > 0 ? "left" : "right"}: you get ${nameIn(from)}'s` });
-  }
-
-  // The last card of each hand goes to the discard pile, face down.
-  async function sevenths(ev, g, k) {
-    play("sell");
-    const flights = ev.list.map((x) => {
-      const start = x.p === me ? handRect(x.slot) : rectOf(x.p, "seat");
-      if (x.p === me) leaving.add(x.slot);
-      const id = x.p === me ? idOf(x.slot) : -1;
-      return art.flyCard(id, view.age, start, art.pileRect(), { g, ms: PACE.fly * k, turn: id >= 0 ? "down" : null, width: 34 });
-    });
-    render();
-    await Promise.all(flights);
-    for (const x of ev.list) {
-      view.hands[x.p] = view.hands[x.p].filter((s) => s !== x.slot);
-      view.discard.push(x.slot);
-    }
-    leaving = new Set();
-    render();
-    const mineGone = ev.list.find((x) => x.p === me);
-    addLog({ kind: "sell", text: `Last cards discarded${mineGone && idOf(mineGone.slot) >= 0 ? ` (yours: ${CARDS[idOf(mineGone.slot)].name})` : ""}` });
-  }
-
-  async function war(ev, g, k) {
-    const strength = seats.map((p) => shields(view, p));
-    const pairs = warPairs(ev.results);
-    addLog({ kind: "war", text: warWords(ev.results, me, ev.age, nameIn) });
-    for (const pair of pairs) if (!pair.includes(me)) addLog({ kind: "war", text: pairWords(pair, ev.age, nameOf) });
-    await art.war({
-      age: ev.age,
-      pairs,
-      strength,
-      g,
-      k,
-      sound: play,
-      onToken: (p, v) => {
-        view.tokens[p].push(v);
-        render();
-      },
-    });
   }
 
   // The score sheet, a row at a time, then the result.
@@ -532,16 +353,15 @@ function mountGame(session, root, shell) {
     return view.hands[me];
   }
 
+  // Out of your turn, a card can still be looked at (and let go of).
   function select(slot) {
-    const choice = myChoice();
-    if (!choice) {
+    if (myChoice()) {
+      if (sel?.slot === slot) return;
+      sel = { slot, build: 0, stage: 0 };
+    } else {
       if (picked?.key === turnKey()) return;
       sel = sel?.slot === slot ? null : { slot, build: 0, stage: 0 };
-      play("tap");
-      return render();
     }
-    if (sel?.slot === slot) return;
-    sel = { slot, build: 0, stage: 0 };
     play("tap");
     render();
   }
@@ -552,52 +372,27 @@ function mountGame(session, root, shell) {
     return { id, card: CARDS[id], ...pickOptions(st(), me, id) };
   }
   const names = () => ({ left: session.players[around.left].name, right: session.players[around.right].name });
-
-  // What the build and stage buttons would send, and their words.
-  function buildPlan(o) {
-    const b = o.build;
-    if (b.chain) return { ok: true, move: moveFor("build", sel.slot), label: "Build free", sub: `Chain from ${listOf(chainsFrom(o.card))}`, pay: 0 };
-    if (o.free && !b.purchases.length) return { ok: false, label: "Build", sub: costWords(o.card.cost), why: "only free, with your wonder" };
-    if (!b.ok || !b.purchases.length) return { ok: false, label: WHY[b.why] ?? "Can't build", sub: b.why === "duplicate" ? "" : costWords(o.card.cost), why: whyWords(b.why, o.card) };
-    const p = b.purchases[sel.build % b.purchases.length];
-    const side = sideCoins(st(), me, p);
-    const words = payWords({ bank: b.coins, ...side }, names());
-    return { ok: true, move: moveFor("build", sel.slot, p), label: "Build", sub: words || "Free", buy: p, side, pay: b.coins + side.left + side.right, ways: b.purchases.length };
-  }
-  function stagePlan(o) {
-    const s = o.stage;
-    if (!s.ok) return { ok: false, label: s.why === "built" ? "Wonder finished" : "Can't afford", sub: s.stage ? `Stage ${ROMAN[s.n + 1]}: ${costWords(s.stage.cost)}` : "", why: whyWords(s.why) };
-    const p = s.purchases[sel.stage % s.purchases.length];
-    const side = sideCoins(st(), me, p);
-    const words = payWords(side, names());
-    return { ok: true, move: moveFor("stage", sel.slot, p), label: `Wonder stage ${ROMAN[s.n + 1]}`, sub: words || "Free", buy: p, side, ways: s.purchases.length };
-  }
+  const plans = (o) => [buildPlan(st(), me, o, sel.slot, sel.build, names()), stagePlan(st(), me, o, sel.slot, sel.stage, names())];
 
   function act(kind) {
     const choice = myChoice();
     if (!choice || !sel) return;
     if (choice === "dig") {
       if (kind === "nothing") return send({ dig: -1 }, "nothing");
-      return send({ dig: sel.slot }, "dig");
+      if (kind === "dig") send({ dig: sel.slot }, "dig");
+      return;
     }
     const o = optionsFor(sel.slot);
     if (!o) return;
-    if (kind === "build") {
-      const plan = buildPlan(o);
-      if (!plan.ok) return refuse();
-      send(plan.move, "build");
-    } else if (kind === "free") {
-      if (!o.free) return refuse();
-      send(moveFor("build", sel.slot, null, true), "free");
-    } else if (kind === "stage") {
-      const plan = stagePlan(o);
-      if (!plan.ok) return refuse();
-      send(plan.move, "stage");
-    } else if (kind === "sell") send({ discard: sel.slot }, "sell");
+    const [b, s] = plans(o);
+    if (kind === "build") b.ok ? send(b.move, "build") : refuse(buttons.build);
+    else if (kind === "free") o.free ? send(moveFor("build", sel.slot, null, true), "free") : refuse(buttons.free);
+    else if (kind === "stage") s.ok ? send(s.move, "stage") : refuse(buttons.stage);
+    else if (kind === "sell") send({ discard: sel.slot }, "sell");
   }
-  function refuse() {
+  function refuse(node) {
     play("nope");
-    table.shake(buttons);
+    table.shake(node);
   }
 
   // Esc lets go of the card; B, W and S build, raise a stage or sell it.
@@ -607,12 +402,11 @@ function mountGame(session, root, shell) {
       const slot = sel.slot;
       sel = null;
       render();
-      (handCard(slot) ?? status).focus({ preventScroll: true });
+      (hand.card(slot) ?? status).focus({ preventScroll: true });
       return;
     }
     if (!sel || !myChoice()) return;
-    const key = e.key.toLowerCase();
-    const kind = { b: "build", w: "stage", s: "sell" }[key];
+    const kind = { b: "build", w: "stage", s: "sell" }[e.key.toLowerCase()];
     if (kind && myChoice() !== "dig") {
       e.preventDefault();
       act(kind);
@@ -620,93 +414,31 @@ function mountGame(session, root, shell) {
   }
   addEventListener("keydown", onKey);
 
-  // Arrows, Home and End move along the hand; Enter and Space pick a card (the button's click).
-  hand.addEventListener("keydown", (e) => {
-    const btn = e.target.closest(".sc-hcard");
-    if (!btn) return;
-    const list = [...hand.querySelectorAll(".sc-hcard")];
-    const i = list.indexOf(btn);
-    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Home: -i, End: list.length - 1 - i }[e.key];
-    if (step === undefined) return;
-    e.preventDefault();
-    const target = list[Math.max(0, Math.min(list.length - 1, i + step))];
-    focusSlot = Number(target.dataset.slot);
-    for (const b of list) b.tabIndex = b === target ? 0 : -1;
-    target.focus();
-  });
-  hand.addEventListener("click", (e) => {
-    const btn = e.target.closest(".sc-hcard");
-    if (!btn) return;
-    focusSlot = Number(btn.dataset.slot);
-    select(focusSlot);
-  });
-
   // ---------- your hand ----------
-  let focusSlot = null;
-  const handButtons = new Map();
   function renderHand() {
     const s = match?.state;
     const choice = myChoice();
     const dig = choice === "dig";
     const slots = dig ? choosable() : (view?.hands[me] ?? []);
     const done = picked?.key === turnKey() ? picked : null;
-    const legal = dig ? new Set(legalMoves(s, me, faceOf).filter((x) => x.dig >= 0).map((x) => x.dig)) : null;
     if (sel && !slots.includes(sel.slot)) sel = null;
-    const hadFocus = hand.contains(document.activeElement) ? Number(document.activeElement.dataset.slot) : null;
-    for (const [slot, b] of handButtons) {
-      if (!slots.includes(slot) || b.dataset.dig !== String(dig)) {
-        b.remove();
-        handButtons.delete(slot);
-      }
-    }
-    const age = Math.max(1, view?.age ?? 1);
-    slots.forEach((slot, i) => {
-      let b = handButtons.get(slot);
-      const id = idOf(slot);
-      if (!b) {
-        b = el("button", { class: "sc-hcard", type: "button", dataset: { slot, dig: String(dig) } }, turnCardEl(id, age, { down: id < 0 }));
-        handButtons.set(slot, b);
-      }
-      const turn = b.firstChild;
-      if (turn.dataset.id !== String(id)) {
-        const was = turn.dataset.id;
-        turn.dataset.id = String(id);
-        turn.querySelector(".front").replaceChildren(id >= 0 ? cardEl(id) : cardEl(null, { age }));
-        turn.querySelector(".back").replaceChildren(cardEl(null, { age }));
-        // A face that has just arrived turns over in place.
-        if (was !== undefined && id >= 0 && !fast()) {
-          turn.classList.add("down");
-          void turn.offsetWidth;
-        }
-      }
-      turn.classList.toggle("down", id < 0);
-      const o = !dig && id >= 0 && s && view && !table.pending ? optionsFor(slot) : null;
-      const can = dig ? legal?.has(slot) : o ? o.build.ok || o.free : false;
-      const isSel = sel?.slot === slot;
-      const isPicked = done?.slot === slot;
-      b.classList.toggle("sel", isSel);
-      b.classList.toggle("picked", !!isPicked);
-      b.classList.toggle("dim", !!done && !isPicked);
-      b.classList.toggle("can", !!can && !!choice);
-      b.classList.toggle("chain", !!o?.build.chain);
-      b.style.opacity = leaving.has(slot) || arriving.has(slot) ? "0" : "";
-      b.setAttribute("aria-pressed", String(isSel));
-      const state = dig ? (can ? "you can build it free" : "you already have it") : !o ? "" : o.build.chain ? "free through a chain" : o.build.purchases.length ? "you can build it" : o.free ? "you can build it free with your wonder" : WHY[o.build.why]?.toLowerCase() ?? "";
-      b.setAttribute("aria-label", id < 0 ? "A card, arriving" : `${cardWords(id)}${state ? ` Now: ${state}.` : ""}${isPicked ? " Picked." : ""}`);
-      b.style.setProperty("--i", String(i));
-      if (hand.children[i] !== b) hand.insertBefore(b, hand.children[i] ?? null);
-    });
-    if (focusSlot === null || !handButtons.has(focusSlot)) focusSlot = slots[0] ?? null;
-    for (const [slot, b] of handButtons) b.tabIndex = slot === focusSlot ? 0 : -1;
-    if (hadFocus !== null && !handButtons.has(hadFocus) && focusSlot !== null) handButtons.get(focusSlot)?.focus({ preventScroll: true });
-    hand.dataset.n = String(slots.length);
-    hand.classList.toggle("choosing", !!choice);
-    hand.classList.toggle("digging", dig);
-    hand.setAttribute("aria-label", dig ? "The discards you can dig through" : `Your hand: ${plural(slots.length, "card")}`);
     const n = view?.hands[me]?.length ?? 0;
-    handHead.textContent = dig ? "The discards · build one free" : !view?.age ? "Your hand" : choice === "last" ? "Your seventh card" : done ? "Your hand · picked" : choice ? "Your hand · pick one" : "Your hand";
     const to = view && passDir(view.age) > 0 ? around.left : around.right;
-    handNext.textContent = view?.age && !dig && n > 1 && view.round < 6 ? `then passes to ${nameIn(to)} ${passDir(view.age) > 0 ? "◂" : "▸"}` : "";
+    hand.draw({
+      slots,
+      age: Math.max(1, view?.age ?? 1),
+      idOf,
+      options: (slot) => (s && view && !table.pending ? optionsFor(slot) : null),
+      choosing: !!choice,
+      dig,
+      legal: dig ? new Set(legalMoves(s, me, faceOf).filter((x) => x.dig >= 0).map((x) => x.dig)) : null,
+      sel: sel?.slot ?? null,
+      picked: done ? done.slot : null,
+      hidden: (slot) => leaving.has(slot) || arriving.has(slot),
+      fast: fast(),
+      title: dig ? "The discards · build one free" : !view?.age ? "Your hand" : choice === "last" ? "Your seventh card" : done ? "Your hand · picked" : choice ? "Your hand · pick one" : "Your hand",
+      next: view?.age && !dig && n > 1 && view.round < 6 ? `then passes to ${nameIn(to)} ${passDir(view.age) > 0 ? "◂" : "▸"}` : "",
+    });
   }
 
   // ---------- the buttons and the detail strip ----------
@@ -720,112 +452,61 @@ function mountGame(session, root, shell) {
     const key = sideKey();
     if (key === shownKey) return;
     shownKey = key;
-    const focused = buttons.contains(document.activeElement) || detail.contains(document.activeElement) ? document.activeElement.id : null;
-    const { btns, info } = sideNodes();
-    buttons.replaceChildren(...btns);
-    buttons.dataset.n = String(btns.length);
-    detail.replaceChildren(...info);
-    buttons.hidden = !btns.length;
-    detail.hidden = !info.length;
+    const focused = detail.contains(document.activeElement) ? document.activeElement.id : null;
+    detail.replaceChildren(...sideNodes());
+    detail.hidden = !detail.childNodes.length;
     renderPicks();
-    if (focused) (document.getElementById(focused) ?? buttons.querySelector("button:not([disabled])") ?? status).focus({ preventScroll: true });
+    if (focused) (document.getElementById(focused) ?? buttons.node.querySelector("button:not([hidden]):not([disabled])") ?? status).focus({ preventScroll: true });
   }
 
-  const btn = (id, label, onclick, { cls = "", disabled = false, sub = null, aria = null, icon = null } = {}) =>
-    el("button", { class: `btn sc-act ${cls}`, type: "button", id, disabled, "aria-label": aria, onclick: disabled ? null : onclick }, icon, el("span", { class: "sc-act-words" }, el("span", { class: "lbl" }, label), sub ? el("small", {}, sub) : null));
-
+  const hint = (text, cls = "") => el("p", { class: `sc-hint ${cls}` }, text);
+  const other = (kind) => {
+    sel[kind] += 1;
+    render();
+  };
+  // Sets the buttons and returns the detail strip's lines.
   function sideNodes() {
     const s = match?.state;
-    if (!match || ended || match.phase !== "playing" || !s || !view) return { btns: [], info: [] };
+    if (!match || ended || match.phase !== "playing" || !s || !view) return (buttons.none(), []);
     const choice = myChoice();
     const done = picked?.key === turnKey() ? picked : null;
-    if (choice === "dig") return digNodes(s);
-    if ((choice === "pick" || choice === "last") && sel) return pickNodes(s);
-    if (choice === "pick" || choice === "last") {
-      return {
-        btns: [btn("sc-build", "Build", null, { cls: "primary", disabled: true }), btn("sc-stage", "Wonder stage", null, { disabled: true }), btn("sc-sell", "Sell for 3", null, { disabled: true, icon: coinEl(3) })],
-        info: [el("p", { class: "sc-hint" }, choice === "last" ? "Your wonder lets you play your seventh card: build it, raise a stage with it, or sell it." : "Tap a card to see what you can do with it. When you have to buy from a neighbour, the cheapest way is picked, and you can choose another.")],
-      };
+    if (choice === "dig") {
+      const id = sel ? idOf(sel.slot) : -1;
+      const legal = !!sel && legalMoves(s, me, faceOf).some((x) => x.dig === sel.slot);
+      buttons.dig(id >= 0 ? CARDS[id].name : null, legal);
+      if (id < 0) return [hint("Your wonder lets you build one card from the discards, free. Tap one to see it.")];
+      const lines = detailNodes({ id, card: CARDS[id], build: { chain: false, ok: legal, why: legal ? null : "duplicate", purchases: [] }, free: false, stage: {} }, null, null, names());
+      if (!legal) lines.push(el("p", { class: "sc-detail-pay no" }, `You already have ${CARDS[id].name}.`));
+      return lines;
     }
+    if (choice && sel) {
+      const o = optionsFor(sel.slot);
+      if (!o) return (buttons.none(), [hint("That card's face is still on its way…")]);
+      const [b, st2] = plans(o);
+      buttons.pick(o, b, st2);
+      return detailNodes(o, b, st2, names(), { onOther: other });
+    }
+    if (choice) {
+      buttons.idle();
+      return [hint(choice === "last" ? "Your wonder lets you play your seventh card: build it, raise a stage with it, or sell it." : "Tap a card to see what you can do with it. When you have to buy from a neighbour, the cheapest way is picked, and you can choose another.")];
+    }
+    buttons.none();
     if (done) {
-      const what = done.kind === "build" || done.kind === "free" ? `build ${CARDS[done.id]?.name ?? "it"}` : done.kind === "stage" ? `raise a wonder stage with ${CARDS[done.id]?.name ?? "it"}` : done.kind === "sell" ? `sell ${CARDS[done.id]?.name ?? "it"} for 3` : done.kind === "dig" ? `build ${CARDS[done.id]?.name ?? "it"} from the discards` : "build nothing";
-      return { btns: [], info: [el("p", { class: "sc-hint sc-done" }, el("strong", {}, "Picked: "), what, ". It happens when everyone has chosen.")] };
+      const name = CARDS[done.id]?.name ?? "it";
+      const what = { build: `build ${name}`, free: `build ${name}`, stage: `raise a wonder stage with ${name}`, sell: `sell ${name} for 3`, dig: `build ${name} from the discards` }[done.kind] ?? "build nothing";
+      return [el("p", { class: "sc-hint sc-done" }, el("strong", {}, "Picked: "), what, ". It happens when everyone has chosen.")];
     }
-    if (s.phase === "dig" && s.digger !== me) return { btns: [], info: [el("p", { class: "sc-hint" }, `${nameOf(s.digger)} is digging through the discards for a card to build free.`)] };
-    if (s.phase === "last" && s.lastSeat !== me) return { btns: [], info: [el("p", { class: "sc-hint" }, `${nameOf(s.lastSeat)}'s wonder plays the seventh card of the age.`)] };
-    if (sel) return { btns: [], info: detailNodes(s, optionsFor(sel.slot), null, null) };
-    return { btns: [], info: [] };
-  }
-
-  function pickNodes(s) {
-    const o = optionsFor(sel.slot);
-    if (!o) return { btns: [], info: [el("p", { class: "sc-hint" }, "That card's face is still on its way…")] };
-    const b = buildPlan(o);
-    const st2 = stagePlan(o);
-    const btns = [
-      btn("sc-build", b.label, () => act("build"), { cls: `primary ${o.build.chain ? "chain" : ""}`, disabled: !b.ok, sub: b.sub, aria: b.ok ? `${b.label} ${o.card.name}: ${b.sub} (B)` : `Can't build ${o.card.name}: ${b.why}` }),
-      o.free && !o.build.chain ? btn("sc-free", "Build free", () => act("free"), { cls: "primary free", sub: "Your wonder's free build this age", aria: `Build ${o.card.name} free with your wonder's free build` }) : null,
-      btn("sc-stage", st2.label, () => act("stage"), { disabled: !st2.ok, sub: st2.sub, aria: st2.ok ? `${st2.label}, tucking ${o.card.name} face down: ${st2.sub} (W)` : `Wonder stage: ${st2.why}` }),
-      btn("sc-sell", "Sell for 3", () => act("sell"), { icon: coinEl(3), aria: `Sell ${o.card.name} face down for 3 coins (S)` }),
-    ].filter(Boolean);
-    return { btns, info: detailNodes(s, o, b, st2) };
-  }
-
-  // The card picked: what it does, what it costs and how you'd pay, or why you can't.
-  function detailNodes(s, o, b, st2) {
-    if (!o) return [];
-    const c = o.card;
-    const from = chainsFrom(c);
-    const lines = [
-      el("div", { class: `sc-detail-head c-${c.color}` }, el("strong", { class: "sc-detail-name" }, c.name), effectEl(c), o.build.chain ? el("span", { class: "sc-badge chain" }, "chain") : null, o.free && !o.build.chain ? el("span", { class: "sc-badge free" }, "free build") : null),
-      el("p", { class: "sc-detail-fx" }, effectWords(c)),
-      el("p", { class: "sc-detail-cost" }, ...(costWords(c.cost) === "free" ? [el("span", { class: "k" }, "Free to build")] : [el("span", { class: "k" }, "Costs"), costEl(c.cost), el("span", {}, costWords(c.cost))]), from.length ? el("small", { class: "sc-chain-from" }, ` · free with ${listOf(from)}`) : null),
-      chainsTo(c).length ? el("p", { class: "sc-chain-to" }, `Makes ${listOf(chainsTo(c))} free later.`) : null,
-    ];
-    if (b) {
-      if (o.build.chain) lines.push(el("p", { class: "sc-detail-pay ok" }, `Free: you have ${listOf(from)}.`));
-      else if (b.ok) {
-        const buy = b.buy && buyWords(b.buy, names());
-        lines.push(el("p", { class: "sc-detail-pay ok" }, buy ? `${buy} for ${plural(b.side.left + b.side.right, "coin")}.` : c.cost.coins ? `Pay ${plural(c.cost.coins, "coin")} to the bank.` : "You make everything it needs."), b.ways > 1 ? btn("sc-other", "Other way to pay", () => ((sel.build += 1), render()), { cls: "small link", aria: `Other way to pay for ${c.name} (${b.ways} ways)` }) : null);
-      } else if (o.free) lines.push(el("p", { class: "sc-detail-pay ok" }, "You can't pay for it, but your wonder's free build can build it."));
-      else lines.push(el("p", { class: "sc-detail-pay no" }, `${whyWords(o.build.why, c)}.`));
-    }
-    if (st2) {
-      const stage = o.stage.stage;
-      if (stage) {
-        const words = st2.ok && st2.buy && buyWords(st2.buy, names());
-        lines.push(el("p", { class: "sc-detail-stage" }, el("span", { class: "k" }, `Stage ${ROMAN[o.stage.n + 1]}`), costEl(stage.cost), el("span", { class: "sc-arrow" }, "→"), effectEl(stage), el("small", {}, ` ${effectWords(stage)}.${st2.ok ? (words ? ` ${words} for ${plural(st2.side.left + st2.side.right, "coin")}.` : "") : ` ${whyWords(o.stage.why)}.`}`)));
-        if (st2.ok && st2.ways > 1) lines.push(btn("sc-other-stage", "Other way to pay", () => ((sel.stage += 1), render()), { cls: "small link", aria: `Other way to pay for the wonder stage (${st2.ways} ways)` }));
-      }
-    }
-    return lines.filter(Boolean);
-  }
-
-  function digNodes(s) {
-    const o = sel ? idOf(sel.slot) : -1;
-    const legal = sel && legalMoves(s, me, faceOf).some((x) => x.dig === sel.slot);
-    const btns = [
-      btn("sc-dig", "Build free", () => act("dig"), { cls: "primary", disabled: !legal, sub: o >= 0 ? CARDS[o].name : "Pick a card", aria: o >= 0 ? `Build ${CARDS[o].name} free from the discards` : "Build free: pick a card first" }),
-      btn("sc-nothing", "Build nothing", () => send({ dig: -1 }, "nothing")),
-    ];
-    const info = o >= 0 ? detailNodes(s, { id: o, card: CARDS[o], build: { chain: false, ok: !!legal, why: legal ? null : "duplicate", purchases: [] }, free: false, stage: {} }, null, null) : [el("p", { class: "sc-hint" }, "Your wonder lets you build one card from the discards, free. Tap one to see it.")];
-    if (o >= 0 && !legal) info.push(el("p", { class: "sc-detail-pay no" }, `You already have ${CARDS[o].name}.`));
-    return { btns, info };
+    if (s.phase === "dig" && s.digger !== me) return [hint(`${nameOf(s.digger)} is digging through the discards for a card to build free.`)];
+    if (s.phase === "last" && s.lastSeat !== me) return [hint(`${nameOf(s.lastSeat)}'s wonder plays the seventh card of the age.`)];
+    if (sel) return detailNodes(optionsFor(sel.slot), null, null, names());
+    return [];
   }
 
   // Who has chosen this turn: everyone's mark, ticked once they've picked (a commitment, public).
   function renderPicks() {
-    const s = match?.state;
     const step = match?.step;
-    const show = !!s && !!step && match.phase === "playing" && !table.pending && step.movers.length > 1;
-    picks.hidden = !show;
-    if (!show) return picks.replaceChildren();
-    picks.replaceChildren(
-      ...step.movers.map((p) => {
-        const done = !!step.commits[p];
-        return el("li", { class: `p-${p} ${done ? "done" : ""}` }, seatMark(p), el("span", { class: "nm" }, nameOf(p)), el("span", { class: "sc-pick-state" }, done ? "✓ picked" : "choosing"), !done && p !== me ? thinkingDots() : null);
-      }),
-    );
+    const show = !!match?.state && !!step && match.phase === "playing" && !table.pending && step.movers.length > 1;
+    picks.draw(show ? step.movers.map((p) => ({ p, name: nameOf(p), done: !!step.commits[p], me: p === me })) : null);
   }
 
   // ---------- a seat's whole city ----------
@@ -1091,11 +772,10 @@ function mountGame(session, root, shell) {
     sheet = null;
     sel = null;
     picked = null;
-    revealing = new Set();
-    leaving = new Set();
-    arriving = new Set();
-    handButtons.forEach((b) => b.remove());
-    handButtons.clear();
+    revealing.clear();
+    leaving.clear();
+    arriving.clear();
+    hand.clear();
     seatDialog.close();
     tuckedAge.clear();
     logList.replaceChildren();
