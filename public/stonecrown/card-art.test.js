@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { cardSvg, cardBack, cardText, resourceIcon, scienceIcon, coinIcon, shieldIcon, pointsIcon, neighbourIcon, stageIcon, defeatIcon, chainIcon, colourIcon, effectIcon } from "./card-art.js";
+import { cardSvg, cardBack, cardText, resourceIcon, scienceIcon, coinIcon, shieldIcon, pointsIcon, neighbourIcon, colourIcon, effectIcon } from "./card-art.js";
 import { CARDS, COLORS, RESOURCES, SYMBOLS } from "./cards.js";
 
 const CSS = readFileSync(new URL("./card-art.css", import.meta.url), "utf8");
@@ -162,9 +162,6 @@ test("the icons are whole svgs in a 24-unit box", () => {
     pointsIcon(7),
     neighbourIcon("left"),
     neighbourIcon("right"),
-    stageIcon(),
-    defeatIcon(),
-    chainIcon(),
     ...COLORS.map((c) => colourIcon(c)),
   ];
   for (const svg of icons) {

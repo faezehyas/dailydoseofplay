@@ -706,7 +706,7 @@ function drawTags({ rows, size }, y) {
     let x = 50 - total / 2;
     for (const t of row) {
       const tw = textWidth(t.text, size), w = tagWidth(t, size);
-      if (t.from) o += P(rr(x, y, w, h, h / 2), "gold") + G(`translate(${pt(x + 1.8 + size * 0.7, y + h / 2)}) scale(${n(size / 16)})`, P(rr(-8.6, -3.2, 9.6, 6.4, 3.2) + rr(-1, -3.2, 9.6, 6.4, 3.2), "ink:1.8")) + T(x + size * 1.45 + 1.8 + tw / 2, y + h * 0.73, size, "ink", t.text);
+      if (t.from) o += P(rr(x, y, w, h, h / 2), "gold") + glyph("link", x + 1.8 + size * 0.7, y + h / 2, size * 1.25) + T(x + size * 1.45 + 1.8 + tw / 2, y + h * 0.73, size, "ink", t.text);
       else o += P(rr(x + 0.35, y + 0.35, w - 0.7, h - 0.7, h / 2 - 0.35), "cream:0.7") + T(x + 2 + tw / 2, y + h * 0.73, size, "cream", t.text) + P(`M${pt(x + w - 2 - size * 0.62, y + h / 2 - size * 0.3)}l${n(size * 0.46)} ${n(size * 0.3)}l${n(-size * 0.46)} ${n(size * 0.3)}Z`, "cream");
       x += w + 2.2;
     }
@@ -774,9 +774,6 @@ export const shieldIcon = () => iconSvg("shield", "shield", glyph("shield", 0, 0
 export const pointsIcon = (v) => iconSvg("points", `${v} point${v === 1 ? "" : "s"}`, pointsAt(v, 0, 0, 20));
 // side "left" (west) or "right" (east): the arrow points at that neighbour.
 export const neighbourIcon = (side) => iconSvg(side, `${side} neighbour`, glyph(side === "left" ? "west" : "east", 0, 0, 20));
-export const stageIcon = () => iconSvg("stage", "wonder stage", glyph("stage", 0, 0, 20));
-export const defeatIcon = () => iconSvg("defeat", "defeat token", defeatAt(0, 0, 20));
-export const chainIcon = () => iconSvg("link", "chain", glyph("link", 0, 0, 20));
 export const colourIcon = (colour) => iconSvg(`card-${colour}`, `${colour} card`, glyph(`card-${colour}`, 0, 0, 20));
 // A card's effect drawn alone, as on its plate: for tips and score sheets.
 export function effectIcon(id) {
