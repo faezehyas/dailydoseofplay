@@ -1,0 +1,910 @@
+/* Stonecrown's card art (card-art.js): the tokens its fill (sc-f-*) and stroke
+   (sc-s-*) classes use, light and dark. A card's class sc-c-<colour> sets its
+   five tones --sc-t0 (sky) to --sc-t4 (deepest). At night the tones sink into
+   an indigo sky and windows (sc-f-win) and lamps light up like lanterns; the
+   cream plates stay paper. Generated from one table: keep the three token
+   blocks in step. */
+:root {
+  --sc-cream: #fff8ea;
+  --sc-trim: #f1dfc0;
+  --sc-ink: #3b2f45;
+  --sc-muted: #6f6378;
+  --sc-shadow: #5a3a3a;
+  --sc-gold: #ffc94a;
+  --sc-gold-dk: #d99a1e;
+  --sc-lamp: #ffd66b;
+  --sc-sun: #fff8ea;
+  --sc-cloud: #fffaf2;
+  --sc-night: transparent;
+  --sc-arrow: #6f6378;
+  --sc-wood: #b97a44;
+  --sc-wood-end: #f1cb93;
+  --sc-wood-ring: #a8703f;
+  --sc-wood-dk: #8a5a32;
+  --sc-leaf: #5fb35d;
+  --sc-stone: #a9aebb;
+  --sc-stone-lt: #d5d9e2;
+  --sc-stone-dk: #7c8291;
+  --sc-stone-line: #6a7080;
+  --sc-clay: #de6a40;
+  --sc-clay-lt: #f6a074;
+  --sc-clay-dk: #a8441f;
+  --sc-ore: #5f6a80;
+  --sc-ore-lt: #9fb0c8;
+  --sc-ore-dk: #3e4658;
+  --sc-glint: #ffffff;
+  --sc-glass: #62c6d0;
+  --sc-glass-dk: #3a9eab;
+  --sc-cork: #c49060;
+  --sc-cloth: #d4507e;
+  --sc-cloth-lt: #f08cae;
+  --sc-cloth-dk: #9c2f58;
+  --sc-papyrus: #efd38a;
+  --sc-papyrus-dk: #c99f45;
+  --sc-papyrus-line: #8a6d34;
+  --sc-sci: #2f8a57;
+  --sc-sci-lt: #7fd09a;
+  --sc-sci-dk: #1d5f3a;
+  --sc-crown: #ffc94a;
+  --sc-crown-dk: #d99a1e;
+  --sc-crown-lt: #fff1b0;
+  --sc-crown-ink: #5e3700;
+  --sc-shield: #ea6b50;
+  --sc-shield-dk: #b8402a;
+  --sc-shield-line: #fff1e6;
+  --sc-coin: #ffcc4a;
+  --sc-coin-dk: #d99a1e;
+  --sc-coin-ink: #5e3700;
+  --sc-defeat: #6b6378;
+  --sc-defeat-lt: #fff8ea;
+  --sc-stage: #2e8994;
+  --sc-stage-lt: #5fb9bd;
+  --sc-stage-dk: #1c5d6a;
+  --sc-card-brown: #9c623a;
+  --sc-card-brown-lt: #e6bd92;
+  --sc-card-grey: #6f7988;
+  --sc-card-grey-lt: #c9ced7;
+  --sc-card-blue: #3c78c3;
+  --sc-card-blue-lt: #a9cff3;
+  --sc-card-yellow: #c98712;
+  --sc-card-yellow-lt: #ffdf86;
+  --sc-card-red: #c4432f;
+  --sc-card-red-lt: #f7a78f;
+  --sc-card-green: #3d9350;
+  --sc-card-green-lt: #abdca2;
+  --sc-card-purple: #7a52b8;
+  --sc-card-purple-lt: #d0b3f0;
+  --sc-brown-0: #f7e4cf;
+  --sc-brown-1: #e6bd92;
+  --sc-brown-2: #c98e5c;
+  --sc-brown-3: #9c623a;
+  --sc-brown-4: #6e3f22;
+  --sc-grey-0: #eceef2;
+  --sc-grey-1: #c9ced7;
+  --sc-grey-2: #9ea7b4;
+  --sc-grey-3: #6f7988;
+  --sc-grey-4: #495260;
+  --sc-blue-0: #ddedfb;
+  --sc-blue-1: #a9cff3;
+  --sc-blue-2: #6ea8e2;
+  --sc-blue-3: #3c78c3;
+  --sc-blue-4: #244f8e;
+  --sc-yellow-0: #fff3cf;
+  --sc-yellow-1: #ffdf86;
+  --sc-yellow-2: #f6c142;
+  --sc-yellow-3: #c98712;
+  --sc-yellow-4: #7f5104;
+  --sc-red-0: #fde1d7;
+  --sc-red-1: #f7a78f;
+  --sc-red-2: #ea6b50;
+  --sc-red-3: #c4432f;
+  --sc-red-4: #8c2a1c;
+  --sc-green-0: #e3f4dd;
+  --sc-green-1: #abdca2;
+  --sc-green-2: #6dbf6b;
+  --sc-green-3: #3d9350;
+  --sc-green-4: #246937;
+  --sc-purple-0: #f0e3fb;
+  --sc-purple-1: #d0b3f0;
+  --sc-purple-2: #a680da;
+  --sc-purple-3: #7a52b8;
+  --sc-purple-4: #513386;
+  --sc-back1-0: #ffd9c2;
+  --sc-back1-1: #f29a74;
+  --sc-back1-2: #d9643f;
+  --sc-back1-3: #b04528;
+  --sc-back1-4: #7e2c18;
+  --sc-back2-0: #d2efe9;
+  --sc-back2-1: #8fd0c6;
+  --sc-back2-2: #3fa59c;
+  --sc-back2-3: #2a7a76;
+  --sc-back2-4: #184f50;
+  --sc-back3-0: #e6dcf7;
+  --sc-back3-1: #b29ae0;
+  --sc-back3-2: #7c5cc0;
+  --sc-back3-3: #553b94;
+  --sc-back3-4: #35226a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --sc-cream: #fff4dc;
+    --sc-trim: #e9d3ad;
+    --sc-ink: #3b2f45;
+    --sc-muted: #6f6378;
+    --sc-shadow: #000000;
+    --sc-gold: #ffc94a;
+    --sc-gold-dk: #d99a1e;
+    --sc-lamp: #ffcf5c;
+    --sc-sun: #fff1cc;
+    --sc-cloud: #e9e4ff;
+    --sc-night: #ffe7a3;
+    --sc-arrow: #6f6378;
+    --sc-wood: #b97a44;
+    --sc-wood-end: #f1cb93;
+    --sc-wood-ring: #a8703f;
+    --sc-wood-dk: #8a5a32;
+    --sc-leaf: #5fb35d;
+    --sc-stone: #a9aebb;
+    --sc-stone-lt: #d5d9e2;
+    --sc-stone-dk: #7c8291;
+    --sc-stone-line: #6a7080;
+    --sc-clay: #de6a40;
+    --sc-clay-lt: #f6a074;
+    --sc-clay-dk: #a8441f;
+    --sc-ore: #5f6a80;
+    --sc-ore-lt: #9fb0c8;
+    --sc-ore-dk: #3e4658;
+    --sc-glint: #ffffff;
+    --sc-glass: #62c6d0;
+    --sc-glass-dk: #3a9eab;
+    --sc-cork: #c49060;
+    --sc-cloth: #d4507e;
+    --sc-cloth-lt: #f08cae;
+    --sc-cloth-dk: #9c2f58;
+    --sc-papyrus: #efd38a;
+    --sc-papyrus-dk: #c99f45;
+    --sc-papyrus-line: #8a6d34;
+    --sc-sci: #2f8a57;
+    --sc-sci-lt: #7fd09a;
+    --sc-sci-dk: #1d5f3a;
+    --sc-crown: #ffc94a;
+    --sc-crown-dk: #d99a1e;
+    --sc-crown-lt: #fff1b0;
+    --sc-crown-ink: #5e3700;
+    --sc-shield: #ea6b50;
+    --sc-shield-dk: #b8402a;
+    --sc-shield-line: #fff1e6;
+    --sc-coin: #ffcc4a;
+    --sc-coin-dk: #d99a1e;
+    --sc-coin-ink: #5e3700;
+    --sc-defeat: #6b6378;
+    --sc-defeat-lt: #fff8ea;
+    --sc-stage: #2e8994;
+    --sc-stage-lt: #5fb9bd;
+    --sc-stage-dk: #1c5d6a;
+    --sc-card-brown: #9c623a;
+    --sc-card-brown-lt: #e6bd92;
+    --sc-card-grey: #6f7988;
+    --sc-card-grey-lt: #c9ced7;
+    --sc-card-blue: #3c78c3;
+    --sc-card-blue-lt: #a9cff3;
+    --sc-card-yellow: #c98712;
+    --sc-card-yellow-lt: #ffdf86;
+    --sc-card-red: #c4432f;
+    --sc-card-red-lt: #f7a78f;
+    --sc-card-green: #3d9350;
+    --sc-card-green-lt: #abdca2;
+    --sc-card-purple: #7a52b8;
+    --sc-card-purple-lt: #d0b3f0;
+    --sc-brown-0: #585267;
+    --sc-brown-1: #6c5b5f;
+    --sc-brown-2: #72534c;
+    --sc-brown-3: #66433a;
+    --sc-brown-4: #4e302b;
+    --sc-grey-0: #555571;
+    --sc-grey-1: #60627c;
+    --sc-grey-2: #5c6079;
+    --sc-grey-3: #4b5169;
+    --sc-grey-4: #363c52;
+    --sc-blue-0: #505574;
+    --sc-blue-1: #536388;
+    --sc-blue-2: #436191;
+    --sc-blue-3: #2c508c;
+    --sc-blue-4: #1e3a70;
+    --sc-yellow-0: #5b5767;
+    --sc-yellow-1: #77695a;
+    --sc-yellow-2: #8a6e3e;
+    --sc-yellow-3: #815922;
+    --sc-yellow-4: #583b17;
+    --sc-red-0: #5a5269;
+    --sc-red-1: #73525e;
+    --sc-red-2: #834145;
+    --sc-red-3: #7e3033;
+    --sc-red-4: #612227;
+    --sc-green-0: #52576b;
+    --sc-green-1: #536866;
+    --sc-green-2: #426d53;
+    --sc-green-3: #2d6047;
+    --sc-green-4: #1e4a38;
+    --sc-purple-0: #565274;
+    --sc-purple-1: #635786;
+    --sc-purple-2: #604c8d;
+    --sc-purple-3: #513986;
+    --sc-purple-4: #3b286b;
+    --sc-back1-0: #5b4f63;
+    --sc-back1-1: #714c52;
+    --sc-back1-2: #7a3e3d;
+    --sc-back1-3: #72312f;
+    --sc-back1-4: #582324;
+    --sc-back2-0: #4d566f;
+    --sc-back2-1: #486375;
+    --sc-back2-2: #2a5f6d;
+    --sc-back2-3: #21515e;
+    --sc-back2-4: #173a48;
+    --sc-back3-0: #535073;
+    --sc-back3-1: #564c80;
+    --sc-back3-2: #4a3980;
+    --sc-back3-3: #3b2b70;
+    --sc-back3-4: #291d59;
+  }
+}
+
+:root[data-theme="dark"] {
+  --sc-cream: #fff4dc;
+  --sc-trim: #e9d3ad;
+  --sc-ink: #3b2f45;
+  --sc-muted: #6f6378;
+  --sc-shadow: #000000;
+  --sc-gold: #ffc94a;
+  --sc-gold-dk: #d99a1e;
+  --sc-lamp: #ffcf5c;
+  --sc-sun: #fff1cc;
+  --sc-cloud: #e9e4ff;
+  --sc-night: #ffe7a3;
+  --sc-arrow: #6f6378;
+  --sc-wood: #b97a44;
+  --sc-wood-end: #f1cb93;
+  --sc-wood-ring: #a8703f;
+  --sc-wood-dk: #8a5a32;
+  --sc-leaf: #5fb35d;
+  --sc-stone: #a9aebb;
+  --sc-stone-lt: #d5d9e2;
+  --sc-stone-dk: #7c8291;
+  --sc-stone-line: #6a7080;
+  --sc-clay: #de6a40;
+  --sc-clay-lt: #f6a074;
+  --sc-clay-dk: #a8441f;
+  --sc-ore: #5f6a80;
+  --sc-ore-lt: #9fb0c8;
+  --sc-ore-dk: #3e4658;
+  --sc-glint: #ffffff;
+  --sc-glass: #62c6d0;
+  --sc-glass-dk: #3a9eab;
+  --sc-cork: #c49060;
+  --sc-cloth: #d4507e;
+  --sc-cloth-lt: #f08cae;
+  --sc-cloth-dk: #9c2f58;
+  --sc-papyrus: #efd38a;
+  --sc-papyrus-dk: #c99f45;
+  --sc-papyrus-line: #8a6d34;
+  --sc-sci: #2f8a57;
+  --sc-sci-lt: #7fd09a;
+  --sc-sci-dk: #1d5f3a;
+  --sc-crown: #ffc94a;
+  --sc-crown-dk: #d99a1e;
+  --sc-crown-lt: #fff1b0;
+  --sc-crown-ink: #5e3700;
+  --sc-shield: #ea6b50;
+  --sc-shield-dk: #b8402a;
+  --sc-shield-line: #fff1e6;
+  --sc-coin: #ffcc4a;
+  --sc-coin-dk: #d99a1e;
+  --sc-coin-ink: #5e3700;
+  --sc-defeat: #6b6378;
+  --sc-defeat-lt: #fff8ea;
+  --sc-stage: #2e8994;
+  --sc-stage-lt: #5fb9bd;
+  --sc-stage-dk: #1c5d6a;
+  --sc-card-brown: #9c623a;
+  --sc-card-brown-lt: #e6bd92;
+  --sc-card-grey: #6f7988;
+  --sc-card-grey-lt: #c9ced7;
+  --sc-card-blue: #3c78c3;
+  --sc-card-blue-lt: #a9cff3;
+  --sc-card-yellow: #c98712;
+  --sc-card-yellow-lt: #ffdf86;
+  --sc-card-red: #c4432f;
+  --sc-card-red-lt: #f7a78f;
+  --sc-card-green: #3d9350;
+  --sc-card-green-lt: #abdca2;
+  --sc-card-purple: #7a52b8;
+  --sc-card-purple-lt: #d0b3f0;
+  --sc-brown-0: #585267;
+  --sc-brown-1: #6c5b5f;
+  --sc-brown-2: #72534c;
+  --sc-brown-3: #66433a;
+  --sc-brown-4: #4e302b;
+  --sc-grey-0: #555571;
+  --sc-grey-1: #60627c;
+  --sc-grey-2: #5c6079;
+  --sc-grey-3: #4b5169;
+  --sc-grey-4: #363c52;
+  --sc-blue-0: #505574;
+  --sc-blue-1: #536388;
+  --sc-blue-2: #436191;
+  --sc-blue-3: #2c508c;
+  --sc-blue-4: #1e3a70;
+  --sc-yellow-0: #5b5767;
+  --sc-yellow-1: #77695a;
+  --sc-yellow-2: #8a6e3e;
+  --sc-yellow-3: #815922;
+  --sc-yellow-4: #583b17;
+  --sc-red-0: #5a5269;
+  --sc-red-1: #73525e;
+  --sc-red-2: #834145;
+  --sc-red-3: #7e3033;
+  --sc-red-4: #612227;
+  --sc-green-0: #52576b;
+  --sc-green-1: #536866;
+  --sc-green-2: #426d53;
+  --sc-green-3: #2d6047;
+  --sc-green-4: #1e4a38;
+  --sc-purple-0: #565274;
+  --sc-purple-1: #635786;
+  --sc-purple-2: #604c8d;
+  --sc-purple-3: #513986;
+  --sc-purple-4: #3b286b;
+  --sc-back1-0: #5b4f63;
+  --sc-back1-1: #714c52;
+  --sc-back1-2: #7a3e3d;
+  --sc-back1-3: #72312f;
+  --sc-back1-4: #582324;
+  --sc-back2-0: #4d566f;
+  --sc-back2-1: #486375;
+  --sc-back2-2: #2a5f6d;
+  --sc-back2-3: #21515e;
+  --sc-back2-4: #173a48;
+  --sc-back3-0: #535073;
+  --sc-back3-1: #564c80;
+  --sc-back3-2: #4a3980;
+  --sc-back3-3: #3b2b70;
+  --sc-back3-4: #291d59;
+}
+
+.sc-card,
+.sc-icon {
+  display: block;
+  overflow: hidden;
+}
+
+/* The corners: the art is square, so a card shows any number of times with no
+   clip-path ids. */
+.sc-card {
+  border-radius: 9% / 6.43%;
+}
+
+.sc-card *,
+.sc-icon * {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sc-card text,
+.sc-icon text {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.sc-bold {
+  font-weight: 700;
+}
+
+.sc-c-brown {
+  --sc-t0: var(--sc-brown-0);
+  --sc-t1: var(--sc-brown-1);
+  --sc-t2: var(--sc-brown-2);
+  --sc-t3: var(--sc-brown-3);
+  --sc-t4: var(--sc-brown-4);
+}
+
+.sc-c-grey {
+  --sc-t0: var(--sc-grey-0);
+  --sc-t1: var(--sc-grey-1);
+  --sc-t2: var(--sc-grey-2);
+  --sc-t3: var(--sc-grey-3);
+  --sc-t4: var(--sc-grey-4);
+}
+
+.sc-c-blue {
+  --sc-t0: var(--sc-blue-0);
+  --sc-t1: var(--sc-blue-1);
+  --sc-t2: var(--sc-blue-2);
+  --sc-t3: var(--sc-blue-3);
+  --sc-t4: var(--sc-blue-4);
+}
+
+.sc-c-yellow {
+  --sc-t0: var(--sc-yellow-0);
+  --sc-t1: var(--sc-yellow-1);
+  --sc-t2: var(--sc-yellow-2);
+  --sc-t3: var(--sc-yellow-3);
+  --sc-t4: var(--sc-yellow-4);
+}
+
+.sc-c-red {
+  --sc-t0: var(--sc-red-0);
+  --sc-t1: var(--sc-red-1);
+  --sc-t2: var(--sc-red-2);
+  --sc-t3: var(--sc-red-3);
+  --sc-t4: var(--sc-red-4);
+}
+
+.sc-c-green {
+  --sc-t0: var(--sc-green-0);
+  --sc-t1: var(--sc-green-1);
+  --sc-t2: var(--sc-green-2);
+  --sc-t3: var(--sc-green-3);
+  --sc-t4: var(--sc-green-4);
+}
+
+.sc-c-purple {
+  --sc-t0: var(--sc-purple-0);
+  --sc-t1: var(--sc-purple-1);
+  --sc-t2: var(--sc-purple-2);
+  --sc-t3: var(--sc-purple-3);
+  --sc-t4: var(--sc-purple-4);
+}
+
+.sc-c-back1 {
+  --sc-t0: var(--sc-back1-0);
+  --sc-t1: var(--sc-back1-1);
+  --sc-t2: var(--sc-back1-2);
+  --sc-t3: var(--sc-back1-3);
+  --sc-t4: var(--sc-back1-4);
+}
+
+.sc-c-back2 {
+  --sc-t0: var(--sc-back2-0);
+  --sc-t1: var(--sc-back2-1);
+  --sc-t2: var(--sc-back2-2);
+  --sc-t3: var(--sc-back2-3);
+  --sc-t4: var(--sc-back2-4);
+}
+
+.sc-c-back3 {
+  --sc-t0: var(--sc-back3-0);
+  --sc-t1: var(--sc-back3-1);
+  --sc-t2: var(--sc-back3-2);
+  --sc-t3: var(--sc-back3-3);
+  --sc-t4: var(--sc-back3-4);
+}
+
+.sc-f-cream {
+  fill: var(--sc-cream);
+}
+
+.sc-f-trim {
+  fill: var(--sc-trim);
+}
+
+.sc-f-ink {
+  fill: var(--sc-ink);
+}
+
+.sc-f-muted {
+  fill: var(--sc-muted);
+}
+
+.sc-f-shadow {
+  fill: var(--sc-shadow);
+}
+
+.sc-f-gold {
+  fill: var(--sc-gold);
+}
+
+.sc-f-gold-dk {
+  fill: var(--sc-gold-dk);
+}
+
+.sc-f-lamp {
+  fill: var(--sc-lamp);
+}
+
+.sc-f-sun {
+  fill: var(--sc-sun);
+}
+
+.sc-f-cloud {
+  fill: var(--sc-cloud);
+}
+
+.sc-f-night {
+  fill: var(--sc-night);
+}
+
+.sc-f-arrow {
+  fill: var(--sc-arrow);
+}
+
+.sc-f-wood {
+  fill: var(--sc-wood);
+}
+
+.sc-f-wood-end {
+  fill: var(--sc-wood-end);
+}
+
+.sc-f-wood-ring {
+  fill: var(--sc-wood-ring);
+}
+
+.sc-f-wood-dk {
+  fill: var(--sc-wood-dk);
+}
+
+.sc-f-leaf {
+  fill: var(--sc-leaf);
+}
+
+.sc-f-stone {
+  fill: var(--sc-stone);
+}
+
+.sc-f-stone-lt {
+  fill: var(--sc-stone-lt);
+}
+
+.sc-f-stone-dk {
+  fill: var(--sc-stone-dk);
+}
+
+.sc-f-stone-line {
+  fill: var(--sc-stone-line);
+}
+
+.sc-f-clay {
+  fill: var(--sc-clay);
+}
+
+.sc-f-clay-lt {
+  fill: var(--sc-clay-lt);
+}
+
+.sc-f-clay-dk {
+  fill: var(--sc-clay-dk);
+}
+
+.sc-f-ore {
+  fill: var(--sc-ore);
+}
+
+.sc-f-ore-lt {
+  fill: var(--sc-ore-lt);
+}
+
+.sc-f-ore-dk {
+  fill: var(--sc-ore-dk);
+}
+
+.sc-f-glint {
+  fill: var(--sc-glint);
+}
+
+.sc-f-glass {
+  fill: var(--sc-glass);
+}
+
+.sc-f-glass-dk {
+  fill: var(--sc-glass-dk);
+}
+
+.sc-f-cork {
+  fill: var(--sc-cork);
+}
+
+.sc-f-cloth {
+  fill: var(--sc-cloth);
+}
+
+.sc-f-cloth-lt {
+  fill: var(--sc-cloth-lt);
+}
+
+.sc-f-cloth-dk {
+  fill: var(--sc-cloth-dk);
+}
+
+.sc-f-papyrus {
+  fill: var(--sc-papyrus);
+}
+
+.sc-f-papyrus-dk {
+  fill: var(--sc-papyrus-dk);
+}
+
+.sc-f-papyrus-line {
+  fill: var(--sc-papyrus-line);
+}
+
+.sc-f-sci {
+  fill: var(--sc-sci);
+}
+
+.sc-f-sci-lt {
+  fill: var(--sc-sci-lt);
+}
+
+.sc-f-sci-dk {
+  fill: var(--sc-sci-dk);
+}
+
+.sc-f-crown {
+  fill: var(--sc-crown);
+}
+
+.sc-f-crown-dk {
+  fill: var(--sc-crown-dk);
+}
+
+.sc-f-crown-lt {
+  fill: var(--sc-crown-lt);
+}
+
+.sc-f-crown-ink {
+  fill: var(--sc-crown-ink);
+}
+
+.sc-f-shield {
+  fill: var(--sc-shield);
+}
+
+.sc-f-shield-dk {
+  fill: var(--sc-shield-dk);
+}
+
+.sc-f-shield-line {
+  fill: var(--sc-shield-line);
+}
+
+.sc-f-coin {
+  fill: var(--sc-coin);
+}
+
+.sc-f-coin-dk {
+  fill: var(--sc-coin-dk);
+}
+
+.sc-f-coin-ink {
+  fill: var(--sc-coin-ink);
+}
+
+.sc-f-defeat {
+  fill: var(--sc-defeat);
+}
+
+.sc-f-defeat-lt {
+  fill: var(--sc-defeat-lt);
+}
+
+.sc-f-stage {
+  fill: var(--sc-stage);
+}
+
+.sc-f-stage-lt {
+  fill: var(--sc-stage-lt);
+}
+
+.sc-f-stage-dk {
+  fill: var(--sc-stage-dk);
+}
+
+.sc-f-card-brown {
+  fill: var(--sc-card-brown);
+}
+
+.sc-f-card-brown-lt {
+  fill: var(--sc-card-brown-lt);
+}
+
+.sc-f-card-grey {
+  fill: var(--sc-card-grey);
+}
+
+.sc-f-card-grey-lt {
+  fill: var(--sc-card-grey-lt);
+}
+
+.sc-f-card-blue {
+  fill: var(--sc-card-blue);
+}
+
+.sc-f-card-blue-lt {
+  fill: var(--sc-card-blue-lt);
+}
+
+.sc-f-card-yellow {
+  fill: var(--sc-card-yellow);
+}
+
+.sc-f-card-yellow-lt {
+  fill: var(--sc-card-yellow-lt);
+}
+
+.sc-f-card-red {
+  fill: var(--sc-card-red);
+}
+
+.sc-f-card-red-lt {
+  fill: var(--sc-card-red-lt);
+}
+
+.sc-f-card-green {
+  fill: var(--sc-card-green);
+}
+
+.sc-f-card-green-lt {
+  fill: var(--sc-card-green-lt);
+}
+
+.sc-f-card-purple {
+  fill: var(--sc-card-purple);
+}
+
+.sc-f-card-purple-lt {
+  fill: var(--sc-card-purple-lt);
+}
+
+.sc-f-t0 {
+  fill: var(--sc-t0);
+}
+
+.sc-f-t1 {
+  fill: var(--sc-t1);
+}
+
+.sc-f-t2 {
+  fill: var(--sc-t2);
+}
+
+.sc-f-t3 {
+  fill: var(--sc-t3);
+}
+
+.sc-f-t4 {
+  fill: var(--sc-t4);
+}
+
+.sc-f-win {
+  fill: var(--sc-t4);
+}
+
+.sc-s-cream {
+  stroke: var(--sc-cream);
+}
+
+.sc-s-trim {
+  stroke: var(--sc-trim);
+}
+
+.sc-s-ink {
+  stroke: var(--sc-ink);
+}
+
+.sc-s-muted {
+  stroke: var(--sc-muted);
+}
+
+.sc-s-t4 {
+  stroke: var(--sc-t4);
+}
+
+.sc-s-t3 {
+  stroke: var(--sc-t3);
+}
+
+.sc-s-gold {
+  stroke: var(--sc-gold);
+}
+
+.sc-s-arrow {
+  stroke: var(--sc-arrow);
+}
+
+.sc-s-wood-ring {
+  stroke: var(--sc-wood-ring);
+}
+
+.sc-s-wood-dk {
+  stroke: var(--sc-wood-dk);
+}
+
+.sc-s-stone-dk {
+  stroke: var(--sc-stone-dk);
+}
+
+.sc-s-stone-line {
+  stroke: var(--sc-stone-line);
+}
+
+.sc-s-gold-dk {
+  stroke: var(--sc-gold-dk);
+}
+
+.sc-s-papyrus-line {
+  stroke: var(--sc-papyrus-line);
+}
+
+.sc-s-glint {
+  stroke: var(--sc-glint);
+}
+
+.sc-s-sci-dk {
+  stroke: var(--sc-sci-dk);
+}
+
+.sc-s-shield-line {
+  stroke: var(--sc-shield-line);
+}
+
+.sc-s-coin-dk {
+  stroke: var(--sc-coin-dk);
+}
+
+.sc-s-stage-dk {
+  stroke: var(--sc-stage-dk);
+}
+
+.sc-s-lamp {
+  stroke: var(--sc-lamp);
+}
+
+/* Night: every window and lamp glows. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .sc-f-win {
+    fill: var(--sc-lamp);
+    stroke: var(--sc-lamp);
+    stroke-width: 2.4px;
+    stroke-opacity: 0.32;
+  }
+
+  :root:not([data-theme="light"]) .sc-f-lamp {
+    stroke: var(--sc-lamp);
+    stroke-width: 3px;
+    stroke-opacity: 0.3;
+  }
+
+  :root:not([data-theme="light"]) .sc-f-sun {
+    stroke: var(--sc-lamp);
+    stroke-width: 5px;
+    stroke-opacity: 0.16;
+  }
+
+  :root:not([data-theme="light"]) .sc-f-cloud {
+    fill-opacity: 0.22;
+  }
+}
+
+:root[data-theme="dark"] .sc-f-win {
+  fill: var(--sc-lamp);
+  stroke: var(--sc-lamp);
+  stroke-width: 2.4px;
+  stroke-opacity: 0.32;
+}
+
+:root[data-theme="dark"] .sc-f-lamp {
+  stroke: var(--sc-lamp);
+  stroke-width: 3px;
+  stroke-opacity: 0.3;
+}
+
+:root[data-theme="dark"] .sc-f-sun {
+  stroke: var(--sc-lamp);
+  stroke-width: 5px;
+  stroke-opacity: 0.16;
+}
+
+:root[data-theme="dark"] .sc-f-cloud {
+  fill-opacity: 0.22;
+}

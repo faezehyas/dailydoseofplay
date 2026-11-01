@@ -1,0 +1,1931 @@
+/* Stonecrown view. Shared tokens come from /engine/theme.css and the card
+   table's (seat colours, status, log, fly layer) from /engine/cards/cards.css;
+   the cards' and wonders' art from card-art.css and pieces.css. Here: the
+   page's layout (your neighbours either side of your wonder and city, your
+   hand under them; stacked on a phone), the top bar, the panels, your hand
+   and what a card in it can do, the city chips, the war, the score sheet and
+   the city dialog. Paper Lantern: layered cut paper with soft offset
+   shadows, cream labels and punched dots; at night an indigo sky where every
+   window glows. */
+.stonecrown {
+  --sc-table: #f6ebdb;
+  --sc-hill-1: #f0d6c0;
+  --sc-hill-2: #e8c3ad;
+  --sc-hill-3: #dcae9c;
+  --sc-paper: #fffaf0;
+  --sc-paper-2: #f1dfc4;
+  --sc-ink: #3b2f45;
+  --sc-muted: #6f6378;
+  --sc-rule: #ecdcc6;
+  --sc-shadow: 90 58 58; /* paper shadows, as rgb parts */
+  --sc-gold: #ffc94a;
+  --sc-gold-dk: #d99a1e;
+  --sc-gold-ink: #6b4a00;
+  --sc-lamp: #ffd66b;
+  --sc-sel: #ffc94a;
+  --sc-dot: rgb(90 58 58 / 16%);
+  --sc-brown: #9c623a;
+  --sc-brown-lt: #f7e4cf;
+  --sc-brown-ink: #6e3f22;
+  --sc-grey: #6f7988;
+  --sc-grey-lt: #eceef2;
+  --sc-grey-ink: #495260;
+  --sc-blue: #3c78c3;
+  --sc-blue-lt: #ddedfb;
+  --sc-blue-ink: #244f8e;
+  --sc-yellow: #d08e16;
+  --sc-yellow-lt: #fff3cf;
+  --sc-yellow-ink: #7a4d03;
+  --sc-red: #c4432f;
+  --sc-red-lt: #fde1d7;
+  --sc-red-ink: #8c2a1c;
+  --sc-green: #3d9350;
+  --sc-green-lt: #e3f4dd;
+  --sc-green-ink: #246937;
+  --sc-purple: #7a52b8;
+  --sc-purple-lt: #f0e3fb;
+  --sc-purple-ink: #513386;
+  --sc-cw: 78px; /* a card in your hand */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  position: relative;
+  color: var(--sc-ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .stonecrown {
+    --sc-table: #17163a;
+    --sc-hill-1: #221f4e;
+    --sc-hill-2: #2b2760;
+    --sc-hill-3: #36306f;
+    --sc-paper: #2e2b5a;
+    --sc-paper-2: #221f48;
+    --sc-ink: #f3ebff;
+    --sc-muted: #c3b8da;
+    --sc-rule: #3d3972;
+    --sc-shadow: 0 0 0;
+    --sc-gold: #ffcf5c;
+    --sc-gold-dk: #e0a62e;
+    --sc-gold-ink: #ffe29a;
+    --sc-lamp: #ffcf5c;
+    --sc-sel: #ffcf5c;
+    --sc-dot: rgb(255 240 210 / 12%);
+    --sc-brown: #b77a4d;
+    --sc-brown-lt: #3a2c3c;
+    --sc-brown-ink: #f1c9a6;
+    --sc-grey: #8b95a6;
+    --sc-grey-lt: #33354e;
+    --sc-grey-ink: #d6dbe4;
+    --sc-blue: #5a92dd;
+    --sc-blue-lt: #26305e;
+    --sc-blue-ink: #bcd9fb;
+    --sc-yellow: #e0a52e;
+    --sc-yellow-lt: #3d3540;
+    --sc-yellow-ink: #ffe29a;
+    --sc-red: #e0614a;
+    --sc-red-lt: #3e2847;
+    --sc-red-ink: #ffc2b2;
+    --sc-green: #57ad67;
+    --sc-green-lt: #243b46;
+    --sc-green-ink: #bfe9b8;
+    --sc-purple: #9b74d6;
+    --sc-purple-lt: #34285e;
+    --sc-purple-ink: #dccaf6;
+  }
+}
+
+:root[data-theme="dark"] .stonecrown {
+  --sc-table: #17163a;
+  --sc-hill-1: #221f4e;
+  --sc-hill-2: #2b2760;
+  --sc-hill-3: #36306f;
+  --sc-paper: #2e2b5a;
+  --sc-paper-2: #221f48;
+  --sc-ink: #f3ebff;
+  --sc-muted: #c3b8da;
+  --sc-rule: #3d3972;
+  --sc-shadow: 0 0 0;
+  --sc-gold: #ffcf5c;
+  --sc-gold-dk: #e0a62e;
+  --sc-gold-ink: #ffe29a;
+  --sc-lamp: #ffcf5c;
+  --sc-sel: #ffcf5c;
+  --sc-dot: rgb(255 240 210 / 12%);
+  --sc-brown: #b77a4d;
+  --sc-brown-lt: #3a2c3c;
+  --sc-brown-ink: #f1c9a6;
+  --sc-grey: #8b95a6;
+  --sc-grey-lt: #33354e;
+  --sc-grey-ink: #d6dbe4;
+  --sc-blue: #5a92dd;
+  --sc-blue-lt: #26305e;
+  --sc-blue-ink: #bcd9fb;
+  --sc-yellow: #e0a52e;
+  --sc-yellow-lt: #3d3540;
+  --sc-yellow-ink: #ffe29a;
+  --sc-red: #e0614a;
+  --sc-red-lt: #3e2847;
+  --sc-red-ink: #ffc2b2;
+  --sc-green: #57ad67;
+  --sc-green-lt: #243b46;
+  --sc-green-ink: #bfe9b8;
+  --sc-purple: #9b74d6;
+  --sc-purple-lt: #34285e;
+  --sc-purple-ink: #dccaf6;
+}
+
+/* Each colour's fill, tint and ink for whatever carries .c-<colour>. */
+.stonecrown .c-brown { --k: var(--sc-brown); --k-lt: var(--sc-brown-lt); --k-ink: var(--sc-brown-ink); }
+.stonecrown .c-grey { --k: var(--sc-grey); --k-lt: var(--sc-grey-lt); --k-ink: var(--sc-grey-ink); }
+.stonecrown .c-blue { --k: var(--sc-blue); --k-lt: var(--sc-blue-lt); --k-ink: var(--sc-blue-ink); }
+.stonecrown .c-yellow { --k: var(--sc-yellow); --k-lt: var(--sc-yellow-lt); --k-ink: var(--sc-yellow-ink); }
+.stonecrown .c-red { --k: var(--sc-red); --k-lt: var(--sc-red-lt); --k-ink: var(--sc-red-ink); }
+.stonecrown .c-green { --k: var(--sc-green); --k-lt: var(--sc-green-lt); --k-ink: var(--sc-green-ink); }
+.stonecrown .c-purple { --k: var(--sc-purple); --k-lt: var(--sc-purple-lt); --k-ink: var(--sc-purple-ink); }
+
+/* The table itself, behind everything (pieces.js's tableSvg). */
+.sc-table-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* A panel of paper: cream, a soft offset shadow below, no outline. */
+.sc-paper,
+.sc-top,
+.sc-seat,
+.sc-mine,
+.sc-hand-area,
+.sc-log-box {
+  background: var(--sc-paper);
+  border-radius: 18px;
+  box-shadow: 0 1.5px 0 rgb(var(--sc-shadow) / 10%), 0 4px 0 rgb(var(--sc-shadow) / 6%), 0 10px 22px rgb(var(--sc-shadow) / 10%);
+}
+
+.sc-title {
+  margin: 0;
+  font: 600 1rem var(--font-display);
+  color: var(--sc-ink);
+}
+
+.sc-label {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--sc-muted);
+}
+
+/* ---------- the top bar ---------- */
+.sc-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  min-height: 52px;
+}
+
+.sc-top-age {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sc-age-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: #2a7a76;
+  color: #fff8ea;
+  font: 700 0.95rem var(--font-display);
+  box-shadow: 0 2px 0 rgb(var(--sc-shadow) / 18%);
+}
+
+.stonecrown[data-age="1"] .sc-age-badge { background: #b04528; }
+.stonecrown[data-age="3"] .sc-age-badge { background: #553b94; }
+
+.sc-top-words {
+  display: grid;
+  line-height: 1.1;
+}
+
+.sc-age {
+  font: 600 1.05rem var(--font-display);
+}
+
+.sc-turn-line {
+  color: var(--sc-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.sc-pass {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline: auto;
+  color: var(--sc-muted);
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.sc-pass-arrow {
+  width: 18px;
+  height: 12px;
+  background: currentColor;
+  clip-path: polygon(0 50%, 45% 0, 45% 30%, 100% 30%, 100% 70%, 45% 70%, 45% 100%);
+}
+
+.sc-pass-arrow.right {
+  transform: scaleX(-1);
+}
+
+/* A phone has no room for the pass direction up here (the hand's heading says
+   it), nor for the neighbours' wonders by name (their labels and cities say it). */
+@media (max-width: 480px) {
+  .sc-seat-wonder {
+    display: none;
+  }
+
+  .sc-top .sc-pass {
+    display: none;
+  }
+
+  .sc-top-age {
+    margin-right: auto;
+  }
+
+  .sc-across-stats .sc-ic.coin {
+    display: none;
+  }
+
+  .sc-act .sc-ic.coin {
+    display: none;
+  }
+}
+
+.sc-across-pill {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 4px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sc-paper-2);
+  color: var(--sc-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sc-across-words {
+  display: grid;
+  line-height: 1;
+  text-align: left;
+}
+
+.sc-across-words b {
+  max-width: 5.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-ink);
+  font: 600 0.9rem var(--font-display);
+}
+
+.sc-across-words small {
+  color: var(--sc-muted);
+  font-size: 0.7rem;
+}
+
+.sc-across-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.sc-across-stats .sc-sh::before {
+  content: "";
+  display: inline-block;
+  width: 11px;
+  height: 13px;
+  margin-right: 2px;
+  vertical-align: -2px;
+  background: var(--sc-red);
+  clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%);
+}
+
+.sc-pile {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  flex: none;
+}
+
+.sc-pile .sc-cardbox {
+  width: 26px;
+  transform: rotate(-6deg);
+  box-shadow: 2px 2px 0 rgb(var(--sc-shadow) / 18%);
+}
+
+/* Someone is digging through it: the pile rummages. */
+@media (prefers-reduced-motion: no-preference) {
+  .sc-pile.dig .sc-cardbox {
+    animation: sc-rummage 0.9s var(--ease-out) infinite;
+  }
+}
+
+@keyframes sc-rummage {
+  0%, 100% { transform: rotate(-6deg); }
+  25% { transform: rotate(8deg) translate(2px, -3px); }
+  50% { transform: rotate(-12deg) translate(-2px, -1px); }
+  75% { transform: rotate(4deg) translate(1px, -4px); }
+}
+
+.sc-pile.empty .sc-cardbox {
+  opacity: 0.35;
+}
+
+.sc-pile b {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  min-width: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--sc-ink);
+  color: var(--sc-paper);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+/* The bank: a little pile of coins that sales come from and costs go to. */
+.sc-bank {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 26px;
+}
+
+.sc-bank .sc-coin-piece {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  filter: drop-shadow(0 1.5px 0 rgb(var(--sc-shadow) / 22%));
+}
+
+.sc-bank .sc-coin-piece:first-child {
+  left: 0;
+  top: 0;
+}
+
+.sc-bank .sc-coin-piece:last-child {
+  right: 0;
+  bottom: 0;
+}
+
+.sc-bank svg,
+.sc-coin-piece svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- layout: neighbours either side, your wonder and city, then your hand ---------- */
+.sc-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: "left right" "mine mine" "hand hand";
+  gap: 10px;
+  align-items: start;
+}
+
+.sc-seat.left { grid-area: left; align-self: stretch; }
+.sc-seat.right { grid-area: right; align-self: stretch; }
+.sc-seat.across { display: none; }
+.sc-mine { grid-area: mine; }
+.sc-hand-area { grid-area: hand; }
+
+/* Below a laptop the hand comes right under the neighbours, so a pick needs
+   no scrolling; its cards are as big as two rows across the width allow. */
+@media (max-width: 999px) {
+  .sc-main {
+    grid-template-areas: "left right" "hand hand" "mine mine";
+  }
+
+  .sc-hand[data-n="3"],
+  .sc-hand[data-n="5"],
+  .sc-hand[data-n="6"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sc-hand[data-n="1"],
+  .sc-hand[data-n="2"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sc-hand[data-n="1"] .sc-hcard,
+  .sc-hand[data-n="2"] .sc-hcard,
+  .sc-hand[data-n="3"] .sc-hcard {
+    max-width: 120px;
+    justify-self: center;
+    width: 100%;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 999px) {
+  .sc-hand.sc-hand {
+    grid-template-columns: repeat(7, minmax(0, 104px));
+    justify-content: center;
+  }
+}
+
+/* With three players, the two others are both your neighbours: right on the left if seated so. */
+.stonecrown .pb-score {
+  display: none;
+}
+
+@media (min-width: 1000px) {
+  .sc-main {
+    grid-template-columns: 250px minmax(0, 1fr) 250px;
+    grid-template-areas: "left mine right" "hand hand hand";
+    gap: 12px 14px;
+  }
+
+  .stonecrown[data-players="4"] .sc-main {
+    grid-template-areas: "left across right" "left mine right" "hand hand hand";
+  }
+
+  .sc-seat.across {
+    display: grid;
+    grid-area: across;
+  }
+
+  .sc-across-pill {
+    display: none;
+  }
+
+  .sc-seat.left,
+  .sc-seat.right {
+    align-self: stretch;
+  }
+}
+
+/* ---------- a neighbour's panel ---------- */
+.sc-seat {
+  position: relative;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  padding: 0 0 10px;
+  align-content: start;
+  min-width: 0;
+}
+
+.sc-seat-head {
+  border-radius: 18px 18px 0 0;
+  background: var(--c);
+  color: var(--c-on, #1f1426);
+}
+
+.sc-seat.p-1 .sc-seat-head,
+.sc-seat.p-2 .sc-seat-head { --c-on: #fff; }
+
+.sc-seat-open {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 24px 9px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  /* The cut-paper edge under the name. */
+  -webkit-mask: radial-gradient(7px 5px at 7px 100%, transparent 98%, #000) -7px 0 / 14px 100% repeat-x;
+  mask: radial-gradient(7px 5px at 7px 100%, transparent 98%, #000) -7px 0 / 14px 100% repeat-x;
+}
+
+.sc-seat-open:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+.sc-seat-name {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 5px;
+  min-width: min(5.5em, 60%);
+  font: 600 1rem var(--font-display);
+}
+
+.sc-seat-name b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-seat-wonder {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-style: italic;
+  opacity: 0.9;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-seat-arrow {
+  width: 12px;
+  height: 10px;
+  flex: none;
+  background: currentColor;
+  opacity: 0.75;
+  clip-path: polygon(0 50%, 50% 0, 50% 28%, 100% 28%, 100% 72%, 50% 72%, 50% 100%);
+}
+
+.sc-seat-arrow.right {
+  order: 9;
+  transform: scaleX(-1);
+}
+
+.sc-seat-arrow.across {
+  display: none;
+}
+
+.sc-seat-stats,
+.sc-seat-sells,
+.sc-counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 10px;
+}
+
+.sc-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.sc-stat .sc-ic {
+  width: 20px;
+  height: 20px;
+}
+
+.sc-tokens {
+  display: inline-flex;
+  gap: 1px;
+}
+
+.sc-tok {
+  display: inline-block;
+  width: 16px;
+  height: 18px;
+}
+
+.sc-tok svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.sc-stage-dots {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.sc-stage-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sc-rule);
+}
+
+.sc-stage-dots i.on {
+  background: var(--sc-gold);
+  box-shadow: 0 0 0 2px rgb(255 201 74 / 30%);
+}
+
+.sc-sells {
+  min-width: 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.sc-sell {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.sc-sell small {
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.sc-counts {
+  gap: 4px;
+}
+
+.sc-count {
+  display: grid;
+  place-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 28px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--k);
+  color: #fff8ea;
+  font: 700 0.82rem var(--font-display);
+}
+
+.sc-count.c-yellow {
+  color: #3b2400;
+}
+
+.sc-count.none {
+  background: var(--k-lt);
+  opacity: 0.7;
+}
+
+.sc-seat-board,
+.sc-seat-city-box {
+  display: none;
+}
+
+/* The card a seat has picked, face down, dropped on its panel's corner. */
+.sc-pickmark {
+  position: absolute;
+  top: -8px;
+  right: -5px;
+  width: 26px;
+  z-index: 1;
+  transform: rotate(8deg);
+  filter: drop-shadow(1px 2px 0 rgb(var(--sc-shadow) / 25%));
+}
+
+.sc-pickmark[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sc-pickmark:not([hidden]) {
+    animation: sc-drop var(--dur-slow) var(--ease-spring);
+  }
+}
+
+@keyframes sc-drop {
+  from {
+    transform: translateY(-10px) rotate(-10deg) scale(0.7);
+    opacity: 0;
+  }
+}
+
+@media (min-width: 1000px) {
+  .sc-seat-board {
+    display: block;
+    margin-inline: 10px;
+  }
+
+  .sc-seat-board svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+  }
+
+  .sc-seat-city-box {
+    display: grid;
+    gap: 4px;
+    padding-inline: 10px;
+  }
+
+  .sc-seat:not(.across) .sc-stage-dots {
+    display: none;
+  }
+
+  .sc-seat.across {
+    grid-template-columns: auto auto 1fr;
+    align-items: center;
+    padding: 0 10px 0 0;
+    gap: 8px;
+  }
+
+  .sc-seat.across .sc-seat-head {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-radius: 18px 0 0 18px;
+  }
+
+  .sc-seat.across .sc-seat-open {
+    height: 100%;
+    mask: none;
+    -webkit-mask: none;
+  }
+
+  .sc-seat.across .sc-seat-board,
+  .sc-seat.across .sc-seat-city-box,
+  .sc-seat.across .sc-seat-sells {
+    display: none;
+  }
+
+  .sc-seat.across .sc-seat-stats,
+  .sc-seat.across .sc-counts {
+    padding: 8px 0;
+    flex-wrap: nowrap;
+  }
+
+  .sc-seat.across .sc-counts {
+    justify-content: flex-end;
+    padding-right: 18px;
+  }
+}
+
+/* ---------- city chips: a built card's colour and effect ---------- */
+.sc-city {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.sc-col {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+}
+
+/* A built card: the top of its mini face (colour and effect), sliced by card-art.js. */
+.sc-chip {
+  position: relative;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sc-chip-art {
+  display: block;
+  aspect-ratio: 44 / 30;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1.5px 0 rgb(var(--sc-shadow) / 16%), 0 3px 6px rgb(var(--sc-shadow) / 10%);
+}
+
+.sc-chip-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+.sc-chip.ghost {
+  aspect-ratio: 44 / 30;
+  border: 2px dashed var(--k);
+  border-radius: 6px;
+  opacity: 0.4;
+}
+
+.sc-chip-name {
+  display: none;
+  max-width: 100%;
+  padding-inline: 3px;
+  overflow: hidden;
+  color: var(--sc-ink);
+  font: 600 0.62rem/1.1 var(--font-display);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .sc-city.mine .sc-chip-name,
+  .sc-city.big .sc-chip-name {
+    display: block;
+  }
+}
+
+.sc-seat-city .sc-city {
+  gap: 2px;
+}
+
+.sc-seat-city .sc-chip-art {
+  border-radius: 4px;
+}
+
+/* Effects as icons. */
+.sc-fx,
+.sc-cost {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  max-width: 100%;
+  line-height: 1;
+}
+
+.sc-ic {
+  position: relative;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.sc-ic svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sc-or {
+  font-size: 0.7em;
+  color: var(--k-ink, var(--sc-muted));
+  opacity: 0.8;
+}
+
+.sc-gap {
+  width: 3px;
+}
+
+.sc-dots {
+  font-size: 0.7em;
+  font-weight: 700;
+  color: var(--k-ink, var(--sc-muted));
+}
+
+.sc-word {
+  padding: 0 3px;
+  border-radius: 4px;
+  background: var(--sc-paper);
+  color: var(--sc-ink);
+  font: 600 0.6rem var(--font-display);
+}
+
+.sc-cost .sc-ic.buy {
+  outline: 2px dashed var(--sc-red);
+  outline-offset: 1px;
+  border-radius: 50%;
+}
+
+.sc-free {
+  font-style: italic;
+  color: var(--sc-muted);
+}
+
+/* ---------- your wonder and city ---------- */
+.sc-mine {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  min-width: 0;
+}
+
+.sc-me-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+
+.sc-me-name {
+  font: 600 1rem var(--font-display);
+}
+
+.sc-me-wonder {
+  color: var(--sc-muted);
+  font-size: 0.82rem;
+}
+
+.sc-grow {
+  flex: 1;
+}
+
+/* Room below the board for the cards tucked under its stages. */
+.sc-board {
+  position: relative;
+  margin-bottom: 12px;
+  border-radius: 14px;
+}
+
+.sc-board-art svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+}
+
+.sc-board .sc-pickmark {
+  display: none;
+}
+
+.sc-detail .sc-arrow {
+  color: var(--sc-muted);
+}
+
+.sc-city-box {
+  display: grid;
+  gap: 6px;
+}
+
+@media (min-width: 1000px) {
+  .sc-mine {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sc-board {
+    /* Smaller on a short laptop screen, so your city shows above your hand. */
+    max-width: clamp(300px, 100svh - 500px, 400px);
+    width: 100%;
+    margin-inline: auto;
+  }
+}
+
+/* ---------- your hand ---------- */
+.sc-hand-area {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  min-width: 0;
+}
+
+.sc-hand-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sc-hand-next {
+  margin-left: auto;
+  color: var(--sc-muted);
+  font-size: 0.85rem;
+}
+
+/* Who has picked sits by the hand's title on a laptop, on a row of its own on a phone. */
+.sc-hand-head .sc-picks {
+  order: 3;
+  flex-basis: 100%;
+}
+
+@media (min-width: 1000px) {
+  .sc-hand-head .sc-picks {
+    order: 0;
+    flex-basis: auto;
+    margin-left: 10px;
+  }
+}
+
+/* On a phone, who has picked is a row of marks: a tick, or dots while they think. */
+@media (max-width: 999px) {
+  .sc-hand-head .sc-picks {
+    order: 0;
+    flex-basis: auto;
+    margin-left: auto;
+    gap: 4px;
+  }
+
+  .sc-hand-head .sc-picks li {
+    position: relative;
+    gap: 2px;
+    padding: 2px 6px 2px 2px;
+  }
+
+  .sc-hand-head .sc-picks li :is(.nm, .sc-pick-state) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .sc-hand-head .sc-picks li.done::after {
+    content: "✓";
+    color: var(--c-ink);
+    font-weight: 700;
+    font-size: 0.8rem;
+  }
+
+  .sc-hand-head .sc-picks .sc-mark {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.sc-hand-wrap {
+  position: relative;
+  min-height: calc(var(--sc-cw) * 1.4 + 8px);
+}
+
+/* No cards and no deck: the hand's place folds away rather than sit empty. */
+.sc-hand-wrap:has(.sc-hand[data-n="0"]):not(:has(.sc-deck:not([hidden]), .pc-busy:not([hidden]))) {
+  min-height: 0;
+}
+
+.sc-hand[data-n="0"] {
+  padding-top: 0;
+}
+
+.sc-hand {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 6px;
+  padding-top: 8px;
+}
+
+.sc-hcard {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  cursor: pointer;
+  transition: transform var(--dur-med) var(--ease-out), opacity var(--dur-med) var(--ease-out), filter var(--dur-med);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sc-hcard:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.sc-hand:not(.choosing) .sc-hcard {
+  cursor: default;
+}
+
+.sc-hcard.sel {
+  transform: translateY(-8px);
+}
+
+.sc-hcard.sel .sc-cardbox {
+  box-shadow: 0 0 0 3px var(--sc-sel), 0 0 0 6px rgb(255 201 74 / 35%), 0 10px 18px rgb(var(--sc-shadow) / 25%);
+}
+
+.sc-hcard.picked {
+  transform: translateY(-8px);
+}
+
+.sc-hcard.picked .sc-cardbox {
+  box-shadow: 0 0 0 3px var(--accent), 0 10px 18px rgb(var(--sc-shadow) / 25%);
+}
+
+.sc-hcard.picked::after {
+  content: "Picked";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: 600 0.72rem var(--font-display);
+}
+
+.sc-hcard.dim {
+  opacity: 0.45;
+  filter: saturate(0.6);
+}
+
+/* A card you can build gets a small gold lantern in its corner. */
+.sc-hand.choosing .sc-hcard.can::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--sc-gold);
+  box-shadow: 0 0 0 2px var(--sc-paper), 0 0 8px var(--sc-lamp);
+}
+
+.sc-hand.choosing .sc-hcard.chain::before {
+  background: var(--sc-green);
+  box-shadow: 0 0 0 2px var(--sc-paper), 0 0 8px var(--sc-green);
+}
+
+.sc-cardbox {
+  display: block;
+  aspect-ratio: 100 / 140;
+  border-radius: 9px;
+  overflow: hidden;
+  box-shadow: 0 2px 0 rgb(var(--sc-shadow) / 14%), 0 6px 12px rgb(var(--sc-shadow) / 14%);
+}
+
+.sc-cardbox svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sc-turn {
+  display: block;
+  perspective: 700px;
+}
+
+.sc-turn .in {
+  position: relative;
+  display: block;
+  transform-style: preserve-3d;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+
+.sc-turn.down .in {
+  transform: rotateY(180deg);
+}
+
+.sc-turn .side {
+  display: block;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.sc-turn .side.back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+}
+
+.sc-deck {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 54px;
+  transform: translate(-50%, -50%);
+}
+
+.sc-deck[hidden] {
+  display: none;
+}
+
+.sc-deck-card {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 54px;
+}
+
+.sc-hand-wrap > .pc-busy {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 100%;
+}
+
+/* The buttons for the card you picked, and what it would do. */
+.sc-side {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.sc-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sc-buttons[data-n="2"],
+.sc-buttons[data-n="4"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sc-buttons[hidden],
+.sc-detail[hidden] {
+  display: none;
+}
+
+.sc-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 6px 6px;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.sc-act-words {
+  display: grid;
+  line-height: 1.15;
+}
+
+.sc-act .lbl {
+  font: 600 1rem var(--font-display);
+}
+
+.sc-act small {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.sc-act .sc-ic.coin {
+  width: 24px;
+  height: 24px;
+}
+
+.sc-act.chain:not([disabled]),
+.sc-act.free:not([disabled]) {
+  background: var(--sc-green);
+  border-color: var(--sc-green);
+  color: #fff;
+}
+
+.sc-act.link {
+  min-height: 32px;
+  justify-self: start;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+.sc-detail {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--sc-paper-2);
+  font-size: 0.88rem;
+}
+
+.sc-detail p {
+  margin: 0;
+}
+
+.sc-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-left: 8px;
+  border-left: 4px solid var(--k);
+}
+
+.sc-detail-name {
+  font: 600 1.05rem var(--font-display);
+}
+
+.sc-detail-head .sc-ic {
+  width: 20px;
+  height: 20px;
+}
+
+.sc-detail-fx,
+.sc-detail-stage small,
+.sc-chain-from {
+  color: var(--sc-muted);
+}
+
+.sc-detail-cost,
+.sc-detail-stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.sc-detail .k {
+  font-weight: 700;
+}
+
+.sc-detail-pay.ok {
+  font-weight: 700;
+}
+
+.sc-detail-pay.no {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.sc-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font: 600 0.72rem var(--font-display);
+  color: #fff;
+}
+
+.sc-badge.chain,
+.sc-badge.free {
+  background: var(--sc-green);
+}
+
+.sc-hint {
+  margin: 0;
+  color: var(--sc-muted);
+  font-size: 0.88rem;
+}
+
+.sc-done strong {
+  color: var(--sc-ink);
+}
+
+/* Who has picked this turn. */
+.sc-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-picks[hidden] {
+  display: none;
+}
+
+.sc-picks li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 3px;
+  border-radius: 999px;
+  background: var(--sc-paper-2);
+  font-size: 0.8rem;
+}
+
+.sc-picks li .nm {
+  font-weight: 700;
+  color: var(--c-ink);
+}
+
+.sc-picks li.done {
+  background: color-mix(in srgb, var(--c) 22%, var(--sc-paper));
+}
+
+.sc-pick-state {
+  color: var(--sc-muted);
+}
+
+.sc-picks .think {
+  --seat: var(--c);
+}
+
+/* The clock. */
+.sc-timer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sc-timer[hidden] {
+  display: none;
+}
+
+.sc-timer .bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--sc-paper-2);
+  overflow: hidden;
+}
+
+.sc-timer .bar span {
+  display: block;
+  height: 100%;
+  background: var(--c);
+  transform-origin: left;
+}
+
+.sc-timer.low .bar span {
+  background: var(--danger);
+}
+
+@media (min-width: 1000px) {
+  .stonecrown {
+    --sc-cw: clamp(88px, 100svh / 8 - 15px, 104px);
+  }
+
+  .sc-hand-area {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-areas: "head head" "hand side" "buttons side";
+    align-items: start;
+    column-gap: 18px;
+  }
+
+  .sc-hand-head { grid-area: head; }
+  .sc-hand-wrap { grid-area: hand; }
+  .sc-buttons { grid-area: buttons; }
+  .sc-side { grid-area: side; }
+
+  .sc-hand {
+    grid-template-columns: repeat(7, minmax(0, var(--sc-cw)));
+    justify-content: start;
+  }
+
+  .sc-buttons,
+  .sc-buttons[data-n="2"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: calc(var(--sc-cw) * 7 + 36px);
+  }
+
+  .sc-buttons[data-n="4"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .sc-side .sc-detail {
+    max-height: 236px;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Your hand stays in view on a laptop, however tall the cities grow. */
+  .sc-hand-area {
+    position: sticky;
+    bottom: 8px;
+    z-index: 4;
+    box-shadow: 0 -6px 18px rgb(var(--sc-shadow) / 12%), 0 1.5px 0 rgb(var(--sc-shadow) / 10%), 0 10px 22px rgb(var(--sc-shadow) / 10%);
+  }
+
+  .sc-hand-area:has(.sc-hand[data-n="0"]):not(:has(.sc-deck:not([hidden]))) {
+    position: static;
+  }
+}
+
+/* ---------- the log ---------- */
+.sc-log-box {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.sc-log-box .pc-log li {
+  background: var(--sc-paper);
+  border-color: var(--sc-rule);
+  color: var(--sc-ink);
+  font-size: 0.88rem;
+}
+
+.sc-log-box .pc-log li:not([class*="p-"]) {
+  border-left-color: var(--sc-gold);
+}
+
+.sc-log-box .sc-mark {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---------- seat marks ---------- */
+.sc-mark {
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.sc-mark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sc-mark .disc {
+  fill: var(--c);
+  stroke: var(--sc-paper, #fff);
+  stroke-width: 1.5;
+}
+
+.sc-mark .sign {
+  fill: rgb(255 255 255 / 85%);
+  stroke: rgb(255 255 255 / 85%);
+}
+
+.sc-mark.p-3 .sign,
+.sc-mark.p-0 .sign {
+  fill: rgb(40 20 10 / 70%);
+  stroke: rgb(40 20 10 / 70%);
+}
+
+.sc-seat-head .sc-mark .disc {
+  stroke: rgb(255 255 255 / 80%);
+}
+
+/* ---------- flying cards, coins and tokens ---------- */
+.sc-fly > .sc-fly-card,
+.sc-fly > .sc-fly-coin,
+.sc-fly > .sc-fly-token {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+}
+
+.sc-fly-coin {
+  width: 22px;
+  height: 22px;
+}
+
+.sc-fly-coin svg,
+.sc-fly-token svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sc-fly-token {
+  width: 26px;
+  height: 30px;
+}
+
+/* ---------- the war ---------- */
+.sc-war,
+.sc-final {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  z-index: 6;
+  display: grid;
+  gap: 8px;
+  min-width: min(340px, 92%);
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--sc-paper);
+  color: var(--sc-ink);
+  box-shadow: 0 3px 0 rgb(var(--sc-shadow) / 14%), 0 18px 40px rgb(var(--sc-shadow) / 30%);
+  transform: translate(-50%, -50%);
+}
+
+.sc-war-title,
+.sc-final-title {
+  margin: 0;
+  text-align: center;
+  font: 600 1.15rem var(--font-display);
+}
+
+.sc-war-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 12px;
+  opacity: 0.6;
+  transition: opacity var(--dur-med);
+}
+
+.sc-war-row.clash {
+  opacity: 1;
+  background: var(--sc-paper-2);
+}
+
+.sc-war-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.sc-war-side:last-child {
+  justify-content: flex-end;
+}
+
+.sc-war-side .nm {
+  color: var(--c-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-war-side .sc-ic {
+  width: 18px;
+  height: 18px;
+}
+
+.sc-war-row.clash .sc-war-side.win b {
+  color: var(--ok);
+}
+
+.sc-war-row.clash .sc-war-side.lose b,
+.sc-war-row.clash .sc-war-side.lose .sc-ic {
+  opacity: 0.6;
+}
+
+.sc-war-x {
+  color: var(--sc-red);
+  font-size: 1.2rem;
+}
+
+/* ---------- the score sheet ---------- */
+.sc-sheet {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.sc-sheet th,
+.sc-sheet td {
+  padding: 4px 6px;
+  text-align: center;
+}
+
+.sc-sheet thead th {
+  font-weight: 600;
+}
+
+.sc-sheet .who {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 7em;
+}
+
+.sc-sheet .who .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-ink);
+}
+
+.sc-sheet tbody th {
+  text-align: left;
+  font-weight: 600;
+}
+
+.sc-sheet tbody th small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.sc-sheet tbody tr + tr {
+  border-top: 1px solid var(--border);
+}
+
+.sc-sheet tfoot tr {
+  border-top: 2px solid var(--text);
+  font-weight: 700;
+}
+
+.sc-sheet tfoot th {
+  text-align: left;
+}
+
+.sc-sheet td {
+  font: 600 0.98rem var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-sheet td.zero {
+  color: var(--sc-muted);
+}
+
+.sc-sheet td.mine,
+.sc-sheet th.mine {
+  background: rgb(var(--sc-shadow) / 5%);
+}
+
+.sc-sheet .lbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sc-sheet .lbl .sc-ic,
+.sc-sheet .lbl .sc-tok {
+  width: 18px;
+  height: 18px;
+}
+
+/* Wonder points: a little gold pyramid. */
+.sc-wonder-pip {
+  background: var(--sc-gold-dk);
+  clip-path: polygon(50% 8%, 96% 92%, 4% 92%);
+}
+
+.sc-sheet tfoot td {
+  font-size: 1.3rem;
+  padding-block: 6px;
+}
+
+.sc-sheet tfoot th {
+  font: 600 1.05rem var(--font-display);
+}
+
+/* The winner's total turns gold, and a crown goes over their name. */
+.sc-sheet.done tfoot td.best {
+  background: var(--sc-gold);
+  color: #4a3000;
+  border-radius: 12px;
+  box-shadow: 0 2px 0 var(--sc-gold-dk), 0 0 18px rgb(255 201 74 / 55%);
+}
+
+.sc-sheet.done thead th.best .who::before {
+  content: "";
+  flex: none;
+  width: 16px;
+  height: 12px;
+  background: var(--sc-gold-dk);
+  clip-path: polygon(0 100%, 0 22%, 26% 58%, 50% 0, 74% 58%, 100% 22%, 100% 100%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sc-final .sc-sheet.done tfoot td.best {
+    animation: sc-crown var(--dur-slow) var(--ease-spring);
+  }
+}
+
+@keyframes sc-crown {
+  40% {
+    transform: scale(1.25);
+  }
+}
+
+.sc-final .sc-sheet tr {
+  opacity: 0.25;
+  transition: opacity var(--dur-med);
+}
+
+.sc-final .sc-sheet thead tr,
+.sc-final .sc-sheet tr.on {
+  opacity: 1;
+}
+
+.sc-final .sc-sheet tbody th small {
+  color: var(--sc-muted);
+}
+
+.sc-final .sc-sheet tbody tr + tr {
+  border-color: var(--sc-rule);
+}
+
+.sc-final .sc-sheet tfoot tr {
+  border-color: var(--sc-ink);
+}
+
+.sc-sheet-box {
+  overflow-x: auto;
+}
+
+.sc-over {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.sc-over .sc-sheet-box {
+  width: min(100%, 620px);
+}
+
+.sc-over .verdict {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  margin: 0;
+  text-align: center;
+}
+
+.sc-over .verdict small {
+  color: var(--muted);
+}
+
+/* ---------- a seat's city ---------- */
+.sc-dialog {
+  width: min(560px, calc(100vw - 24px));
+  max-height: calc(100vh - 40px);
+  padding: 14px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--sc-paper);
+  color: var(--sc-ink);
+}
+
+.sc-dialog::backdrop {
+  background: rgb(20 15 30 / 45%);
+}
+
+.sc-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sc-dialog-head h2 {
+  margin: 0;
+  font: 600 1.2rem var(--font-display);
+  color: var(--c-ink);
+}
+
+.sc-dialog-head small {
+  color: var(--sc-muted);
+}
+
+.sc-dialog-close {
+  margin-left: auto;
+}
+
+.sc-dialog-facts {
+  margin: 8px 0;
+  color: var(--sc-muted);
+  font-size: 0.88rem;
+}
+
+.sc-dialog-board svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+
+.stonecrown:has(.sc-dialog) .sc-dialog .sc-mark {
+  width: 22px;
+  height: 22px;
+}
+
+/* ---------- result moment ---------- */
+.stonecrown .celebrate-lit {
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-hcard,
+  .sc-turn .in {
+    transition: none;
+  }
+}
+
+.sc-fx-card {
+  --h: 22px;
+  display: inline-block;
+  flex: none;
+  width: calc(var(--h) * var(--w, 1));
+  height: var(--h);
+}
+
+.sc-fx-card svg {
+  width: 100%;
+  height: 100%;
+}
+
+.sc-chain-to {
+  color: var(--sc-muted);
+  font-size: 0.82rem;
+}
+
+/* The score sheet over the table fits a phone: names shorten, columns tighten. */
+.sc-final {
+  width: min(560px, calc(100% - 16px));
+  min-width: 0;
+}
+
+@media (max-width: 520px) {
+  .sc-sheet {
+    font-size: 0.8rem;
+  }
+
+  .sc-sheet th,
+  .sc-sheet td {
+    padding: 3px 2px;
+  }
+
+  .sc-sheet .who {
+    flex-direction: column;
+    gap: 1px;
+    max-width: 4.6em;
+  }
+
+  .sc-sheet .who .nm {
+    max-width: 100%;
+  }
+}
+
+/* The tutorial: the lesson's words sit over the table, so your wonder is a little smaller and your hand still shows on a laptop. */
+@media (min-width: 1000px) {
+  .tut-stage .sc-board {
+    max-width: max(300px, calc(100svh - 560px));
+  }
+}

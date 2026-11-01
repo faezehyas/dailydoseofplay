@@ -14,6 +14,7 @@ import { autoplay as goFish } from "./go-fish.shared.js";
 import { autoplay as ginRummy } from "./gin-rummy.shared.js";
 import { autoplay as hearts } from "./hearts.shared.js";
 import { autoplay as hexlands } from "./hexlands.shared.js";
+import { autoplay as stonecrown } from "./stonecrown.shared.js";
 
 const skip = skipWithoutPlaywright();
 
@@ -33,9 +34,10 @@ const GAMES = [
   ["gin-rummy", "paper"],
   ["hearts", "bell"],
   ["hexlands", "wood"],
+  ["stonecrown", "paper"],
 ];
 // The card games play through their own controls, seeded, with the robots at full speed.
-const CARD_GAMES = { "crazy-eights": crazyEights, "go-fish": goFish, "gin-rummy": ginRummy, hearts, hexlands };
+const CARD_GAMES = { "crazy-eights": crazyEights, "go-fish": goFish, "gin-rummy": ginRummy, hearts, hexlands, stonecrown };
 // The outcome each title stands for: someone else's win is "over" with more than two players.
 const OUTCOME = { "You won": "win", "You lost": "loss", Draw: "draw" };
 
@@ -69,6 +71,7 @@ async function playToTheEnd(open, base, slug) {
       () => localStorage.setItem("ddp-gin-rummy-settings", JSON.stringify({ target: 0 })),
       () => localStorage.setItem("ddp-hearts-settings", JSON.stringify({ target: 0 })),
       () => localStorage.setItem("ddp-hexlands-settings", JSON.stringify({ players: 3, target: 8 })),
+      () => localStorage.setItem("ddp-stonecrown-settings", JSON.stringify({ players: 3 })),
     ],
   });
   await page.goto(`${base}/${slug}/?robot=1`);

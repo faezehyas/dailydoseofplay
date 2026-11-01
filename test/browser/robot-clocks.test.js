@@ -26,6 +26,7 @@ const GAMES = [
   ["gin-rummy", "gr", "moveSeconds", 15],
   ["hearts", "hr", "moveSeconds", 15],
   ["hexlands", "hx", "moveSeconds", 30],
+  ["stonecrown", "sc", "moveSeconds", 30],
 ];
 
 async function setup(t) {
