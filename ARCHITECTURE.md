@@ -1,7 +1,7 @@
 # Architecture
 
 Daily Dose of Play is a free site of browser games for two or more players,
-and playing never needs an account (Chutes and Ladders, Ludo, Crazy Eights, Go Fish, Hearts and Hexlands seat up to four). One small Node server
+and playing never needs an account (Chutes and Ladders, Ludo, Crazy Eights, Go Fish, Hearts, Hexlands and Stonecrown seat up to four). One small Node server
 on Wasmer Edge serves the pages and introduces players to each other. The games
 themselves run browser to browser over WebRTC DataChannels: with more than
 two players, every guest connects to the room creator's browser, which
@@ -135,8 +135,9 @@ flowchart TB
     g_board_view["board-view.js<br>Ludo only"]
     g_board["board.js<br>Hexlands only"]
     g_tiles["tiles.js<br>Hexlands only"]
-    g_pieces["pieces.js<br>Hexlands only"]
-    g_card_art["card-art.js<br>Hexlands only"]
+    g_pieces["pieces.js<br>Hexlands and Stonecrown"]
+    g_card_art["card-art.js<br>Hexlands and Stonecrown"]
+    g_cards["cards.js<br>Stonecrown only"]
   end
   subgraph engine ["Engine: public/engine/"]
     e_boot["boot.js<br>static pages"]
@@ -269,6 +270,16 @@ flowchart TB
   g_tiles --> g_board
   g_tiles --> g_card_art
   g_pieces --> g_board
+  g_rules --> g_cards
+  g_robot --> g_cards
+  g_card_art --> g_cards
+  g_pieces --> g_cards
+  g_pieces --> g_card_art
+  g_sounds --> g_cards
+  g_art --> g_cards
+  g_art --> g_card_art
+  g_art --> g_pieces
+  p_main --> g_cards
   g_rules --> g_board
   g_robot --> e_robot_pace
   g_robot --> e_session
@@ -1004,7 +1015,7 @@ its largest message, with four players and a 108-card deck, is 3063 (a part
 of a `shuffle`); Crazy Eights' (four players, 52 cards) is about the same,
 3063 to 3065 as reshuffles add digits to the round number, Go Fish's
 3063, Gin Rummy's 3064 to 3065 (two players, the deck shuffled again every
-hand), Hearts' 3064 (four players, a game to 50) and Hexlands' 3064 (four players, the development cards' shuffle). A pass's sealed cards go
+hand), Hearts' 3064 (four players, a game to 50) Hexlands' 3064 (four players, the development cards' shuffle) and Stonecrown's 3064 (four players, an age's shuffle). A pass's sealed cards go
 in a `seal` message of about 704 characters (three cards, four players).
 
 **Why a pre-negotiated channel.** With the default in-band handshake, the
@@ -1182,7 +1193,7 @@ the lobby cards:
 | Lobby, invite, waiting room | 520 px | all |
 | Game, `layout: "narrow"` | 520 px | Tic Tac Toe, Connect 4, Chess, Checkers |
 | Game, `layout: "medium"` | 640 px | Gomoku, Backgammon |
-| Game, `layout: "wide"` (the default) | 980 px | Sea Battle, Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts, Hexlands |
+| Game, `layout: "wide"` (the default) | 980 px | Sea Battle, Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts, Hexlands, Stonecrown |
 
 Below that width the column is the page's width less its 16 px gutters. A
 game's own top-level box has no `max-width`, so it fills `#game`. The default
@@ -1307,10 +1318,10 @@ Checkers, the last checker borne off in Backgammon, the last ship sunk in
 Sea Battle (once its shell lands), the pawn on 100 in Chutes and Ladders,
 the last box in Dots and Boxes, the winner's tokens home in Ludo, the
 winners' books in Go Fish, the winner's melds on the table in Gin Rummy, and the
-winner's pill and tricks in Hearts, and the winner's buildings in Hexlands. The
+winner's pill and tricks in Hearts, and the winner's buildings in Hexlands, and the winner's city in Stonecrown. The
 chimes (`chimes.js`) are one melody, a C-major pentatonic jingle, in a
 timbre that fits the game's pieces (`flavour`): `wood` for Chess, Checkers,
-Backgammon, Ludo and Hexlands; `paper` for Tic Tac Toe, Gomoku, Dots and Boxes and Gin Rummy;
+Backgammon, Ludo and Hexlands; `paper` for Tic Tac Toe, Gomoku, Dots and Boxes, Gin Rummy and Stonecrown;
 `plastic` for Connect 4; `bell` for Chutes and Ladders and Hearts; `water` (a bubble
 under the bell) for Sea Battle and Go Fish. They are synthesized, at the `fanfare`
 level, and follow the mute toggle. With `prefers-reduced-motion` only the
@@ -1526,7 +1537,7 @@ checks that no game opens its own audio context or output.
 | `icon.svg` | Card art for the home page (16:10) |
 | `preview.svg` | Optional: the tile's short animated preview (see **Tile previews**) |
 | `tutorial.js`, `lessons.js` | Optional: the tutorial (see **Tutorials**). `lessons.js` is its lessons as data; `tutorial.js` exports them with the adapter the engine plays them through, and `main.js` passes `tutorial: () => import("./tutorial.js")`. |
-| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo; Chutes and Ladders, with its spinner and its pawns' hops, climbs and slides), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces, Gomoku's grid and point names, Checkers' crown, Dots and Boxes' paper, lines and boxes, Backgammon's cells, checkers and dice, Sea Battle's boards, ships, ship dragging and the shells' flight and landing; Crazy Eights' pace, discard pile, suit badge, an 8's burst and suit picker; Go Fish's seats, books, ask and the motion of asking, fishing and books; Gin Rummy's table with its melds, buttons, lay-offs and score card; Hearts' table with its seats, trick, pass and tally; Hexlands' island table, spots, hand, bank, points tokens, discard parts and the motion the tutorial shares) |
+| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo; Chutes and Ladders, with its spinner and its pawns' hops, climbs and slides), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces, Gomoku's grid and point names, Checkers' crown, Dots and Boxes' paper, lines and boxes, Backgammon's cells, checkers and dice, Sea Battle's boards, ships, ship dragging and the shells' flight and landing; Crazy Eights' pace, discard pile, suit badge, an 8's burst and suit picker; Go Fish's seats, books, ask and the motion of asking, fishing and books; Gin Rummy's table with its melds, buttons, lay-offs and score card; Hearts' table with its seats, trick, pass and tally; Hexlands' island table, spots, hand, bank, points tokens, discard parts and the motion the tutorial shares; Stonecrown's table with its neighbour panels, wonder, city, hand, pick buttons, war moment and score sheet) |
 | `motion.js` | Optional: the move motion the view shares with the tutorial, with its sounds (Chess's slide and capture and its drag, Backgammon's checker flights and drag, Dots and Boxes' pencil strokes and boxes) |
 | `pick.js`, `board-view.js` | Checkers' picking of a move square by square (and one tap for a whole multi-jump); Ludo's token motion, rolling die and move choices. Both shared by the view and the tutorial. |
 
@@ -1537,9 +1548,10 @@ that started the room, and has no dealer. `engine/card-match.js` does it with
 mental poker: every player holds a share of the deck's key, and a card can
 only be read with every share. With three or more players, a modified host
 can still read a hand (see **A modified host** below). The rules contract is
-at the top of that file; Crazy Eights, Go Fish, Gin Rummy, Hearts and Hexlands
-use it (see **Crazy Eights in depth**, **Go Fish in depth**, **Gin Rummy in
-depth**, **Hearts in depth** and **Hexlands in depth**).
+at the top of that file; Crazy Eights, Go Fish, Gin Rummy, Hearts, Hexlands
+and Stonecrown use it (see **Crazy Eights in depth**, **Go Fish in depth**,
+**Gin Rummy in depth**, **Hearts in depth**, **Hexlands in depth** and
+**Stonecrown in depth**).
 
 **How a match runs.** Every message carries `m`, as in `TurnMatch`.
 
@@ -1753,7 +1765,7 @@ table's pieces and motion, the robots' pacing and the leaving notice. A game
 builds its own layout from those pieces, keeps its own rules, robot and
 special moments, and links `cards/cards.css` after `theme.css`. Each part
 carries the class `pc-<part>` for the shared styles and `<prefix>-<part>`
-(`ce-` for Crazy Eights, `gf-` for Go Fish, `gr-` for Gin Rummy, `hr-` for Hearts, `hx-` for Hexlands) for the
+(`ce-` for Crazy Eights, `gf-` for Go Fish, `gr-` for Gin Rummy, `hr-` for Hearts, `hx-` for Hexlands, `sc-` for Stonecrown) for the
 game's own styles and tests.
 
 **Sizes.** A card is 66 bytes, a share 131. A shuffle message is 66 bytes a

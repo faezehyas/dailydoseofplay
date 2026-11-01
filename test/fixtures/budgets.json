@@ -60,6 +60,10 @@
       "modules": 38,
       "bytes": 271554
     },
+    "stonecrown": {
+      "modules": 52,
+      "bytes": 635652
+    },
     "tic-tac-toe": {
       "modules": 37,
       "bytes": 212277
@@ -210,6 +214,15 @@
     "sea-battle/rules.js": 17722,
     "sea-battle/settings.js": 1034,
     "sea-battle/sounds.js": 6989,
+    "stonecrown/art.js": 38162,
+    "stonecrown/card-art.js": 77025,
+    "stonecrown/cards.js": 14782,
+    "stonecrown/how-to-play.js": 5917,
+    "stonecrown/main.js": 60520,
+    "stonecrown/pieces.js": 48090,
+    "stonecrown/rules.js": 25716,
+    "stonecrown/settings.js": 1348,
+    "stonecrown/sounds.js": 18910,
     "tic-tac-toe/art.js": 344,
     "tic-tac-toe/how-to-play.js": 1312,
     "tic-tac-toe/main.js": 13115,
