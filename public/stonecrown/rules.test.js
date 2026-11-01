@@ -348,15 +348,50 @@ test("Babylon B plays the seventh card once its second stage is built, even in t
   assert.deepEqual([t.st.phase, t.st.lastSeat, t.st.age], ["last", 0, 1]);
   assert.deepEqual(movers(t.st), [0]);
   assert.deepEqual(t.st.hands[0], [seventh]);
+  // The others' seventh cards are discarded, hidden, first.
+  assert.deepEqual(of(ev, "discard").filter((e) => e.seventh), [
+    { type: "discard", p: 1, slot: others[0][1], seventh: true },
+    { type: "discard", p: 2, slot: others[1][1], seventh: true },
+  ]);
+  assert.ok([others[0][1], others[1][1]].every((s) => t.st.discard.includes(s) && !t.deck.slots[s].open));
+  assert.deepEqual(t.st.hands.slice(1), [[], []]);
   assert.ok(t.legal(1).length === 0);
   throwsRule(() => t.move(1, { discard: others[0][1] }), /not your move/);
   ev = t.turn({ 0: { build: seventh } });
   assert.deepEqual(t.st.city[0].at(-1).id, ID("amphitheatre"));
-  // The others' seventh cards are discarded, hidden; then the war and age II.
-  assert.deepEqual(of(ev, "discard"), [{ type: "discard", p: 1, slot: others[0][1], seventh: true }, { type: "discard", p: 2, slot: others[1][1], seventh: true }]);
-  assert.ok([others[0][1], others[1][1]].every((s) => t.st.discard.includes(s) && !t.deck.slots[s].open));
+  assert.ok(!of(ev, "discard").length);
   assert.deepEqual([t.st.phase, t.st.lastSeat, t.st.age, t.st.round], ["pick", -1, 2, 1]);
   assert.ok(of(ev, "war").length && of(ev, "age").length);
+});
+
+test("in the sixth turn Halicarnassus digs before Babylon B plays its seventh card, which may then buy what the digger built", () => {
+  const t = table({ wonders: [["babylon", "B"], ["halicarnassus", "A"], ["rhodes"]] });
+  t.st.round = ROUNDS;
+  t.stages(0, 2);
+  t.stages(1, 1);
+  t.city(1, "ore-seam", "smeltery");
+  t.st.coins = [3, 3, 3];
+  // Babylon's seventh card, Palisade, needs a wood; only the dug Woodcutter's Camp will make one.
+  const [, seventh] = t.hand(0, "shrine", "palisade");
+  const [tuck, theirs] = t.hand(1, "amphitheatre", "woodcutters-camp");
+  const [, third] = t.hand(2, "shrine", "guard-post");
+  let ev = t.turn({ 1: { stage: tuck } });
+  assert.deepEqual([t.st.phase, t.st.digger, t.st.lastSeat], ["dig", 1, -1]);
+  assert.ok(!of(ev, "last").length);
+  assert.deepEqual(t.st.hands[0], [seventh], "Babylon keeps its seventh card through the dig");
+  assert.ok(!t.st.discard.includes(seventh));
+  assert.ok(t.st.discard.includes(theirs) && t.st.discard.includes(third));
+  assert.ok(!t.legal(1).some((m) => m.dig === seventh));
+  ev = t.turn({ 1: { dig: theirs } });
+  assert.deepEqual(of(ev, "last"), [{ type: "last", p: 0 }]);
+  assert.deepEqual([t.st.phase, t.st.digger, t.st.lastSeat, movers(t.st)], ["last", -1, 0, [0]]);
+  // Halicarnassus is Babylon's left.
+  const buy = { left: res({ [WOOD]: 1 }), right: none };
+  assert.deepEqual(t.legal(0).filter((m) => m.build === seventh), [{ build: seventh, buy }]);
+  ev = t.turn({ 0: { build: seventh, buy } });
+  assert.equal(t.st.city[0].at(-1).id, ID("palisade"));
+  assert.deepEqual([t.st.phase, t.st.age], ["pick", 2]);
+  assert.ok(of(ev, "war").length);
 });
 
 test("the seventh card of each hand is discarded, hidden, without a Babylon B second stage", () => {
@@ -476,6 +511,16 @@ test("wild science: Babylon's stage and the Scholars' Guild take the symbol that
   assert.equal(score(t.st, 0).science, 10);
   t.city(0, "herbalist", "tinkers-shed", "scholars-guild");
   assert.equal(score(t.st, 0).science, sciencePoints([1, 1, 0], 2));
+});
+
+test("a copied Sailors' Guild counts itself among the copier's purple cards, as if built", () => {
+  const t = table({ wonders: [["olympia", "B"], ["giza"], ["rhodes"]] });
+  t.city(0, "ore-seam", "clay-bank");
+  t.city(1, "sailors-guild");
+  t.stages(0, 3);
+  const s = score(t.st, 0);
+  assert.deepEqual([s.copied, s.guilds], [ID("sailors-guild"), 2 + 1]);
+  assert.equal(score(t.st, 1).guilds, 1);
 });
 
 test("Olympia B copies the neighbour's guild that scores best, a copied Scholars' Guild a wild symbol", () => {

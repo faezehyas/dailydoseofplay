@@ -235,14 +235,16 @@ export function score(state, p) {
   let copied = -1;
   if (stages.some((s) => s.copyGuild)) {
     const theirs = [leftOf(state, p), rightOf(state, p)].flatMap((q) => cardsOf(state, q).filter((c) => c.color === "purple"));
+    // Scored as if built: a guild counting your purple cards counts the copy too.
+    const copyPoints = (g) => guildPoints(g) + (g.score && [g.score.per].flat().includes("purple") && g.score.from.includes("self") ? g.score.points : 0);
     let best = science;
     for (const g of theirs) {
-      const value = guildPoints(g) + sciencePoints(counts, wilds + (g.science === "any" ? 1 : 0));
+      const value = copyPoints(g) + sciencePoints(counts, wilds + (g.science === "any" ? 1 : 0));
       if (value > best) [best, copied] = [value, g.id];
     }
     if (copied !== -1) {
       const g = CARDS[copied];
-      guilds += guildPoints(g);
+      guilds += copyPoints(g);
       science = sciencePoints(counts, wilds + (g.science === "any" ? 1 : 0));
     }
   }
@@ -471,24 +473,20 @@ export function makeRules(config = DEFAULT_CONFIG, players = MAX_PLAYERS) {
     events.push({ type: "over", winners: winners.slice(), scores });
   }
 
-  // After a step is resolved: the last card, the seventh cards, a dig, then
-  // the hands pass or the age ends.
+  // After a step is resolved. In the sixth turn the seventh cards are
+  // discarded, all but a Babylon B seat's, Halicarnassus digs, and then
+  // Babylon plays its seventh card as a turn of its own. Then the hands pass
+  // or the age ends.
   function next(state, deck, from, events) {
     const lastTurn = state.round === ROUNDS;
+    const q = lastTurn ? (seatsOf(state).find((p) => stageHas(state, p, "playLast") && state.hands[p].length === 1) ?? -1) : -1;
     if (from === "pick" && lastTurn) {
-      const q = seatsOf(state).find((p) => stageHas(state, p, "playLast") && state.hands[p].length === 1);
-      if (q !== undefined) {
-        state.phase = "last";
-        state.lastSeat = q;
-        events.push({ type: "last", p: q });
-        return;
+      for (const [p, hand] of state.hands.entries()) {
+        if (p === q) continue;
+        for (const slot of hand) events.push({ type: "discard", p, slot, seventh: true });
+        state.discard.push(...hand);
+        state.hands[p] = [];
       }
-    }
-    if (from !== "dig" && lastTurn) {
-      state.lastSeat = -1;
-      state.hands.forEach((hand, p) => hand.forEach((slot) => events.push({ type: "discard", p, slot, seventh: true })));
-      state.discard.push(...state.hands.flat());
-      state.hands = state.hands.map(() => []);
     }
     if (from !== "dig" && state.digger !== -1 && state.discard.length) {
       state.phase = "dig";
@@ -497,6 +495,13 @@ export function makeRules(config = DEFAULT_CONFIG, players = MAX_PLAYERS) {
       return;
     }
     state.digger = -1;
+    if (q !== -1 && from !== "last") {
+      state.phase = "last";
+      state.lastSeat = q;
+      events.push({ type: "last", p: q });
+      return;
+    }
+    state.lastSeat = -1;
     state.phase = "pick";
     if (!lastTurn) {
       const dir = passDir(state.age);
