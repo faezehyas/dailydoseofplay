@@ -511,14 +511,12 @@ function mountGame(session, root, shell) {
   // ---------- your moves ----------
   const st = () => match.state;
   function send(move, kind) {
-    const s = st();
     const slot = move.build ?? move.stage ?? move.discard ?? move.dig;
     picked = { key: turnKey(), slot, kind, id: slot >= 0 ? idOf(slot) : -1 };
     sel = null;
     play("pick");
     match.play(move);
     render();
-    void s;
   }
 
   // The cards you choose from now: your hand, or the discards while you dig.
