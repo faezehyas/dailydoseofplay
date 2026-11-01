@@ -10,24 +10,12 @@
 // through the discards; and a tally tick for each score row. A win or a loss
 // plays the result chimes (engine/chimes.js).
 import { defineSounds } from "../engine/sound.js";
-import { tone as rawTone, noise as rawNoise, pentatonic } from "../engine/synth.js";
+import { tone, noise, pentatonic } from "../engine/synth.js";
 import { cardSounds, tableSounds } from "../engine/cards/card-sounds.js";
 import { COLORS } from "./cards.js";
 
 const note = pentatonic(293.66); // D4 up
 
-// A gain is 1 until its first scheduled change, and synth.js's envelopes
-// start at t: when t falls between two samples, a note's first sample can
-// slip out at full level, a click. A gate shut until just after t stops it.
-function gate(a, o, t) {
-  const g = a.createGain();
-  g.gain.value = 0;
-  g.gain.setValueAtTime(1, t + 1.5 / a.sampleRate);
-  g.connect(o);
-  return g;
-}
-const tone = (a, o, t, opts) => rawTone(a, gate(a, o, t), t, opts);
-const noise = (a, o, t, opts) => rawNoise(a, gate(a, o, t), t, opts);
 const vary = (x, by) => x * (1 + (Math.random() * 2 - 1) * by);
 
 // ---------- the lyre ----------
