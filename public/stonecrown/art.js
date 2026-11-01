@@ -9,7 +9,7 @@ import { el } from "../engine/shell.js";
 import { easing } from "../engine/cards/table.js";
 import { CARDS, WONDERS, COLORS, RESOURCE_NAMES, SYMBOLS, RAW, GOODS, DISCARD_COINS, VICTORY } from "./cards.js";
 import { stagesOf, canBuild, canStage, unitPrice, production, shields, ROUNDS } from "./rules.js";
-import { cardSvg, cardBack, resourceIcon, scienceIcon, coinIcon, shieldIcon, pointsIcon } from "./card-art.js";
+import { cardSvg, cardBack, cardText, effectIcon, resourceIcon, scienceIcon, coinIcon, shieldIcon, pointsIcon, neighbourIcon, colourIcon } from "./card-art.js";
 import { wonderSvg, wonderMini, coinSvg, tokenSvg, tableSvg } from "./pieces.js";
 
 export const PACE = { fly: 620, flip: 420, flyGap: 70, coin: 520, pass: 520, deal: 300, dealGap: 45, stage: 520, war: 520, warGap: 360, row: 380, between: 140, bubble: 900 };
@@ -92,14 +92,8 @@ export function effectWords(x) {
 export const chainsTo = (card) => [...new Set(CARDS.filter((c) => c.from.includes(card.key)).map((c) => c.name))];
 export const chainsFrom = (card) => [...new Set(card.from.map((k) => CARDS.find((c) => c.key === k)?.name).filter(Boolean))];
 
-// "Timber Mill, brown: makes 2 wood. Costs 1 coin." and its chains.
-export function cardWords(id) {
-  const c = CARDS[id];
-  if (!c) return "a card";
-  const from = chainsFrom(c);
-  const to = chainsTo(c);
-  return [`${c.name}, ${c.color}: ${effectWords(c)}`, costWords(c.cost) === "free" ? "Free to build" : `Costs ${costWords(c.cost)}`, from.length ? `Free with ${orWords(from)}` : "", to.length ? `Builds ${listOf(to)} free` : ""].filter(Boolean).join(". ") + ".";
-}
+// A card in words (card-art.js): its name, age, colour, cost, effect and chains.
+export const cardWords = (id) => (CARDS[id] ? cardText(id) : "a card");
 
 export function stageWords(stage, n) {
   return `Stage ${ROMAN[n + 1]}: ${effectWords(stage)}. Costs ${costWords(stage.cost)}.`;
@@ -165,11 +159,12 @@ export function whyWords(why, card = null) {
 export function warWords(results, me, age, nameOf) {
   const won = VICTORY[age - 1];
   const n = results.length;
-  const parts = [(me + 1) % n, (me + n - 1) % n].map((q, i) => {
-    const r = results[me][i];
-    return r > 0 ? `beat ${nameOf(q)} (${signed(won)})` : r < 0 ? `lost to ${nameOf(q)} (−1)` : `drew with ${nameOf(q)}`;
-  });
-  return `War: you ${listOf(parts)}`;
+  const [l, r] = [(me + 1) % n, (me + n - 1) % n];
+  const [a, b] = results[me];
+  const both = `${nameOf(l)} and ${nameOf(r)}`;
+  if (a === b) return `War: you ${a > 0 ? `beat ${both} (${signed(won)} each)` : a < 0 ? `lost to ${both} (−1 each)` : `drew with ${both}`}`;
+  const one = (q, x) => (x > 0 ? `beat ${nameOf(q)} (${signed(won)})` : x < 0 ? `lost to ${nameOf(q)} (−1)` : `drew with ${nameOf(q)}`);
+  return `War: you ${one(l, a)} and ${one(r, b)}`;
 }
 // Each neighbouring pair once: [p, its left neighbour, the result for p].
 export const warPairs = (results) => results.map((r, p) => [p, (p + 1) % results.length, r[0]]);
@@ -249,11 +244,7 @@ export const resEl = (r) => art(`sc-ic r-${r}`, resourceIcon(r));
 export const sciEl = (s) => art(`sc-ic sci-${s}`, scienceIcon(s));
 export const shieldEl = () => art("sc-ic shield", shieldIcon());
 export const pointsEl = (n) => art("sc-ic points", pointsIcon(n));
-export const coinEl = (n = null) => {
-  const node = art("sc-ic coin", coinIcon());
-  if (n !== null) node.append(el("b", { class: "sc-coin-n" }, String(n)));
-  return node;
-};
+export const coinEl = (n = null) => art("sc-ic coin", n === null ? coinIcon() : coinIcon(n));
 export const tokenEl = (v) => art(`sc-tok ${v < 0 ? "defeat" : "victory"}`, tokenSvg(v));
 export const coinPieceEl = (v) => art("sc-coin-piece", coinSvg(v));
 
@@ -266,10 +257,16 @@ export function seatMark(p) {
 }
 
 const SEP = () => el("span", { class: "sc-or", "aria-hidden": "true" }, "/");
-const colorSquare = (c) => el("span", { class: `sc-swatch c-${c}`, "aria-hidden": "true" });
-const sideArrow = (side) => el("span", { class: `sc-side ${side}`, "aria-hidden": "true" }, side === "left" ? "◂" : side === "right" ? "▸" : "•");
-// A card's or stage's effect as icons, for chips and the detail strip.
+const sideEl = (side) => art(`sc-ic side ${side}`, neighbourIcon(side));
+// A wonder stage's effect as icons, for the detail strip (a card's comes from effectIcon()).
 export function effectEl(x) {
+  if (x.id !== undefined && CARDS[x.id] === x) {
+    const node = art("sc-fx sc-fx-card", effectIcon(x.id));
+    // Its width follows its viewBox: an effect is one icon or a row of them.
+    const [, , w, h] = (node.firstChild.getAttribute("viewBox") ?? "0 0 24 24").split(/\s+/).map(Number);
+    node.style.setProperty("--w", String(w / h));
+    return node;
+  }
   const row = el("span", { class: "sc-fx", "aria-hidden": "true" });
   if (x.produce) x.produce.forEach((u, i) => {
     if (i && u.length > 1) row.append(el("span", { class: "sc-gap" }));
@@ -277,20 +274,13 @@ export function effectEl(x) {
   });
   if (x.points) row.append(pointsEl(x.points));
   for (let i = 0; i < (x.shields ?? 0); i++) row.append(shieldEl());
-  if (x.science === "any") [0, 1, 2].forEach((s, j) => row.append(...(j ? [SEP()] : []), sciEl(s)));
+  if (x.science === "any") row.append(sciEl("any"));
   else if (x.science !== undefined) row.append(sciEl(x.science));
   if (x.gold) row.append(coinEl(x.gold));
-  if (x.trade) row.append(...x.trade.sides.filter((s) => s === "left").map(sideArrow), resEl(x.trade.kinds[0]), el("span", { class: "sc-dots" }, "…"), coinEl(1), ...x.trade.sides.filter((s) => s === "right").map(sideArrow));
-  for (const [k, each] of [["income", "coins"], ["score", "points"]]) {
-    const e = x[k];
-    if (!e || (k === "score" && x.income)) continue;
-    const per = e.per === "stage" ? el("span", { class: "sc-stage-ic" }, "▲") : e.per === "defeat" ? tokenEl(-1) : el("span", { class: "sc-swatches" }, ...[].concat(e.per).map(colorSquare));
-    row.append(...e.from.filter((s) => s === "left").map(sideArrow), per, ...e.from.filter((s) => s === "right").map(sideArrow), el("span", { class: "sc-eq" }, "="), each === "coins" ? coinEl(e.coins) : pointsEl(e.points));
-    if (k === "income" && x.score) row.append(pointsEl(x.score.points));
-  }
+  if (x.trade) row.append(...x.trade.sides.filter((s) => s === "left").map(sideEl), resEl(x.trade.kinds[0]), el("span", { class: "sc-dots" }, "…"), coinEl(1), ...x.trade.sides.filter((s) => s === "right").map(sideEl));
   if (x.dig) row.append(el("span", { class: "sc-word" }, "dig"));
-  if (x.free) row.append(el("span", { class: "sc-word" }, "free"));
-  if (x.copyGuild) row.append(el("span", { class: "sc-word" }, "copy guild"));
+  if (x.free) row.append(el("span", { class: "sc-word" }, "free build"));
+  if (x.copyGuild) row.append(art("sc-ic", colourIcon("purple")), el("span", { class: "sc-word" }, "copy"));
   if (x.playLast) row.append(el("span", { class: "sc-word" }, "7th card"));
   return row;
 }
@@ -342,8 +332,13 @@ export function turnCardEl(id, age, { size = "full", down = true } = {}) {
 // A built card in a city: its colour, its effect as icons, and its name where there's room.
 export function chipEl(id) {
   const c = CARDS[id];
-  return el("span", { class: `sc-chip c-${c.color}`, title: c.name, dataset: { id } }, effectEl(c), el("span", { class: "sc-chip-name" }, c.name));
+  return el("span", { class: `sc-chip c-${c.color}`, title: c.name, dataset: { id } }, art("sc-chip-art", miniArt(id)), el("span", { class: "sc-chip-name" }, c.name));
 }
+const minis = new Map();
+const miniArt = (id) => {
+  if (!minis.has(id)) minis.set(id, cardSvg(id, { size: "mini" }));
+  return minis.get(id);
+};
 
 // A city in columns by colour; empty colours keep a dashed place.
 export function cityEl(ids, { cls = "" } = {}) {
@@ -388,6 +383,8 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {} }) {
       el("div", { class: "sc-seat-city-box" }, el("span", { class: "sc-label" }, `${nameOf(p)}'s city`), city),
       pick,
     );
+    // The whole panel opens the city; its name is the button keyboards and screen readers use.
+    node.addEventListener("click", (e) => !e.target.closest(".sc-seat-open") && onSeat(p));
     let key = "";
     function draw(view, { picked = false } = {}) {
       const w = view.wonders[p];

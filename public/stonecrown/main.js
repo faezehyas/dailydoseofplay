@@ -22,7 +22,7 @@ import { robotPause } from "../engine/robot-pace.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { CARDS, WONDERS, HAND } from "./cards.js";
 import { makeRules, normalizeConfig, forcedMove, legalMoves, designOf, passDir, stagesOf, shields, score, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
-import { PACE, ROMAN, plural, listOf, cardWords, stageWords, effectWords, costWords, sideCoins, payWords, buyWords, moveFor, pickOptions, WHY, whyWords, warWords, warPairs, pairWords, resultWords, viewOf, turnWords, seatWords, chainsFrom, cardEl, turnCardEl, costEl, effectEl, coinEl, seatMark, cityEl, boardSvg, tableEl, scTable, scoreSheet } from "./art.js";
+import { PACE, ROMAN, plural, listOf, cardWords, stageWords, effectWords, costWords, sideCoins, payWords, buyWords, moveFor, pickOptions, WHY, whyWords, warWords, warPairs, pairWords, resultWords, viewOf, turnWords, seatWords, chainsFrom, chainsTo, cardEl, turnCardEl, costEl, effectEl, coinEl, seatMark, cityEl, boardSvg, tableEl, scTable, scoreSheet } from "./art.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
 import { howToPlay } from "./how-to-play.js";
@@ -776,6 +776,7 @@ function mountGame(session, root, shell) {
       el("div", { class: `sc-detail-head c-${c.color}` }, el("strong", { class: "sc-detail-name" }, c.name), effectEl(c), o.build.chain ? el("span", { class: "sc-badge chain" }, "chain") : null, o.free && !o.build.chain ? el("span", { class: "sc-badge free" }, "free build") : null),
       el("p", { class: "sc-detail-fx" }, effectWords(c)),
       el("p", { class: "sc-detail-cost" }, ...(costWords(c.cost) === "free" ? [el("span", { class: "k" }, "Free to build")] : [el("span", { class: "k" }, "Costs"), costEl(c.cost), el("span", {}, costWords(c.cost))]), from.length ? el("small", { class: "sc-chain-from" }, ` · free with ${listOf(from)}`) : null),
+      chainsTo(c).length ? el("p", { class: "sc-chain-to" }, `Makes ${listOf(chainsTo(c))} free later.`) : null,
     ];
     if (b) {
       if (o.build.chain) lines.push(el("p", { class: "sc-detail-pay ok" }, `Free: you have ${listOf(from)}.`));

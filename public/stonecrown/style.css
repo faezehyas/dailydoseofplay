@@ -389,8 +389,8 @@
   align-items: start;
 }
 
-.sc-seat.left { grid-area: left; }
-.sc-seat.right { grid-area: right; }
+.sc-seat.left { grid-area: left; align-self: stretch; }
+.sc-seat.right { grid-area: right; align-self: stretch; }
 .sc-seat.across { display: none; }
 .sc-mine { grid-area: mine; }
 .sc-hand-area { grid-area: hand; }
@@ -433,6 +433,7 @@
 /* ---------- a neighbour's panel ---------- */
 .sc-seat {
   position: relative;
+  cursor: pointer;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 6px;
@@ -474,9 +475,10 @@
 
 .sc-seat-name {
   display: inline-flex;
+  flex: 0 1 auto;
   align-items: center;
   gap: 5px;
-  min-width: 0;
+  min-width: min(5.5em, 60%);
   font: 600 1rem var(--font-display);
 }
 
@@ -488,10 +490,14 @@
 }
 
 .sc-seat-wonder {
+  flex: 0 1 auto;
+  min-width: 0;
   margin-left: auto;
+  overflow: hidden;
   font-size: 0.78rem;
   font-style: italic;
   opacity: 0.9;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -729,22 +735,33 @@
   min-width: 0;
 }
 
+/* A built card: the top of its mini face (colour and effect), sliced by card-art.js. */
 .sc-chip {
   position: relative;
   display: grid;
-  place-items: center;
-  min-height: 24px;
-  padding: 2px 1px;
-  border-radius: 8px;
-  background: var(--k-lt);
-  box-shadow: inset 0 0 0 2.5px var(--k), 0 2px 0 rgb(var(--sc-shadow) / 14%);
+  gap: 1px;
+  min-width: 0;
+}
+
+.sc-chip-art {
+  display: block;
+  aspect-ratio: 44 / 30;
+  border-radius: 6px;
   overflow: hidden;
+  box-shadow: 0 1.5px 0 rgb(var(--sc-shadow) / 16%), 0 3px 6px rgb(var(--sc-shadow) / 10%);
+}
+
+.sc-chip-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
 }
 
 .sc-chip.ghost {
-  background: transparent;
-  box-shadow: none;
+  aspect-ratio: 44 / 30;
   border: 2px dashed var(--k);
+  border-radius: 6px;
   opacity: 0.4;
 }
 
@@ -753,15 +770,11 @@
   max-width: 100%;
   padding-inline: 3px;
   overflow: hidden;
-  color: var(--k-ink);
+  color: var(--sc-ink);
   font: 600 0.62rem/1.1 var(--font-display);
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.sc-city.mine .sc-chip,
-.sc-city.big .sc-chip {
-  min-height: 30px;
 }
 
 @media (min-width: 640px) {
@@ -775,14 +788,8 @@
   gap: 2px;
 }
 
-.sc-seat-city .sc-chip {
-  min-height: 20px;
-  border-radius: 6px;
-}
-
-.sc-seat-city .sc-ic {
-  width: 13px;
-  height: 13px;
+.sc-seat-city .sc-chip-art {
+  border-radius: 4px;
 }
 
 /* Effects as icons. */
@@ -904,8 +911,10 @@
   flex: 1;
 }
 
+/* Room below the board for the cards tucked under its stages. */
 .sc-board {
   position: relative;
+  margin-bottom: 12px;
   border-radius: 14px;
 }
 
@@ -1708,5 +1717,50 @@
   .sc-hcard,
   .sc-turn .in {
     transition: none;
+  }
+}
+
+.sc-fx-card {
+  --h: 22px;
+  display: inline-block;
+  flex: none;
+  width: calc(var(--h) * var(--w, 1));
+  height: var(--h);
+}
+
+.sc-fx-card svg {
+  width: 100%;
+  height: 100%;
+}
+
+.sc-chain-to {
+  color: var(--sc-muted);
+  font-size: 0.82rem;
+}
+
+/* The score sheet over the table fits a phone: names shorten, columns tighten. */
+.sc-final {
+  width: min(560px, calc(100% - 16px));
+  min-width: 0;
+}
+
+@media (max-width: 520px) {
+  .sc-sheet {
+    font-size: 0.8rem;
+  }
+
+  .sc-sheet th,
+  .sc-sheet td {
+    padding: 3px 2px;
+  }
+
+  .sc-sheet .who {
+    flex-direction: column;
+    gap: 1px;
+    max-width: 4.6em;
+  }
+
+  .sc-sheet .who .nm {
+    max-width: 100%;
   }
 }

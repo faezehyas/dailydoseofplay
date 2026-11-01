@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CARDS, WONDERS, DISCARD_COINS } from "./cards.js";
-import { costWords, effectWords, cardWords, payWords, buyWords, moveFor, pickOptions, sideCoins, warWords, warPairs, pairWords, resultWords, viewOf, seatsAround, cityColumns, sells, turnWords, seatWords } from "./art.js";
+import { costWords, effectWords, cardWords, chainsFrom, chainsTo, stageWords, payWords, buyWords, moveFor, pickOptions, sideCoins, warWords, warPairs, pairWords, resultWords, viewOf, seatsAround, cityColumns, sells, turnWords, seatWords } from "./art.js";
 
 const idOf = (key) => CARDS.find((c) => c.key === key).id;
 const zero = () => [0, 0, 0, 0, 0, 0, 0];
@@ -54,10 +54,13 @@ test("costs and effects read as plain words", () => {
   assert.equal(effectWords(WONDERS.find((w) => w.key === "halicarnassus").sides.A[1]), "build one card from the discards free");
 });
 
-test("a card's words name its chains both ways", () => {
-  assert.equal(cardWords(idOf("shrine")), "Shrine, blue: 2 points. Free to build. Builds Sanctuary free.");
-  assert.equal(cardWords(idOf("sanctuary")), "Sanctuary, blue: 3 points. Costs 1 wood, 1 clay and 1 glass. Free with Shrine. Builds Temple of All free.");
-  assert.equal(cardWords(idOf("agora")), "Agora, yellow: makes glass, cloth or papyrus, one a turn. Costs 2 clay. Free with East Road or West Road. Builds Harbour free.");
+test("a card's words, and the chains the detail strip names both ways", () => {
+  assert.match(cardWords(idOf("sanctuary")), /^Sanctuary/);
+  assert.equal(cardWords(-1), "a card");
+  assert.deepEqual(chainsFrom(CARDS[idOf("agora")]), ["East Road", "West Road"]);
+  assert.deepEqual(chainsTo(CARDS[idOf("shrine")]), ["Sanctuary"]);
+  assert.deepEqual(chainsTo(CARDS[idOf("weavers-hall")]), [], "the grey cards chain to nothing");
+  assert.equal(stageWords(WONDERS[0].sides.A[1], 1), "Stage II: 2 shields. Costs 3 clay.");
 });
 
 test("payments and purchases name who gets the coins", () => {
@@ -121,6 +124,8 @@ test("the war in words, from your seat and for each pair", () => {
   const results = [[1, -1], [0, -1], [1, 0]];
   const name = (p) => ["you", "Ana", "Ben"][p];
   assert.equal(warWords(results, 0, 2, name), "War: you beat Ana (+3) and lost to Ben (−1)");
+  assert.equal(warWords([[1, 1], [-1, 0], [0, -1]], 0, 3, name), "War: you beat Ana and Ben (+5 each)");
+  assert.equal(warWords([[0, 0], [0, 0], [0, 0]], 0, 1, name), "War: you drew with Ana and Ben");
   assert.deepEqual(warPairs(results), [[0, 1, 1], [1, 2, 0], [2, 0, 1]]);
   const Name = (p) => ["You", "Ana", "Ben"][p];
   assert.equal(pairWords([0, 1, 1], 1, Name), "You beat Ana (+1)");
