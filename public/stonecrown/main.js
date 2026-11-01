@@ -381,9 +381,9 @@ function mountGame(session, root, shell) {
 
   function act(kind) {
     const choice = myChoice();
+    if (choice === "dig" && kind === "nothing") return send({ dig: -1 }, "nothing");
     if (!choice || !sel) return;
     if (choice === "dig") {
-      if (kind === "nothing") return send({ dig: -1 }, "nothing");
       if (kind === "dig") send({ dig: sel.slot }, "dig");
       return;
     }
@@ -571,7 +571,7 @@ function mountGame(session, root, shell) {
     if (acrossPill && view) {
       const q = around.across;
       acrossPill.replaceChildren(seatMark(q), el("span", { class: "sc-across-words" }, el("b", {}, nameOf(q)), el("small", {}, "across")), el("span", { class: "sc-across-stats", "aria-hidden": "true" }, coinEl(view.coins[q]), el("span", { class: "sc-sh" }, String(shields(view, q)))));
-      acrossPill.setAttribute("aria-label", `${nameOf(q)}, across the table (not a neighbour): ${seatWords(view, q)}. Show their city`);
+      acrossPill.setAttribute("aria-label", `${nameOf(q)}, across the table (not a neighbour), ${seatWords(view, q)}. Show their city`);
     }
     if (view) art.drawPile(view);
     art.pile.classList.toggle("dig", view?.phase === "dig");

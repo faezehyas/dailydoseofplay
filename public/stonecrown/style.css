@@ -454,10 +454,6 @@
 }
 
 @media (min-width: 1000px) {
-  .page[data-view="game"][data-layout="wide"]:has(.stonecrown) {
-    --column: 1240px;
-  }
-
   .sc-main {
     grid-template-columns: 250px minmax(0, 1fr) 250px;
     grid-template-areas: "left mine right" "hand hand hand";

@@ -514,7 +514,7 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, ageOf =
         });
       }
       const where = side === "across" ? "across the table (not a neighbour)" : `your ${side} neighbour`;
-      const label = `${nameOf(p)}, ${where}, ${W.name} side ${w.side}: ${seatWords(view, p)}. Show their city`;
+      const label = `${nameOf(p)}, ${where}, ${W.name} side ${w.side}, ${seatWords(view, p)}. Show their city`;
       if (changed("label", label)) open.setAttribute("aria-label", label);
     }
     const rects = {
