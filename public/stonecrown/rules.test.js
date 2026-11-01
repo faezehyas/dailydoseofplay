@@ -353,7 +353,7 @@ test("Babylon B plays the seventh card once its second stage is built, even in t
   ev = t.turn({ 0: { build: seventh } });
   assert.deepEqual(t.st.city[0].at(-1).id, ID("amphitheatre"));
   // The others' seventh cards are discarded, hidden; then the war and age II.
-  assert.deepEqual(of(ev, "discard").map((e) => e.slot), [others[0][1], others[1][1]]);
+  assert.deepEqual(of(ev, "discard"), [{ type: "discard", p: 1, slot: others[0][1], seventh: true }, { type: "discard", p: 2, slot: others[1][1], seventh: true }]);
   assert.ok([others[0][1], others[1][1]].every((s) => t.st.discard.includes(s) && !t.deck.slots[s].open));
   assert.deepEqual([t.st.phase, t.st.lastSeat, t.st.age, t.st.round], ["pick", -1, 2, 1]);
   assert.ok(of(ev, "war").length && of(ev, "age").length);

@@ -187,8 +187,8 @@ export function canBuild(state, p, id) {
   if (chained(state, p, card)) return { ok: true, why: null, chain: true, free, purchases: [] };
   const all = purchases(state, p, card.cost);
   const ok = all.filter((b) => b.coins + card.cost.coins <= state.coins[p]);
-  const why = ok.length ? null : all.length ? "coins" : "resources";
-  return { ok: ok.length > 0 || free, why: ok.length || free ? null : why, chain: false, free, purchases: ok };
+  const why = ok.length || free ? null : all.length ? "coins" : "resources";
+  return { ok: !why, why, chain: false, free, purchases: ok };
 }
 
 // Can p build its next wonder stage now? { ok, why, n, purchases }.
@@ -285,7 +285,7 @@ export function reveals(state, player, move) {
   return [];
 }
 
-const card = (players, deck, slot) => {
+const shownCard = (players, deck, slot) => {
   const f = deck.face(slot);
   if (f === null) throw new RuleError("show the card you build");
   return CARDS[designOf(players, f)];
@@ -300,7 +300,7 @@ function plan(state, p, move, deck) {
   if (kind === "dig") {
     if (slot === -1) return { kind, slot };
     if (!state.discard.includes(slot)) throw new RuleError("dig: a card from the discard pile, or -1");
-    const c = card(state.players, deck, slot);
+    const c = shownCard(state.players, deck, slot);
     if (holdsKey(state, p, c.key)) throw new RuleError(`you already have ${c.name}`);
     return { kind, slot, id: c.id, how: "dig", coins: 0, left: zero(), right: zero(), bought: { left: 0, right: 0 } };
   }
@@ -331,7 +331,7 @@ function plan(state, p, move, deck) {
     const bought = pay(stage.cost.res, 0);
     return { kind, slot, n, coins: 0, left, right, bought };
   }
-  const c = card(state.players, deck, slot);
+  const c = shownCard(state.players, deck, slot);
   if (holdsKey(state, p, c.key)) throw new RuleError(`you already have ${c.name}`);
   const none = { left: 0, right: 0 };
   if (hasFree) {
@@ -486,7 +486,7 @@ export function makeRules(config = DEFAULT_CONFIG, players = MAX_PLAYERS) {
     }
     if (from !== "dig" && lastTurn) {
       state.lastSeat = -1;
-      state.hands.forEach((hand, p) => hand.forEach((slot) => events.push({ type: "discard", p, slot })));
+      state.hands.forEach((hand, p) => hand.forEach((slot) => events.push({ type: "discard", p, slot, seventh: true })));
       state.discard.push(...state.hands.flat());
       state.hands = state.hands.map(() => []);
     }
