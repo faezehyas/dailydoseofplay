@@ -968,9 +968,14 @@ goes at once, as in a robot game. Cancel keeps playing. Robot games, finished ma
 before leaving" in the settings panel (`askBeforeLeaving()` in `shell.js`). The browser's Back (or a phone's back gesture) is
 Leave too: a game gets a history entry of its own when it starts, so Back
 returns to the lobby, asking first in the same cases; Back while the question
-is open closes it, like Esc. Closing or reloading the tab in those cases gets the
-browser's own "Leave site?" prompt (`beforeunload`), since a page can't show
-its own dialog there.
+is open closes it, like Esc. Closing or reloading the tab gets the browser's
+own "Leave site?" prompt (`beforeunload`), since a page can't show its own
+dialog there: during any match in progress, robot games included (a reload is
+often an accident), unless "Ask before leaving" is off. So does a reload in a friend room before the game starts:
+the host's once the room is open (its invite link would stop working), a
+guest's once connected to the host. Safari on an iPhone never shows that
+prompt, so the game view turns off pull-to-refresh (`overscroll-behavior-y:
+none` on `html`).
 
 **Message size.** `JSON.parse` blocks the tab, so a modified client could
 freeze other players' tabs with huge messages. Every link therefore checks a
