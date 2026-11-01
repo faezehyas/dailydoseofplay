@@ -120,7 +120,15 @@ export function unitPrice(state, p, r, side) {
   return trades.some((x) => x.trade.kinds.includes(r) && x.trade.sides.includes(side)) ? TRADE_DISCOUNT : TRADE_COST;
 }
 
-const price = (state, p, left, right) => sum(RESOURCES.map((r) => left[r] * unitPrice(state, p, r, "left") + right[r] * unitPrice(state, p, r, "right")));
+// The coins a purchase { left, right } (7 counts each) pays each neighbour: { left, right }.
+export function sideCoins(state, p, buy) {
+  const at = (side) => sum(buy[side].map((n, r) => n * unitPrice(state, p, r, side)));
+  return { left: at("left"), right: at("right") };
+}
+const price = (state, p, left, right) => {
+  const paid = sideCoins(state, p, { left, right });
+  return paid.left + paid.right;
+};
 const lessOne = (res, t, r) => res.map((n, k) => Math.max(0, n - t[k] + (k === r ? 1 : 0)));
 
 // Why buying left and right from the neighbours doesn't pay for res, or null.
@@ -204,13 +212,13 @@ export function canStage(state, p) {
 // ---------- scoring ----------
 
 const matches = (card, per) => (Array.isArray(per) ? per.includes(card.color) : card.color === per);
-function countPer(state, q, per) {
+export function countPer(state, q, per) {
   if (per === "stage") return state.stages[q].length;
   if (per === "defeat") return state.tokens[q].filter((t) => t === DEFEAT).length;
   return cardsOf(state, q).filter((c) => matches(c, per)).length;
 }
 // income or score, { per, from, coins | points }, as if the card were p's.
-const tally = (state, p, { per, from }, each) => each * sum(from.map((side) => countPer(state, seatOn(state, p, side), per)));
+export const tally = (state, p, { per, from }, each) => each * sum(from.map((side) => countPer(state, seatOn(state, p, side), per)));
 
 // Points for science symbol counts [star, cog, quill] plus wild symbols, each set to what scores best.
 export function sciencePoints(counts, wilds = 0) {
@@ -218,17 +226,23 @@ export function sciencePoints(counts, wilds = 0) {
   return sum(counts.map((n) => n * n)) + 7 * Math.min(...counts);
 }
 
+// p's science symbols: { counts: [star, cog, quill], wilds }.
+export function scienceSymbols(state, p) {
+  const counts = [0, 0, 0];
+  let wilds = 0;
+  for (const x of [...cardsOf(state, p), ...builtStages(state, p)]) {
+    if (x.science === "any") wilds++;
+    else if (x.science !== undefined) counts[x.science]++;
+  }
+  return { counts, wilds };
+}
+
 // p's score sheet: { military, coins, wonder, civic, commerce, guilds, science, total, copied }.
 // copied: the neighbour's guild Olympia B copies (the one scoring best), or -1.
 export function score(state, p) {
   const cards = cardsOf(state, p);
   const stages = builtStages(state, p);
-  const counts = [0, 0, 0];
-  let wilds = 0;
-  for (const x of [...cards, ...stages]) {
-    if (x.science === "any") wilds++;
-    else if (x.science !== undefined) counts[x.science]++;
-  }
+  const { counts, wilds } = scienceSymbols(state, p);
   const guildPoints = (c) => (c.score ? tally(state, p, c.score, c.score.points) : 0);
   let guilds = sum(cards.filter((c) => c.color === "purple").map(guildPoints));
   let science = sciencePoints(counts, wilds);
@@ -322,7 +336,7 @@ function plan(state, p, move, deck) {
   const pay = (res, coins) => {
     const fault = purchaseFault(state, p, res, left, right);
     if (fault) throw new RuleError(fault);
-    const bought = { left: price(state, p, left, zero()), right: price(state, p, zero(), right) };
+    const bought = sideCoins(state, p, { left, right });
     if (coins + bought.left + bought.right > state.coins[p]) throw new RuleError("you haven't the coins for that");
     return bought;
   };

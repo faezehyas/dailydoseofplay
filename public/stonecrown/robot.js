@@ -20,7 +20,10 @@ import {
   forcedMove,
   production,
   unitPrice,
+  sideCoins,
   score,
+  tally,
+  scienceSymbols,
   sciencePoints,
   shields,
   leftOf,
@@ -101,14 +104,6 @@ function worth(card) {
 }
 
 // ---------- p's state after its own pick ----------
-function countPer(state, q, per) {
-  if (per === "stage") return state.stages[q].length;
-  if (per === "defeat") return state.tokens[q].filter((t) => t === DEFEAT).length;
-  return cardsOf(state, q).filter((c) => (Array.isArray(per) ? per.includes(c.color) : c.color === per)).length;
-}
-const seatOn = (state, p, side) => (side === "left" ? leftOf(state, p) : side === "right" ? rightOf(state, p) : p);
-const tally = (state, p, { per, from }, each) => each * sum(from.map((side) => countPer(state, seatOn(state, p, side), per)));
-
 // The state as p's pick alone leaves it: a card built (id), a stage, coins
 // paid or received; the others' picks of the same turn are unknown.
 function after(state, p, { id, stage = false, pay = 0, gain = 0, free = false }) {
@@ -134,18 +129,9 @@ function scienceWith(counts, wilds, k) {
   for (let a = 0; a <= k; a++) for (let b = 0; a + b <= k; b++) top = Math.max(top, sciencePoints([counts[0] + a, counts[1] + b, counts[2] + k - a - b], wilds));
   return top;
 }
-function symbols(state, p) {
-  const counts = [0, 0, 0];
-  let wilds = 0;
-  for (const x of [...cardsOf(state, p), ...builtStages(state, p)]) {
-    if (x.science === "any") wilds++;
-    else if (x.science !== undefined) counts[x.science]++;
-  }
-  return { counts, wilds };
-}
 // Science points with the symbols p may still expect, more the more it already has.
 function scienceAhead(ctx, state, p) {
-  const { counts, wilds } = symbols(state, p);
+  const { counts, wilds } = scienceSymbols(state, p);
   const now = sciencePoints(counts, wilds);
   const [base, per] = ctx.lv.sci;
   const x = Math.min(4, ctx.left.game * (base + per * (sum(counts) + wilds)));
@@ -377,20 +363,16 @@ function denials(ctx, ids) {
 // What a purchase costs beyond its coins: coins handed to a neighbour help it, more so one who's ahead.
 function purchaseCost(ctx, m) {
   const { state, me, lv } = ctx;
-  const b = m.buy;
-  if (!b) return 0;
-  const toL = sum(b.left.map((n, r) => n * unitPrice(state, me, r, "left")));
-  const toR = sum(b.right.map((n, r) => n * unitPrice(state, me, r, "right")));
+  if (!m.buy) return 0;
+  const to = sideCoins(state, me, m.buy);
   const tip = (q) => (ctx.totals[q] >= ctx.totals[me] ? lv.tip : lv.tip / 3) + 1e-3;
-  return toL * tip(leftOf(state, me)) + toR * tip(rightOf(state, me));
+  return to.left * tip(leftOf(state, me)) + to.right * tip(rightOf(state, me));
 }
 
 // The coins a build or stage move pays from p's purse.
 function paid(state, me, m, card) {
-  const b = m.buy;
-  const toL = b ? sum(b.left.map((n, r) => n * unitPrice(state, me, r, "left"))) : 0;
-  const toR = b ? sum(b.right.map((n, r) => n * unitPrice(state, me, r, "right"))) : 0;
-  return toL + toR + (card && !m.free ? card.cost.coins : 0);
+  const to = m.buy ? sideCoins(state, me, m.buy) : { left: 0, right: 0 };
+  return to.left + to.right + (card && !m.free ? card.cost.coins : 0);
 }
 
 // A dig stage builds a discarded card free at the end of the turn: worth more the fuller the pile.
