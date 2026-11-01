@@ -1,8 +1,8 @@
 // Headless-browser test for leaving a game: in a live friend match Leave, or
 // the browser's Back, asks first in the site's dialog (Cancel, Esc or Back
 // keeps playing, Leave ends it for the others), and closing the tab gets the
-// browser's prompt; robot games and finished matches leave at once. Skips if
-// Playwright is missing.
+// browser's prompt, in a robot game too; robot games and finished matches
+// leave at once by Leave or Back. Skips if Playwright is missing.
 //
 //   npm run test:browser
 import test from "node:test";
@@ -88,7 +88,7 @@ test("in a live friend game, Leave or Back asks first: Cancel, Esc or Back keeps
   assertNoErrors();
 });
 
-test("a finished friend match and a robot game leave at once, by Leave or Back", { skip, timeout: 120_000 }, async (t) => {
+test("a finished friend match and a robot game leave at once, by Leave or Back; closing the tab mid robot game asks", { skip, timeout: 120_000 }, async (t) => {
   const { srv, open, room, assertNoErrors, prompts } = await setup(t);
   const host = await open("Ada");
   const guest = await open("Bo");
@@ -115,12 +115,15 @@ test("a finished friend match and a robot game leave at once, by Leave or Back",
   await back(solo);
   await solo.locator("#play-friend").waitFor();
   assert.equal(await solo.locator("dialog").count(), 0);
-  // Closing the tab mid robot game doesn't ask.
+  // Closing the tab mid robot game asks: a reload would lose the match.
   await solo.click("#play-robot");
   await waitForState(solo, (ddp) => ddp.match?.phase === "playing");
-  await solo.close({ runBeforeUnload: true });
-  await solo.waitForEvent("close");
   assert.deepEqual(prompts, []);
+  const prompted = solo.waitForEvent("dialog");
+  await solo.close({ runBeforeUnload: true });
+  await prompted;
+  assert.deepEqual(prompts, ["Cy: beforeunload"]);
+  assert.equal(await phase(solo), "playing");
   assertNoErrors();
 });
 

@@ -104,7 +104,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   const fewest = Math.max(2, minPlayers);
   const choosePlayers = robots === undefined && settings && maxPlayers > fewest;
   if (choosePlayers) settings.offerPlayers(Array.from({ length: maxPlayers - fewest + 1 }, (_, i) => fewest + i));
-  const state = { room: null, session: null, game: null, tutorial: null, mustAsk: () => false, leave: null, robot: null, robots: [], attempt: 0 };
+  const state = { room: null, session: null, game: null, tutorial: null, mustAsk: () => false, mustAskOnUnload: () => false, leave: null, robot: null, robots: [], attempt: 0 };
   window.ddp = state; // handy for debugging and browser tests
 
   const params = new URLSearchParams(location.search);
@@ -758,6 +758,8 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
     let inProgress = false;
     // Only people are asked about: once robots play every other seat, Leave is as in a robot game.
     state.mustAsk = () => inProgress && session.mode === "friend" && session.others.some((p) => !p.robot) && askBeforeLeaving();
+    // A reload, often by accident, loses any match, a robot game's too.
+    state.mustAskOnUnload = () => inProgress && askBeforeLeaving();
     state.leave = async () => {
       if (state.mustAsk() && !(await confirmLeave(session))) return;
       leaveGame();
@@ -826,7 +828,7 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
   // a host's invite link stops working, a guest has to join again. Only the
   // browser's own prompt can ask.
   function mustAskBeforeUnload() {
-    if (state.session) return state.mustAsk();
+    if (state.session) return state.mustAskOnUnload();
     const room = state.room;
     if (!room || !askBeforeLeaving()) return false;
     if (room instanceof GuestRoom) return !!room.link?.open;
