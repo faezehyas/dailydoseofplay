@@ -150,9 +150,10 @@ function mountGame(session, root, shell) {
   const handArea = el(
     "section",
     { class: "sc-hand-area", "aria-label": "Your move" },
-    el("div", { class: "sc-hand-head" }, el("h2", { class: "sc-title" }, hand.title), hand.next),
+    el("div", { class: "sc-hand-head" }, el("h2", { class: "sc-title" }, hand.title), picks.node, hand.next),
     el("div", { class: "sc-hand-wrap" }, hand.node, deck, table.busyChip),
-    el("div", { class: "sc-side" }, timer, buttons.node, detail, picks.node),
+    buttons.node,
+    el("div", { class: "sc-side" }, timer, detail),
   );
 
   const logList = el("ol", { class: table.cls("log"), id: "sc-log", role: "log", "aria-label": "What happened" });
@@ -312,6 +313,7 @@ function mountGame(session, root, shell) {
   let sheet = null;
   async function over(ev, g, k) {
     finalScores = ev.scores;
+    render();
     const order = seatOrder(ev.scores);
     sheet = scoreSheet(ev.scores, order, { me, nameOf, winners: ev.winners });
     addLog({ kind: "win", text: resultWords(ev.scores, ev.winners, me, nameOf) });

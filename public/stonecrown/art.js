@@ -612,10 +612,12 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, ageOf =
   const rectsOf = (p) => (p === me ? mineRects : panels.get(p)?.rects);
   // An overlay in the middle of the screen, wherever the table is scrolled.
   function centre(node) {
-    const o = flyLayer.getBoundingClientRect();
-    const y = Math.max(120, Math.min(o.height - 120, innerHeight / 2 - o.top));
-    node.style.top = `${y.toFixed(0)}px`;
     flyLayer.append(node);
+    // Wholly inside the table (its layer clips), as near the screen's middle as that allows.
+    const o = flyLayer.getBoundingClientRect();
+    const half = node.offsetHeight / 2 + 8;
+    const y = Math.max(half, Math.min(o.height - half, innerHeight / 2 - o.top));
+    node.style.top = `${y.toFixed(0)}px`;
   }
 
   // ---------- motion ----------
@@ -801,32 +803,56 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, ageOf =
   };
 }
 
-// The score sheet: a row at a time, counted up. scores by seat; order: the
-// seats as columns; returns { node, play({ g, k, wait, sound }) }.
+// The score sheet: a row at a time, each counted up while the total row
+// adds it in, then the winner's total lights up. scores by seat; order: the
+// seats as columns; returns { node, play({ g, k, wait, live, fast, sound }) }.
+const ROW_ICON = {
+  military: () => shieldEl(),
+  coins: () => coinEl(),
+  wonder: () => el("span", { class: "sc-ic sc-wonder-pip", "aria-hidden": "true" }),
+  civic: () => art("sc-ic", colourIcon("blue")),
+  commerce: () => art("sc-ic", colourIcon("yellow")),
+  guilds: () => art("sc-ic", colourIcon("purple")),
+  science: () => art("sc-ic", colourIcon("green")),
+};
 export function scoreSheet(scores, order, { me, nameOf, winners = [] }) {
-  const head = el("tr", {}, el("th", { scope: "col" }, el("span", { class: "sr-only" }, "Row")), ...order.map((p) => el("th", { scope: "col", class: `p-${p} ${p === me ? "mine" : ""}` }, el("span", { class: "who" }, seatMark(p), el("span", { class: "nm" }, p === me ? "You" : nameOf(p))))));
+  const won = (p) => winners.includes(p);
+  const head = el("tr", {}, el("th", { scope: "col" }, el("span", { class: "sr-only" }, "Row")), ...order.map((p) => el("th", { scope: "col", class: `p-${p} ${p === me ? "mine" : ""} ${won(p) ? "best" : ""}` }, el("span", { class: "who" }, seatMark(p), el("span", { class: "nm" }, p === me ? "You" : nameOf(p))))));
   const cells = [];
-  const rows = SCORE_ROWS.map(([key, label, note], i) => {
-    const tds = order.map((p) => el("td", { class: `mono ${key === "total" && winners.includes(p) ? "best" : ""}` }, String(scores[p][key])));
+  const rows = SCORE_ROWS.map(([key, label, note]) => {
+    const tds = order.map((p) => el("td", { class: `${p === me ? "mine" : ""} ${key === "total" && won(p) ? "best" : ""} ${scores[p][key] ? "" : "zero"}` }, String(scores[p][key])));
     cells.push(tds);
-    return el("tr", { class: `r-${key}` }, el("th", { scope: "row" }, el("span", { class: "lbl" }, label), note ? el("small", {}, note) : null), ...tds);
+    return el("tr", { class: `r-${key}` }, el("th", { scope: "row" }, el("span", { class: "lbl" }, ROW_ICON[key]?.(), label), note ? el("small", {}, note) : null), ...tds);
   });
-  const node = el("table", { class: "sc-sheet", id: "sc-sheet" }, el("caption", { class: "sr-only" }, "Final scores"), el("thead", {}, head), el("tbody", {}, rows.slice(0, -1)), el("tfoot", {}, rows.at(-1)));
+  const node = el("table", { class: "sc-sheet done", id: "sc-sheet" }, el("caption", { class: "sr-only" }, "Final scores"), el("thead", {}, head), el("tbody", {}, rows.slice(0, -1)), el("tfoot", {}, rows.at(-1)));
   async function play({ g, k = 1, wait, live, fast, sound }) {
     if (fast()) return;
-    for (const tds of cells) tds.forEach((td) => (td.textContent = ""));
-    for (const [i, [key]] of SCORE_ROWS.entries()) {
+    node.classList.remove("done");
+    const totals = cells.at(-1);
+    const sum = order.map(() => 0);
+    cells.slice(0, -1).forEach((tds) => tds.forEach((td) => (td.textContent = "")));
+    totals.forEach((td) => (td.textContent = "0"));
+    rows.at(-1).classList.add("on");
+    for (const [i, [key]] of SCORE_ROWS.slice(0, -1).entries()) {
       if (!live(g)) break;
       rows[i].classList.add("on");
       sound("score", { row: i });
       const target = order.map((p) => scores[p][key]);
       const steps = 6;
       for (let s = 1; s <= steps; s++) {
-        cells[i].forEach((td, j) => (td.textContent = String(Math.round((target[j] * s) / steps))));
+        cells[i].forEach((td, j) => {
+          const now = Math.round((target[j] * s) / steps);
+          td.textContent = String(now);
+          totals[j].textContent = String(sum[j] + now);
+        });
         await wait((PACE.row / steps) * k, g);
       }
+      target.forEach((t, j) => (sum[j] += t));
     }
     cells.forEach((tds, i) => tds.forEach((td, j) => (td.textContent = String(scores[order[j]][SCORE_ROWS[i][0]]))));
+    if (!live(g)) return;
+    sound("score", { row: SCORE_ROWS.length - 1 });
+    node.classList.add("done");
   }
   return { node, play };
 }
@@ -843,14 +869,14 @@ export function buildPlan(state, me, o, slot, i, names) {
   if (!b.ok || !b.purchases.length) return { ok: false, label: WHY[b.why] ?? "Can't build", sub: b.why === "duplicate" ? "" : costWords(o.card.cost), why: whyWords(b.why, o.card) };
   const p = b.purchases[i % b.purchases.length];
   const side = sideCoins(state, me, p);
-  return { ok: true, move: moveFor("build", slot, p), label: "Build", sub: payWords({ bank: b.coins, ...side }, names) || "Free", buy: p, side, ways: b.purchases.length };
+  return { ok: true, move: moveFor("build", slot, p), label: "Build", sub: payWords({ bank: b.coins, ...side }, names) || "Pay nothing", buy: p, side, ways: b.purchases.length };
 }
 export function stagePlan(state, me, o, slot, i, names) {
   const s = o.stage;
   if (!s.ok) return { ok: false, label: s.why === "built" ? "Wonder finished" : "Can't afford", sub: s.stage ? `Stage ${ROMAN[s.n + 1]}: ${costWords(s.stage.cost)}` : "", why: whyWords(s.why) };
   const p = s.purchases[i % s.purchases.length];
   const side = sideCoins(state, me, p);
-  return { ok: true, move: moveFor("stage", slot, p), label: `Wonder stage ${ROMAN[s.n + 1]}`, sub: payWords(side, names) || "Free", buy: p, side, ways: s.purchases.length };
+  return { ok: true, move: moveFor("stage", slot, p), label: `Wonder stage ${ROMAN[s.n + 1]}`, sub: payWords(side, names) || "Pay nothing", buy: p, side, ways: s.purchases.length };
 }
 
 // What a screen reader hears a card in your hand can do now.

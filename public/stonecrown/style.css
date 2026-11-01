@@ -400,6 +400,40 @@
 .sc-mine { grid-area: mine; }
 .sc-hand-area { grid-area: hand; }
 
+/* Below a laptop the hand comes right under the neighbours, so a pick needs
+   no scrolling; its cards are as big as two rows across the width allow. */
+@media (max-width: 999px) {
+  .sc-main {
+    grid-template-areas: "left right" "hand hand" "mine mine";
+  }
+
+  .sc-hand[data-n="3"],
+  .sc-hand[data-n="5"],
+  .sc-hand[data-n="6"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sc-hand[data-n="1"],
+  .sc-hand[data-n="2"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sc-hand[data-n="1"] .sc-hcard,
+  .sc-hand[data-n="2"] .sc-hcard,
+  .sc-hand[data-n="3"] .sc-hcard {
+    max-width: 120px;
+    justify-self: center;
+    width: 100%;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 999px) {
+  .sc-hand.sc-hand {
+    grid-template-columns: repeat(7, minmax(0, 104px));
+    justify-content: center;
+  }
+}
+
 /* With three players, the two others are both your neighbours: right on the left if seated so. */
 .stonecrown .pb-score {
   display: none;
@@ -930,15 +964,67 @@
 
 .sc-hand-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   flex-wrap: wrap;
 }
 
 .sc-hand-next {
+  margin-left: auto;
   color: var(--sc-muted);
   font-size: 0.85rem;
+}
+
+/* Who has picked sits by the hand's title on a laptop, on a row of its own on a phone. */
+.sc-hand-head .sc-picks {
+  order: 3;
+  flex-basis: 100%;
+}
+
+@media (min-width: 1000px) {
+  .sc-hand-head .sc-picks {
+    order: 0;
+    flex-basis: auto;
+    margin-left: 10px;
+  }
+}
+
+/* On a phone, who has picked is a row of marks: a tick, or dots while they think. */
+@media (max-width: 999px) {
+  .sc-hand-head .sc-picks {
+    order: 0;
+    flex-basis: auto;
+    margin-left: auto;
+    gap: 4px;
+  }
+
+  .sc-hand-head .sc-picks li {
+    position: relative;
+    gap: 2px;
+    padding: 2px 6px 2px 2px;
+  }
+
+  .sc-hand-head .sc-picks li :is(.nm, .sc-pick-state) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .sc-hand-head .sc-picks li.done::after {
+    content: "✓";
+    color: var(--c-ink);
+    font-weight: 700;
+    font-size: 0.8rem;
+  }
+
+  .sc-hand-head .sc-picks .sc-mark {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 .sc-hand-wrap {
@@ -1322,13 +1408,15 @@
   }
 
   .sc-hand-area {
-    grid-template-columns: minmax(0, 1fr) 300px;
-    grid-template-areas: "head head" "hand side";
+    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-areas: "head head" "hand side" "buttons side";
+    align-items: start;
     column-gap: 18px;
   }
 
   .sc-hand-head { grid-area: head; }
   .sc-hand-wrap { grid-area: hand; }
+  .sc-buttons { grid-area: buttons; }
   .sc-side { grid-area: side; }
 
   .sc-hand {
@@ -1336,8 +1424,28 @@
     justify-content: start;
   }
 
-  .sc-buttons {
-    grid-template-columns: minmax(0, 1fr);
+  .sc-buttons,
+  .sc-buttons[data-n="2"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: calc(var(--sc-cw) * 7 + 36px);
+  }
+
+  .sc-buttons[data-n="4"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .sc-side .sc-detail {
+    max-height: 236px;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Your hand stays in view on a laptop, however tall the cities grow. */
+  .sc-hand-area {
+    position: sticky;
+    bottom: 8px;
+    z-index: 4;
+    box-shadow: 0 -6px 18px rgb(var(--sc-shadow) / 12%), 0 1.5px 0 rgb(var(--sc-shadow) / 10%), 0 10px 22px rgb(var(--sc-shadow) / 10%);
   }
 }
 
@@ -1460,7 +1568,7 @@
   gap: 8px;
   padding: 4px 6px;
   border-radius: 12px;
-  opacity: 0.5;
+  opacity: 0.6;
   transition: opacity var(--dur-med);
 }
 
@@ -1496,7 +1604,8 @@
   color: var(--ok);
 }
 
-.sc-war-row.clash .sc-war-side.lose {
+.sc-war-row.clash .sc-war-side.lose b,
+.sc-war-row.clash .sc-war-side.lose .sc-ic {
   opacity: 0.6;
 }
 
@@ -1561,8 +1670,74 @@
   text-align: left;
 }
 
-.sc-sheet td.best {
-  color: var(--ok);
+.sc-sheet td {
+  font: 600 0.98rem var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-sheet td.zero {
+  color: var(--sc-muted);
+}
+
+.sc-sheet td.mine,
+.sc-sheet th.mine {
+  background: rgb(var(--sc-shadow) / 5%);
+}
+
+.sc-sheet .lbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sc-sheet .lbl .sc-ic,
+.sc-sheet .lbl .sc-tok {
+  width: 18px;
+  height: 18px;
+}
+
+/* Wonder points: a little gold pyramid. */
+.sc-wonder-pip {
+  background: var(--sc-gold-dk);
+  clip-path: polygon(50% 8%, 96% 92%, 4% 92%);
+}
+
+.sc-sheet tfoot td {
+  font-size: 1.3rem;
+  padding-block: 6px;
+}
+
+.sc-sheet tfoot th {
+  font: 600 1.05rem var(--font-display);
+}
+
+/* The winner's total turns gold, and a crown goes over their name. */
+.sc-sheet.done tfoot td.best {
+  background: var(--sc-gold);
+  color: #4a3000;
+  border-radius: 12px;
+  box-shadow: 0 2px 0 var(--sc-gold-dk), 0 0 18px rgb(255 201 74 / 55%);
+}
+
+.sc-sheet.done thead th.best .who::before {
+  content: "";
+  flex: none;
+  width: 16px;
+  height: 12px;
+  background: var(--sc-gold-dk);
+  clip-path: polygon(0 100%, 0 22%, 26% 58%, 50% 0, 74% 58%, 100% 22%, 100% 100%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sc-final .sc-sheet.done tfoot td.best {
+    animation: sc-crown var(--dur-slow) var(--ease-spring);
+  }
+}
+
+@keyframes sc-crown {
+  40% {
+    transform: scale(1.25);
+  }
 }
 
 .sc-final .sc-sheet tr {

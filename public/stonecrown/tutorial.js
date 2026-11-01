@@ -171,9 +171,10 @@ export function board() {
   const handArea = el(
     "section",
     { class: "sc-hand-area", "aria-label": "Your move" },
-    el("div", { class: "sc-hand-head" }, el("h2", { class: "sc-title" }, hand.title), hand.next),
+    el("div", { class: "sc-hand-head" }, el("h2", { class: "sc-title" }, hand.title), picks.node, hand.next),
     el("div", { class: "sc-hand-wrap" }, hand.node),
-    el("div", { class: "sc-side" }, buttons.node, detail, picks.node),
+    buttons.node,
+    el("div", { class: "sc-side" }, detail),
   );
 
   const warLine = el("span", { class: "sr-only", role: "status" });
