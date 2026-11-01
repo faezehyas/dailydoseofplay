@@ -317,7 +317,8 @@ function mountGame(session, root, shell) {
     const order = seatOrder(ev.scores);
     sheet = scoreSheet(ev.scores, order, { me, nameOf, winners: ev.winners });
     addLog({ kind: "win", text: resultWords(ev.scores, ev.winners, me, nameOf) });
-    if (fast() || !live(g)) return;
+    if (!live(g)) return;
+    if (fast()) return void play("score", { row: 7 });
     const box = el("div", { class: "sc-final", role: "presentation" }, el("p", { class: "sc-final-title" }, "Final scores"), sheet.node);
     art.centre(box);
     box.animate([{ opacity: 0, transform: "translate(-50%, -46%)" }, { opacity: 1, transform: "translate(-50%, -50%)" }], { duration: 260, easing: easing("out"), fill: "both" });
@@ -366,6 +367,8 @@ function mountGame(session, root, shell) {
     }
     play("tap");
     render();
+    // On a phone the buttons can sit just under the fold: they come up to meet the card.
+    if (myChoice() && !buttons.node.hidden) buttons.node.scrollIntoView({ block: "nearest", behavior: fast() ? "auto" : "smooth" });
   }
 
   function optionsFor(slot) {
@@ -423,6 +426,8 @@ function mountGame(session, root, shell) {
     const dig = choice === "dig";
     const slots = dig ? choosable() : (view?.hands[me] ?? []);
     const done = picked?.key === turnKey() ? picked : null;
+    // Your pick stays marked until it turns over with everyone's.
+    const shown = done ?? (picked && table.pending ? picked : null);
     if (sel && !slots.includes(sel.slot)) sel = null;
     const n = view?.hands[me]?.length ?? 0;
     const to = view && passDir(view.age) > 0 ? around.left : around.right;
@@ -435,7 +440,7 @@ function mountGame(session, root, shell) {
       dig,
       legal: dig ? new Set(legalMoves(s, me, faceOf).filter((x) => x.dig >= 0).map((x) => x.dig)) : null,
       sel: sel?.slot ?? null,
-      picked: done ? done.slot : null,
+      picked: shown ? shown.slot : null,
       hidden: (slot) => leaving.has(slot) || arriving.has(slot),
       fast: fast(),
       title: dig ? "The discards · build one free" : !view?.age ? "Your hand" : choice === "last" ? "Your seventh card" : done ? "Your hand · picked" : choice ? "Your hand · pick one" : "Your hand",
@@ -614,7 +619,7 @@ function mountGame(session, root, shell) {
     rootBox.dataset.phase = phase;
     shell.setInProgress?.(phase === "starting" || phase === "playing");
     if (s && !view && !table.pending) view = viewOf(s);
-    if (picked && picked.key !== turnKey()) picked = null;
+    if (picked && picked.key !== turnKey() && !table.pending) picked = null;
     const choice = myChoice();
     if (!choice && !picked && sel && match?.state?.phase === "dig") sel = null;
     bar.update({ turn: -1, thinking: current || match?.busy ? -1 : thinkingSeat(), checked: match?.checked ?? [] });

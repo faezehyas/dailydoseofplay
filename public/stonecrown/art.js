@@ -661,14 +661,21 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, ageOf =
   }
 
   // Cards turn over where they lie, together: [{ id, age, rect }].
+  // Where a seat's pick turns over: a card big enough to read, centred on its
+  // pick mark, kept inside the table's edges (the fly layer clips).
+  function flipRect(rect) {
+    const w = Math.max(52, Math.min(84, rect.w));
+    const h = w * 1.4;
+    return { x: Math.max(4, Math.min(flyLayer.clientWidth - w - 4, rect.x + rect.w / 2 - w / 2)), y: rect.y + rect.h / 2 - h / 2, w, h };
+  }
   async function flipAll(cards, { g, ms = PACE.flip }) {
     if (fast() || !live(g) || !cards.length) return;
     const nodes = cards.map(({ id, age, rect }) => {
-      const w = Math.max(52, Math.min(84, rect.w));
+      const r = flipRect(rect);
       const node = turnCardEl(id, age, { down: true });
       node.classList.add("sc-fly-card");
-      node.style.width = `${w}px`;
-      node.style.transform = `translate(${(rect.x + rect.w / 2 - w / 2).toFixed(1)}px, ${(rect.y + rect.h / 2 - w * 0.7).toFixed(1)}px)`;
+      node.style.width = `${r.w}px`;
+      node.style.transform = `translate(${r.x.toFixed(1)}px, ${r.y.toFixed(1)}px)`;
       flyLayer.append(node);
       return { node, up: id >= 0 };
     });
@@ -737,6 +744,12 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, ageOf =
     });
     if (fast() || !live(g)) {
       pairs.forEach(([p, q, r]) => r && (onToken(r > 0 ? p : q, won), onToken(r > 0 ? q : p, -1)));
+      // Without the motion the war is still heard: the clash, then how it went for you.
+      if (!live(g)) return;
+      sound("war");
+      const mine = pairs.flatMap(([p, q, r]) => (p === me ? [r] : q === me ? [-r] : []));
+      if (mine.some((r) => r > 0)) sound("victory", { value: won }, 0.4);
+      else if (mine.some((r) => r < 0)) sound("defeat", {}, 0.4);
       return;
     }
     centre(box);
@@ -796,6 +809,7 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, ageOf =
     pileRect: () => rectIn(pile),
     centre,
     flyCard,
+    flipRect,
     flipAll,
     flyCoins,
     bump,
@@ -826,7 +840,7 @@ export function scoreSheet(scores, order, { me, nameOf, winners = [] }) {
   });
   const node = el("table", { class: "sc-sheet done", id: "sc-sheet" }, el("caption", { class: "sr-only" }, "Final scores"), el("thead", {}, head), el("tbody", {}, rows.slice(0, -1)), el("tfoot", {}, rows.at(-1)));
   async function play({ g, k = 1, wait, live, fast, sound }) {
-    if (fast()) return;
+    if (fast()) return void sound("score", { row: SCORE_ROWS.length - 1 });
     node.classList.remove("done");
     const totals = cells.at(-1);
     const sum = order.map(() => 0);
@@ -987,7 +1001,7 @@ export function handView({ onSelect = () => {} } = {}) {
       const isPicked = picked === slot;
       b.classList.toggle("sel", isSel);
       b.classList.toggle("picked", isPicked);
-      b.classList.toggle("dim", picked !== null && !isPicked);
+      b.classList.toggle("dim", slots.includes(picked) && !isPicked);
       b.classList.toggle("can", can && choosing);
       b.classList.toggle("chain", !!o?.build.chain);
       b.style.opacity = hidden(slot) ? "0" : "";
@@ -1131,8 +1145,11 @@ export function scMotion(table, art, ctx) {
     sound("reveal");
     revealing.clear();
     draw();
-    await art.flipAll(list.filter((x) => x.p !== me && x.type === "build").map((x) => ({ id: x.id, age: v.age, rect: from.get(x.p) })), { g, ms: PACE.flip * k });
+    const flips = list.filter((x) => x.p !== me && x.type === "build" && from.get(x.p));
+    await art.flipAll(flips.map((x) => ({ id: x.id, age: v.age, rect: from.get(x.p) })), { g, ms: PACE.flip * k });
     if (!live(g)) return;
+    // Those cards fly on from where they turned over.
+    for (const x of flips) from.set(x.p, art.flipRect(from.get(x.p)));
     // Every place measured before anything moves: a flight added to the page would make each measure lay it out again.
     const plan = list.map((x) => {
       const bought = x.bought ?? { left: 0, right: 0 };
@@ -1154,7 +1171,7 @@ export function scMotion(table, art, ctx) {
       const mine = p === me ? idOf(x.slot) : -1;
       if (x.type === "build") {
         sound("build", { color: CARDS[x.id].color, how: x.how }, at(delay));
-        flights.push(art.flyCard(x.id, v.age, start, to, { ...opts, ms: PACE.fly * k, width: p === me ? null : 40 }).then(() => {
+        flights.push(art.flyCard(x.id, v.age, start, to, { ...opts, ms: PACE.fly * k, width: p === me ? null : (start?.w ?? 40) }).then(() => {
           v.city[p].push({ slot: x.slot, id: x.id });
           if (x.how === "dig") v.discard = v.discard.filter((s) => s !== x.slot);
           draw();

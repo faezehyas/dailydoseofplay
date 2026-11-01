@@ -327,8 +327,10 @@ export function board() {
     const box = el("div", { class: "sc-final", role: "presentation", style: "position: fixed; top: 50%" }, el("p", { class: "sc-final-title" }, resultWords(ev.scores, ev.winners, 0, nameOf)), sheet.node);
     finalBox = box;
     node.append(box);
-    if (fast()) sheet.node.querySelectorAll("tr").forEach((tr) => tr.classList.add("on"));
-    else {
+    if (fast()) {
+      sheet.node.querySelectorAll("tr").forEach((tr) => tr.classList.add("on"));
+      sound("score", { row: 7 });
+    } else {
       box.animate([{ opacity: 0, transform: "translate(-50%, -46%)" }, { opacity: 1, transform: "translate(-50%, -50%)" }], { duration: 260, fill: "both" });
       await sheet.play({ g, wait, live, fast, sound });
     }
