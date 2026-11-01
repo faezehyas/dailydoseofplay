@@ -822,9 +822,19 @@ export function startGameShell({ slug, title, tagline = "", createRobot, onSessi
 
   addEventListener("pagehide", () => state.session?.leave());
 
-  // Closing or reloading the tab mid-match: only the browser's own prompt can ask.
+  // Closing or reloading the tab would drop you from the match, or from a room:
+  // a host's invite link stops working, a guest has to join again. Only the
+  // browser's own prompt can ask.
+  function mustAskBeforeUnload() {
+    if (state.session) return state.mustAsk();
+    const room = state.room;
+    if (!room || !askBeforeLeaving()) return false;
+    if (room instanceof GuestRoom) return !!room.link?.open;
+    return !!room.code && !room.closed;
+  }
+
   addEventListener("beforeunload", (e) => {
-    if (!state.session || !state.mustAsk()) return;
+    if (!mustAskBeforeUnload()) return;
     e.preventDefault();
     e.returnValue = true; // older Safari and Chrome
   });

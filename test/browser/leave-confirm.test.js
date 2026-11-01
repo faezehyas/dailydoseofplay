@@ -153,3 +153,40 @@ test("with three players, a guest hears a robot takes their seat; the host is as
   assert.equal(await host.locator("dialog[open]").count(), 0);
   assertNoErrors();
 });
+
+test("reloading in a friend room asks first: the host once the room is open, a guest once connected; a game page doesn't pull to refresh", { skip, timeout: 120_000 }, async (t) => {
+  const { srv, open, assertNoErrors, prompts } = await setup(t);
+  // A reload asks when the page cancels beforeunload, without leaving it.
+  const asks = (page) =>
+    page.evaluate(() => {
+      const e = new Event("beforeunload", { cancelable: true });
+      dispatchEvent(e);
+      return e.defaultPrevented;
+    });
+  const host = await open("Ada");
+  await host.goto(`${srv.base}/ludo/`);
+  assert.equal(await asks(host), false, "nothing to lose in the lobby");
+  await host.click("#play-friend");
+  await host.locator("#room-code").waitFor();
+  assert.equal(await asks(host), true, "the invite link would stop working");
+
+  const guest = await open("Bo");
+  assert.equal(await asks(guest), false);
+  await joinByInvite(host, [guest], srv);
+  await guest.locator("#lobby-status", { hasText: "Waiting for Ada to start" }).waitFor({ timeout: 20_000 });
+  assert.equal(await asks(guest), true, "connected and waiting");
+  assert.equal(await host.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY), "auto");
+
+  await host.locator("#roster li.ready", { hasText: "Bo" }).waitFor();
+  await host.click("#start-game");
+  for (const p of [host, guest]) await waitForState(p, (ddp) => ddp.match?.phase === "playing");
+  assert.equal(await guest.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY), "none");
+
+  // The browser's own prompt, for real; staying keeps the room's game.
+  const prompted = host.waitForEvent("dialog");
+  await host.close({ runBeforeUnload: true });
+  await prompted;
+  assert.deepEqual(prompts, ["Ada: beforeunload"]);
+  assert.equal(await phase(host), "playing");
+  assertNoErrors();
+});

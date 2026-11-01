@@ -347,7 +347,7 @@ function generalSettings() {
     el(
       "div",
       { class: "pref-list" },
-      toggle("settings-ask", "Ask before leaving", "When you leave a game with friends", prefs.askBeforeLeaving, (on) => setPrefs({ askBeforeLeaving: on })),
+      toggle("settings-ask", "Ask before leaving", "When you leave or reload a game with friends", prefs.askBeforeLeaving, (on) => setPrefs({ askBeforeLeaving: on })),
       toggle("settings-reactions", "Mute reactions", "Hide other players' emoji and phrases", prefs.muteReactions, (on) => setPrefs({ muteReactions: on })),
     ),
   ];
