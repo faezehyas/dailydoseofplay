@@ -3087,6 +3087,153 @@ so a friend joining a room doesn't download it.
 got }`, `nodeal { p }`, `longest { p, size }`, `army { p, size }`,
 `turn { p }`, `claim { p, slots }`, `over { winner, points }` (`points`: everyone's public points).
 
+## Stonecrown in depth
+
+Stonecrown is a card-drafting game for three or four players (the rules and
+data cover three to seven), on `CardMatch` (see **Card games**). Over three
+ages of six turns, everyone picks a card from their hand at the same time,
+then hands go round to a neighbour. A pick builds the card into your city,
+builds a stage of your wonder with the card tucked face down, or sells it
+for 3 coins. The richest civilisation in points wins. Every card is a real
+card in the deck, so hands, picks, tucked cards and the discard pile stay
+hidden as at a real table.
+
+**The data** (`cards.js`): resources wood, stone, clay, ore (raw) and glass,
+cloth, papyrus (goods), `0` to `6`; colours brown (raw materials), grey
+(goods), blue (points), yellow (commerce), red (shields), green (science)
+and purple (guilds); science symbols star, cog and quill, `0` to `2`.
+`CARDS` holds every design with its age, colour, cost (`{ res: [7 counts],
+coins }`), one effect, the keys of earlier cards that build it free
+(`from`), and `players`: the player counts from which each copy is in the
+game. Two designs share a `key` when they are the same building in two ages
+(the grey cards); a city holds at most one card of a key. `WONDERS` holds
+the seven wonders: the resource each produces from the start and the stages
+of sides A and B. Neighbours: **left is seat p + 1, right is seat p − 1**.
+
+**The deck**: `deckFor(players)` maps each face to a design: the age I
+cards, then age II, then age III without guilds, then all 10 guilds
+(`deckRanges(players)` gives each range). 7 cards a player an age, so 88
+faces with four players and 148 with seven. Age III deals `players + 2`
+guilds with its other cards.
+
+**Hidden cards as moves.**
+
+- **Ages.** The rules set `openFaces = deckSize`: every card starts face up
+  in face order, which shows nothing. At the start of each age, `settle()`
+  shuffles that age's faces (`deck.shuffle()`, which hides them) and deals 7
+  to each seat. For age III it first shuffles the 10 guilds and keeps the
+  first `players + 2` new slots, unseen, then shuffles those with the age's
+  other cards and deals; the guilds left out are never seen until the audit,
+  so nobody knows which guilds are in play.
+- **Picks** are a step (see **Steps**): every seat with a hand moves at
+  once, unseen until all have chosen. A build shows its card (`reveals()`).
+  A wonder stage or a sale doesn't: the card stays in its holder's hand,
+  hidden, recorded in the state as tucked or discarded, and the state never
+  depends on its face.
+- **Passing.** After a turn, every card left in each hand goes to the
+  neighbour with `deck.pass()`: to the left in ages I and III, to the right
+  in age II. Only the receiver (and the giver) sees it.
+- **The seventh card** of each hand is discarded, hidden, at the end of the
+  age, except for a Babylon B player who has built its second stage (below).
+- **Digging the discards** (Halicarnassus): when a stage with `dig` is
+  built, at the end of that turn every card in the discard pile not already
+  theirs is passed to that player, who sees them all and may build one free.
+  The cards stay in the discard pile in the state; the one built is shown.
+
+**Turn order of business.** Picks are only recorded by `applyMove()`
+(`state.picks`); the step's one `settle()` resolves them all, in seat
+order, from the state at the start of the turn. So each pick is legal
+whatever the others chose, and nobody can buy from a card built this turn,
+as in the real game.
+
+1. Every seat pays its card's coins to the bank and its purchases to its
+   neighbours, and builds, tucks or discards. Coins received (purchases,
+   sales, yellow cards, wonder stages) arrive after everyone has paid, so
+   they can't be spent this turn.
+2. Yellow cards with `income` count what is in the cities after all of this
+   turn's builds.
+3. In the sixth turn: a Babylon B seat with `playLast` plays its last card
+   (phase `last`), then every other last card is discarded.
+4. A seat that built a `dig` stage this turn digs (phase `dig`).
+5. Hands pass, or after the sixth turn the age ends: military, then the next
+   age is dealt, or the game is scored.
+
+**Paying for a card or a stage.** A cost is coins (paid to the bank) and
+resources. Resources come from your city's brown and grey cards, your
+wonder's own resource, yellow cards and wonder stages that produce a choice
+(one unit a turn each), and purchases. You may buy from either neighbour the
+units their brown and grey cards and their wonder's own resource produce,
+each unit once a turn, at 2 coins each, or 1 with a matching `trade` effect
+(the two roads and Artisans' Row, Olympia B's first stage). Buying doesn't
+use up the neighbour's resources. A card is free with no purchase when your
+city holds a card whose key is in its `from` (a chain). A move's purchase
+must be one the neighbour can produce at once (choice cards count once),
+must cover the cost together with your own production, and must be minimal:
+dropping any one unit bought must leave the cost uncovered. You can't build
+a card whose key your city already holds, nor stages out of order or beyond
+the last; selling is always allowed.
+
+**Wonder stage effects**: points, shields, coins (once, when built), a
+resource choice (not for sale), a wild science symbol, `dig`, `free` (once
+an age, build a card free), `trade`, `copyGuild` (at the end, score one
+neighbour's guild as your own) and `playLast`.
+
+**Military.** At the end of age a (1 to 3), each seat compares shields with
+each neighbour: more takes a victory token of 1, 3 or 5 points, fewer takes
+a defeat token of −1, a tie takes nothing.
+
+**Scoring** (the score sheet, by seat): military (tokens), coins (1 point a
+3 coins), wonder (stage points), civic (blue cards), commerce (yellow
+`score`), guilds (purple `score`, and Olympia B's copied guild), science
+(for each symbol, its count squared, plus 7 a set of all three), and the
+total. Wild symbols and the copied guild take whatever scores best. The
+highest total wins; a tie goes to the most coins, and a tie on both is
+shared (`winner` −2, `winners` the seats).
+
+**Settings**: `side`: `"A"` (default), `"B"` or `"random"` (each seat its
+own); `moveSeconds` and the robot `level` as in Hexlands. `newState` deals
+each seat a wonder at random from its `rng` (see **Rolls**), in the open, as
+at a real table.
+
+**The state** (`rules.js`):
+
+| Field | |
+|---|---|
+| `players`, `first`, `turn`, `winner`, `winners`, `moves` | As in every card game; `turn` is unused, every phase being a step |
+| `side` | The setting |
+| `wonders` | By seat: `{ w, side }`, `w` an index into `WONDERS` |
+| `age`, `round` | 1 to 3, and the turn in the age, 1 to 6 |
+| `phase` | `"pick"`, `"last"`, `"dig"` or `"over"` |
+| `hands` | By seat: the slots of its hand, hidden |
+| `city` | By seat: `[{ slot, id }]`, the cards built, `id` a design |
+| `stages` | By seat: the slots tucked under its built stages, hidden |
+| `coins` | By seat |
+| `tokens` | By seat: its military tokens, e.g. `[1, -1, 3]` |
+| `discard` | The slots of the discard pile, hidden |
+| `picks` | By seat: the move it picked this turn, or `null` |
+| `freeAge` | By seat: the age it last used `free` in, or 0 |
+| `digger`, `lastSeat` | The seat digging or playing its last card, or −1 |
+| `pool` | The slots of the guilds not dealt, hidden |
+
+**Moves** (every phase is a step; `buy` is `{ left: [7 counts], right: [7
+counts] }`, omitted when nothing is bought):
+
+| Phase | Who moves | Moves |
+|---|---|---|
+| `pick` | Every seat | `{ build: slot, buy }`, `{ build: slot, free: true }` (the `free` stage, once an age), `{ stage: slot, buy }` (the next stage of its wonder), `{ discard: slot }` (3 coins) |
+| `last` | `lastSeat` | The same, with its last card |
+| `dig` | `digger` | `{ dig: slot }` (a discard pile slot, built free) or `{ dig: -1 }` |
+
+**Events** (`applyMove()` and `settle()` return them, for the view):
+`age { age }` (dealt), `build { p, slot, id, how, coins, bought: { left,
+right } }` (`how`: `"paid"`, `"chain"`, `"free"` or `"dig"`; `coins` paid to
+the bank; `bought` the coins paid each side), `stage { p, slot, n }` (the
+stage index), `discard { p, slot }`, `gain { p, coins, why }` (`why`:
+`"sale"`, `"card"`, `"stage"`, `"trade"`), `last { p }`, `dig { p }`,
+`pass { dir }` (1 left, −1 right), `war { age, results: by seat [left,
+right] }` (each `1`, `0` or `-1`), `over { winners, scores }` (`scores` by
+seat: `{ military, coins, wonder, civic, commerce, guilds, science, total }`).
+
 ## Differences from the reference (wasmerio/edge-multiplayer-games)
 
 | Reference | Here | Why |
