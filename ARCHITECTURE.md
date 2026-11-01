@@ -3154,7 +3154,8 @@ as in the real game.
    turn's builds.
 3. In the sixth turn: a Babylon B seat with `playLast` plays its last card
    (phase `last`), then every other last card is discarded.
-4. A seat that built a `dig` stage this turn digs (phase `dig`).
+4. A seat that built a `dig` stage this turn digs (phase `dig`), unless the
+   discard pile is empty.
 5. Hands pass, or after the sixth turn the age ends: military, then the next
    age is dealt, or the game is scored.
 
@@ -3199,7 +3200,7 @@ at a real table.
 
 | Field | |
 |---|---|
-| `players`, `first`, `turn`, `winner`, `winners`, `moves` | As in every card game; `turn` is unused, every phase being a step |
+| `players`, `first`, `turn`, `winner`, `winners`, `moves` | As in every card game; `turn` is always −1, every phase being a step |
 | `side` | The setting |
 | `wonders` | By seat: `{ w, side }`, `w` an index into `WONDERS` |
 | `age`, `round` | 1 to 3, and the turn in the age, 1 to 6 |
@@ -3214,9 +3215,11 @@ at a real table.
 | `freeAge` | By seat: the age it last used `free` in, or 0 |
 | `digger`, `lastSeat` | The seat digging or playing its last card, or −1 |
 | `pool` | The slots of the guilds not dealt, hidden |
+| `piles` | By age: the face-up slots of that age not yet dealt |
 
 **Moves** (every phase is a step; `buy` is `{ left: [7 counts], right: [7
-counts] }`, omitted when nothing is bought):
+counts] }`, omitted or all zeros when nothing is bought; a move has exactly
+one of `build`, `stage`, `discard` or `dig`):
 
 | Phase | Who moves | Moves |
 |---|---|---|
@@ -3227,12 +3230,14 @@ counts] }`, omitted when nothing is bought):
 **Events** (`applyMove()` and `settle()` return them, for the view):
 `age { age }` (dealt), `build { p, slot, id, how, coins, bought: { left,
 right } }` (`how`: `"paid"`, `"chain"`, `"free"` or `"dig"`; `coins` paid to
-the bank; `bought` the coins paid each side), `stage { p, slot, n }` (the
-stage index), `discard { p, slot }`, `gain { p, coins, why }` (`why`:
-`"sale"`, `"card"`, `"stage"`, `"trade"`), `last { p }`, `dig { p }`,
+the bank; `bought` the coins paid each side), `stage { p, slot, n, bought }` (the
+stage index), `discard { p, slot, seventh }` (`seventh` for a last card),
+`gain { p, coins, why, from }` (`why`: `"sale"`, `"card"`, `"stage"`,
+`"trade"`; `from` the buyer, for a trade), `last { p }`, `dig { p }`,
 `pass { dir }` (1 left, −1 right), `war { age, results: by seat [left,
 right] }` (each `1`, `0` or `-1`), `over { winners, scores }` (`scores` by
-seat: `{ military, coins, wonder, civic, commerce, guilds, science, total }`).
+seat: `{ military, coins, wonder, civic, commerce, guilds, science, total,
+copied }`, `copied` the guild Olympia B copied, or −1).
 
 ## Differences from the reference (wasmerio/edge-multiplayer-games)
 
