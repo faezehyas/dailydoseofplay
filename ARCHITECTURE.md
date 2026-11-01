@@ -1451,8 +1451,10 @@ rank, an 8 naming the suit, drawing, going out), Go Fish (asking for a rank,
 Go fish and a lucky catch, a book, the most books wins), Gin Rummy (sets and
 runs, drawing and discarding, deadwood, knocking, gin) and Hearts (following
 suit, passing three cards, the queen of spades, breaking hearts, shooting the
-moon) and Hexlands (settling, rolling for resources, roads and settlements,
-cities and development cards, the robber and knights, trading and winning). Sea Battle's runs in the page with both fleets fixed and
+moon), Hexlands (settling, rolling for resources, roads and settlements,
+cities and development cards, the robber and knights, trading and winning)
+and Stonecrown (picking and building, buying and chains, wonder stages and
+selling, passing hands and war, science and the score sheet). Sea Battle's runs in the page with both fleets fixed and
 known to it, firing through `rules.js` alone; `match.js` and its
 commitments don't come into it. The card games' run on
 `cards/lesson-deck.js`: fixed hands and a deck whose every card is known, so

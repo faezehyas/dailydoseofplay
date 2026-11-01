@@ -1723,3 +1723,10 @@
     max-width: 100%;
   }
 }
+
+/* The tutorial: the lesson's words sit over the table, so your wonder is a little smaller and your hand still shows on a laptop. */
+@media (min-width: 1000px) {
+  .tut-stage .sc-board {
+    max-width: max(300px, calc(100svh - 560px));
+  }
+}

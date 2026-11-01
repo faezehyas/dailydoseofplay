@@ -51,6 +51,7 @@ startGameShell({
   slug: "stonecrown",
   title: "Stonecrown",
   howToPlay,
+  tutorial: () => import("./tutorial.js"),
   layout: "wide",
   settings,
   minPlayers: MIN_PLAYERS,
