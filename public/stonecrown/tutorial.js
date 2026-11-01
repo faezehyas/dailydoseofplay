@@ -9,8 +9,8 @@ import { el } from "../engine/shell.js";
 import { RuleError } from "../engine/turn-match.js";
 import { cardTable } from "../engine/cards/table.js";
 import { CARDS, WONDERS, HAND, deckRanges } from "./cards.js";
-import { makeRules, deckOf, movers, canBuild, canStage, passDir, leftOf, rightOf, stagesOf, shields, ROUNDS } from "./rules.js";
-import { PACE, ROMAN, plural, listOf, cardWords, stageWords, effectWords, costWords, sideCoins, payWords, buyWords, moveFor, pickOptions, WHY, whyWords, warWords, warPairs, resultWords, viewOf, turnWords, seatWords, chainsFrom, chainsTo, turnCardEl, costEl, effectEl, coinEl, seatMark, cityEl, boardSvg, tableEl, scTable, scoreSheet } from "./art.js";
+import { makeRules, deckOf, movers, canBuild, canStage, passDir, leftOf, rightOf, stagesOf, shields, sideCoins, ROUNDS } from "./rules.js";
+import { PACE, ROMAN, plural, listOf, cardWords, stageWords, effectWords, costWords, payWords, buyWords, moveFor, pickOptions, WHY, whyWords, warWords, warPairs, resultWords, viewOf, turnWords, seatWords, chainsFrom, chainsTo, turnCardEl, costEl, effectEl, coinEl, seatMark, cityEl, boardSvg, tableEl, scTable, scoreSheet } from "./art.js";
 import { play as sound } from "./sounds.js";
 import { PLAYERS, WONDER_KEYS, cards } from "./lessons.js";
 

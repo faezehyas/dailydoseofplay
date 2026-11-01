@@ -8,9 +8,13 @@
 import { el } from "../engine/shell.js";
 import { easing } from "../engine/cards/table.js";
 import { CARDS, WONDERS, COLORS, RESOURCE_NAMES, SYMBOLS, RAW, GOODS, DISCARD_COINS, VICTORY } from "./cards.js";
-import { stagesOf, canBuild, canStage, unitPrice, production, shields, ROUNDS } from "./rules.js";
+import { stagesOf, canBuild, canStage, production, shields, ROUNDS } from "./rules.js";
 import { cardSvg, cardBack, cardText, effectIcon, resourceIcon, scienceIcon, coinIcon, shieldIcon, pointsIcon, neighbourIcon, colourIcon } from "./card-art.js";
 import { wonderSvg, wonderMini, coinSvg, tokenSvg, tableSvg } from "./pieces.js";
+
+// The motion curve, read from the theme once rather than for every flight.
+let curve = null;
+const easeOut = () => (curve ??= easing("out"));
 
 export const PACE = { fly: 620, flip: 420, flyGap: 70, coin: 520, pass: 520, deal: 300, dealGap: 45, stage: 520, war: 520, warGap: 360, row: 380, between: 140, bubble: 900 };
 export const ROMAN = ["", "I", "II", "III", "IV"];
@@ -97,12 +101,6 @@ export const cardWords = (id) => (CARDS[id] ? cardText(id) : "a card");
 
 export function stageWords(stage, n) {
   return `Stage ${ROMAN[n + 1]}: ${effectWords(stage)}. Costs ${costWords(stage.cost)}.`;
-}
-
-// What a purchase pays each neighbour: { left, right }.
-export function sideCoins(state, p, buy) {
-  const at = (side) => sum(buy[side].map((n, r) => n * unitPrice(state, p, r, side)));
-  return { left: at("left"), right: at("right") };
 }
 
 // "Pay 2 to Ana, 1 to Ben" for coins to the bank and to each neighbour; "" for nothing.
@@ -235,9 +233,21 @@ export const turnWords = (age, round) => (age ? `Age ${ROMAN[age]} · Turn ${Mat
 // ---------- small pieces of art as elements ----------
 // card-art.js and pieces.js return markup: a whole <svg>, or shapes for a 24-unit box.
 export const svgOf = (markup) => (/^\s*<svg/.test(markup) ? markup : `<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">${markup}</svg>`);
+// Markup is parsed once, then cloned: parsing the same art again each turn
+// is most of what a busy age III costs a slow phone.
+const parsed = new Map();
+function svgNode(key, markup) {
+  let t = parsed.get(key);
+  if (!t) {
+    t = document.createElement("template");
+    t.innerHTML = svgOf(markup());
+    parsed.set(key, t);
+  }
+  return t.content.cloneNode(true);
+}
 const art = (cls, markup) => {
   const node = el("span", { class: cls, "aria-hidden": "true" });
-  node.innerHTML = svgOf(markup);
+  node.append(svgNode(markup, () => markup));
   return node;
 };
 export const resEl = (r) => art(`sc-ic r-${r}`, resourceIcon(r));
@@ -252,7 +262,7 @@ export const coinPieceEl = (v) => art("sc-coin-piece", coinSvg(v));
 export function seatMark(p) {
   const marks = ["", '<circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="2"/>', '<path d="M3 10h18v4H3z"/>', '<path d="M6 9l6 6 6-6" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>'];
   const node = el("span", { class: `sc-mark p-${p}`, "aria-hidden": "true" });
-  node.innerHTML = `<svg viewBox="0 0 24 24" focusable="false"><circle class="disc" cx="12" cy="12" r="11"/><g class="sign">${marks[p] ?? ""}</g></svg>`;
+  node.append(svgNode(`mark ${p}`, () => `<svg viewBox="0 0 24 24" focusable="false"><circle class="disc" cx="12" cy="12" r="11"/><g class="sign">${marks[p] ?? ""}</g></svg>`));
   return node;
 }
 
@@ -300,12 +310,18 @@ export function costEl(cost, { have = null } = {}) {
   return row;
 }
 
-// Wonder boards are big markup: each one drawn once per stage count.
+// Wonder boards are big markup: each one drawn once per stage count and the
+// ages of the cards tucked under them (their backs show the age).
 const boards = new Map();
-export function boardSvg(w, side, built, { mini = false } = {}) {
-  const key = `${w}:${side}:${built}:${mini}`;
-  if (!boards.has(key)) boards.set(key, mini ? wonderMini(w, side, built) : wonderSvg(w, side, { built, tucked: built }));
+export function boardSvg(w, side, built, { mini = false, tucked = [] } = {}) {
+  const key = mini ? `${w}:${side}:${built}:mini` : `${w}:${side}:${built}:${tucked.join("")}`;
+  if (!boards.has(key)) boards.set(key, mini ? wonderMini(w, side, built) : wonderSvg(w, side, { built, tucked: tucked.length === built ? tucked : built }));
   return boards.get(key);
+}
+// The same board as nodes, to append.
+export function boardEl(w, side, built, opts) {
+  const markup = boardSvg(w, side, built, opts);
+  return svgNode(markup, () => markup);
 }
 // The table behind everything: paper hills by day, an indigo sky by night.
 export function tableEl() {
@@ -314,14 +330,12 @@ export function tableEl() {
   return node;
 }
 
-const cardArt = new Map();
 // A card as a span holding its art: a design id, or a back of an age (id -1 or null).
 export function cardEl(id, { age = 1, size = "full", cls = "" } = {}) {
   const back = id === null || id === undefined || id < 0;
-  const key = back ? `b${age}:${size}` : `${id}:${size}`;
-  if (!cardArt.has(key)) cardArt.set(key, svgOf(back ? cardBack(age, { size }) : cardSvg(id, { size })));
+  const key = back ? `card b${age}:${size}` : `card ${id}:${size}`;
   const node = el("span", { class: `sc-cardbox ${back ? "back" : `c-${CARDS[id].color}`} ${cls}`, "aria-hidden": "true" });
-  node.innerHTML = cardArt.get(key);
+  node.append(svgNode(key, () => (back ? cardBack(age, { size }) : cardSvg(id, { size }))));
   return node;
 }
 // A card that turns over: a front and a back (CSS turns .sc-turn.down).
@@ -332,27 +346,110 @@ export function turnCardEl(id, age, { size = "full", down = true } = {}) {
 // A built card in a city: its colour, its effect as icons, and its name where there's room.
 export function chipEl(id) {
   const c = CARDS[id];
-  return el("span", { class: `sc-chip c-${c.color}`, title: c.name, dataset: { id } }, art("sc-chip-art", miniArt(id)), el("span", { class: "sc-chip-name" }, c.name));
+  return el("span", { class: `sc-chip c-${c.color}`, title: c.name, dataset: { id } }, el("span", { class: "sc-chip-art", "aria-hidden": "true" }, svgNode(`card ${id}:mini`, () => cardSvg(id, { size: "mini" }))), el("span", { class: "sc-chip-name" }, c.name));
 }
-const minis = new Map();
-const miniArt = (id) => {
-  if (!minis.has(id)) minis.set(id, cardSvg(id, { size: "mini" }));
-  return minis.get(id);
-};
 
-// A city in columns by colour; empty colours keep a dashed place.
-export function cityEl(ids, { cls = "" } = {}) {
-  return el(
-    "div",
-    { class: `sc-city ${cls}` },
-    cityColumns(ids).map((col, i) => el("div", { class: `sc-col c-${COLORS[i]} ${col.length ? "" : "empty"}` }, col.length ? col.map(chipEl) : el("span", { class: `sc-chip ghost c-${COLORS[i]}`, "aria-hidden": "true" }))),
-  );
+// A city in columns by colour; empty colours keep a dashed place. A city
+// only grows, so set(ids) appends the cards built since; anything else (a
+// rematch) draws it again.
+export function cityView({ cls = "" } = {}) {
+  const ghost = (c) => el("span", { class: `sc-chip ghost c-${c}`, "aria-hidden": "true" });
+  const cols = COLORS.map((c) => el("div", { class: `sc-col c-${c} empty` }, ghost(c)));
+  const node = el("div", { class: `sc-city ${cls}` }, cols);
+  let shown = [];
+  function set(ids) {
+    if (ids.length === shown.length && ids.every((id, i) => id === shown[i])) return false;
+    if (ids.length < shown.length || shown.some((id, i) => id !== ids[i])) {
+      cols.forEach((col, i) => (col.replaceChildren(ghost(COLORS[i])), col.classList.add("empty")));
+      shown = [];
+    }
+    for (const id of ids.slice(shown.length)) {
+      const col = cols[COLORS.indexOf(CARDS[id].color)];
+      if (col.classList.contains("empty")) col.replaceChildren();
+      col.classList.remove("empty");
+      col.append(chipEl(id));
+    }
+    shown = ids.slice();
+    return true;
+  }
+  return { node, set };
+}
+export function cityEl(ids, opts) {
+  const city = cityView(opts);
+  city.set(ids);
+  return city.node;
+}
+
+// A seat's whole city in a dialog: its public facts, its wonder and every
+// card built. whereOf(p): "your left neighbour"… Parts are redrawn only
+// when they change, so keyboard focus stays on Close while the table moves.
+export function cityDialog({ nameOf, whereOf, ageOf = () => 1 }) {
+  let mark = el("span");
+  const title = el("h2", { id: "sc-dialog-title" });
+  const where = el("small");
+  const close = el("button", { class: "btn small sc-dialog-close", type: "button", onclick: () => node.close() }, "Close");
+  const head = el("div", { class: "sc-dialog-head" }, mark, title, where, close);
+  const facts = el("p", { class: "sc-dialog-facts" });
+  const board = el("div", { class: "sc-dialog-board", role: "img" });
+  const empty = el("p", { class: "sc-hint" }, "Nothing built yet.");
+  const list = el("ul", { class: "sr-only" });
+  let city = cityView({ cls: "big" });
+  const node = el("dialog", { class: "card sc-dialog", id: "sc-dialog", "aria-labelledby": "sc-dialog-title" }, head, facts, board, empty, city.node, list);
+  let seat = -1;
+  let shown = {};
+  const changed = (part, value) => shown[part] !== value && ((shown[part] = value), true);
+  node.addEventListener("click", (e) => e.target === node && node.close());
+  node.addEventListener("close", () => (seat = -1));
+
+  function draw(view) {
+    if (seat < 0 || !view) return;
+    const p = seat;
+    const w = view.wonders[p];
+    const W = WONDERS[w.w];
+    const built = view.stages[p].length;
+    const ids = view.city[p].map((x) => x.id);
+    const words = seatWords(view, p);
+    if (changed("facts", words)) facts.textContent = words;
+    const tucked = view.stages[p].map(ageOf);
+    if (changed("board", `${w.w}:${w.side}:${built}:${tucked.join("")}`)) {
+      board.replaceChildren(boardEl(w.w, w.side, built, { tucked }));
+      board.setAttribute("aria-label", `${W.name}, side ${w.side}: ${built} of ${stagesOf(view, p).length} stages built. ${stagesOf(view, p).map((x, n) => stageWords(x, n)).join(" ")}`);
+    }
+    if (city.set(ids)) {
+      empty.hidden = ids.length > 0;
+      list.replaceChildren(...ids.map((id) => el("li", {}, cardWords(id))));
+    }
+  }
+  // Shows seat p's city, or brings it up to date.
+  function open(p, view) {
+    if (!view) return;
+    if (seat !== p) {
+      seat = p;
+      shown = {};
+      const fresh = cityView({ cls: "big" });
+      city.node.replaceWith(fresh.node);
+      city = fresh;
+      empty.hidden = false;
+      list.replaceChildren();
+      head.className = `sc-dialog-head p-${p}`;
+      const m = seatMark(p);
+      mark.replaceWith(m);
+      mark = m;
+      title.textContent = `${nameOf(p)}'s city`;
+      where.textContent = whereOf(p);
+    }
+    draw(view);
+    if (!node.open) node.showModal();
+    close.focus();
+  }
+  return { node, open, draw, close: () => node.open && node.close() };
 }
 
 // ---------- the table ----------
 // table: engine/cards/table.js (the queue, the fly layer, bubbles).
-// me, players; nameOf(p); onSeat(p) opens a seat's city.
-export function scTable(table, { me, players, nameOf, onSeat = () => {} }) {
+// me, players; nameOf(p); onSeat(p) opens a seat's city; ageOf(slot): the
+// age of a card tucked under a wonder, which its back shows.
+export function scTable(table, { me, players, nameOf, onSeat = () => {}, ageOf = () => 1 }) {
   const { live, fast, wait, flyLayer, rectIn } = table;
   const around = seatsAround(players, me);
   const order = [around.left, around.right, around.across].filter((p) => p >= 0 && p !== me);
@@ -369,7 +466,7 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {} }) {
     const sellRow = el("span", { class: "sc-sells" });
     const counts = el("span", { class: "sc-counts", "aria-hidden": "true" }, COLORS.map((c) => el("span", { class: `sc-count c-${c}` }, "0")));
     const wonder = el("div", { class: "sc-seat-board", "aria-hidden": "true" });
-    const city = el("div", { class: "sc-seat-city" });
+    const cityBox = el("div", { class: "sc-seat-city" });
     const pick = el("span", { class: "sc-pickmark", "aria-hidden": "true", hidden: true }, cardEl(null));
     const open = el("button", { class: "sc-seat-open", type: "button", onclick: () => onSeat(p) }, arrow, head, wonderName);
     const node = el(
@@ -380,36 +477,44 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {} }) {
       el("div", { class: "sc-seat-sells" }, el("span", { class: "sc-label" }, "sells"), sellRow),
       counts,
       wonder,
-      el("div", { class: "sc-seat-city-box" }, el("span", { class: "sc-label" }, `${nameOf(p)}'s city`), city),
+      el("div", { class: "sc-seat-city-box" }, el("span", { class: "sc-label" }, `${nameOf(p)}'s city`), cityBox),
       pick,
     );
     // The whole panel opens the city; its name is the button keyboards and screen readers use.
     node.addEventListener("click", (e) => !e.target.closest(".sc-seat-open") && onSeat(p));
-    let key = "";
+    // Each part is redrawn only when what it shows changes: boards and city chips are big markup.
+    const shown = {};
+    const changed = (part, value) => shown[part] !== value && ((shown[part] = value), true);
+    const city = cityView();
+    cityBox.append(city.node);
     function draw(view, { picked = false } = {}) {
+      pick.hidden = !picked;
       const w = view.wonders[p];
       const W = WONDERS[w.w];
+      const built = view.stages[p].length;
       const ids = view.city[p].map((x) => x.id);
-      const k = JSON.stringify([w, ids, view.coins[p], view.tokens[p], view.stages[p].length]);
-      pick.hidden = !picked;
-      if (k === key) return;
-      key = k;
-      wonderName.textContent = `${W.city} ${w.side}`;
-      coins.replaceChildren(coinEl(view.coins[p]));
       const sh = shields(view, p);
-      shieldsEl.replaceChildren(shieldEl(), el("b", {}, String(sh)));
-      tokens.replaceChildren(...view.tokens[p].map(tokenEl));
-      const total = stagesOf(view, p).length;
-      dots.replaceChildren(...Array.from({ length: total }, (_, i) => el("i", { class: i < view.stages[p].length ? "on" : "" })));
-      sellRow.replaceChildren(...sells(view, p).map(({ unit, n }) => el("span", { class: "sc-sell" }, ...unit.flatMap((r, j) => (j ? [SEP(), resEl(r)] : [resEl(r)])), n > 1 ? el("small", {}, `×${n}`) : "")));
-      const cols = cityColumns(ids);
-      [...counts.children].forEach((c, i) => {
-        c.textContent = cols[i].length ? String(cols[i].length) : "";
-        c.classList.toggle("none", !cols[i].length);
-      });
-      wonder.innerHTML = boardSvg(w.w, w.side, view.stages[p].length, { mini: true });
-      city.replaceChildren(cityEl(ids));
-      open.setAttribute("aria-label", `${nameOf(p)}, your ${side} neighbour${side === "across" ? "" : ""}, ${W.name} side ${w.side}: ${seatWords(view, p)}. Show their city`);
+      if (changed("coins", view.coins[p])) coins.replaceChildren(coinEl(view.coins[p]));
+      if (changed("shields", sh)) shieldsEl.replaceChildren(shieldEl(), el("b", {}, String(sh)));
+      if (changed("tokens", view.tokens[p].join())) tokens.replaceChildren(...view.tokens[p].map(tokenEl));
+      const board = `${w.w}:${w.side}:${built}`;
+      if (changed("board", board)) {
+        wonderName.textContent = `${W.city} ${w.side}`;
+        const total = stagesOf(view, p).length;
+        dots.replaceChildren(...Array.from({ length: total }, (_, i) => el("i", { class: i < built ? "on" : "" })));
+        wonder.replaceChildren(boardEl(w.w, w.side, built, { mini: true }));
+      }
+      if (city.set(ids) || changed("sells", board)) {
+        sellRow.replaceChildren(...sells(view, p).map(({ unit, n }) => el("span", { class: "sc-sell" }, ...unit.flatMap((r, j) => (j ? [SEP(), resEl(r)] : [resEl(r)])), n > 1 ? el("small", {}, `×${n}`) : "")));
+        const cols = cityColumns(ids);
+        [...counts.children].forEach((c, i) => {
+          c.textContent = cols[i].length ? String(cols[i].length) : "";
+          c.classList.toggle("none", !cols[i].length);
+        });
+      }
+      const where = side === "across" ? "across the table (not a neighbour)" : `your ${side} neighbour`;
+      const label = `${nameOf(p)}, ${where}, ${W.name} side ${w.side}: ${seatWords(view, p)}. Show their city`;
+      if (changed("label", label)) open.setAttribute("aria-label", label);
     }
     const rects = {
       pick: () => rectIn(pick.hidden ? node : pick),
@@ -434,40 +539,51 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {} }) {
   const meWonderName = el("span", { class: "sc-me-wonder" });
   const meStats = el("div", { class: "sc-me-stats", role: "group" }, seatMark(me), el("b", { class: "sc-me-name" }, "You"), meWonderName, el("span", { class: "sc-grow" }), meCoins, meShields, meTokens);
   const boardBox = el("div", { class: "sc-board", id: "sc-board", role: "img" });
-  const myCity = el("div", { class: "sc-my-city" });
+  const myCity = el("div", { class: "sc-my-city", role: "img" });
   const cityBox = el("section", { class: "sc-city-box", "aria-label": "Your city" }, el("h2", { class: "sc-title" }, "Your city"), myCity);
   const mine = el("section", { class: "sc-mine", "aria-label": "Your wonder and city" }, meStats, boardBox, cityBox);
   const myPick = el("span", { class: "sc-pickmark mine", "aria-hidden": "true", hidden: true }, cardEl(null));
   boardBox.append(myPick);
-  let myKey = "";
+  const mineShown = {};
+  const mineChanged = (part, value) => mineShown[part] !== value && ((mineShown[part] = value), true);
+  const myCityView = cityView({ cls: "mine" });
+  myCity.append(myCityView.node);
   let myBuilt = -1;
   function drawMine(view) {
     const w = view.wonders[me];
     const W = WONDERS[w.w];
     const ids = view.city[me].map((x) => x.id);
     const built = view.stages[me].length;
-    const k = JSON.stringify([w, ids, view.coins[me], view.tokens[me], built]);
-    if (k === myKey) return;
-    myKey = k;
-    meWonderName.textContent = `${W.name} · ${w.side}`;
-    meCoins.replaceChildren(coinEl(view.coins[me]));
-    meCoins.setAttribute("aria-label", plural(view.coins[me], "coin"));
-    meShields.replaceChildren(shieldEl(), el("b", {}, String(shields(view, me))));
-    meShields.setAttribute("aria-label", plural(shields(view, me), "shield"));
-    meTokens.replaceChildren(...view.tokens[me].map(tokenEl));
-    meTokens.setAttribute("aria-label", view.tokens[me].length ? `War tokens ${view.tokens[me].map(signed).join(" ")}` : "No war tokens");
-    meStats.setAttribute("aria-label", `You: ${W.name}, side ${w.side}, ${plural(view.coins[me], "coin")}, ${plural(shields(view, me), "shield")}`);
-    const art = el("span", { class: "sc-board-art" });
-    art.innerHTML = boardSvg(w.w, w.side, built);
-    // The stage just built pops in (pieces.css).
-    if (myBuilt >= 0 && built > myBuilt) art.querySelector(`.sc-stage[data-stage="${built - 1}"]`)?.classList.add("sc-new");
-    myBuilt = built;
-    boardBox.replaceChildren(art, myPick);
-    const stages = stagesOf(view, me);
-    boardBox.setAttribute("aria-label", `Your wonder, ${W.name}, side ${w.side}: makes ${RES_NAMES[W.produce]}. ${built} of ${stages.length} stages built. ${stages.map((s, n) => `${n < built ? "Built" : "To build"}: ${stageWords(s, n)}`).join(" ")}`);
-    myCity.replaceChildren(cityEl(ids, { cls: "mine" }));
-    myCity.setAttribute("aria-label", ids.length ? `Your city: ${cityColumns(ids).flatMap((col, i) => (col.length ? [`${COLOR_NAMES[COLORS[i]]}: ${listOf(col.map((id) => CARDS[id].name))}`] : [])).join("; ")}` : "Your city is empty");
-    myCity.setAttribute("role", "img");
+    const sh = shields(view, me);
+    if (mineChanged("coins", view.coins[me])) {
+      meCoins.replaceChildren(coinEl(view.coins[me]));
+      meCoins.setAttribute("aria-label", plural(view.coins[me], "coin"));
+    }
+    if (mineChanged("shields", sh)) {
+      meShields.replaceChildren(shieldEl(), el("b", {}, String(sh)));
+      meShields.setAttribute("aria-label", plural(sh, "shield"));
+    }
+    if (mineChanged("tokens", view.tokens[me].join())) {
+      meTokens.replaceChildren(...view.tokens[me].map(tokenEl));
+      meTokens.setAttribute("aria-label", view.tokens[me].length ? `War tokens ${view.tokens[me].map(signed).join(" ")}` : "No war tokens");
+    }
+    const facts = `You: ${W.name}, side ${w.side}, ${plural(view.coins[me], "coin")}, ${plural(sh, "shield")}`;
+    if (mineChanged("facts", facts)) meStats.setAttribute("aria-label", facts);
+    const tucked = view.stages[me].map(ageOf);
+    if (mineChanged("board", `${w.w}:${w.side}:${built}:${tucked.join("")}`)) {
+      meWonderName.textContent = `${W.name} · ${w.side}`;
+      const art = el("span", { class: "sc-board-art" });
+      art.append(boardEl(w.w, w.side, built, { tucked }));
+      // The stage just built pops in (pieces.css).
+      if (myBuilt >= 0 && built > myBuilt) art.querySelector(`.sc-stage[data-stage="${built - 1}"]`)?.classList.add("sc-new");
+      myBuilt = built;
+      boardBox.replaceChildren(art, myPick);
+      const stages = stagesOf(view, me);
+      boardBox.setAttribute("aria-label", `Your wonder, ${W.name}, side ${w.side}: makes ${RES_NAMES[W.produce]}. ${built} of ${stages.length} stages built. ${stages.map((s, n) => `${n < built ? "Built" : "To build"}: ${stageWords(s, n)}`).join(" ")}`);
+    }
+    if (myCityView.set(ids) || !myCity.hasAttribute("aria-label")) {
+      myCity.setAttribute("aria-label", ids.length ? `Your city: ${cityColumns(ids).flatMap((col, i) => (col.length ? [`${COLOR_NAMES[COLORS[i]]}: ${listOf(col.map((id) => CARDS[id].name))}`] : [])).join("; ")}` : "Your city is empty");
+    }
   }
   const mineRects = {
     pick: () => rectIn(myPick.hidden ? boardBox : myPick),
@@ -510,7 +626,9 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {} }) {
     if (!live(g)) return;
     const w = width ?? Math.max(30, Math.min(84, Math.max(from.w, to.w)));
     const h = w * 1.4;
-    const node = turnCardEl(id, age, { down: turn === "up" || id === null || id < 0 });
+    const back = id === null || id < 0;
+    // A back that never turns is drawn alone.
+    const node = back && !turn ? el("span", { class: "sc-turn", "aria-hidden": "true" }, el("span", { class: "in" }, el("span", { class: "side" }, cardEl(null, { age })))) : turnCardEl(id, age, { down: turn === "up" || back });
     node.classList.add("sc-fly-card");
     node.style.width = `${w}px`;
     flyLayer.append(node);
@@ -528,12 +646,12 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {} }) {
         { transform: at((x0 + x1) / 2, Math.min(y0, y1) - lift, (s0 + s1) / 2 * 1.08, spin), opacity: 1, offset: 0.5 },
         { transform: at(x1, y1, s1, 0), opacity: fade ? 0 : 1 },
       ],
-      { duration: ms, easing: easing("out"), fill: "forwards" },
+      { duration: ms, easing: easeOut(), fill: "forwards" },
     );
     if (turn) {
       const inner = node.querySelector(".in");
       const [a, b] = turn === "up" ? ["rotateY(180deg)", "rotateY(0deg)"] : ["rotateY(0deg)", "rotateY(180deg)"];
-      inner.animate([{ transform: a }, { transform: b }], { duration: ms * 0.5, delay: ms * 0.15, easing: easing("out"), fill: "forwards" });
+      inner.animate([{ transform: a }, { transform: b }], { duration: ms * 0.5, delay: ms * 0.15, easing: easeOut(), fill: "forwards" });
     }
     await motion.finished.catch(() => {});
     node.remove();
@@ -554,8 +672,8 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {} }) {
     await Promise.all(
       nodes.map(({ node, up }) => {
         const inner = node.querySelector(".in");
-        const lift = node.animate([{ translate: "0 0" }, { translate: "0 -10px", offset: 0.5 }, { translate: "0 0" }], { duration: ms * 1.3, easing: easing("out"), composite: "add" });
-        const turn = up ? inner.animate([{ transform: "rotateY(180deg)" }, { transform: "rotateY(0deg)" }], { duration: ms, delay: ms * 0.15, easing: easing("out"), fill: "forwards" }) : null;
+        const lift = node.animate([{ translate: "0 0" }, { translate: "0 -10px", offset: 0.5 }, { translate: "0 0" }], { duration: ms * 1.3, easing: easeOut(), composite: "add" });
+        const turn = up ? inner.animate([{ transform: "rotateY(180deg)" }, { transform: "rotateY(0deg)" }], { duration: ms, delay: ms * 0.15, easing: easeOut(), fill: "forwards" }) : null;
         return Promise.all([lift.finished.catch(() => {}), turn?.finished.catch(() => {})]);
       }),
     );
@@ -588,7 +706,7 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {} }) {
               { transform: `translate(${(x0 + x1) / 2}px, ${Math.min(y0, y1) - lift}px) scale(1.1)`, offset: 0.5 },
               { transform: `translate(${x1}px, ${y1}px) scale(.85)`, opacity: 0.9 },
             ],
-            { duration: ms, easing: easing("out"), fill: "forwards" },
+            { duration: ms, easing: easeOut(), fill: "forwards" },
           )
           .finished.catch(() => {});
         node.remove();
@@ -619,14 +737,14 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {} }) {
       return;
     }
     centre(box);
-    box.animate([{ opacity: 0, transform: "translate(-50%, -46%) scale(.94)" }, { opacity: 1, transform: "translate(-50%, -50%) scale(1)" }], { duration: 260, easing: easing("out"), fill: "both" });
+    box.animate([{ opacity: 0, transform: "translate(-50%, -46%) scale(.94)" }, { opacity: 1, transform: "translate(-50%, -50%) scale(1)" }], { duration: 260, easing: easeOut(), fill: "both" });
     sound("war");
     await wait(320 * k, g);
     for (const [i, [p, q, r]] of pairs.entries()) {
       if (!live(g)) break;
       const row = rows[i];
       row.classList.add("clash");
-      row.animate([{ transform: "scale(1)" }, { transform: "scale(1.06)", offset: 0.35 }, { transform: "scale(1)" }], { duration: PACE.war * k, easing: easing("out") });
+      row.animate([{ transform: "scale(1)" }, { transform: "scale(1.06)", offset: 0.35 }, { transform: "scale(1)" }], { duration: PACE.war * k, easing: easeOut() });
       await wait(PACE.war * 0.55 * k, g);
       if (r) {
         const [a, b] = r > 0 ? [p, q] : [q, p];
@@ -654,7 +772,7 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {} }) {
     const y0 = from.y + from.h / 2 - s / 2;
     const x1 = to.x + to.w / 2 - s / 2;
     const y1 = to.y + to.h / 2 - s / 2;
-    await node.animate([{ transform: `translate(${x0}px, ${y0}px) scale(1.4)` }, { transform: `translate(${(x0 + x1) / 2}px, ${Math.min(y0, y1) - 40}px) scale(1.2)`, offset: 0.5 }, { transform: `translate(${x1}px, ${y1}px) scale(.9)` }], { duration: PACE.fly, easing: easing("out"), fill: "forwards" }).finished.catch(() => {});
+    await node.animate([{ transform: `translate(${x0}px, ${y0}px) scale(1.4)` }, { transform: `translate(${(x0 + x1) / 2}px, ${Math.min(y0, y1) - 40}px) scale(1.2)`, offset: 0.5 }, { transform: `translate(${x1}px, ${y1}px) scale(.9)` }], { duration: PACE.fly, easing: easeOut(), fill: "forwards" }).finished.catch(() => {});
     node.remove();
   }
 

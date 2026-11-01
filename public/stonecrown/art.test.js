@@ -4,7 +4,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CARDS, WONDERS, DISCARD_COINS } from "./cards.js";
-import { costWords, effectWords, cardWords, chainsFrom, chainsTo, stageWords, payWords, buyWords, moveFor, pickOptions, sideCoins, warWords, warPairs, pairWords, resultWords, viewOf, seatsAround, cityColumns, sells, turnWords, seatWords } from "./art.js";
+import { sideCoins } from "./rules.js";
+import { costWords, effectWords, cardWords, chainsFrom, chainsTo, stageWords, payWords, buyWords, moveFor, pickOptions, warWords, warPairs, pairWords, resultWords, viewOf, seatsAround, cityColumns, sells, turnWords, seatWords } from "./art.js";
 
 const idOf = (key) => CARDS.find((c) => c.key === key).id;
 const zero = () => [0, 0, 0, 0, 0, 0, 0];

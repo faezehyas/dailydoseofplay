@@ -21,8 +21,8 @@ import { humanPause, startPacedRobot } from "../engine/cards/paced-robot.js";
 import { robotPause } from "../engine/robot-pace.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { CARDS, WONDERS, HAND } from "./cards.js";
-import { makeRules, normalizeConfig, forcedMove, legalMoves, designOf, passDir, stagesOf, shields, score, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
-import { PACE, ROMAN, plural, listOf, cardWords, stageWords, effectWords, costWords, sideCoins, payWords, buyWords, moveFor, pickOptions, WHY, whyWords, warWords, warPairs, pairWords, resultWords, viewOf, turnWords, seatWords, chainsFrom, chainsTo, cardEl, turnCardEl, costEl, effectEl, coinEl, seatMark, cityEl, boardSvg, tableEl, scTable, scoreSheet } from "./art.js";
+import { makeRules, normalizeConfig, forcedMove, legalMoves, designOf, passDir, stagesOf, shields, score, sideCoins, leftOf, rightOf, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
+import { PACE, ROMAN, plural, listOf, cardWords, effectWords, costWords, payWords, buyWords, moveFor, pickOptions, WHY, whyWords, warWords, warPairs, pairWords, resultWords, viewOf, turnWords, seatWords, chainsFrom, chainsTo, cardEl, turnCardEl, costEl, effectEl, coinEl, seatMark, cityDialog, tableEl, scTable, scoreSheet } from "./art.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
 import { howToPlay } from "./how-to-play.js";
@@ -122,9 +122,13 @@ function mountGame(session, root, shell) {
   bar.update({ badges: seats.map((p) => seatMark(p)) });
   const status = el("p", { class: table.cls("status"), id: "sc-status", role: "status", "aria-live": "polite", tabindex: "-1" });
 
-  const dialog = el("dialog", { class: "card sc-dialog", id: "sc-dialog", "aria-labelledby": "sc-dialog-title" });
-  const art = scTable(table, { me, players: count, nameOf, onSeat: (p) => openSeat(p) });
+  // The age of each card tucked under a wonder, as its stage was built (its back shows it).
+  const tuckedAge = new Map();
+  const ageOf = (slot) => tuckedAge.get(slot) ?? 1;
+  const art = scTable(table, { me, players: count, nameOf, ageOf, onSeat: (p) => openSeat(p) });
   const { around } = art;
+  const seatDialog = cityDialog({ nameOf, ageOf, whereOf: (p) => (p === around.left ? "your left neighbour" : p === around.right ? "your right neighbour" : "across the table") });
+  const dialog = seatDialog.node;
 
   // The top bar: the age and turn, which way hands go, the discard pile, and with four, the player across.
   const ageBadge = el("span", { class: "sc-age-badge", "aria-hidden": "true" });
@@ -216,6 +220,7 @@ function mountGame(session, root, shell) {
   // A step's picks arrive as one batch of events: they turn over and land together.
   function enqueueAll(events) {
     let batch = null;
+    let sevenths = null;
     for (const ev of events) {
       const isPick = ev.type === "build" || ev.type === "stage" || (ev.type === "discard" && !ev.seventh);
       if (isPick || (ev.type === "gain" && batch)) {
@@ -225,15 +230,13 @@ function mountGame(session, root, shell) {
       }
       batch = null;
       if (ev.type === "discard") {
-        const last = enqueueAll.sevenths;
-        if (last && !last.done) last.list.push(ev);
-        else table.enqueue((enqueueAll.sevenths = { type: "sevenths", list: [ev] }));
+        if (sevenths) sevenths.list.push(ev);
+        else table.enqueue((sevenths = { type: "sevenths", list: [ev] }));
         continue;
       }
-      enqueueAll.sevenths = null;
+      sevenths = null;
       table.enqueue(ev);
     }
-    enqueueAll.sevenths = null;
   }
 
   const rectOf = (p, part, arg) => art.rectsOf(p)?.[part]?.(arg) ?? null;
@@ -294,8 +297,8 @@ function mountGame(session, root, shell) {
       const paid = (x.coins ?? 0) + bought.left + bought.right;
       view.coins[p] -= paid;
       if (x.coins) flights.push(art.flyCoins(x.coins, rectOf(p, "coins"), art.bankRect(), { g, ms: PACE.coin * k }));
-      if (bought.left) flights.push(art.flyCoins(bought.left, rectOf(p, "coins"), rectOf(around.left === p ? (p + 1) % count : (p + 1) % count, "coins") ?? art.bankRect(), { g, ms: PACE.coin * k }));
-      if (bought.right) flights.push(art.flyCoins(bought.right, rectOf(p, "coins"), rectOf((p + count - 1) % count, "coins") ?? art.bankRect(), { g, ms: PACE.coin * k }));
+      if (bought.left) flights.push(art.flyCoins(bought.left, rectOf(p, "coins"), rectOf(leftOf(view, p), "coins"), { g, ms: PACE.coin * k }));
+      if (bought.right) flights.push(art.flyCoins(bought.right, rectOf(p, "coins"), rectOf(rightOf(view, p), "coins"), { g, ms: PACE.coin * k }));
       if (bought.left || bought.right) play("trade", { n: bought.left + bought.right });
       if (x.type === "build") {
         const color = CARDS[x.id].color;
@@ -309,6 +312,7 @@ function mountGame(session, root, shell) {
       } else if (x.type === "stage") {
         play("stage", { n: x.n });
         const id = p === me ? idOf(x.slot) : -1;
+        tuckedAge.set(x.slot, view.age);
         flights.push(art.flyCard(id, view.age, start, rectOf(p, "wonder"), { g, ms: PACE.stage * k, turn: p === me && id >= 0 ? "down" : null, width: p === me ? null : 36 }).then(() => {
           view.stages[p].push(x.slot);
           render();
@@ -351,7 +355,7 @@ function mountGame(session, root, shell) {
     if (!list.length) return;
     const flights = list.map((x) => {
       const from = x.why === "trade" ? rectOf(x.from, "coins") : art.bankRect();
-      play(x.why === "trade" ? "coins" : "coins", { n: x.coins });
+      play("coins", { n: x.coins });
       return art.flyCoins(x.coins, from, rectOf(x.p, "coins"), { g, ms: PACE.coin * k }).then(() => {
         view.coins[x.p] += x.coins;
         render();
@@ -553,6 +557,7 @@ function mountGame(session, root, shell) {
   function buildPlan(o) {
     const b = o.build;
     if (b.chain) return { ok: true, move: moveFor("build", sel.slot), label: "Build free", sub: `Chain from ${listOf(chainsFrom(o.card))}`, pay: 0 };
+    if (o.free && !b.purchases.length) return { ok: false, label: "Build", sub: costWords(o.card.cost), why: "only free, with your wonder" };
     if (!b.ok || !b.purchases.length) return { ok: false, label: WHY[b.why] ?? "Can't build", sub: b.why === "duplicate" ? "" : costWords(o.card.cost), why: whyWords(b.why, o.card) };
     const p = b.purchases[sel.build % b.purchases.length];
     const side = sideCoins(st(), me, p);
@@ -686,7 +691,7 @@ function mountGame(session, root, shell) {
       b.classList.toggle("chain", !!o?.build.chain);
       b.style.opacity = leaving.has(slot) || arriving.has(slot) ? "0" : "";
       b.setAttribute("aria-pressed", String(isSel));
-      const state = dig ? (can ? "you can build it free" : "you already have it") : !o ? "" : o.build.chain ? "free through a chain" : o.build.ok ? "you can build it" : o.free ? "you can build it with the free build" : WHY[o.build.why]?.toLowerCase() ?? "";
+      const state = dig ? (can ? "you can build it free" : "you already have it") : !o ? "" : o.build.chain ? "free through a chain" : o.build.purchases.length ? "you can build it" : o.free ? "you can build it free with your wonder" : WHY[o.build.why]?.toLowerCase() ?? "";
       b.setAttribute("aria-label", id < 0 ? "A card, arriving" : `${cardWords(id)}${state ? ` Now: ${state}.` : ""}${isPicked ? " Picked." : ""}`);
       b.style.setProperty("--i", String(i));
       if (hand.children[i] !== b) hand.insertBefore(b, hand.children[i] ?? null);
@@ -782,7 +787,8 @@ function mountGame(session, root, shell) {
       else if (b.ok) {
         const buy = b.buy && buyWords(b.buy, names());
         lines.push(el("p", { class: "sc-detail-pay ok" }, buy ? `${buy} for ${plural(b.side.left + b.side.right, "coin")}.` : c.cost.coins ? `Pay ${plural(c.cost.coins, "coin")} to the bank.` : "You make everything it needs."), b.ways > 1 ? btn("sc-other", "Other way to pay", () => ((sel.build += 1), render()), { cls: "small link", aria: `Other way to pay for ${c.name} (${b.ways} ways)` }) : null);
-      } else lines.push(el("p", { class: "sc-detail-pay no" }, `${whyWords(o.build.why, c)}.${o.free ? " Your wonder's free build can build it." : ""}`));
+      } else if (o.free) lines.push(el("p", { class: "sc-detail-pay ok" }, "You can't pay for it, but your wonder's free build can build it."));
+      else lines.push(el("p", { class: "sc-detail-pay no" }, `${whyWords(o.build.why, c)}.`));
     }
     if (st2) {
       const stage = o.stage.stage;
@@ -823,33 +829,7 @@ function mountGame(session, root, shell) {
   }
 
   // ---------- a seat's whole city ----------
-  let dialogSeat = -1;
-  function openSeat(p) {
-    if (!view) return;
-    dialogSeat = p;
-    drawDialog();
-    if (!dialog.open) dialog.showModal();
-    dialog.querySelector(".sc-dialog-close")?.focus();
-  }
-  function drawDialog() {
-    if (dialogSeat < 0 || !view) return;
-    const p = dialogSeat;
-    const w = view.wonders[p];
-    const W = WONDERS[w.w];
-    const ids = view.city[p].map((x) => x.id);
-    const board = el("div", { class: "sc-dialog-board", role: "img", "aria-label": `${W.name}, side ${w.side}: ${view.stages[p].length} of ${stagesOf(view, p).length} stages built. ${stagesOf(view, p).map((x, n) => stageWords(x, n)).join(" ")}` });
-    board.innerHTML = boardSvg(w.w, w.side, view.stages[p].length);
-    const side = p === around.left ? "your left neighbour" : p === around.right ? "your right neighbour" : "across the table";
-    dialog.replaceChildren(
-      el("div", { class: `sc-dialog-head p-${p}` }, seatMark(p), el("h2", { id: "sc-dialog-title" }, `${nameOf(p)}'s city`), el("small", {}, side), el("button", { class: "btn small sc-dialog-close", type: "button", onclick: () => dialog.close() }, "Close")),
-      el("p", { class: "sc-dialog-facts" }, seatWords(view, p)),
-      board,
-      ids.length ? cityEl(ids, { cls: "big" }) : el("p", { class: "sc-hint" }, "Nothing built yet."),
-      el("ul", { class: "sr-only" }, ids.map((id) => el("li", {}, cardWords(id)))),
-    );
-  }
-  dialog.addEventListener("click", (e) => e.target === dialog && dialog.close());
-  dialog.addEventListener("close", () => (dialogSeat = -1));
+  const openSeat = (p) => seatDialog.open(p, view);
 
   // ---------- render ----------
   function describe(ev) {
@@ -909,7 +889,7 @@ function mountGame(session, root, shell) {
     const step = match?.step;
     for (const [p, panel] of art.panels) panel.draw(view, { picked: (!!step?.commits[p] && !table.pending) || revealing.has(p) });
     art.drawMine(view);
-    if (dialog.open) drawDialog();
+    seatDialog.draw(view);
   }
 
   function renderDeck() {
@@ -1116,7 +1096,8 @@ function mountGame(session, root, shell) {
     arriving = new Set();
     handButtons.forEach((b) => b.remove());
     handButtons.clear();
-    if (dialog.open) dialog.close();
+    seatDialog.close();
+    tuckedAge.clear();
     logList.replaceChildren();
     const opponents = listOf(seats.filter((p) => p !== me).map((p) => session.players[p].name));
     note.textContent = m === 1 ? `Playing ${opponents}. Good luck!` : `Rematch #${m - 1}: new wonders, and a fresh deck shuffled by every browser.`;
@@ -1126,7 +1107,7 @@ function mountGame(session, root, shell) {
     window.ddp.match = mt; // browser tests read this
     mt.on("update", () => {
       if (mt !== match) return;
-      if (dialog.open && !mt.state) dialog.close();
+      if (!mt.state) seatDialog.close();
       render();
     });
     mt.on("invalid", (reason) => {
@@ -1211,7 +1192,7 @@ function mountGame(session, root, shell) {
       setTabAlert(null);
       removeEventListener("keydown", onKey);
       document.removeEventListener("visibilitychange", onVisible);
-      if (dialog.open) dialog.close();
+      seatDialog.close();
       for (const off of offs) off();
     },
   };
