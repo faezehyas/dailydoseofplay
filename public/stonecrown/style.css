@@ -336,6 +336,20 @@
   box-shadow: 2px 2px 0 rgb(var(--sc-shadow) / 18%);
 }
 
+/* Someone is digging through it: the pile rummages. */
+@media (prefers-reduced-motion: no-preference) {
+  .sc-pile.dig .sc-cardbox {
+    animation: sc-rummage 0.9s var(--ease-out) infinite;
+  }
+}
+
+@keyframes sc-rummage {
+  0%, 100% { transform: rotate(-6deg); }
+  25% { transform: rotate(8deg) translate(2px, -3px); }
+  50% { transform: rotate(-12deg) translate(-2px, -1px); }
+  75% { transform: rotate(4deg) translate(1px, -4px); }
+}
+
 .sc-pile.empty .sc-cardbox {
   opacity: 0.35;
 }
@@ -1030,6 +1044,15 @@
 .sc-hand-wrap {
   position: relative;
   min-height: calc(var(--sc-cw) * 1.4 + 8px);
+}
+
+/* No cards and no deck: the hand's place folds away rather than sit empty. */
+.sc-hand-wrap:has(.sc-hand[data-n="0"]):not(:has(.sc-deck:not([hidden]), .pc-busy:not([hidden]))) {
+  min-height: 0;
+}
+
+.sc-hand[data-n="0"] {
+  padding-top: 0;
 }
 
 .sc-hand {

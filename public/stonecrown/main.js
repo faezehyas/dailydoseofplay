@@ -517,7 +517,11 @@ function mountGame(session, root, shell) {
   // ---------- render ----------
   function describe(ev) {
     if (!ev) return null;
-    if (ev.type === "picks") return ev.picks.length > 1 ? "Everyone has picked" : ev.picks[0]?.how === "dig" ? `${nameOf(ev.picks[0].p)} ${verb(ev.picks[0].p, "builds")} from the discards` : null;
+    if (ev.type === "picks") {
+      const x = ev.picks[0];
+      if (ev.picks.length > 1 || !x) return "Everyone has picked";
+      return x.how === "dig" ? `${nameOf(x.p)} ${verb(x.p, "builds")} from the discards` : `${nameOf(x.p)} ${verb(x.p, "plays")} the seventh card`;
+    }
     if (ev.type === "pass") return `Hands pass ${ev.dir > 0 ? "left" : "right"}`;
     if (ev.type === "age") return `Age ${ROMAN[ev.age]}: ${HAND} cards each`;
     if (ev.type === "sevenths") return "Last cards discarded";
@@ -565,6 +569,7 @@ function mountGame(session, root, shell) {
       acrossPill.setAttribute("aria-label", `${nameOf(q)}, across the table (not a neighbour): ${seatWords(view, q)}. Show their city`);
     }
     if (view) art.drawPile(view);
+    art.pile.classList.toggle("dig", view?.phase === "dig");
   }
 
   function renderTable() {
