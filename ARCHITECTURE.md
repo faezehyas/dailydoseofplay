@@ -3164,11 +3164,14 @@ as in the real game.
    they can't be spent this turn.
 2. Yellow cards with `income` count what is in the cities after all of this
    turn's builds.
-3. In the sixth turn: a Babylon B seat with `playLast` plays its last card
-   (phase `last`), then every other last card is discarded.
+3. In the sixth turn, every last card is discarded except a Babylon B
+   seat's with `playLast`.
 4. A seat that built a `dig` stage this turn digs (phase `dig`), unless the
    discard pile is empty.
-5. Hands pass, or after the sixth turn the age ends: military, then the next
+5. In the sixth turn, the Babylon B seat then plays its last card (phase
+   `last`), as a seventh turn of its own: after the dig, so the digger never
+   sees it, and from a state that includes what the digger built.
+6. Hands pass, or after the sixth turn the age ends: military, then the next
    age is dealt, or the game is scored.
 
 **Paying for a card or a stage.** A cost is coins (paid to the bank) and

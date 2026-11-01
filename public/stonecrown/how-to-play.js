@@ -14,7 +14,7 @@ export const howToPlay = {
   turn: [
     "**Everyone picks at once.** Choose a card from your hand and what to do with it. Nobody sees a pick until all are in, then they all happen together.",
     "**Build it** into your city by paying its cost, in coins (to the bank), resources or both; many cards are free. Your brown and grey cards, your wonder and a few yellow cards make resources every turn, and using them doesn't use them up. You can't build two cards of the same name.",
-    "**Buy** what you're missing from a neighbour: anything their brown or grey cards make, or their wonder's own resource, 2 coins a unit (1 with the right yellow card). It costs them nothing, and they get your coins once the turn is over, like every coin that comes in this turn.",
+    "**Buy** what you're missing from a neighbour: anything their brown or grey cards make, or their wonder's own resource, 2 coins a unit (1 with the right yellow card or wonder stage). It costs them nothing, and they get your coins once the turn is over, like every coin that comes in this turn.",
     "**Chains**: many cards from age II on are free if your city already holds an earlier card they name. Each card shows what it chains to and from.",
     "**Raise a wonder stage**: pay the next stage's cost and tuck the card face down under your wonder. Any card will do, and nobody sees which. Stages go in order.",
     "**Sell** the card face down for 3 coins. You can always do this.",
