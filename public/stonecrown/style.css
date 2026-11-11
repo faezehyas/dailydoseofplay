@@ -2058,7 +2058,7 @@
   font-size: 0.8rem;
 }
 
-.sc-hand-area > .sc-shelf.full {
+.stonecrown .sc-hand-area > .sc-shelf.full {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
@@ -2067,38 +2067,38 @@
   padding: 5px 8px 4px 10px;
 }
 
-.sc-hand-area > .sc-shelf .sc-shelf-head {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-head {
   flex: none;
   padding: 0 0 4px;
 }
 
-.sc-hand-area > .sc-shelf .sc-shelf-lab {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-lab {
   display: block;
   width: 6.2em;
   font-size: 0.62rem;
   line-height: 1.2;
 }
 
-.sc-hand-area > .sc-shelf .sc-shelf-key {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-key {
   display: none;
 }
 
-.sc-hand-area > .sc-shelf .sc-shelf-fixed {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-fixed {
   flex: 1 1 auto;
   grid-template-columns: minmax(0, 4fr) minmax(0, 3fr);
   gap: 10px;
 }
 
-.sc-hand-area > .sc-shelf .sc-shelf-group {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-group {
   gap: 4px;
   padding-bottom: 6px;
 }
 
-.sc-hand-area > .sc-shelf .sc-shelf-group::after {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-group::after {
   height: 5px;
 }
 
-.sc-hand-area > .sc-shelf .sc-slot {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-slot {
   grid-template-columns: auto auto;
   justify-content: center;
   gap: 0 3px;
@@ -2106,24 +2106,24 @@
   border-radius: 9px;
 }
 
-.sc-hand-area > .sc-shelf .sc-slot-words {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-slot-words {
   display: contents;
 }
 
-.sc-hand-area > .sc-shelf .sc-slot-src {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-slot-src {
   display: none;
 }
 
-.sc-hand-area > .sc-shelf .sc-slot-n {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-slot-n {
   font-size: 1rem;
 }
 
-.sc-hand-area > .sc-shelf .sc-slot-ic > .sc-ic {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-slot-ic > .sc-ic {
   width: 24px;
   height: 24px;
 }
 
-.sc-hand-area > .sc-shelf .sc-slot-mark {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-slot-mark {
   left: -4px;
   top: -4px;
   width: 13px;
@@ -2131,99 +2131,106 @@
 }
 
 /* Either tokens: inline after the seven, a dashed label each. */
-.sc-hand-area > .sc-shelf .sc-shelf-either {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-either {
   flex: 0 1 auto;
   gap: 4px;
   padding-bottom: 6px;
 }
 
-.sc-hand-area > .sc-shelf .sc-slot.either {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-slot.either {
   padding: 2px 6px;
 }
 
-.sc-hand-area > .sc-shelf .sc-slot.either .sc-slot-n {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-slot.either .sc-slot-n {
   display: none;
 }
 
-.sc-hand-area > .sc-shelf .sc-either-ics .sc-ic {
+.stonecrown .sc-hand-area > .sc-shelf.full .sc-either-ics .sc-ic {
   width: 20px;
   height: 20px;
 }
 
 /* A phone: the label a word, the slots as tight as the width asks. */
 @container (max-width: 459px) {
-  .sc-hand-area > .sc-shelf .sc-shelf-group {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-group {
     gap: 3px;
   }
 
-  .sc-hand-area > .sc-shelf .sc-shelf-fixed {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-fixed {
     gap: 6px;
   }
 
-  .sc-hand-area > .sc-shelf .sc-slot {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-slot {
     padding: 2px 2px 2px 1px;
     gap: 0 1px;
   }
 
-  .sc-hand-area > .sc-shelf .sc-slot-ic > .sc-ic {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-slot-ic > .sc-ic {
     width: 20px;
     height: 20px;
   }
 
-  .sc-hand-area > .sc-shelf .sc-slot-n {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-slot-n {
     font-size: 0.9rem;
   }
 
   /* Each slot as wide as it needs: what you don't make is its dimmed icon alone. */
-  .sc-hand-area > .sc-shelf .sc-shelf-fixed,
-  .sc-hand-area > .sc-shelf .sc-shelf-group {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-fixed,
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-group {
     display: flex;
   }
 
-  .sc-hand-area > .sc-shelf .sc-shelf-group {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-group {
     flex: 1 1 auto;
   }
 
-  .sc-hand-area > .sc-shelf .sc-slot {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-slot {
     flex: 1 1 auto;
   }
 
-  .sc-hand-area > .sc-shelf .sc-slot.none {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-slot.none {
     grid-template-columns: auto;
   }
 
-  .sc-hand-area > .sc-shelf .sc-slot.none .sc-slot-n {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-slot.none .sc-slot-n {
     display: none;
+  }
+
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-slot-mark {
+    left: -6px;
+    top: -7px;
+    width: 12px;
+    height: 12px;
   }
 }
 
 /* The narrowest phones: smaller icons, so seven slots with counts still fit. */
 @container (max-width: 330px) {
-  .sc-hand-area > .sc-shelf .sc-shelf-group {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-group {
     gap: 2px;
   }
 
-  .sc-hand-area > .sc-shelf .sc-slot {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-slot {
     padding: 1px;
   }
 
-  .sc-hand-area > .sc-shelf .sc-slot-ic > .sc-ic {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-slot-ic > .sc-ic {
     width: 17px;
     height: 17px;
   }
 
-  .sc-hand-area > .sc-shelf .sc-slot-n {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-slot-n {
     font-size: 0.8rem;
   }
 }
 
 @media (max-width: 480px) {
-  .sc-hand-area > .sc-shelf.full {
+  .stonecrown .sc-hand-area > .sc-shelf.full {
     gap: 3px 6px;
     padding: 4px 6px 3px;
   }
 
-  .sc-hand-area > .sc-shelf .sc-shelf-lab {
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-lab {
     width: 3.2em;
     font-size: 0.56rem;
     letter-spacing: 0.04em;
@@ -2235,7 +2242,7 @@
     grid-template-areas: "head head" "shelf side" "hand side" "buttons side";
   }
 
-  .sc-hand-area > .sc-shelf {
+  .stonecrown .stonecrown .sc-hand-area > .sc-shelf.full {
     grid-area: shelf;
     max-width: calc(var(--sc-cw) * 7 + 36px);
   }
