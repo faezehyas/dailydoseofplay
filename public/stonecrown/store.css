@@ -514,8 +514,14 @@
   top: -9px;
   left: 50%;
   transform: translateX(-50%);
+  width: max-content;
   max-width: calc(100% + 8px);
   font-size: clamp(0.56rem, 1.6vw, 0.74rem);
+  /* A long label on a narrow card takes two lines rather than lose its end. */
+  white-space: normal;
+  text-align: center;
+  text-wrap: balance;
+  line-height: 1.05;
 }
 
 @media (prefers-reduced-motion: no-preference) {
