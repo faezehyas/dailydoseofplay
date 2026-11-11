@@ -247,3 +247,21 @@ test("tokens two wars could have left read as unknown until the war events say",
   // Seat 1 lost to seat 0 on its right in age I whichever war it was.
   assert.equal(res[0][1][1], -1);
 });
+
+test("a war the screen has shown flies its flag and ends the warning before the state moves on", () => {
+  const t = table({ players: 4, wonders: [["rhodes"], ["giza"], ["babylon"], ["ephesus"]] });
+  t.st.age = 3;
+  t.st.round = ROUNDS;
+  t.st.tokens = [[1, 1, 3], [-1, -1, -1], [1, 3, 3], [-1, -1, -1]];
+  const wars = [
+    [[1, 1], [-1, -1], [0, 1], [-1, 0]],
+    [[0, 1], [-1, 0], [1, 1], [-1, -1]],
+  ];
+  t.city(1, "palisade");
+  assert.equal(borderFacts(t.st, 0, "left", { wars }).warn, "you trail by 1");
+  // Age III's war, shown while the state still says age III (the score sheet comes next).
+  wars.push([[-1, 1], [1, -1], [1, 1], [-1, -1]]);
+  const facts = borderFacts(t.st, 0, "left", { wars });
+  assert.deepEqual(facts.flags, [1, 0, -1]);
+  assert.equal(facts.warn, null);
+});

@@ -317,14 +317,15 @@ export function warResults(state) {
 // null to come (or unreadable). wars: the results of the rules' war events
 // by age, where known; they win over the tokens.
 export function borderFlags(state, p, side, wars = []) {
-  const k = side === "right" ? 1 : 0, done = finishedAges(state);
+  // A war the screen has shown counts as finished before the state's age moves on.
+  const k = side === "right" ? 1 : 0, done = Math.min(3, Math.max(finishedAges(state), wars.length));
   const read = wars.length >= done ? [] : warResults(state);
   return [0, 1, 2].map((a) => (a < done ? (wars[a]?.[p]?.[k] ?? read[a]?.[p]?.[k] ?? null) : null));
 }
 
-// From turn 5 of an age: how p stands against that neighbour's shields.
-export function warnWords(state, me, side) {
-  if (!state.age || state.phase === "over" || state.round < Math.min(5, ROUNDS)) return null;
+// From turn 5 of an age until its war is shown: how p stands against that neighbour's shields.
+export function warnWords(state, me, side, wars = []) {
+  if (!state.age || state.phase === "over" || state.round < Math.min(5, ROUNDS) || wars[state.age - 1]) return null;
   const q = side === "left" ? leftOf(state, me) : rightOf(state, me);
   const d = shields(state, me) - shields(state, q);
   return d < 0 ? `you trail by ${-d}` : d > 0 ? `you lead by ${d}` : "level";
@@ -344,7 +345,7 @@ export function borderFacts(state, me, side, { wars = [] } = {}) {
     sale: production(state, q).sale,
     shields: { mine: shields(state, me), theirs: shields(state, q) },
     flags: borderFlags(state, me, side, wars),
-    warn: warnWords(state, me, side),
+    warn: warnWords(state, me, side, wars),
   };
 }
 
