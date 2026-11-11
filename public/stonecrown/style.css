@@ -216,6 +216,24 @@
   display: none;
 }
 
+/* Explain mode's bar fits between the ring and the rest of the table. */
+.sc-top-mid {
+  container-type: inline-size;
+}
+
+.sc-top-mid > .sc-explain-slot {
+  max-width: 100%;
+}
+
+.sc-top-mid .sc-explain-bar.inline {
+  max-width: 100%;
+}
+
+@container (max-width: 480px) {
+  .sc-top-mid .sc-explain-text .long { display: none; }
+  .sc-top-mid .sc-explain-text .short { display: inline; }
+}
+
 .sc-top-side {
   grid-area: side;
   display: flex;

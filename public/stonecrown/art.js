@@ -699,10 +699,13 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
       tokens: () => rectIn(stats.tokens.lastChild ?? stats.shields),
       seat: () => rectIn(node),
       slot: () => rectIn(slot),
-      // Where their pick stays a beat as it turns over: the top of their panel.
+      // Where their pick stays a beat as it turns over: under the border
+      // (which shows what it changes), or the top of a short panel.
       recap: () => {
         const r = rectIn(node);
-        return { x: r.x, y: r.y + 52, w: r.w, h: 150 };
+        const b = rectIn(border.node);
+        const under = b.y + b.h + 4;
+        return { x: r.x, y: r.y + r.h - under >= 160 ? under : r.y + 52, w: r.w, h: 150 };
       },
     };
     return { p, node, draw, rects, pick, slot, stack, border, city: cityBox };
@@ -719,7 +722,7 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
       "button",
       { class: `sc-across-pill p-${p}`, type: "button", id: p === around.across ? "sc-across" : null, dataset: { seat: p, tip: "seat", tipSeat: p }, onclick: () => onSeat(p) },
       seatMark(p),
-      el("span", { class: "sc-across-words", dataset: { tip: "seat", tipSeat: p } }, el("b", {}, nameOf(p)), el("small", {}, where)),
+      el("span", { class: "sc-across-words" }, el("b", {}, nameOf(p)), el("small", {}, where)),
       el("span", { class: "sc-across-stats", "aria-hidden": "true" }, stats.coins, stats.shields),
       el("span", { class: "sc-seat-hand" }, slot, pick),
     );
@@ -870,10 +873,10 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
     const out = [];
     for (const c of colours) {
       if (c === "brown" || c === "grey") {
-        const box = q === me ? shelf.node : panel.sale.node;
+        const box = q === me ? shelf.node : panel.border.sells;
         for (const card of view.city[q].map((x) => CARDS[x.id]).filter((x) => x.color === c)) {
           const u = card.produce?.[0] ?? [];
-          const node = u.length > 1 ? [...box.querySelectorAll(".sc-slot.either")].find((s) => s.dataset.tipRes === u.join(",")) : box.querySelector(`.sc-slot.r-${u[0]}`);
+          const node = q !== me ? (u.length === 1 ? box.querySelector(`.sc-border-unit:not(.either):not([hidden]) .r-${u[0]}`)?.parentNode : null) : u.length > 1 ? [...box.querySelectorAll(".sc-slot.either")].find((s) => s.dataset.tipRes === u.join(",")) : box.querySelector(`.sc-slot.r-${u[0]}`);
           out.push(node ?? box);
         }
       } else {
@@ -882,7 +885,8 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
         out.push(...(chips.length ? chips : Array(view.city[q].filter((x) => CARDS[x.id].color === c).length).fill(panel?.node.querySelector(`.sc-count.c-${c}`) ?? box)));
       }
     }
-    return out;
+    // Only what is on screen (your shelf hides while your hand is folded).
+    return out.filter(shows);
   }
   // A card of yours that a lesson points at: its chip, or its shelf slot.
   function chipFor(id) {

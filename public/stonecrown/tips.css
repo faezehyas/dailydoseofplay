@@ -585,6 +585,12 @@
   height: 28px;
 }
 
+/* A hand card's badge, as in your hand: its coin the size of its words. */
+.sc-legend-ic .sc-tag .sc-ic {
+  width: 1.25em;
+  height: 1.25em;
+}
+
 .sc-legend-ic .sc-tok {
   width: 30px;
   height: 36px;
