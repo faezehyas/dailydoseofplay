@@ -574,7 +574,11 @@ function mountGame(session, root, shell) {
     if (!o) return;
     if (o.build.chain) return coach("chain", buttons.build);
     const [b] = plans(o);
-    if (b.ok && b.buy && [...b.buy.left, ...b.buy.right].some(Boolean)) coach("buy", detail.querySelector(".sc-unit.buy") ?? buttons.build);
+    // The purchase's hint points at the river your coins will cross, or failing that (scrolled away) the purchase.
+    if (!b.ok || !b.buy || ![...b.buy.left, ...b.buy.right].some(Boolean)) return;
+    const river = art.borders.get(b.buy.left.some(Boolean) ? "left" : "right")?.node;
+    const r = river?.getBoundingClientRect();
+    coach("buy", r && r.top >= 0 && r.bottom <= innerHeight ? river : (detail.querySelector(".sc-unit.buy") ?? buttons.build));
   }
 
   // Who has chosen this turn: everyone's mark, ticked once they've picked (a commitment, public).

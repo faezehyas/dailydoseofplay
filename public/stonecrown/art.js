@@ -1153,8 +1153,9 @@ export function costMatch(state, me, o, b, s) {
     const units = matchCost(state, me, c.cost, b?.ok ? b.buy : null);
     return { units, light: highlightOf(units), kind: "build", buys: bought(b?.ok && b.buy) };
   }
+  // A card that costs nothing lights nothing; one you can't build (you have it) lights the stage it could raise.
   const stage = o.stage?.stage;
-  if (stage && sum(stage.cost.res) && o.stage.why !== "built") {
+  if (stage && o.build.why === "duplicate" && sum(stage.cost.res) && o.stage.why !== "built") {
     const units = matchCost(state, me, stage.cost, s?.ok ? s.buy : null);
     return { units, light: highlightOf(units), kind: "stage", buys: bought(s?.ok && s.buy) };
   }
