@@ -787,7 +787,7 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
     const total = view.age ? score(view, me).total : 0;
     if (mineChanged("score", total)) {
       myScore.textContent = view.age ? plural(total, "point") : "";
-      nameBtn.setAttribute("aria-label", view.age ? `You: ${plural(total, "point")} so far. Show the score so far` : "You");
+      nameBtn.setAttribute("aria-label", view.age ? `You, ${plural(total, "point")} so far. Show the score so far` : "You");
     }
     const tucked = view.stages[me].map(ageOf);
     if (mineChanged("board", `${w.w}:${w.side}:${built}:${tucked.join("")}`)) {
@@ -1278,7 +1278,8 @@ export function handView({ onSelect = () => {} } = {}) {
       if (b.dataset.badge !== bkey) {
         b.dataset.badge = bkey;
         b.querySelector(".sc-tag")?.remove();
-        if (badge) b.append(badgeEl(badge, kit));
+        // The card's label says what its badge does.
+        if (badge) b.append(Object.assign(badgeEl(badge, kit), { ariaHidden: "true" }));
       }
       const isSel = sel === slot;
       const isPicked = picked === slot;
@@ -1291,7 +1292,7 @@ export function handView({ onSelect = () => {} } = {}) {
       b.setAttribute("aria-pressed", String(isSel));
       const now = handState(o, { dig, can });
       const tag = badge ? ` ${badge.label}.` : "";
-      b.setAttribute("aria-label", id < 0 ? "A card, arriving" : `${cardWords(id)}${now ? ` Now: ${now}.` : tag}${isPicked ? " Picked." : ""}`);
+      b.setAttribute("aria-label", id < 0 ? "A card, arriving" : `${cardWords(id)}${now ? ` ${now[0].toUpperCase()}${now.slice(1)}.` : tag}${isPicked ? " Picked." : ""}`);
       b.style.setProperty("--i", String(i));
       if (node.children[i] !== b) node.insertBefore(b, node.children[i] ?? null);
     });
