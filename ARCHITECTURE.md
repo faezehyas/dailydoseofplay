@@ -3337,7 +3337,7 @@ state, and marks every explainable element with `data-tip="<kind>"` and
 
 After each flip the neighbours' picks show large for a beat with what they
 mean for you; the hand tray folds to a strip while you wait, so your city
-shows. Tips, shelves, borders and the recap are written only from the public
+shows (it stays open while keyboard focus is inside it). Tips, shelves, borders and the recap are written only from the public
 state and your own `face()`, and a name leaves the page with its card: the
 browser tests scan every page for the name of a card that page can't know.
 
