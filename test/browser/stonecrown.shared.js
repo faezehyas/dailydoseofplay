@@ -7,7 +7,8 @@ export const state = (page) => page.evaluate(() => window.ddp.match.state);
 // Plays this page's picks through the page's own controls: what the robot at
 // `level` would do, by tapping the card in the hand (or in the discards while
 // digging), "Other way to pay" until the robot's purchase is the one shown,
-// then Build, Build free, Wonder stage, Sell for 3, or Build nothing. Moves
+// then Build, Build free, Wonder stage, Sell for 3, or Build nothing, and
+// Continue when the war scene waits for it. Moves
 // the page makes for you (a dig with nothing to build) are the page's. hold:
 // phases left to the test. window.__scPlayed counts each kind of move played,
 // window.__scDirect any the controls couldn't make.
@@ -40,6 +41,8 @@ export function autoplay(page, { level = "medium", hold = [] } = {}) {
         return canBuild(st, window.ddp.match.me, designOf(st.players, face(move.build))).chain ? "build-chain" : `build${bought}`;
       };
       const tick = () => {
+        // The war scene waits for Continue.
+        if (click(".ws:not([hidden]) .ws-go")) return;
         const m = window.ddp.match;
         if (!m || m.phase !== "playing" || !$(".stonecrown.my-turn")) return;
         const st = m.state;
@@ -218,15 +221,16 @@ export const handHeld = (page) =>
     return m.state.hands[m.me].map((s) => designOf(m.state.players, m.face(s))).sort((a, b) => a - b);
   });
 
-// The coins each seat's panel shows (yours in your stats) once the table
-// has caught up with the game: the coins each holds. Fails after 20 s.
+// The coins each seat's panel (or, across the table, its pill) shows (yours
+// in your stats) once the table has caught up with the game: the coins each
+// holds. Fails after 20 s.
 export const coinsShown = (page) =>
   waitForState(
     page,
     () => {
       const m = window.ddp.match;
       const shown = m.state.coins.map((_, p) => {
-        const node = p === m.me ? document.querySelector(".sc-me-stats .sc-stat.coins") : document.querySelector(`.sc-seat[data-seat="${p}"] .sc-stat.coins`);
+        const node = p === m.me ? document.querySelector(".sc-me-stats .sc-stat.coins") : document.querySelector(`:is(.sc-seat, .sc-across-pill)[data-seat="${p}"] .sc-stat.coins`);
         return Number(node?.textContent.match(/\d+/)?.[0]);
       });
       return shown.every((n, p) => n === m.state.coins[p]);
