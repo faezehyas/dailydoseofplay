@@ -19,6 +19,7 @@ export const HINT_WORDS = {
 };
 
 const ROMAN = ["", "I", "II", "III"];
+const FLAG_KEY = "A raised gold flag is a win, a torn red one at half-mast a loss, a striped one a draw, and a faint one on a dotted pole still to come.";
 const RES = RESOURCE_NAMES;
 const SCI = SYMBOLS;
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
@@ -398,7 +399,7 @@ const WORDS = {
     });
     const open = [1, 2, 3].filter((age, i) => !known(rs[i])).map((age) => ROMAN[age]);
     if (open.length) words.push(`${open.length > 1 ? "ages" : "age"} ${listOf(open)} still to come`);
-    return { title: "Flags", body: `Your wars with ${c.nameOf(q)}: ${listOf(words)}. Gold flags are wins, red losses, grey still to come.` };
+    return { title: "Flags", body: `Your wars with ${c.nameOf(q)}: ${listOf(words)}. ${FLAG_KEY}` };
   },
 
   warn(a, c) {
@@ -632,7 +633,7 @@ export const LEGEND = [
       { icon: ["art", "bridge"], name: "Bridge", text: "A road card: raw materials from this neighbour cost 1 coin." },
       { icon: ["art", "stall"], name: "Market stall", text: "Artisans' Row: glass, cloth and papyrus from both neighbours cost 1 coin." },
       { icon: ["art", "walls"], name: "Walls", text: "Rise on each bank as its shields grow." },
-      { icon: ["art", "flags"], name: "Flags", text: "One for each age on each border: gold won, red lost, grey still to come." },
+      { icon: ["art", "flags"], name: "Flags", text: `One for each age on each border. ${FLAG_KEY}` },
     ],
   },
   {
@@ -681,7 +682,7 @@ const GLYPHS = {
   bridge: SVG('<path class="w2" d="M0 24q5-2 10 0t10 0 10 0 10 0V32H0z"/><path class="st2" d="M0 14h40v6h-4a10 8 0 0 0-32 0H0z"/><path class="st" d="M0 12h40v3H0z"/><path class="ln2" d="M10 15v4M20 15v3M30 15v4"/>'),
   stall: SVG('<path class="wd2" d="M6 16h28v12H6z"/><path class="wd" d="M4 15h32v3H4z"/><path class="aw" d="M4 6h32l-2 7H6z"/><path class="aw2" d="M10 6l-1 7h5l1-7zM20 6v7h5l-1-7zM30 6l1 7h3l-2-7z"/><circle class="g" cx="13" cy="22" r="3"/><circle class="c" cx="20" cy="22" r="3"/><circle class="p" cx="27" cy="22" r="3"/>'),
   walls: SVG('<path class="st2" d="M2 14h4v-3h4v3h4v-3h4v3h4v-3h4v3h4v-3h4v3h2v16H2z"/><path class="st" d="M26 30V9h3V6h3v3h2V6h3v3h1v21z"/><path class="ln2" d="M2 20h24M2 25h24M14 14v6M8 20v5M20 20v5"/><path class="ink" d="M30 16h4v6h-4z"/>'),
-  flags: SVG('<path class="ln" d="M6 30V4M20 30V4M34 30V4"/><path class="won" d="M6 5h11l-3 4 3 4H6z"/><path class="lost" d="M20 5h11l-3 4 3 4H20z"/><path class="none" d="M34 5h5l-1.5 4 1.5 4h-5z"/>'),
+  flags: SVG('<path class="ln" d="M6 30V4M20 30V4M34 30V4"/><path class="won" d="M6 5h11l-3 4 3 4H6z"/><path class="lost" d="M20 13h10l-2.5 2.2 2 2-2.8 2 1.8 1.8H20z"/><path class="draw" d="M34 5h5.5v3H34zM34 10h5.5v3H34z"/>'),
   arrows: SVG('<path class="arr" d="M30 9a12 10 0 1 0 3 12"/><path class="arrh" d="M28 3l6 6-8 2z"/>'),
   pips: SVG('<circle class="pip on" cx="5" cy="16" r="3.2"/><circle class="pip on" cx="11" cy="16" r="3.2"/><circle class="pip on" cx="17" cy="16" r="3.2"/><circle class="pip" cx="23" cy="16" r="3.2"/><circle class="pip" cx="29" cy="16" r="3.2"/><circle class="pip" cx="35" cy="16" r="3.2"/>'),
 };

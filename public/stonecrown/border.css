@@ -450,9 +450,18 @@
 
 .sc-border-flags i.open { border-left-style: dotted; }
 .sc-border-flags i:not(.open)::after { opacity: 1; }
+/* Not by colour alone: a win flies high, a loss hangs torn at half-mast,
+   a draw is striped like "=". */
 .sc-border-flags i.won::after { background: var(--sc-b-flag-won); }
-.sc-border-flags i.lost::after { background: var(--sc-b-flag-lost); }
-.sc-border-flags i.draw::after { background: var(--sc-b-flag-draw); }
+.sc-border-flags i.lost::after {
+  top: 0.48em;
+  background: var(--sc-b-flag-lost);
+  clip-path: polygon(0 0, 100% 0, 78% 28%, 96% 52%, 70% 74%, 88% 100%, 0 100%);
+}
+.sc-border-flags i.draw::after {
+  background: linear-gradient(var(--sc-b-flag-draw) 0 36%, transparent 36% 64%, var(--sc-b-flag-draw) 64%);
+  clip-path: none;
+}
 
 /* Each bank's shields, on a badge by its defences; the stronger side's is ringed in gold. */
 .sc-border-tally {

@@ -44,6 +44,7 @@
   --sc-g-won: #f4bd3c;
   --sc-g-lost: #c2402e;
   --sc-g-none: #c9bfae;
+  --sc-g-draw: #a99bb8;
   --sc-g-glass: #62c6d0;
   --sc-g-cloth: #d4507e;
   --sc-g-papyrus: #e8c66a;
@@ -92,6 +93,7 @@
     --sc-g-won: #ffcf5c;
     --sc-g-lost: #ff8a74;
     --sc-g-none: #6b6890;
+    --sc-g-draw: #c3b8da;
     --sc-g-glass: #6fd3dc;
     --sc-g-cloth: #f07aa2;
     --sc-g-papyrus: #f0d27a;
@@ -140,6 +142,7 @@
   --sc-g-won: #ffcf5c;
   --sc-g-lost: #ff8a74;
   --sc-g-none: #6b6890;
+  --sc-g-draw: #c3b8da;
   --sc-g-glass: #6fd3dc;
   --sc-g-cloth: #f07aa2;
   --sc-g-papyrus: #f0d27a;
@@ -752,6 +755,7 @@
 .sc-glyph .won { fill: var(--sc-g-won); }
 .sc-glyph .lost { fill: var(--sc-g-lost); }
 .sc-glyph .none { fill: var(--sc-g-none); }
+.sc-glyph .draw { fill: var(--sc-g-draw); }
 .sc-glyph .arr { fill: none; stroke: var(--sc-g-line); stroke-width: 2.6; stroke-linecap: round; }
 .sc-glyph .arrh { fill: var(--sc-g-line); }
 .sc-glyph .pip { fill: var(--sc-g-pip); }

@@ -179,7 +179,7 @@ test("seats, direction, turn, tokens, flags and warnings say who and how many", 
   assert.equal(say(t.st, "tokens", { seat: 1 }).body, "Robot 1 won 1 point in age I and 3 points in age II, and lost once (−1). Tokens add up to +3 on the score sheet.");
   t.st.tokens[0] = [];
   assert.match(say(t.st, "tokens").body, /^You have no war tokens yet\. .* wins 3 points and fewer loses 1\./);
-  assert.equal(say(t.st, "flags", { seat: 1, results: "1,-1," }).body, "Your wars with Robot 1: won age I (+1), lost age II (−1) and age III still to come. Gold flags are wins, red losses, grey still to come.");
+  assert.equal(say(t.st, "flags", { seat: 1, results: "1,-1," }).body, "Your wars with Robot 1: won age I (+1), lost age II (−1) and age III still to come. A raised gold flag is a win, a torn red one at half-mast a loss, a striped one a draw, and a faint one on a dotted pole still to come.");
   assert.match(say(t.st, "flags", { seat: 1, results: "0" }).body, /: drew age I and ages II and III still to come\./);
   t.city(1, "ramparts");
   assert.deepEqual(say(t.st, "warn", { seat: 1 }), { title: "You trail by 2", body: "Robot 1 has 2 shields and you have 0. You need 3 more shields before the age ends to win +3, or 2 to draw; otherwise you take −1." });
