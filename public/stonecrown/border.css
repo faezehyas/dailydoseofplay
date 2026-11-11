@@ -1,0 +1,550 @@
+/* The border strip under a neighbour's panel (border.js): a cut-paper river
+   with their bank on the outer side and yours toward the centre, and the
+   price sign, their sale shelf, the war flags, the shields tally and the
+   warning laid over it. Every colour is a --sc-b-* token with a night value:
+   by night the sky turns indigo and windows and lanterns glow (.sc-b-night
+   parts show only then). */
+:root {
+  --sc-b-sky: #fdeedd;
+  --sc-b-sun: #fff8ea;
+  --sc-b-cloud: #fffaf2;
+  --sc-b-lamp: #ffd66b;
+  --sc-b-far2: #f6dcc8;
+  --sc-b-far: #eecdb6;
+  --sc-b-water: #b9dcec;
+  --sc-b-water-lt: #cde7f2;
+  --sc-b-wave: #ffffff;
+  --sc-b-bank-them: #d3e6c5;
+  --sc-b-meadow-them: #c0dbb0;
+  --sc-b-lip-them: #9cc28e;
+  --sc-b-tuft-them: #8fba82;
+  --sc-b-bank-me: #f8e0c3;
+  --sc-b-meadow-me: #f1cfa8;
+  --sc-b-lip-me: #dcae80;
+  --sc-b-tuft-me: #d9a877;
+  --sc-b-road: #fbf1df;
+  --sc-b-cream: #fff8ea;
+  --sc-b-house-shade: #efdcc0;
+  --sc-b-win: #54405e;
+  --sc-b-leaf: #6aab67;
+  --sc-b-leaf-dk: #44875a;
+  --sc-b-reed: #6f8f56;
+  --sc-b-wood: #c48b55;
+  --sc-b-wood-dk: #8a5a32;
+  --sc-b-rope: #8f6440;
+  --sc-b-stone: #f4e9d6;
+  --sc-b-stone-dk: #d3bf9c;
+  --sc-b-stone-line: #e3d3b6;
+  --sc-b-gate: #6b4a3a;
+  --sc-b-lantern: #f2885a;
+  --sc-b-awning: #ef6f56;
+  --sc-b-glass: #4fb3b8;
+  --sc-b-cloth: #9a7bd8;
+  --sc-b-papyrus: #f6e6b8;
+  --sc-b-papyrus-dk: #d8bf7e;
+  --sc-b-shadow: #5a3a3a;
+  --sc-b-seat-0: #ff6b4a;
+  --sc-b-seat-1: #2b8a8a;
+  --sc-b-seat-2: #7c55e6;
+  --sc-b-seat-3: #e8a317;
+  --sc-b-seat-4: #3f79c9;
+  --sc-b-seat-5: #c2507f;
+  --sc-b-seat-6: #5a9a3c;
+  --sc-b-chip: #fffaf0;
+  --sc-b-chip-edge: #e9d5b8;
+  --sc-b-ink: #3b2f45;
+  --sc-b-muted: #6f6378;
+  --sc-b-trail: #b0321f;
+  --sc-b-lead: #1f7a4c;
+  --sc-b-flag-won: #f4b83a;
+  --sc-b-flag-lost: #d2462f;
+  --sc-b-flag-draw: #a99bb8;
+  --sc-b-flag-open: #d9cfc0;
+  --sc-b-flag-pole: #8a5a32;
+  --sc-b-night: 0;
+  --sc-b-cloud-o: 0.92;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --sc-b-sky: #24215a;
+    --sc-b-sun: #fff1c9;
+    --sc-b-cloud: #3d3a80;
+    --sc-b-lamp: #ffcf5c;
+    --sc-b-far2: #2e2b68;
+    --sc-b-far: #383474;
+    --sc-b-water: #26507e;
+    --sc-b-water-lt: #2d5c8c;
+    --sc-b-wave: #7fb0e0;
+    --sc-b-bank-them: #2c4d55;
+    --sc-b-meadow-them: #26434b;
+    --sc-b-lip-them: #1b333b;
+    --sc-b-tuft-them: #3b6168;
+    --sc-b-bank-me: #4c3858;
+    --sc-b-meadow-me: #43304f;
+    --sc-b-lip-me: #33243e;
+    --sc-b-tuft-me: #5e4770;
+    --sc-b-road: #5d527e;
+    --sc-b-cream: #f2e4c4;
+    --sc-b-house-shade: #d3bd95;
+    --sc-b-win: #ffcf5c;
+    --sc-b-leaf: #3f7d62;
+    --sc-b-leaf-dk: #2c6050;
+    --sc-b-reed: #5f8a72;
+    --sc-b-wood: #a3743f;
+    --sc-b-wood-dk: #6e4c2c;
+    --sc-b-rope: #caa576;
+    --sc-b-stone: #a7a3cf;
+    --sc-b-stone-dk: #7a76ab;
+    --sc-b-stone-line: #908cbd;
+    --sc-b-gate: #2a2448;
+    --sc-b-lantern: #ffd36b;
+    --sc-b-awning: #e7664f;
+    --sc-b-glass: #6fd0d2;
+    --sc-b-cloth: #b9a0f0;
+    --sc-b-papyrus: #f3e2b0;
+    --sc-b-papyrus-dk: #c9ad6a;
+    --sc-b-shadow: #000000;
+    --sc-b-seat-0: #ff7a5c;
+    --sc-b-seat-1: #4fc1c1;
+    --sc-b-seat-2: #b496ff;
+    --sc-b-seat-3: #ffc04d;
+    --sc-b-seat-4: #6fa2e8;
+    --sc-b-seat-5: #e07aa4;
+    --sc-b-seat-6: #85c46a;
+    --sc-b-chip: #2e2b5a;
+    --sc-b-chip-edge: #1a1840;
+    --sc-b-ink: #f3ebff;
+    --sc-b-muted: #c3b8da;
+    --sc-b-trail: #ffab9a;
+    --sc-b-lead: #7fe0ac;
+    --sc-b-flag-won: #ffcf5c;
+    --sc-b-flag-lost: #ff8a73;
+    --sc-b-flag-draw: #c3b8da;
+    --sc-b-flag-open: #5a5690;
+    --sc-b-flag-pole: #caa576;
+    --sc-b-night: 1;
+    --sc-b-cloud-o: 0.3;
+  }
+}
+
+:root[data-theme="dark"] {
+  --sc-b-sky: #24215a;
+  --sc-b-sun: #fff1c9;
+  --sc-b-cloud: #3d3a80;
+  --sc-b-lamp: #ffcf5c;
+  --sc-b-far2: #2e2b68;
+  --sc-b-far: #383474;
+  --sc-b-water: #26507e;
+  --sc-b-water-lt: #2d5c8c;
+  --sc-b-wave: #7fb0e0;
+  --sc-b-bank-them: #2c4d55;
+  --sc-b-meadow-them: #26434b;
+  --sc-b-lip-them: #1b333b;
+  --sc-b-tuft-them: #3b6168;
+  --sc-b-bank-me: #4c3858;
+  --sc-b-meadow-me: #43304f;
+  --sc-b-lip-me: #33243e;
+  --sc-b-tuft-me: #5e4770;
+  --sc-b-road: #5d527e;
+  --sc-b-cream: #f2e4c4;
+  --sc-b-house-shade: #d3bd95;
+  --sc-b-win: #ffcf5c;
+  --sc-b-leaf: #3f7d62;
+  --sc-b-leaf-dk: #2c6050;
+  --sc-b-reed: #5f8a72;
+  --sc-b-wood: #a3743f;
+  --sc-b-wood-dk: #6e4c2c;
+  --sc-b-rope: #caa576;
+  --sc-b-stone: #a7a3cf;
+  --sc-b-stone-dk: #7a76ab;
+  --sc-b-stone-line: #908cbd;
+  --sc-b-gate: #2a2448;
+  --sc-b-lantern: #ffd36b;
+  --sc-b-awning: #e7664f;
+  --sc-b-glass: #6fd0d2;
+  --sc-b-cloth: #b9a0f0;
+  --sc-b-papyrus: #f3e2b0;
+  --sc-b-papyrus-dk: #c9ad6a;
+  --sc-b-shadow: #000000;
+  --sc-b-seat-0: #ff7a5c;
+  --sc-b-seat-1: #4fc1c1;
+  --sc-b-seat-2: #b496ff;
+  --sc-b-seat-3: #ffc04d;
+  --sc-b-seat-4: #6fa2e8;
+  --sc-b-seat-5: #e07aa4;
+  --sc-b-seat-6: #85c46a;
+  --sc-b-chip: #2e2b5a;
+  --sc-b-chip-edge: #1a1840;
+  --sc-b-ink: #f3ebff;
+  --sc-b-muted: #c3b8da;
+  --sc-b-trail: #ffab9a;
+  --sc-b-lead: #7fe0ac;
+  --sc-b-flag-won: #ffcf5c;
+  --sc-b-flag-lost: #ff8a73;
+  --sc-b-flag-draw: #c3b8da;
+  --sc-b-flag-open: #5a5690;
+  --sc-b-flag-pole: #caa576;
+  --sc-b-night: 1;
+  --sc-b-cloud-o: 0.3;
+}
+
+/* ---------- the art ---------- */
+.sc-b-night { opacity: var(--sc-b-night); }
+.sc-b-cloud { opacity: var(--sc-b-cloud-o); }
+.sc-b-hot { fill: transparent; pointer-events: all; cursor: help; }
+.sc-b-text { fill: var(--sc-b-ink); font: 700 5px var(--font-display, sans-serif); }
+.sc-b-pc { transform-box: fill-box; transform-origin: 50% 100%; }
+.sc-b-pc[data-unroll] { transform-origin: 50% 0; }
+.sc-b-lamp { transform-box: fill-box; transform-origin: 50% 40%; }
+.sc-b-them-0 { --sc-b-them: var(--sc-b-seat-0); }
+.sc-b-them-1 { --sc-b-them: var(--sc-b-seat-1); }
+.sc-b-them-2 { --sc-b-them: var(--sc-b-seat-2); }
+.sc-b-them-3 { --sc-b-them: var(--sc-b-seat-3); }
+.sc-b-them-4 { --sc-b-them: var(--sc-b-seat-4); }
+.sc-b-them-5 { --sc-b-them: var(--sc-b-seat-5); }
+.sc-b-them-6 { --sc-b-them: var(--sc-b-seat-6); }
+.sc-b-me-0 { --sc-b-me: var(--sc-b-seat-0); }
+.sc-b-me-1 { --sc-b-me: var(--sc-b-seat-1); }
+.sc-b-me-2 { --sc-b-me: var(--sc-b-seat-2); }
+.sc-b-me-3 { --sc-b-me: var(--sc-b-seat-3); }
+.sc-b-me-4 { --sc-b-me: var(--sc-b-seat-4); }
+.sc-b-me-5 { --sc-b-me: var(--sc-b-seat-5); }
+.sc-b-me-6 { --sc-b-me: var(--sc-b-seat-6); }
+.sc-bf-roof-them { fill: var(--sc-b-them); }
+.sc-bf-roof-me { fill: var(--sc-b-me); }
+.sc-bf-sky { fill: var(--sc-b-sky); }
+.sc-bf-sun { fill: var(--sc-b-sun); }
+.sc-bf-cloud { fill: var(--sc-b-cloud); }
+.sc-bf-lamp { fill: var(--sc-b-lamp); }
+.sc-bf-far2 { fill: var(--sc-b-far2); }
+.sc-bf-far { fill: var(--sc-b-far); }
+.sc-bf-water { fill: var(--sc-b-water); }
+.sc-bf-water-lt { fill: var(--sc-b-water-lt); }
+.sc-bf-bank-them { fill: var(--sc-b-bank-them); }
+.sc-bf-meadow-them { fill: var(--sc-b-meadow-them); }
+.sc-bf-lip-them { fill: var(--sc-b-lip-them); }
+.sc-bf-tuft-them { fill: var(--sc-b-tuft-them); }
+.sc-bf-bank-me { fill: var(--sc-b-bank-me); }
+.sc-bf-meadow-me { fill: var(--sc-b-meadow-me); }
+.sc-bf-lip-me { fill: var(--sc-b-lip-me); }
+.sc-bf-tuft-me { fill: var(--sc-b-tuft-me); }
+.sc-bf-road { fill: var(--sc-b-road); }
+.sc-bf-cream { fill: var(--sc-b-cream); }
+.sc-bf-house-shade { fill: var(--sc-b-house-shade); }
+.sc-bf-win { fill: var(--sc-b-win); }
+.sc-bf-leaf { fill: var(--sc-b-leaf); }
+.sc-bf-leaf-dk { fill: var(--sc-b-leaf-dk); }
+.sc-bf-wood { fill: var(--sc-b-wood); }
+.sc-bf-wood-dk { fill: var(--sc-b-wood-dk); }
+.sc-bf-stone { fill: var(--sc-b-stone); }
+.sc-bf-stone-dk { fill: var(--sc-b-stone-dk); }
+.sc-bf-stone-line { fill: var(--sc-b-stone-line); }
+.sc-bf-gate { fill: var(--sc-b-gate); }
+.sc-bf-lantern { fill: var(--sc-b-lantern); }
+.sc-bf-awning { fill: var(--sc-b-awning); }
+.sc-bf-glass { fill: var(--sc-b-glass); }
+.sc-bf-cloth { fill: var(--sc-b-cloth); }
+.sc-bf-papyrus { fill: var(--sc-b-papyrus); }
+.sc-bf-papyrus-dk { fill: var(--sc-b-papyrus-dk); }
+.sc-bf-shadow { fill: var(--sc-b-shadow); }
+.sc-bs-lamp { stroke: var(--sc-b-lamp); }
+.sc-bs-wave { stroke: var(--sc-b-wave); }
+.sc-bs-rope { stroke: var(--sc-b-rope); }
+.sc-bs-reed { stroke: var(--sc-b-reed); }
+
+/* ---------- the strip ---------- */
+.sc-border {
+  position: relative;
+  container-type: inline-size;
+  aspect-ratio: 250 / 84;
+  min-height: 64px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--sc-b-sky);
+  color: var(--sc-b-ink);
+  font-family: var(--font-display, sans-serif);
+  isolation: isolate;
+}
+
+.sc-border-art,
+.sc-border-fx {
+  position: absolute;
+  inset: 0;
+}
+
+.sc-border-art > svg,
+.sc-border-fx > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sc-border-fx {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.sc-border-ui {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26% minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    ". sign flags"
+    "tally tally tally"
+    "sells sells warn";
+  gap: 2px;
+  padding: 3px 4px 4px;
+  font-size: clamp(9.5px, 4.3cqw, 11.5px);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.sc-border-right .sc-border-ui {
+  grid-template-areas:
+    "flags sign ."
+    "tally tally tally"
+    "warn sells sells";
+}
+
+.sc-border-ui > * {
+  pointer-events: auto;
+  min-width: 0;
+}
+
+/* A paper tag: cream on the art, a soft cut-paper shadow under it. */
+.sc-border-sign,
+.sc-border-flags,
+.sc-border-warn,
+.sc-border-sells {
+  background: var(--sc-b-chip);
+  border-radius: 999px;
+  box-shadow: 0 1px 0 var(--sc-b-chip-edge), 0 2px 3px rgb(60 30 30 / 12%);
+}
+
+.sc-border-ui :focus-visible {
+  outline: 2px solid var(--focus, #2f6fed);
+  outline-offset: 1px;
+}
+
+.sc-border .sc-ic {
+  display: inline-block;
+  flex: none;
+  width: 1.3em;
+  height: 1.3em;
+}
+
+.sc-border .sc-ic svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The price sign hangs over the crossing on two short cords. */
+.sc-border-sign {
+  grid-area: sign;
+  justify-self: center;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.2em 0.5em 0.2em 0.35em;
+  margin-top: 0.15em;
+  white-space: nowrap;
+  font-weight: 600;
+  cursor: help;
+}
+
+.sc-border-sign::before,
+.sc-border-sign::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  width: 1px;
+  height: 0.5em;
+  background: var(--sc-b-flag-pole);
+}
+
+.sc-border-sign::before { left: 28%; }
+.sc-border-sign::after { right: 28%; }
+
+.sc-border-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1em;
+}
+
+.sc-border-price b {
+  font-size: 1.15em;
+  font-weight: 700;
+}
+
+.sc-border-price small {
+  font-size: 0.9em;
+  font-weight: 500;
+  color: var(--sc-b-muted);
+  margin-right: 0.15em;
+}
+
+.sc-border-each {
+  font-weight: 500;
+}
+
+.sc-border-sign.split {
+  gap: 0.45em;
+}
+
+/* The age flags on your bank. */
+.sc-border-flags {
+  grid-area: flags;
+  justify-self: end;
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.2em;
+  padding: 0.22em 0.5em 0.2em 0.55em;
+  cursor: help;
+}
+
+.sc-border-right .sc-border-flags {
+  justify-self: start;
+  flex-direction: row-reverse;
+}
+
+.sc-border-flags i {
+  position: relative;
+  display: block;
+  width: 0.66em;
+  height: 1.15em;
+  border-left: 1.5px solid var(--sc-b-flag-pole);
+}
+
+.sc-border-flags i::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0.66em;
+  height: 0.62em;
+  background: var(--sc-b-flag-open);
+  opacity: 0.75;
+  clip-path: polygon(0 0, 100% 0, 72% 50%, 100% 100%, 0 100%);
+}
+
+.sc-border-flags i.open { border-left-style: dotted; }
+.sc-border-flags i:not(.open)::after { opacity: 1; }
+.sc-border-flags i.won::after { background: var(--sc-b-flag-won); }
+.sc-border-flags i.lost::after { background: var(--sc-b-flag-lost); }
+.sc-border-flags i.draw::after { background: var(--sc-b-flag-draw); }
+
+/* Each bank's shields, on a badge by its defences; the stronger side's is ringed in gold. */
+.sc-border-tally {
+  grid-area: tally;
+  align-self: start;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 calc(9% - 4px);
+  pointer-events: none;
+}
+
+.sc-border-right .sc-border-tally { flex-direction: row-reverse; }
+
+.sc-border-shield {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.08em;
+  padding: 0.12em 0.4em 0.12em 0.2em;
+  border-radius: 999px;
+  background: var(--sc-b-chip);
+  box-shadow: 0 1px 0 var(--sc-b-chip-edge), 0 2px 3px rgb(60 30 30 / 12%);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+  cursor: help;
+}
+
+.sc-border-shield b { font-size: 1.1em; }
+.sc-border-shield .sc-ic { width: 1.15em; height: 1.15em; }
+
+.sc-border-tally.ahead .theirs,
+.sc-border-tally.behind .mine {
+  box-shadow: 0 0 0 1.5px var(--sc-b-flag-won), 0 2px 3px rgb(60 30 30 / 12%);
+}
+
+/* The warning, from turn 5. */
+.sc-border-warn {
+  grid-area: warn;
+  justify-self: end;
+  align-self: end;
+  padding: 0.25em 0.55em;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.sc-border-warn[hidden] { display: none; }
+.sc-border-right .sc-border-warn { justify-self: start; }
+.sc-border-warn.trail { color: var(--sc-b-trail); }
+.sc-border-warn.lead { color: var(--sc-b-lead); }
+.sc-border-warn.level { color: var(--sc-b-muted); }
+
+/* Their sale shelf sits on their bank, wrapping into a second row if it must. */
+.sc-border-sells {
+  grid-area: sells;
+  justify-self: start;
+  align-self: end;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15em 0.3em;
+  max-width: 100%;
+  padding: 0.2em 0.45em;
+  border-radius: 0.8em;
+  cursor: help;
+}
+
+.sc-border-right .sc-border-sells { justify-self: end; }
+.sc-border-sells:empty { display: none; }
+
+.sc-border-unit {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sc-border-unit.either {
+  padding: 0 0.15em;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--sc-b-chip-edge);
+}
+
+.sc-border-none {
+  color: var(--sc-b-muted);
+  font-weight: 500;
+}
+
+.sc-border-coin {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  background: var(--sc-b-flag-won);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sc-border-warn:not([hidden]) {
+    animation: sc-border-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  @keyframes sc-border-in {
+    0% {
+      transform: scale(0.7);
+      opacity: 0;
+    }
+    100% {
+      transform: none;
+      opacity: 1;
+    }
+  }
+}
