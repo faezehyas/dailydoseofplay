@@ -763,9 +763,18 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
     node.style.top = "0px";
     const w = node.offsetWidth;
     const h = node.offsetHeight;
-    const below = vh - r.bottom;
-    const down = below >= h + gap + m || below >= r.top;
-    const top = clamp(down ? r.bottom + gap : r.top - gap - h, m, Math.max(m, vh - h - m));
+    // Inside a zone (data-tip-zone: your hand and what explains it), the
+    // bubble keeps out of the whole zone when the screen has room.
+    const z = t.closest("[data-tip-zone]")?.getBoundingClientRect();
+    let down;
+    let top;
+    if (z && z.top - gap - h >= m) [down, top] = [false, z.top - gap - h];
+    else if (z && vh - z.bottom >= h + gap + m) [down, top] = [true, z.bottom + gap];
+    else {
+      const below = vh - r.bottom;
+      down = below >= h + gap + m || below >= r.top;
+      top = clamp(down ? r.bottom + gap : r.top - gap - h, m, Math.max(m, vh - h - m));
+    }
     const left = clamp(r.left + r.width / 2 - w / 2, m, Math.max(m, vw - w - m));
     node.style.left = `${Math.round(left)}px`;
     node.style.top = `${Math.round(top)}px`;
@@ -810,7 +819,7 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
     t.classList.add("sc-tip-on");
     describe(t, true);
     place(bubble, t);
-    if (!quiet && (via === "tap" || via === "hold")) live.textContent = [w.title, w.body, ...(w.more ?? [])].join(". ").replace(/\.\./g, ".");
+    if (!quiet && (via === "tap" || via === "hold" || via === "key")) live.textContent = [w.title, w.body, ...(w.more ?? [])].join(". ").replace(/\.\./g, ".");
   }
   function unmark(t) {
     t.classList.remove("sc-tip-on");
@@ -868,32 +877,58 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
 
   // ---------- events ----------
   const on = (node, type, f, opts) => (node.addEventListener(type, f, opts), () => node.removeEventListener(type, f, opts));
+  // A target marked data-tip-on="hold" (a card in your hand, whose shelf
+  // and detail strip already explain it) opens only on press and hold (a
+  // mouse too), a tap in Explain mode or "i" while it has focus.
+  const holdOnly = (t) => t?.dataset.tipOn === "hold";
+  // Hover follows the mouse moving: the table moving under a still pointer opens nothing.
+  let pointer = "";
+  let pending = null;
+  const moved = (e) => {
+    const xy = `${Math.round(e.clientX)},${Math.round(e.clientY)}`;
+    const was = pointer;
+    pointer = xy;
+    return xy !== was;
+  };
   const off = [
-    on(root, "pointerover", (e) => {
-      if (e.pointerType !== "mouse") return;
+    on(doc, "pointerdown", (e) => void moved(e), true),
+    on(root, "pointermove", (e) => {
+      if (e.pointerType !== "mouse" || !moved(e)) return;
       const t = tipOf(e.target);
-      if (!t || t === target) return;
+      if (t === target || (t && t === pending)) return;
       clearTimeout(hover);
-      hover = setTimeout(() => show(t, "hover"), target ? 60 : 220);
+      pending = null;
+      if (!t || holdOnly(t)) return void (how === "hover" && hide());
+      pending = t;
+      hover = setTimeout(() => ((pending = null), show(t, "hover")), target ? 60 : 220);
     }),
     on(root, "pointerout", (e) => {
       if (e.pointerType !== "mouse") return;
       const t = tipOf(e.target);
       if (!t || (e.relatedTarget && t.contains(e.relatedTarget))) return;
       clearTimeout(hover);
+      pending = null;
       if (how === "hover" && target === t) hide();
     }),
     on(root, "focusin", (e) => {
       const t = tipOf(e.target);
-      if (t && focusVisible(e.target)) show(t, "focus");
+      if (t && !holdOnly(t) && focusVisible(e.target)) show(t, "focus");
+      else if (target && (how === "focus" || how === "key") && t !== target) hide();
     }),
     on(root, "focusout", (e) => {
-      if (how === "focus" && target && !target.contains(e.relatedTarget)) hide();
+      if ((how === "focus" || how === "key") && target && !target.contains(e.relatedTarget)) hide();
     }),
-    on(root, "pointerdown", (e) => {
-      if (e.pointerType === "mouse") return;
+    on(root, "keydown", (e) => {
+      if ((e.key !== "i" && e.key !== "I") || e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.("input, textarea")) return;
       const t = tipOf(e.target);
       if (!t) return;
+      e.preventDefault();
+      if (target === t && how === "key") hide();
+      else show(t, "key");
+    }),
+    on(root, "pointerdown", (e) => {
+      const t = tipOf(e.target);
+      if (!t || (e.pointerType === "mouse" && (!holdOnly(t) || e.button !== 0))) return;
       clearTimeout(hold);
       held = { x: e.clientX, y: e.clientY };
       hold = setTimeout(() => {
