@@ -1667,10 +1667,11 @@ export function scMotion(table, art, ctx) {
     const v = view();
     said("war", ev);
     const tokens = tokensAfter(v.tokens, ev.results, ev.age);
-    const facts = warFacts({ ...v, tokens }, ev.results, me, ev.age);
+    // The scene's tips (and your score) read the view: it holds this war's tokens from the start.
+    v.tokens = tokens;
+    const facts = warFacts(v, ev.results, me, ev.age);
     onWar(ev, facts, false);
     if (live(g)) await art.war.play(facts, { wait: warWait(), k });
-    v.tokens = tokens;
     onWar(ev, facts, true);
     draw();
   }
