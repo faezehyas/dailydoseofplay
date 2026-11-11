@@ -157,6 +157,58 @@ test("Stonecrown's Halicarnassus digs through the discards by tapping: a card bu
   assertNoErrors();
 });
 
+// By keyboard on a laptop, with the page watched for hidden cards: a card
+// picked with Enter and S keeps focus in your hand (the hand doesn't fold
+// from under it) and focus lands on a card of the hand passed to you; a
+// card's tip opened with "i" leaves with the hand passed on; Explain mode and
+// the legend open and close from the keyboard, and focus comes back to "?".
+test("Stonecrown by keyboard: focus stays in your hand, tips leave with it, Explain mode and the legend", { skip, timeout: 300_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("keys", { viewport: { width: 1366, height: 900 }, reducedMotion: "reduce", robotPace: 0.001, seed: "keys" });
+  await page.addInitScript(() => localStorage.setItem("ddp-stonecrown-settings", JSON.stringify({ players: 3, side: "A", level: "easy" })));
+  await page.goto(`${srv.base}/stonecrown/?robot=1`);
+  await waitForState(page, (ddp) => ddp.match?.phase === "playing", undefined, { timeout: 60_000 });
+  await watchLeaks(page, { dom: true });
+  const myTurn = () => waitForState(page, () => !!document.querySelector(".stonecrown.my-turn") && window.ddp.match.state.phase === "pick", undefined, { timeout: 60_000, why: "my pick" });
+  const focused = () => page.evaluate(() => ({ card: !!document.activeElement?.closest("#sc-hand .sc-hcard"), id: document.activeElement?.id ?? "", folded: document.querySelector(".stonecrown").classList.contains("sc-waiting") }));
+  await myTurn();
+  await page.locator('#sc-hand .sc-hcard[tabindex="0"]').focus();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Enter");
+  await page.locator("#sc-hand .sc-hcard.sel").waitFor();
+  // Its tip, opened with "i", is about a card about to be passed on.
+  await page.keyboard.press("i");
+  await page.locator(".sc-tip:not([hidden])").waitFor();
+  const round = (await state(page)).round;
+  await page.keyboard.press("s");
+  const now = await focused();
+  assert.equal(now.card, true, "focus stays on the card after the pick");
+  assert.equal(now.folded, false, "the hand doesn't fold from under the keyboard's focus");
+  await waitForState(page, (ddp, r) => ddp.match.state.round > r, round, { timeout: 60_000, why: "the hands pass" });
+  await myTurn();
+  assert.equal((await focused()).card, true, "focus lands on a card of the hand passed to you");
+  assert.equal(await page.locator(".sc-tip:not([hidden])").count(), 0, "the tip left with the card");
+  // Explain mode from the keyboard: stops only where a screen reader can name them.
+  await page.keyboard.press("?");
+  assert.equal(await page.locator("#sc-ask").getAttribute("aria-pressed"), "true");
+  assert.equal(await page.locator('[aria-hidden="true"] [data-tip-tab], [role="img"] [data-tip-tab], button [data-tip-tab]').count(), 0, "no silent stops");
+  await page.locator(".sc-explain-bar button", { hasText: "All icons" }).click();
+  await page.locator("dialog.sc-legend[open]").waitFor();
+  await page.keyboard.press("Escape");
+  await page.locator("dialog.sc-legend[open]").waitFor({ state: "detached" }).catch(() => {});
+  assert.equal(await page.locator("dialog.sc-legend[open]").count(), 0, "Escape closes the legend");
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("#sc-ask").getAttribute("aria-pressed"), "false", "Escape ends Explain mode");
+  assert.equal((await focused()).id, "sc-ask", "focus comes back to the ? button");
+  // The rest of the age, watched.
+  await autoplay(page, { level: "easy" });
+  await waitForState(page, (ddp) => ddp.match.state.age >= 2 || ddp.match.phase !== "playing", undefined, { timeout: 120_000, why: "age II" });
+  await stopAutoplay(page);
+  assert.deepEqual(await leaked(page), [], "no tip, legend or Explain mode showed a card it shouldn't");
+  assertNoErrors();
+});
+
 // The tip layer on its own, over a few targets of its own: a hover or a hold
 // whose target leaves the page opens nothing and says nothing; an open tip is
 // not rebuilt while unrelated parts of the page change, and closes at once

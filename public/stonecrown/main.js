@@ -714,7 +714,8 @@ function mountGame(session, root, shell) {
     // While you wait for the others, their picks turn over and the hands
     // pass, your hand folds to a strip, so your city and the borders show on
     // a laptop; it opens as the cards passed to you land.
-    rootBox.classList.toggle("sc-waiting", !choice && match?.phase === "playing" && !!view?.hands[me]?.length && (!table.pending || current?.type === "picks" || (current?.type === "pass" && !arriving.size)));
+    // A keyboard's focus in the part that folds keeps it open, so focus isn't lost.
+    rootBox.classList.toggle("sc-waiting", !choice && !keyboardInHand() && match?.phase === "playing" && !!view?.hands[me]?.length && (!table.pending || current?.type === "picks" || (current?.type === "pass" && !arriving.size)));
     renderTimer();
     renderResult();
     setTabAlert(choice ? "Your pick" : null);
@@ -724,6 +725,16 @@ function mountGame(session, root, shell) {
       cuedTurn = key;
     }
     autoMove();
+  }
+
+  function keyboardInHand() {
+    const f = document.activeElement;
+    if (!f || !handArea.contains(f) || f.closest(".sc-hand-head")) return false;
+    try {
+      return f.matches(":focus-visible");
+    } catch {
+      return true;
+    }
   }
 
   // The robot whose pick is awaited: the first in the step that hasn't chosen.
