@@ -1187,5 +1187,5 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
     root.classList.remove("sc-tips", "sc-explaining");
   }
 
-  return { destroy, explain: (v = !explaining) => setExplain(v), explaining: () => explaining, legend, coach, hide, refresh: () => target && show(target, how, true) };
+  return { destroy, explain: (v = !explaining) => setExplain(v), explaining: () => explaining, legend, coach, seen: (hint) => memory.seen(hint), hide, refresh: () => target && show(target, how, true) };
 }

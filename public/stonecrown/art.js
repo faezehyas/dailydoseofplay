@@ -1607,14 +1607,13 @@ export function scMotion(table, art, ctx) {
       const moving = [to, from, (to + dir + n) % n, (from - dir + n) % n].map(art.stackOf).filter(Boolean);
       moving.forEach((s) => (s.style.visibility = "hidden"));
       ring = art.ring.pass(dir, { ms });
-      const slides = [];
-      const go = (a, b) => a && b && slides.push(slide(stackEl(v.age, count), a, b, { ms, layer: flyLayer }).then((node) => node.remove()));
-      go(centre, art.slotRect(to));
-      go(art.slotRect(from), centre);
+      // Every rect is read before the first slide adds to the page.
       const next = (to + dir + n) % n;
-      if (next !== me) go(art.slotRect(to), art.slotRect(next));
       const giver = (from - dir + n) % n;
-      if (giver !== to && giver !== me) go(art.slotRect(giver), art.slotRect(from));
+      const legs = [[centre, art.slotRect(to)], [art.slotRect(from), centre]];
+      if (next !== me) legs.push([art.slotRect(to), art.slotRect(next)]);
+      if (giver !== to && giver !== me) legs.push([art.slotRect(giver), art.slotRect(from)]);
+      const slides = legs.filter(([a, b]) => a && b).map(([a, b]) => slide(stackEl(v.age, count), a, b, { ms, layer: flyLayer }).then((node) => node.remove()));
       await Promise.all(slides);
       moving.forEach((s) => (s.style.visibility = ""));
       if (!live(g)) return;

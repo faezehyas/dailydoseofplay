@@ -577,10 +577,11 @@ function mountGame(session, root, shell) {
 
   // The first purchase and the first chain each get a hint, once ever.
   function hintFor() {
-    if (!sel || !myChoice() || myChoice() === "dig") return;
+    if (!sel || !myChoice() || myChoice() === "dig" || (tips.seen("chain") && tips.seen("buy"))) return;
     const o = optionsFor(sel.slot);
     if (!o) return;
     if (o.build.chain) return coach("chain", buttons.build);
+    if (tips.seen("buy")) return;
     const [b] = plans(o);
     // The purchase's hint points at the river your coins will cross, or failing that (scrolled away) the purchase.
     if (!b.ok || !b.buy || ![...b.buy.left, ...b.buy.right].some(Boolean)) return;
