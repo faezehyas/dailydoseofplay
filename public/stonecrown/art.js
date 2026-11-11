@@ -820,8 +820,8 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
   const drawShelf = (view, light = {}) => shelf.update(shelfOf(view, me), light);
   // The ring: every seat, its stack, this age's way and its turns.
   function drawRing(view) {
-    const count = Math.max(0, ...view.hands.map((h) => h.length));
-    const key = `${view.age}:${view.round}:${count}`;
+    const count = view.hands.map((h) => h.length);
+    const key = `${view.age}:${view.round}:${count.join(",")}`;
     if (mineChanged("ring", key)) ring.update({ players, me, age: view.age, round: Math.min(view.round, ROUNDS), count });
   }
   const mineRects = {
@@ -838,7 +838,7 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
   const pile = el("span", { class: "sc-pile", role: "img", dataset: { tip: "discard" } }, cardEl(null, { age: 1, size: "mini" }), el("b", { class: "mono" }, "0"));
   function drawPile(view) {
     const n = view.discard.length;
-    pile.lastChild.textContent = String(n);
+    if (pile.lastChild.textContent !== String(n)) pile.lastChild.textContent = String(n);
     pile.classList.toggle("empty", !n);
     const age = Math.max(1, view.age);
     if (pile.dataset.age !== String(age)) {

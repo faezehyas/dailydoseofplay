@@ -191,6 +191,8 @@ function feltSvg(players, me, dir) {
   return `<svg class="sc-ring-felt" viewBox="0 0 ${W} ${H}" focusable="false" aria-hidden="true">${o}<g class="chevs">${chev}</g></svg>`;
 }
 
+// update's count: one number for every seat, or one per seat (a Babylon seat
+// can hold its seventh card while the other hands are empty).
 export function seatRing({ kit, nameOf }) {
   const { W, H } = RING;
   const words = el("p", { class: "sc-ring-words" });
@@ -216,6 +218,7 @@ export function seatRing({ kit, nameOf }) {
   let marked = null;
   let busy = null;
   let built = "";
+  const countOf = (p) => (Array.isArray(st.count) ? (st.count[p] ?? 0) : st.count);
 
   const place = (s, deg) => {
     const [x, y] = pointAt(deg, RING.lane);
@@ -263,7 +266,7 @@ export function seatRing({ kit, nameOf }) {
     });
     seatsBox.replaceChildren(...seats);
     stacks = angles.map((deg, p) => {
-      const s = el("span", { class: "sc-ring-stack", "data-tip": "back", "data-tip-where": "stack", "data-tip-seat": String(p) }, stackEl(st.age, st.count));
+      const s = el("span", { class: "sc-ring-stack", "data-tip": "back", "data-tip-where": "stack", "data-tip-seat": String(p) }, stackEl(st.age, countOf(p)));
       place(s, deg);
       return s;
     });
@@ -290,11 +293,12 @@ export function seatRing({ kit, nameOf }) {
     dirText.textContent = `hands go ${dir > 0 ? "left" : "right"}`;
     dirText.dataset.tipDir = String(dir);
     dirText.dataset.tipAge = String(st.age);
-    for (const s of stacks) {
-      setStack(s.firstChild, st.age, st.count);
-      s.hidden = !(st.count > 0);
-      s.dataset.tipCount = String(st.count);
-    }
+    stacks.forEach((s, p) => {
+      const n = countOf(p);
+      setStack(s.firstChild, st.age, n);
+      s.hidden = !(n > 0);
+      s.dataset.tipCount = String(n);
+    });
     words.textContent = ringWords(st, (p) => (p === st.me ? "you" : nameOf(p)));
   }
 
