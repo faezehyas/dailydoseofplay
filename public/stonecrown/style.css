@@ -2242,9 +2242,15 @@
     grid-template-areas: "head head" "shelf side" "hand side" "buttons side";
   }
 
-  .stonecrown .stonecrown .sc-hand-area > .sc-shelf.full {
+  .stonecrown .sc-hand-area > .sc-shelf.full {
     grid-area: shelf;
     max-width: calc(var(--sc-cw) * 7 + 36px);
+  }
+
+  /* The seven slots narrow before the either tokens take a second row. */
+  .stonecrown .sc-hand-area > .sc-shelf.full .sc-shelf-fixed {
+    flex: 1 1 320px;
+    min-width: 320px;
   }
 
   /* While you wait for the others, your hand folds to a strip and your city shows. */
