@@ -275,6 +275,12 @@ flowchart TB
   g_tiles --> g_board
   g_tiles --> g_card_art
   g_pieces --> g_board
+  g_art --> g_store
+  g_art --> g_border
+  g_art --> g_war
+  g_art --> g_ring
+  g_art --> g_tips
+  p_main --> g_war
   g_tips --> e_shell
   g_tips --> g_cards
   g_tips --> g_rules
