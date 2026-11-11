@@ -417,5 +417,18 @@
   .sc-ring-plate:not(.me) .nm { display: none; }
   .sc-ring-plate .sc-mark { width: 1.3em; height: 1.3em; }
   .sc-ring-dir { display: none; }
+
+  /* The middle shrinks to keep clear of the stacks above and below it. */
+  .sc-ring-mid { gap: 3px; }
+
+  .sc-ring-medal {
+    width: 22px;
+    box-shadow: 0 0 0 1.5px var(--sc-ring-medal-rim), 0 2px 4px -1px var(--sc-ring-shade), 0 0 12px 4px var(--sc-ring-glow);
+  }
+
+  .sc-ring-numeral { font-size: 11px; }
+  .sc-ring-pips { gap: 2px; }
+  .sc-ring-pips i { width: 4px; }
+  .sc-ring-pips i.now { transform: scale(1.25); }
 }
 

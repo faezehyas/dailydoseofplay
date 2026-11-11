@@ -701,12 +701,13 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
       seat: () => rectIn(node),
       slot: () => rectIn(slot),
       // Where their pick stays a beat as it turns over: under the border
-      // (which shows what it changes), or the top of a short panel.
+      // (which shows what it changes), or under a panel too short for it
+      // (a phone's), so it covers neither the border nor their numbers.
       recap: () => {
         const r = rectIn(node);
         const b = rectIn(border.node);
         const under = b.y + b.h + 4;
-        return { x: r.x, y: r.y + r.h - under >= 160 ? under : r.y + 52, w: r.w, h: 150 };
+        return { x: r.x, y: r.y + r.h - under >= 160 ? under : r.y + r.h + 4, w: r.w, h: 150 };
       },
     };
     return { p, node, draw, rects, pick, slot, stack, border, city: cityBox };
@@ -1137,7 +1138,7 @@ export function buildPlan(state, me, o, slot, i, names) {
 }
 export function stagePlan(state, me, o, slot, i, names) {
   const s = o.stage;
-  if (!s.ok) return { ok: false, label: s.why === "built" ? "Wonder finished" : "Can't afford", sub: s.stage ? `Stage ${ROMAN[s.n + 1]}: ${costWords(s.stage.cost)}` : "", why: whyWords(s.why) };
+  if (!s.ok) return { ok: false, label: s.why === "built" || !s.stage ? "Wonder finished" : `Stage ${ROMAN[s.n + 1]}`, sub: s.stage ? `Can't pay ${costWords(s.stage.cost)}` : "", why: whyWords(s.why) };
   const p = s.purchases[i % s.purchases.length];
   const side = sideCoins(state, me, p);
   return { ok: true, move: moveFor("stage", slot, p), label: `Wonder stage ${ROMAN[s.n + 1]}`, sub: payWords(side, names) || "Pay nothing", buy: p, side, ways: s.purchases.length };

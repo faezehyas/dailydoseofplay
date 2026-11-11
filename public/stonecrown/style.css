@@ -272,6 +272,18 @@
   }
 }
 
+/* A narrow phone gives the ring the room: a seat across shows its name and
+   hand (its tip and label say the rest; it never fights you). */
+@media (max-width: 400px) {
+  .sc-top-side {
+    max-width: 140px;
+  }
+
+  .sc-top-side .sc-across-stats {
+    display: none;
+  }
+}
+
 /* A phone has no room for the neighbours' wonders by name (their labels and cities say it). */
 @media (max-width: 480px) {
   .sc-seat-wonder {
@@ -283,6 +295,32 @@
   }
 
   .sc-act .sc-ic.coin {
+    display: none;
+  }
+
+  /* Three buttons across a phone: a label on one line where it can be,
+     balanced over two where it can't, and at most two lines under it. */
+  .sc-act {
+    padding-inline: 4px;
+  }
+
+  .sc-act .lbl {
+    font-size: 0.9rem;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+
+  .sc-act small {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: 0.68rem;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  .sc-act small[hidden] {
     display: none;
   }
 }
@@ -1858,8 +1896,9 @@
   flex: none;
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  /* Round at the theme's 44 px least height for a button. */
+  width: 44px;
+  height: 44px;
   padding: 0;
   border-radius: 50%;
   font: 700 1.15rem/1 var(--font-display);
