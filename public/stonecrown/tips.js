@@ -781,9 +781,12 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
     // Inside a zone (data-tip-zone: your hand and what explains it), the
     // bubble keeps out of the whole zone when the screen has room.
     const z = t.closest("[data-tip-zone]")?.getBoundingClientRect();
+    // A hint inside something marked data-coach-above (the war scene) waits above it, covering none of it.
+    const over = node !== bubble ? t.closest("[data-coach-above]")?.getBoundingClientRect() : null;
     let down;
     let top;
-    if (z && z.top - gap - h >= m) [down, top] = [false, z.top - gap - h];
+    if (over && over.top - gap - h >= m) [down, top] = [false, over.top - gap - h];
+    else if (z && z.top - gap - h >= m) [down, top] = [false, z.top - gap - h];
     else if (z && vh - z.bottom >= h + gap + m) [down, top] = [true, z.bottom + gap];
     else {
       const below = vh - r.bottom;

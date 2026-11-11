@@ -126,7 +126,7 @@ export function warScene({ kit, nameOf, sound = () => {}, reduced = null } = {})
   const button = el("button", { class: "btn primary ws-go", type: "button" }, label, bar);
   const card = el(
     "div",
-    { class: "ws-card" },
+    { class: "ws-card", dataset: { coachAbove: "" } },
     el("header", { class: "ws-banner" }, el("div", { class: "ws-ribbon" }, title), stakes),
     front,
     el("div", { class: "ws-sums" }, sumAge, sumAll),
