@@ -522,6 +522,34 @@
   transform: translateY(6px);
 }
 
+/* The sums' frames and the elsewhere line's lead stand from the start, so
+   the card keeps its size and Continue stays put: only what they hold comes in. */
+.ws-sum.ws-step,
+.ws-else.ws-step {
+  transition: none;
+}
+
+.ws-sum.ws-step.ws-off,
+.ws-else.ws-step.ws-off {
+  opacity: 1;
+  transform: none;
+}
+
+.ws-sum > b,
+.ws-else-v {
+  transition: opacity 0.4s, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ws-sum.ws-off > b,
+.ws-else.ws-off .ws-else-v {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.ws-else-v {
+  display: inline-block;
+}
+
 /* ---------- Continue ---------- */
 .ws-foot {
   display: flex;
@@ -560,6 +588,8 @@
 /* ---------- without movement: things only appear, in the same order ---------- */
 .ws.ws-still .ws-card,
 .ws.ws-still .ws-step.ws-off,
+.ws.ws-still .ws-sum.ws-off > b,
+.ws.ws-still .ws-else.ws-off .ws-else-v,
 .ws.ws-still .ws-shields .ws-off,
 .ws.ws-still .ws-gate .ws-stamp.ws-off {
   transform: none;
@@ -579,6 +609,8 @@
 @media (prefers-reduced-motion: reduce) {
   .ws-card,
   .ws-step.ws-off,
+  .ws-sum.ws-off > b,
+  .ws-else.ws-off .ws-else-v,
   .ws-shields .ws-off,
   .ws-gate .ws-stamp.ws-off {
     transform: none;

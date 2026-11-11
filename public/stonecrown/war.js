@@ -281,7 +281,7 @@ export function warScene({ kit, nameOf, sound = () => {}, reduced = null } = {})
     sumAll.setAttribute("aria-label", `Your war so far: ${facts.total.tokens.length ? `${facts.total.tokens.map(signed).join(" ")}, ${points(facts.total.points)}` : "no tokens yet"}`);
     const others = elsewhereWords(facts.elsewhere, nameOf);
     elsewhere.hidden = !others;
-    elsewhere.textContent = others ? `Elsewhere at the table: ${others}.` : "";
+    elsewhere.replaceChildren(...(others ? [el("span", { class: "ws-else-k" }, "Elsewhere at the table: "), el("span", { class: "ws-else-v" }, `${others}.`)] : []));
     for (const x of [sumAge, sumAll, elsewhere]) x.classList.add("ws-off");
     label.textContent = "Continue";
     button.classList.remove("counting");
