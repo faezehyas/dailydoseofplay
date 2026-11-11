@@ -3298,6 +3298,49 @@ right] }` (each `1`, `0` or `-1`), `over { winners, scores }` (`scores` by
 seat: `{ military, coins, wonder, civic, commerce, guilds, science, total,
 copied }`, `copied` the guild Olympia B copied, or −1).
 
+**The view.** The table is built to explain itself, from five modules beside
+`art.js`. Each takes art.js's element makers as a `kit` (so none imports
+`art.js`), keeps its facts and words in pure functions that read the rules'
+state, and marks every explainable element with `data-tip="<kind>"` and
+`data-tip-*` arguments.
+
+- `store.js`, **the storehouse**: one shelf of the seven resources with what
+  you make each turn and where it comes from, choice producers as "either"
+  tokens. Selecting a hand card matches its cost against the shelf (have,
+  buy from whom at what price, nobody sells), and every hand card wears a
+  badge before it is tapped: Free, You make it, Chain, a coin price, Can't
+  build.
+- `border.js`, **the two borders**: under each neighbour's name runs a river
+  strip drawn from the state: a ferry and "2 each" until a trade card turns
+  it into a stone bridge (raw materials at 1) or adds a market stall (goods
+  at 1), walls that grow with each side's shields, what the neighbour sells
+  on their bank, one flag per age, and from turn 5 "you trail by 2". A
+  purchase is a cart crossing with the resources while the coins go the
+  other way; a card that pays per counted card flashes each one.
+- `war.js`, **the war scene**: at the end of an age, shields line up across
+  each border one by one, a stamp lands on each ("You won +3"), then this
+  age's sum, the war so far and the rest of the table. It waits for
+  Continue, or closes by itself when a move clock runs.
+- `ring.js`, **the seat ring and the hand-off**: a small ring in the top bar
+  with every seat's stack, this age's direction, the age and six turn pips.
+  You and your neighbours have name plates, other seats a dot in their
+  colour with their seat mark, so it holds for seven. After the flip your
+  hand folds to a stack that slides into one neighbour's panel while the
+  other's slides to you.
+- `tips.js`, **tips**: one delegated layer for hover, focus, press and hold,
+  and an Explain mode where a tap explains instead of acting. `tipWords()`
+  writes one or two sentences from the live state ("Robot 1 has 4 shields and
+  you have 2…"). Hand cards open large only on hold or `I`, and a tip for
+  anything in the hand tray (`data-tip-zone`) opens above it. The legend
+  sits behind "?", and four first-time hints (purchase, chain, war, pass)
+  show once, remembered under `ddp-stonecrown-hints`.
+
+After each flip the neighbours' picks show large for a beat with what they
+mean for you; the hand tray folds to a strip while you wait, so your city
+shows. Tips, shelves, borders and the recap are written only from the public
+state and your own `face()`, and a name leaves the page with its card: the
+browser tests scan every page for the name of a card that page can't know.
+
 ## Differences from the reference (wasmerio/edge-multiplayer-games)
 
 | Reference | Here | Why |
