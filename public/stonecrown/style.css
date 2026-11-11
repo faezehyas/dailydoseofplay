@@ -2152,3 +2152,8 @@
 .sc-explaining [data-tip] {
   cursor: help;
 }
+
+/* Your pick wears "Picked" where its badge was. */
+.sc-hcard.picked .sc-tag {
+  visibility: hidden;
+}

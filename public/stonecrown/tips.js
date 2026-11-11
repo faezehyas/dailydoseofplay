@@ -858,7 +858,11 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
   const watch = new MutationObserver((records) => {
     if (!records.some(relevant)) return;
     if (explaining) tag(true);
-    if ((target || coaching) && !frame) frame = win.requestAnimationFrame(refresh);
+    // A target gone from the page (a hand passed on) takes its words with it at once.
+    if (target && !target.isConnected) {
+      if (frame) win.cancelAnimationFrame(frame);
+      refresh();
+    } else if ((target || coaching) && !frame) frame = win.requestAnimationFrame(refresh);
   });
   watch.observe(root, { childList: true, subtree: true, characterData: true });
 

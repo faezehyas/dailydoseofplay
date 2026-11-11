@@ -956,7 +956,8 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
       if (caption) {
         note = el("span", { class: "sc-recap" }, caption);
         flyLayer.append(note);
-        const nw = Math.min(190, flyLayer.clientWidth - 8);
+        // As wide as its panel allows, so two neighbours' lines never overlap.
+        const nw = Math.min(190, Math.max(r.w + 16, rect.w - 8), flyLayer.clientWidth - 8);
         note.style.width = `${nw}px`;
         note.style.transform = `translate(${Math.max(4, Math.min(flyLayer.clientWidth - nw - 4, r.x + r.w / 2 - nw / 2)).toFixed(1)}px, ${(r.y + r.h + 6).toFixed(1)}px)`;
         note.animate([{ opacity: 0, translate: "0 -6px" }, { opacity: 1, translate: "0 0" }], { duration: 260, delay: ms * 0.8, easing: easeOut(), fill: "backwards" });
