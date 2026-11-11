@@ -152,6 +152,15 @@ export function watchLeaks(page, { dom = false } = {}) {
         for (const n of document.body.querySelectorAll("*")) for (const a of n.attributes) if (!SKIP.has(a.name)) parts.push(a.value);
         return parts.join("\n");
       };
+      // Where a name shows, for the report: the innermost element whose text has it, or an attribute.
+      const shownAt = (re) => {
+        const tag = (n) => `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ""}${n.classList.length ? `.${[...n.classList].join(".")}` : ""}`;
+        for (const n of document.body.querySelectorAll("*")) {
+          for (const a of n.attributes) if (!SKIP.has(a.name) && re.test(a.value)) return `${tag(n)}[${a.name}]`;
+          if (re.test(n.textContent) && ![...n.children].some((c) => re.test(c.textContent))) return `${tag(n)} text`;
+        }
+        return "?";
+      };
       const scanPage = (m) => {
         const st = m?.state;
         if (!st?.age || m.phase !== "playing") return;
@@ -175,7 +184,7 @@ export function watchLeaks(page, { dom = false } = {}) {
           if (!patterns.get(name).test(text)) continue;
           const where = st.hands.findIndex((h) => h.includes(id));
           const pile = where >= 0 ? `seat ${where}'s hand` : st.discard.includes(id) ? "the discards" : st.stages.findIndex((h) => h.includes(id)) >= 0 ? "a wonder" : "somewhere";
-          note(`${m.m}:${m.me}:shows ${name} (slot ${id}, in ${pile}, age ${st.age} turn ${st.round} ${st.phase})`);
+          note(`${m.m}:${m.me}:shows ${name} (slot ${id}, in ${pile}, age ${st.age} turn ${st.round} ${st.phase}) in ${shownAt(patterns.get(name))}`);
         }
       };
       // Once the page has drawn an update of its own match, and every 100 ms.
