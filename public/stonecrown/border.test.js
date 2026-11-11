@@ -26,7 +26,7 @@ function assertClean(svg) {
   assert.ok(!/\sid="/.test(svg), "no ids");
   assert.ok(!/url\(/.test(svg), "no url() references");
   assert.ok(!/NaN|undefined|Infinity|null/.test(svg), "no NaN, undefined, null or Infinity");
-  assert.match(svg, /^<svg class="sc-border-svg sc-b-(left|right) sc-b-them-\d sc-b-me-\d" viewBox="0 0 240 80" preserveAspectRatio="xMidYMax slice" role="img" aria-label="[^"]+">/);
+  assert.match(svg, /^<svg class="sc-border-svg sc-b-(left|right) sc-b-them-\d sc-b-me-\d" viewBox="0 0 240 80" preserveAspectRatio="xMidYMax meet" role="img" aria-label="[^"]+">/);
 }
 const classes = (svg) => new Set([...svg.matchAll(/class="([^"]*)"/g)].flatMap((m) => m[1].split(/\s+/)));
 

@@ -250,7 +250,7 @@ export function borderSvg({ side = "left", raw = 2, goods = 2, walls = [0, 0], s
     hot(DX0 - 4, 22, DX1 - DX0 + 8, 30, "wall", ` data-tip-side="${side}" data-tip-bank="theirs"`) +
     hot(mirror(DX1) - 4, 22, DX1 - DX0 + 8, 30, "wall", ` data-tip-side="${side}" data-tip-bank="mine"`) +
     hot(92, 34, 56, 26, "crossing", ` data-tip-side="${side}"`);
-  return `<svg class="sc-border-svg sc-b-${right ? "right" : "left"} sc-b-them-${seat(seats[0])} sc-b-me-${seat(seats[1])}" viewBox="0 0 ${BW} ${BH}" preserveAspectRatio="xMidYMax slice" role="img" aria-label="${label}">` +
+  return `<svg class="sc-border-svg sc-b-${right ? "right" : "left"} sc-b-them-${seat(seats[0])} sc-b-me-${seat(seats[1])}" viewBox="0 0 ${BW} ${BH}" preserveAspectRatio="xMidYMax meet" role="img" aria-label="${label}">` +
     (right ? `<g transform="matrix(-1 0 0 1 ${BW} 0)">${art}</g>` : art) + "</svg>";
 }
 
@@ -348,6 +348,20 @@ export function borderFacts(state, me, side, { wars = [] } = {}) {
   };
 }
 
+// A sale's units grouped: [{ u: [r…], n }], alike units (the same resource,
+// or the same choice) counted together.
+export function saleGroups(units = []) {
+  const groups = [];
+  for (const u of units) {
+    const key = u.join("/");
+    const g = groups.find((x) => x.key === key);
+    if (g) g.n++;
+    else groups.push({ key, u, n: 1 });
+  }
+  return groups;
+}
+const saleWords = (groups) => (groups.length ? groups.map((g) => `${g.n > 1 ? `${g.n} × ` : ""}${g.u.map((r) => RESOURCE_NAMES[r]).join(" or ")}`).join(", ") : "nothing");
+
 // ---------- the component ----------
 const FLAG_WORDS = { 1: "you won", 0: "a draw", "-1": "you lost", null: "to come" };
 const ROMAN = ["I", "II", "III"];
@@ -413,21 +427,62 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
     warn.className = "sc-border-warn " + (/trail/.test(facts.warn) ? "trail" : /lead/.test(facts.warn) ? "lead" : "level");
     const s = data.sells;
     if (s instanceof Node) { if (sells.firstChild !== s || sells.childNodes.length !== 1) sells.replaceChildren(s); }
-    else if (Array.isArray(s) || (s === undefined && Array.isArray(data.sale))) {
-      const units = s ?? data.sale;
-      sells.replaceChildren(
-        ...(units.length
-          ? units.map((u) => el("span", { class: "sc-border-unit" + (u.length > 1 ? " either" : "") }, ...u.map((r) => (kit.resEl ? kit.resEl(r) : el("span", {}, RESOURCE_NAMES[r])))))
-          : [el("span", { class: "sc-border-none" }, "sells nothing")]),
-      );
+    else if (Array.isArray(s) || (s === undefined && Array.isArray(data.sale))) drawSale(s ?? data.sale);
+    sells.setAttribute("aria-label", `What ${who} sells you: ${saleWords(saleGroups(saleShown))}`);
+  }
+
+  // What they sell, one slim line on their bank: alike units counted (×n),
+  // a choice as "a / b"; what doesn't fit becomes "+n" (the tip lists it all).
+  let saleShown = [];
+  let saleKey = "";
+  const more = el("span", { class: "sc-border-more", "aria-hidden": "true" });
+  const icon = (r) => (kit.resEl ? kit.resEl(r) : el("span", {}, RESOURCE_NAMES[r]));
+  function drawSale(units) {
+    const key = JSON.stringify(units);
+    if (key === saleKey) return;
+    saleKey = key;
+    saleShown = units;
+    const groups = saleGroups(units);
+    sells.replaceChildren(
+      ...(groups.length
+        ? groups.map((g) =>
+            el(
+              "span",
+              { class: "sc-border-unit" + (g.u.length > 1 ? " either" : ""), dataset: { n: String(g.n) } },
+              ...g.u.flatMap((r, j) => (j ? [el("i", { class: "sc-border-or" }, "/"), icon(r)] : [icon(r)])),
+              g.n > 1 ? el("small", {}, `×${g.n}`) : null,
+            ),
+          )
+        : [el("span", { class: "sc-border-none" }, "sells nothing")]),
+      more,
+    );
+    fit();
+  }
+  // Hides the units past the line's end, from the last, and counts them on "+n".
+  function fit() {
+    const items = [...sells.querySelectorAll(".sc-border-unit")];
+    items.forEach((x) => (x.hidden = false));
+    more.hidden = true;
+    if (!sells.clientWidth) return;
+    let gone = 0;
+    for (let i = items.length - 1; i > 0 && sells.scrollWidth > sells.clientWidth + 1; i--) {
+      items[i].hidden = true;
+      gone += Number(items[i].dataset.n);
+      more.textContent = `+${gone}`;
+      more.hidden = false;
     }
-    sells.setAttribute("aria-label", `What ${who} sells you`);
+  }
+  if (typeof ResizeObserver === "function") {
+    let w = 0;
+    new ResizeObserver(() => {
+      if (sells.clientWidth !== w) (w = sells.clientWidth), fit();
+    }).observe(sells);
   }
 
   // The fx layer: an empty scene of the same viewBox over the art, never mirrored (X() mirrors positions instead).
   const svgOf = () => fx.querySelector("svg");
   const ensureFx = () => {
-    if (!svgOf()) fx.innerHTML = `<svg viewBox="0 0 ${BW} ${BH}" preserveAspectRatio="xMidYMax slice"></svg>`;
+    if (!svgOf()) fx.innerHTML = `<svg viewBox="0 0 ${BW} ${BH}" preserveAspectRatio="xMidYMax meet"></svg>`;
     return svgOf();
   };
   const X = (x) => (right ? mirror(x) : x);
@@ -537,5 +592,5 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
   }
 
   update({});
-  return { node, update, cart, lay };
+  return { node, sells, update, cart, lay };
 }
