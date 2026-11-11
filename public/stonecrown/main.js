@@ -278,6 +278,7 @@ function mountGame(session, root, shell) {
     wars[ev.age - 1] = ev.results;
     render();
     status.setAttribute("aria-live", "polite");
+    logList.removeAttribute("aria-live");
   }
 
   async function animate(ev, g) {
@@ -339,6 +340,8 @@ function mountGame(session, root, shell) {
       addLog({ kind: "sell", text: `Last cards discarded${mineGone && idOf(mineGone.slot) >= 0 ? ` (yours: ${CARDS[idOf(mineGone.slot)].name})` : ""}` });
     }
     if (kind === "war") {
+      // The war scene says it (onWar speaks again once it closes).
+      logList.setAttribute("aria-live", "off");
       addLog({ kind: "war", text: warWords(x.results, me, x.age, nameIn) });
       for (const pair of warPairs(x.results)) if (!pair.includes(me)) addLog({ kind: "war", text: pairWords(pair, x.age, nameOf) });
     }
@@ -359,6 +362,10 @@ function mountGame(session, root, shell) {
   let sheet = null;
   async function over(ev, g, k) {
     finalScores = ev.scores;
+    // The borders behind the sheet show all three wars, and no warning.
+    view.phase = "over";
+    view.winners = ev.winners.slice();
+    view.winner = ev.winners.length === 1 ? ev.winners[0] : -2;
     render();
     const order = seatOrder(ev.scores);
     sheet = scoreSheet(ev.scores, order, { me, nameOf, winners: ev.winners });
@@ -377,10 +384,11 @@ function mountGame(session, root, shell) {
   // ---------- log ----------
   function addLog(entry) {
     entry.node = el("li", { class: `${entry.player === undefined ? "" : `p-${entry.player}`} ${entry.kind || ""} fresh` }, entry.player === undefined ? null : seatMark(entry.player), el("span", {}, entry.text));
+    log[0]?.node.classList.remove("fresh");
     log.unshift(entry);
-    for (const old of log.slice(1)) old.node.classList.remove("fresh");
-    log = log.slice(0, 80);
-    logList.replaceChildren(...log.map((e) => e.node));
+    for (const old of log.splice(80)) old.node.remove();
+    // Only the new line is added, so the log announces it alone.
+    logList.prepend(entry.node);
   }
 
   // ---------- your moves ----------
@@ -763,7 +771,8 @@ function mountGame(session, root, shell) {
     const who = d.movers.includes(me) ? me : d.movers[0];
     timerFill.style.transform = `scaleX(${Math.max(0, Math.min(1, left / (secs * 1000))).toFixed(3)})`;
     timer.className = `sc-timer p-${who} ${left < 5000 ? "low" : ""}`;
-    timerText.textContent = left > -1000 ? `${Math.max(0, Math.ceil(left / 1000))} s` : "";
+    const secsText = left > -1000 ? `${Math.max(0, Math.ceil(left / 1000))} s` : "";
+    if (timerText.textContent !== secsText) timerText.textContent = secsText;
     timer.setAttribute("aria-label", who === me ? "Time for your pick" : d.movers.length > 1 ? "Time for everyone's pick" : `Time for ${nameOf(who)}'s pick`);
     if (who === me && myChoice() && left <= 3000 && left > 0) {
       const sec = Math.ceil(left / 1000);
@@ -788,7 +797,8 @@ function mountGame(session, root, shell) {
       toast("Time's up: a card was picked for you");
       send(move, move.build !== undefined ? "build" : move.stage !== undefined ? "stage" : move.discard !== undefined ? "sell" : move.dig >= 0 ? "dig" : "nothing");
     } else if (!mine(d) && left <= -CLAIM_GRACE_MS) {
-      status.textContent = `Waiting for ${listOf(d.movers.map(nameOf))}'s browser…`;
+      const quiet = `Waiting for ${listOf(d.movers.map(nameOf))}'s browser…`;
+      if (status.textContent !== quiet) status.textContent = quiet;
     }
   }
   const ticker = setInterval(tick, 200);
@@ -872,6 +882,7 @@ function mountGame(session, root, shell) {
     art.war.close();
     tips.hide();
     status.setAttribute("aria-live", "polite");
+    logList.removeAttribute("aria-live");
     tuckedAge.clear();
     logList.replaceChildren();
     const opponents = listOf(seats.filter((p) => p !== me).map((p) => session.players[p].name));

@@ -1871,10 +1871,16 @@
   box-shadow: 0 0 0 3px rgb(255 201 74 / 35%);
 }
 
-/* While Explain mode's bar is in the top bar, a phone hides what it covers. */
+/* While Explain mode's bar is in the top bar, a phone hides the status line
+   it covers from sight only: it still speaks, and can still take focus. */
 @media (max-width: 639px) {
   .sc-explain-on .sc-top-mid > .pc-status {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
