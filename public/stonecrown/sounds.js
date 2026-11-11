@@ -5,12 +5,16 @@
 // out for each age; a chisel on stone for a building, with a note for its
 // colour; a carved block settling for a wonder stage; coins dropped on your
 // pile for a sale, rising for coins you get, slid across the table to pay a
-// neighbour; hands sliding round; a far-off drum and horn for the war; a
-// little fanfare for a victory token, a soft thud for a defeat; a rustle
-// through the discards; and a tally tick for each score row. A win or a loss
-// plays the result chimes (engine/chimes.js).
+// neighbour, while a cart rumbles over the bridge with what they sold, or a
+// raft is hauled across on its rope; the bridge's stones set one by one, or
+// a stall's awning snapped open; the stacks of hands dragged round to the
+// next seat; a far-off drum and horn for the war, shields stepping into line
+// one by one, and the result stamped on each border; a little fanfare for a
+// victory token, a soft thud for a defeat; a rustle through the discards;
+// and a tally tick for each score row. A win or a loss plays the result
+// chimes (engine/chimes.js).
 import { defineSounds } from "../engine/sound.js";
-import { tone, noise, pentatonic } from "../engine/synth.js";
+import { tone, noise, noiseBuf, pentatonic } from "../engine/synth.js";
 import { cardSounds, tableSounds } from "../engine/cards/card-sounds.js";
 import { COLORS } from "./cards.js";
 
@@ -94,6 +98,74 @@ function bell(a, o, t, freq, gain = 0.04, dur = 0.7) {
   tone(a, o, t, { freq: freq * 5.4, dur: dur * 0.18, gain: gain * 0.1 });
 }
 
+// ---------- what rolls, laps or drags ----------
+// A gain curve that swells to `gain` a part `rise` of the way through and
+// dies away again, with no corner for the ear to catch.
+function swell(gain, rise) {
+  const curve = new Float32Array(48);
+  for (let i = 0; i < curve.length; i++) {
+    const x = i / (curve.length - 1);
+    curve[i] = gain * (x < rise ? Math.sin((Math.PI / 2) * (x / rise)) : Math.cos((Math.PI / 2) * ((x - rise) / (1 - rise)))) ** 2;
+  }
+  return curve;
+}
+
+// Noise that swells and dies away rather than strikes, its filter
+// travelling from `freq` to `to`.
+function wash(a, o, t, { kind = "white", type = "bandpass", freq = 800, to = freq, q = 1, dur = 0.4, gain = 0.1, rise = 0.4 } = {}) {
+  const src = a.createBufferSource();
+  src.buffer = noiseBuf(a, kind);
+  src.loop = true;
+  const f = a.createBiquadFilter();
+  f.type = type;
+  f.Q.value = q;
+  f.frequency.setValueAtTime(freq, t);
+  if (to !== freq) f.frequency.exponentialRampToValueAtTime(to, t + dur);
+  const g = a.createGain();
+  g.gain.value = 0;
+  g.gain.setValueCurveAtTime(swell(gain, rise), t, dur);
+  src.connect(f).connect(g).connect(o);
+  src.start(t, Math.random() * 2);
+  src.stop(t + dur + 0.02);
+}
+
+// A wet rope creaking as it takes the strain: it sticks and slips, quicker
+// as it tightens, and the rope's own fibres ring with each slip.
+function creak(a, o, t, { dur = 0.24, gain = 0.05, from = 30, to = 50 } = {}) {
+  const osc = a.createOscillator();
+  osc.type = "sawtooth";
+  const rate = new Float32Array(10);
+  for (let i = 0; i < rate.length; i++) rate[i] = vary(from + ((to - from) * i) / (rate.length - 1), 0.07);
+  osc.frequency.setValueCurveAtTime(rate, t, dur);
+  const g = a.createGain();
+  g.gain.value = 0;
+  g.gain.setValueCurveAtTime(swell(gain, 0.55), t, dur);
+  g.connect(o);
+  for (const [freq, q, k] of [[640, 7, 1], [1480, 9, 0.45]]) {
+    const f = a.createBiquadFilter();
+    f.type = "bandpass";
+    f.frequency.value = vary(freq, 0.05);
+    f.Q.value = q;
+    const part = a.createGain();
+    part.gain.value = k;
+    osc.connect(f).connect(part).connect(g);
+  }
+  osc.start(t);
+  osc.stop(t + dur + 0.02);
+}
+
+// A drop falling back into the river: a small round note that leaps up.
+function plip(a, o, t, freq, gain = 0.02) {
+  tone(a, o, t, { freq, to: freq * 1.7, dur: 0.055, gain, attack: 0.006 });
+}
+
+// Wood knocked on wood: a dry tock, its pitch the size of the piece.
+function knock(a, o, t, gain = 0.1, pitch = 1) {
+  tone(a, o, t, { freq: 340 * pitch, to: 270 * pitch, dur: 0.045, gain });
+  tone(a, o, t, { freq: 790 * pitch, to: 700 * pitch, dur: 0.02, gain: gain * 0.25 });
+  noise(a, o, t, { dur: 0.018, gain: gain * 0.7, freq: 1100 * pitch, q: 1.8 });
+}
+
 // ---------- paper ----------
 // A card slid over another: noise whose filter travels with it.
 function slide(a, o, t, { dur = 0.08, gain = 0.1, from = 1600, to = 3000, q = 0.8, attack = 0.025 } = {}) {
@@ -125,11 +197,11 @@ function chisel(a, o, t, gain = 0.12, pitch = 1) {
   for (let i = 0; i < 2; i++) noise(a, o, t + 0.03 + Math.random() * 0.06, { dur: 0.007, gain: gain * 0.22, type: "highpass", freq: 5200 });
 }
 
-// A dressed stone set in its course.
-function block(a, o, t, gain = 0.2) {
-  tone(a, o, t, { freq: 250, to: 150, dur: 0.07, gain: gain * 0.6 });
-  noise(a, o, t, { dur: 0.04, gain, freq: 950, q: 1.1 });
-  noise(a, o, t, { kind: "brown", dur: 0.07, gain: gain * 0.7, type: "lowpass", freq: 500 });
+// A dressed stone set in its course; a bigger stone has a lower `pitch`.
+function block(a, o, t, gain = 0.2, pitch = 1) {
+  tone(a, o, t, { freq: 250 * pitch, to: 150 * pitch, dur: 0.07, gain: gain * 0.6 });
+  noise(a, o, t, { dur: 0.04, gain, freq: 950 * pitch, q: 1.1 });
+  noise(a, o, t, { kind: "brown", dur: 0.07, gain: gain * 0.7, type: "lowpass", freq: 500 * pitch });
 }
 
 // A great carved block lowered into place: deep, with a rock as it beds.
@@ -210,6 +282,17 @@ function horn(a, o, t, freq, { dur = 0.5, gain = 0.05, open = 3 } = {}) {
 // A brass "ta" for the victory fanfare: brighter and quicker than the war horn.
 function trumpet(a, o, t, freq, dur = 0.14, gain = 0.035) {
   horn(a, o, t, freq, { dur, gain, open: 5 });
+}
+
+// A shield brought up into the line: leather over wood knocked against its
+// neighbour, and the bronze boss answering.
+function shieldTap(a, o, t, gain = 0.12, pitch = 1) {
+  tone(a, o, t, { freq: 210 * pitch, to: 150 * pitch, dur: 0.05, gain: gain * 0.45 });
+  tone(a, o, t, { freq: 460 * pitch, to: 390 * pitch, dur: 0.03, gain: gain * 0.5 });
+  noise(a, o, t, { dur: 0.026, gain, freq: 800 * pitch, q: 1.3 });
+  noise(a, o, t, { dur: 0.006, gain: gain * 0.2, type: "highpass", freq: 4500 });
+  tone(a, o, t, { freq: 1250 * pitch, dur: 0.11, gain: gain * 0.12 });
+  tone(a, o, t, { freq: 2140 * pitch, dur: 0.06, gain: gain * 0.05 });
 }
 
 // ---------- when everyone moves at once ----------
@@ -313,14 +396,82 @@ const SYNTH = {
     far.connect(o);
     for (let i = 0; i < k; i++) clink(a, far, t + 0.2 + i * 0.075, note(13 - i), 0.05, 0.16);
   },
-  // The hands slid round to the next player: a sweep up going left, down
-  // going right.
+  // Bought from a neighbour: over a bridge, a small cart's wheels rumble
+  // from cobble to cobble, slowing as it arrives, and its axle ticks twice;
+  // by the ferry, two pulls on the creaking rope, the river lapping at the
+  // raft after each, and the raft nudging the bank. Quiet and low, so the
+  // coins going the other way ring over it.
+  cart: (a, o, t, { way = "bridge" } = {}) => {
+    if (way === "ferry") {
+      for (const [at, k] of [[0, 1], [0.58, 0.85]]) {
+        creak(a, o, t + at, { dur: vary(0.22, 0.1), gain: 0.24 * k, from: vary(38, 0.1), to: vary(68, 0.1) });
+        for (const [d, f, g] of [[0.12, 360, 1], [0.27, 460, 0.6], [0.4, 400, 0.35]]) {
+          wash(a, o, t + at + vary(d, 0.08), { kind: "brown", freq: vary(f, 0.1), to: f * 1.8, q: 2, dur: 0.17, gain: 0.32 * k * g, rise: 0.35 });
+        }
+        wash(a, o, t + at + 0.18, { type: "highpass", freq: 3200, dur: 0.3, gain: 0.006 * k, rise: 0.3 });
+        plip(a, o, t + at + vary(0.3, 0.1), note(7) * vary(1, 0.08), 0.055 * k);
+        plip(a, o, t + at + vary(0.45, 0.1), note(9) * vary(1, 0.08), 0.04 * k);
+      }
+      knock(a, o, t + 1.24, 0.065, 0.45);
+      noise(a, o, t + 1.24, { kind: "brown", dur: 0.12, gain: 0.2, type: "lowpass", freq: 260 });
+      return;
+    }
+    wash(a, o, t, { kind: "brown", freq: 210, q: 0.9, dur: 1.25, gain: 0.12, rise: 0.35 });
+    wash(a, o, t, { freq: 300, q: 1, dur: 1.2, gain: 0.03, rise: 0.4 });
+    wash(a, o, t + 0.1, { freq: 1300, to: 1000, q: 2.5, dur: 1, gain: 0.008, rise: 0.4 });
+    let at = t + 0.04;
+    for (let i = 0; i < 9; i++) {
+      const k = 0.35 + 0.65 * Math.sin((Math.PI * i) / 8) ** 0.8;
+      // One wheel drops off the cobble, then the other.
+      for (const [d, w] of [[0, 1], [vary(0.032, 0.25), 0.55]]) {
+        tone(a, o, at + d, { freq: vary(150, 0.12), to: 100, dur: 0.05, gain: 0.06 * k * w });
+        noise(a, o, at + d, { dur: 0.04, gain: 0.2 * k * w, freq: vary(430, 0.15), q: 1.3 });
+        noise(a, o, at + d, { dur: 0.012, gain: 0.04 * k * w, freq: vary(950, 0.2), q: 1.6 });
+      }
+      at += vary(0.115 + (i > 5 ? 0.012 * (i - 5) : 0), 0.12);
+    }
+    for (const [d, pitch] of [[0.32, 2.4], [0.8, 2.2]]) knock(a, o, t + d, 0.06, pitch);
+  },
+  // Something built on the border. A bridge: its stones set from each bank
+  // in turn, the keystone slid down between them, and a warm string as the
+  // arch holds. A stall: its awning shaken out and snapped taut, the prop
+  // knocked into place, and a bright string.
+  lay: (a, o, t, { kind = "bridge" } = {}) => {
+    if (kind === "stall") {
+      // The canvas flutters as it is shaken out, each shake a little higher.
+      for (let i = 0; i < 3; i++) wash(a, o, t + i * 0.045, { freq: 650 * 1.35 ** i, to: 1300 * 1.35 ** i, q: 1.1, dur: 0.08, gain: 0.072 + 0.03 * i, rise: 0.7 });
+      const snap = t + 0.14;
+      noise(a, o, snap, { dur: 0.03, gain: 0.31, freq: 1500, q: 0.7, attack: 0.004 });
+      noise(a, o, snap, { dur: 0.01, gain: 0.085, type: "highpass", freq: 3500 });
+      noise(a, o, snap, { kind: "brown", dur: 0.06, gain: 0.19, type: "lowpass", freq: 500 });
+      tone(a, o, snap, { freq: 190, to: 120, dur: 0.07, gain: 0.13 });
+      noise(a, o, snap + 0.07, { dur: 0.03, gain: 0.07, freq: 1000, q: 1, attack: 0.008 });
+      noise(a, o, snap + 0.13, { dur: 0.03, gain: 0.05, freq: 900, q: 1, attack: 0.008 });
+      knock(a, o, t + 0.37, 0.18);
+      lyre(a, o, t + 0.38, note(7), 0.085, 0.8);
+      return;
+    }
+    for (const [at, pitch, k] of [[0, 0.92, 0.6], [0.15, 1.08, 0.68], [0.29, 0.98, 0.76], [0.42, 1.14, 0.85]]) block(a, o, t + vary(at, 0.04), 0.15 * k, vary(pitch, 0.03));
+    wash(a, o, t + 0.55, { freq: 2100, to: 1100, q: 2.2, dur: 0.09, gain: 0.04, rise: 0.6 });
+    block(a, o, t + 0.64, 0.22, 0.78);
+    tone(a, o, t + 0.64, { freq: 120, to: 80, dur: 0.12, gain: 0.08, attack: 0.005 });
+    lyre(a, o, t + 0.66, note(-2), 0.085, 1.4);
+    lyre(a, o, t + 0.66, note(3), 0.03, 1);
+  },
+  // The stacks of hands dragged round to the next seat: the weight of a
+  // stack on the table, its pitch climbing going left and falling going
+  // right, and the cards knocking square as each stack stops.
   pass: (a, o, t, { dir = 1 } = {}) => {
-    const left = dir === 1 || dir === "left";
-    const [from, to] = left ? [900, 2400] : [2400, 900];
-    slide(a, o, t, { dur: 0.22, gain: 0.08, from, to, q: 0.6, attack: 0.08 });
-    slide(a, o, t + 0.05, { dur: 0.2, gain: 0.05, from: from * 1.3, to: to * 1.3, q: 0.8, attack: 0.07 });
-    pat(a, o, t + 0.22, 0.07);
+    const left = dir === "left" || dir > 0;
+    const [from, to] = left ? [520, 1250] : [1250, 520];
+    wash(a, o, t, { freq: from, to, q: 0.8, dur: 0.42, gain: 0.1, rise: 0.45 });
+    wash(a, o, t, { freq: 300, q: 0.7, dur: 0.4, gain: 0.07, rise: 0.4 });
+    wash(a, o, t + 0.03, { freq: from * 2.6, to: to * 2.6, q: 0.9, dur: 0.36, gain: 0.03, rise: 0.4 });
+    for (const [at, k] of [[0.42, 1], [0.5, 0.6]]) {
+      pat(a, o, t + at, 0.1 * k);
+      tone(a, o, t + at, { freq: 170, to: 110, dur: 0.05, gain: 0.05 * k });
+      for (let i = 0; i < 3; i++) noise(a, o, t + at + 0.03 + i * vary(0.022, 0.2), { dur: 0.01, gain: 0.04 * k * 0.75 ** i, freq: vary(2600, 0.15), q: 1.5 });
+    }
   },
   // The war at the end of an age: a drum far off, and a horn calling over
   // the hills, its echo coming back.
@@ -334,6 +485,27 @@ const SYNTH = {
     horn(a, far, t + 0.72, note(0), { dur: 0.55, gain: 0.12 });
     horn(a, far, t + 1.0, note(0), { dur: 0.45, gain: 0.03, open: 2 });
     drum(a, far, t + 1.0, 0.06);
+  },
+  // One shield stepping into line at a border. They come one after another
+  // (`i` counts them from 0), each a shade higher than the last.
+  shield: (a, o, t, { i = 0 } = {}) => {
+    const step = Math.min(14, Math.max(0, i));
+    shieldTap(a, o, t, vary(0.12, 0.08), vary(1 + 0.025 * step, 0.01));
+  },
+  // The result stamped on a border: the block comes down on the paper and
+  // the table under it. A win rings a bright fifth, a loss a low string, a
+  // draw only knocks. The token's own fanfare or thud follows.
+  stamp: (a, o, t, { result = 0 } = {}) => {
+    noise(a, o, t, { dur: 0.03, gain: 0.2, freq: 1100, q: 1 });
+    noise(a, o, t, { dur: 0.012, gain: 0.05, type: "highpass", freq: 3800 });
+    tone(a, o, t, { freq: 340, to: 240, dur: 0.05, gain: 0.14 });
+    tone(a, o, t, { freq: 165, to: 90, dur: 0.1, gain: 0.16, attack: 0.004 });
+    noise(a, o, t, { kind: "brown", dur: 0.08, gain: 0.14, type: "lowpass", freq: 450 });
+    if (result > 0) {
+      lyre(a, o, t + 0.03, note(5), 0.055, 0.6);
+      lyre(a, o, t + 0.06, note(8), 0.05, 0.7);
+    } else if (result < 0) lyre(a, o, t + 0.03, note(-5), 0.075, 0.7);
+    else knock(a, o, t + 0.09, 0.11, 0.85);
   },
   // A victory token: a quick brass "ta-ta-taa" over a bright string, the
   // bigger the token the higher it climbs.
@@ -388,8 +560,12 @@ export const sounds = defineSounds({
   sell: sound("sell", "action", 0.08, 8.9),
   coins: sound("coins", "action", 0.07, 6.9),
   trade: sound("trade", "action", 0.08, 7.5),
-  pass: sound("pass", "action", 0.1, 15.9, -4),
+  cart: sound("cart", "action", 0.2, 11, -5),
+  lay: sound("lay", "action", 0.15, 5.6),
+  pass: sound("pass", "action", 0.1, 10.2, -4),
   war: sound("war", "highlight", 0.3, 0.9),
+  shield: sound("shield", "ui", 0.06, 10.2),
+  stamp: sound("stamp", "action", 0.12, 5),
   victory: sound("victory", "highlight", 0.45, 11),
   defeat: sound("defeat", "highlight", 0.3, 3.6, -3),
   dig: sound("dig", "action", 0.2, 19.2, -2),
