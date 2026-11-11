@@ -3,7 +3,7 @@
    the dashed slot it rests in, a stack sliding. Paper Lantern: a cut-paper
    table with layered soft shadows; at night an indigo cloth. Seat colours
    0–3 come from /engine/cards/cards.css; 4–6 are here for a bigger table. */
-:where(.stonecrown, .sc-ring, .sc-stack, .sc-slot) {
+:where(.stonecrown, .sc-ring, .sc-stack, .sc-stack-slot) {
   --sc-seat-4: #3569b5;
   --sc-seat-5: #b0436f;
   --sc-seat-6: #3f7f2a;
@@ -32,7 +32,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) :where(.stonecrown, .sc-ring, .sc-stack, .sc-slot) {
+  :root:not([data-theme="light"]) :where(.stonecrown, .sc-ring, .sc-stack, .sc-stack-slot) {
     --sc-seat-4: #6fa0ee;
     --sc-seat-5: #e98bb2;
     --sc-seat-6: #86c766;
@@ -60,7 +60,7 @@
   }
 }
 
-:root[data-theme="dark"] :where(.stonecrown, .sc-ring, .sc-stack, .sc-slot) {
+:root[data-theme="dark"] :where(.stonecrown, .sc-ring, .sc-stack, .sc-stack-slot) {
   --sc-seat-4: #6fa0ee;
   --sc-seat-5: #e98bb2;
   --sc-seat-6: #86c766;
@@ -139,7 +139,7 @@
 
 .sc-stack[data-count="0"] { visibility: hidden; }
 
-.sc-slot {
+.sc-stack-slot {
   display: inline-grid;
   flex: none;
   place-items: center;
@@ -149,13 +149,13 @@
   border-radius: 10px;
 }
 
-.sc-slot.sm { width: 28px; height: 30px; border-width: 1.5px; border-radius: 7px; }
-.sc-slot.lg { width: 76px; height: 80px; }
-.sc-slot > .sc-stack { width: 92%; }
+.sc-stack-slot.sm { width: 28px; height: 30px; border-width: 1.5px; border-radius: 7px; }
+.sc-stack-slot.lg { width: 76px; height: 80px; }
+.sc-stack-slot > .sc-stack { width: 92%; }
 
 @media (max-width: 560px) {
-  .sc-slot { width: 40px; height: 46px; }
-  .sc-slot.lg { width: 60px; height: 64px; }
+  .sc-stack-slot { width: 40px; height: 46px; }
+  .sc-stack-slot.lg { width: 60px; height: 64px; }
 }
 
 .sc-stack.sc-sliding {

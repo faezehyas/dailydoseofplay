@@ -212,7 +212,7 @@ test("matchCost: the mock-up's Water Channel and Infirmary", () => {
   const units = matchCost(st, 0, cost, buy);
   assert.deepEqual(units, [
     { r: STONE, how: "own", source: "your wonder" },
-    { r: STONE, how: "either", source: "Dig Site", either: 0 },
+    { r: STONE, how: "either", source: "Dig Site", either: 0, options: [STONE, CLAY] },
     { r: STONE, how: "buy", side: "right", coins: 2 },
   ]);
   assert.deepEqual(highlightOf(units), { use: [STONE, "e0"], buy: [STONE], need: [] });
@@ -233,7 +233,7 @@ test("matchCost: an either token goes where nobody sells, so what stays missing 
   const st = table({ wonders: [["rhodes"], ["babylon"], ["olympia"]], cities: [["dig-site"], [], []] });
   const units = matchCost(st, 0, res({ [STONE]: 1, [CLAY]: 1 }), null);
   assert.deepEqual(units, [
-    { r: STONE, how: "either", source: "Dig Site", either: 0 },
+    { r: STONE, how: "either", source: "Dig Site", either: 0, options: [STONE, CLAY] },
     { r: CLAY, how: "missing", side: "left", coins: 2 },
   ]);
   // With West Road the left price is 1.
@@ -248,17 +248,17 @@ test("badges: make, free, chain, wonder, pay and can't", () => {
     stages: [2, 0, 0],
     coins: [4, 3, 3],
   });
-  assert.deepEqual(badgeOf(options(st, 0, "palisade")), { kind: "make", coins: 0, label: "You make it" });
-  assert.deepEqual(badgeOf(options(st, 0, "town-well")), { kind: "free", coins: 0, label: "Free" });
-  assert.deepEqual(badgeOf(options(st, 0, "sanctuary")), { kind: "chain", coins: 0, label: "Chain · free" });
-  assert.deepEqual(badgeOf(options(st, 0, "guard-post")), { kind: "pay", coins: 2, label: "2 coins" }, "ore from Rhodes");
-  assert.deepEqual(badgeOf(options(st, 0, "riverside-grove")), { kind: "pay", coins: 1, label: "1 coin" }, "bank coins count");
+  assert.deepEqual(badgeOf(options(st, 0, "palisade")), { id: ID("palisade"), kind: "make", coins: 0, label: "You make it" });
+  assert.deepEqual(badgeOf(options(st, 0, "town-well")), { id: ID("town-well"), kind: "free", coins: 0, label: "Free" });
+  assert.deepEqual(badgeOf(options(st, 0, "sanctuary")), { id: ID("sanctuary"), kind: "chain", coins: 0, label: "Chain · free" });
+  assert.deepEqual(badgeOf(options(st, 0, "guard-post")), { id: ID("guard-post"), kind: "pay", coins: 2, label: "2 coins" }, "ore from Rhodes");
+  assert.deepEqual(badgeOf(options(st, 0, "riverside-grove")), { id: ID("riverside-grove"), kind: "pay", coins: 1, label: "1 coin" }, "bank coins count");
   assert.equal(badgeOf(options(st, 0, "shrine")).kind, "no");
   assert.equal(badgeOf(options(st, 0, "shrine")).label, "Already built");
   // Glass nobody sells: only the free build (Olympia A stage II) can build it.
-  assert.deepEqual(badgeOf(options(st, 0, "tinkers-shed")), { kind: "wonder", coins: 0, label: "Wonder · free" });
+  assert.deepEqual(badgeOf(options(st, 0, "tinkers-shed")), { id: ID("tinkers-shed"), kind: "wonder", coins: 0, label: "Wonder · free" });
   const used = { ...st, freeAge: [2, 0, 0] };
-  assert.deepEqual(badgeOf(options(used, 0, "tinkers-shed")), { kind: "no", coins: 0, label: "Can't build", why: "resources", reason: "You and your neighbours can't make what it needs." });
+  assert.deepEqual(badgeOf(options(used, 0, "tinkers-shed")), { id: ID("tinkers-shed"), kind: "no", coins: 0, label: "Can't build", why: "resources", reason: "You and your neighbours can't make what it needs." });
   const poor = { ...used, coins: [1, 3, 3] };
   assert.equal(badgeOf(options(poor, 0, "guard-post")).why, "coins");
   assert.equal(badgeOf({ build: canBuild(poor, 0, ID("guard-post")), id: ID("guard-post") }).label, "Can't build", "works from an id too");

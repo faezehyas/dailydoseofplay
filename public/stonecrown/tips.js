@@ -85,6 +85,8 @@ const seatOf = (a, c) => {
   const p = Number(a.seat);
   return a.seat !== undefined && a.seat !== "" && Number.isInteger(p) && p >= 0 && p < c.n ? p : c.me;
 };
+// A border's side names the neighbour on it.
+const sideSeat = (a, c) => (a.seat !== undefined && a.seat !== "" ? seatOf(a, c) : a.side === "right" ? c.R : a.side === "left" ? c.L : c.me);
 const intOf = (v, fallback = null) => {
   const x = Number(v);
   return v !== undefined && v !== null && v !== "" && Number.isInteger(x) ? x : fallback;
@@ -281,7 +283,7 @@ const WORDS = {
   },
 
   sells(a, c) {
-    const q = seatOf(a, c);
+    const q = sideSeat(a, c);
     const s = c.side(q);
     const units = production(c.state, q).sale;
     const what = cap(saleWords(units));
@@ -501,7 +503,7 @@ const WORDS = {
   },
 
   wall(a, c) {
-    const q = seatOf(a, c);
+    const q = a.bank === "mine" ? c.me : sideSeat(a, c);
     const sh = shields(c.state, q);
     const from = [...cardsOf(c.state, q).filter((x) => x.shields).map((x) => x.name), ...(builtStages(c.state, q).some((x) => x.shields) ? [`${q === c.me ? "your" : "their"} wonder`] : [])];
     if (!sh) return { title: "Walls", body: `${q === c.me ? "You have" : `${c.Name(q)} has`} no shields yet, so no walls stand on ${q === c.me ? "your" : "their"} bank.` };
@@ -820,6 +822,9 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
     target = null;
     how = null;
     bubble.hidden = true;
+    // Words about a card in a hand passed on must not stay in the page.
+    bubble.replaceChildren();
+    live.textContent = "";
   }
   // The same thing redrawn (a new turn): follow it, and refresh its words.
   const signature = (t) => Object.entries(t.dataset).filter(([k]) => k.startsWith("tip")).map(([k, v]) => `${k}=${v}`).sort().join("&");
@@ -1039,7 +1044,7 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
   function legend() {
     hide();
     legendDialog ??= buildLegend();
-    if (!legendDialog.isConnected) doc.body.append(legendDialog);
+    if (!legendDialog.isConnected) root.append(legendDialog);
     const from = doc.activeElement;
     if (!legendDialog.open) legendDialog.showModal();
     legendDialog.opened(from);

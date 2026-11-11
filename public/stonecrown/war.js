@@ -120,7 +120,7 @@ export function warScene({ kit, nameOf, sound = () => {}, reduced = null } = {})
   const sumAge = el("div", { class: "ws-sum ws-step" });
   const sumAll = el("div", { class: "ws-sum ws-step" });
   const elsewhere = el("p", { class: "ws-else ws-step" });
-  const live = el("p", { class: "sr-only", id: "ws-live", role: "status", "aria-live": "polite" });
+  const live = el("p", { class: "sr-only", id: "ws-live" });
   const bar = el("span", { class: "ws-count", "aria-hidden": "true" });
   const label = el("span", {}, "Continue");
   const button = el("button", { class: "btn primary ws-go", type: "button" }, label, bar);
@@ -207,7 +207,7 @@ export function warScene({ kit, nameOf, sound = () => {}, reduced = null } = {})
     const words = result > 0 ? ["You won", signed(win)] : result < 0 ? ["You lost", "−1"] : ["Draw", "no token"];
     const stamp = el(
       "div",
-      { class: `ws-stamp ${kind} ws-off`, ...(result ? { "data-tip": "tokens", "data-tip-value": result > 0 ? win : DEFEAT } : {}) },
+      { class: `ws-stamp ${kind} ws-off`, ...(result ? { "data-tip": "tokens" } : {}) },
       token,
       el("b", {}, words[0]),
       el("span", {}, words[1]),
@@ -228,7 +228,7 @@ export function warScene({ kit, nameOf, sound = () => {}, reduced = null } = {})
         a.pieces.forEach((s) => s.classList.remove("ws-off"));
         a.num.textContent = String(a.total);
       }
-      if (most) sound("shield", { n: most });
+      if (most) sound("shield", { i: 0 });
       return sleep(450 * k, r);
     }
     const step = Math.max(70, Math.min(230, 1500 / Math.max(most, 1))) * k;
@@ -241,7 +241,7 @@ export function warScene({ kit, nameOf, sound = () => {}, reduced = null } = {})
         void a.num.offsetWidth;
         a.num.classList.add("tick");
       }
-      sound("shield", { n: i });
+      sound("shield", { i });
       if (!(await sleep(step, r))) return false;
     }
     return sleep(380 * k, r);
@@ -297,8 +297,9 @@ export function warScene({ kit, nameOf, sound = () => {}, reduced = null } = {})
     document.addEventListener("keydown", onKey, true);
     node.addEventListener("focusout", onFocusOut);
     requestAnimationFrame(() => node.classList.add("on"));
-    button.focus({ preventScroll: true });
+    // The dialog's description, read once as Continue takes focus.
     live.textContent = `${warSummary(facts, nameOf)}.`;
+    button.focus({ preventScroll: true });
     sound("war");
 
     (async () => {

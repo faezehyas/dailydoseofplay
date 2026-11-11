@@ -41,16 +41,6 @@ export function ringWords({ players, me, age, round }, nameOf) {
   return `Age ${ROMAN[age] ?? age}, turn ${turn} of ${ROUNDS}. Hands go ${dir > 0 ? "left" : "right"}: yours to ${nameOf(to)}, and you get ${nameOf(from)}'s.`;
 }
 
-// Seat marks past the four art.js draws (seats 4–6 at a bigger table): a
-// triangle, a ring and a cross, so no two seats differ by colour alone.
-const MORE_MARKS = ['<path d="M12 6.5l5.5 9.5h-11z"/>', '<circle cx="12" cy="12" r="4.4" fill="none" stroke-width="2.4"/>', '<path d="M10.5 6h3v4.5H18v3h-4.5V18h-3v-4.5H6v-3h4.5z"/>'];
-function markOf(kit, p) {
-  const node = kit.seatMark(p);
-  const sign = node.querySelector?.(".sign");
-  if (sign && !sign.childElementCount && MORE_MARKS[p - 4]) sign.innerHTML = MORE_MARKS[p - 4];
-  return node;
-}
-
 const reduced = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const ease = () => (typeof document === "undefined" ? "" : getComputedStyle(document.documentElement).getPropertyValue("--ease-out").trim()) || "cubic-bezier(0.22, 1, 0.36, 1)";
 // Close to the theme's --ease-out, so the ring keeps time with slide().
@@ -64,7 +54,7 @@ export function stackEl(age, count) {
   setStack(node, age, count);
   return node;
 }
-function setStack(node, age, count) {
+export function setStack(node, age, count) {
   const a = Math.min(3, Math.max(1, age || 1));
   if (node.dataset.age !== String(a)) {
     node.dataset.age = String(a);
@@ -77,7 +67,7 @@ function setStack(node, age, count) {
 }
 
 // The dashed place a stack rests in: "sm", "md" or "lg".
-export const slotEl = (size = "md") => el("span", { class: `sc-slot ${size}`, "aria-hidden": "true" });
+export const slotEl = (size = "md") => el("span", { class: `sc-stack-slot ${size}`, "aria-hidden": "true" });
 
 const rectOf = (r) => ({ x: r.x ?? r.left, y: r.y ?? r.top, w: r.w ?? r.width, h: r.h ?? r.height });
 
@@ -264,8 +254,8 @@ export function seatRing({ kit, nameOf }) {
       const near = p === me || p === left || p === right;
       const name = p === me ? "You" : nameOf(p);
       const seat = near
-        ? el("span", { class: `sc-ring-plate p-${p}${p === me ? " me" : ""}`, "data-tip": "seat", "data-tip-p": String(p) }, markOf(kit, p), el("span", { class: "nm" }, name))
-        : el("span", { class: `sc-ring-dot p-${p}`, role: "img", "aria-label": name, tabindex: "0", "data-tip": "seat", "data-tip-p": String(p) }, markOf(kit, p));
+        ? el("span", { class: `sc-ring-plate p-${p}${p === me ? " me" : ""}`, "data-tip": "seat", "data-tip-seat": String(p) }, kit.seatMark(p), el("span", { class: "nm" }, name))
+        : el("span", { class: `sc-ring-dot p-${p}`, role: "img", "aria-label": name, tabindex: "0", "data-tip": "seat", "data-tip-seat": String(p) }, kit.seatMark(p));
       const [x, y] = pointAt(deg, RING.seat);
       seat.style.left = pct(clamp(x, W * 0.12, W * 0.88), W);
       seat.style.top = pct(y, H);
@@ -273,7 +263,7 @@ export function seatRing({ kit, nameOf }) {
     });
     seatsBox.replaceChildren(...seats);
     stacks = angles.map((deg, p) => {
-      const s = el("span", { class: "sc-ring-stack", "data-tip": "back", "data-tip-p": String(p) }, stackEl(st.age, st.count));
+      const s = el("span", { class: "sc-ring-stack", "data-tip": "back", "data-tip-where": "stack", "data-tip-seat": String(p) }, stackEl(st.age, st.count));
       place(s, deg);
       return s;
     });
@@ -283,9 +273,14 @@ export function seatRing({ kit, nameOf }) {
     later();
   }
 
+  let feltKey = "";
   function draw() {
     const dir = passDir(st.age || 1);
-    felt.innerHTML = feltSvg(st.players, st.me, dir);
+    const key = `${st.players} ${st.me} ${dir}`;
+    if (key !== feltKey) {
+      feltKey = key;
+      felt.innerHTML = feltSvg(st.players, st.me, dir);
+    }
     node.dataset.dir = dir > 0 ? "left" : "right";
     numeral.textContent = ROMAN[st.age] ?? "";
     medal.dataset.tipAge = String(st.age);
@@ -294,6 +289,7 @@ export function seatRing({ kit, nameOf }) {
     [...pips.children].forEach((pip, i) => (pip.className = i < turn - 1 ? "done" : i === turn - 1 ? "now" : ""));
     dirText.textContent = `hands go ${dir > 0 ? "left" : "right"}`;
     dirText.dataset.tipDir = String(dir);
+    dirText.dataset.tipAge = String(st.age);
     for (const s of stacks) {
       setStack(s.firstChild, st.age, st.count);
       s.hidden = !(st.count > 0);
@@ -330,7 +326,7 @@ export function seatRing({ kit, nameOf }) {
       marked = marked === null ? null : passTarget(n, marked, dir);
       stacks.forEach((s, p) => {
         place(s, angles[p]);
-        s.dataset.tipP = String(p);
+        s.dataset.tipSeat = String(p);
       });
       node.classList.remove("passing");
       busy = null;

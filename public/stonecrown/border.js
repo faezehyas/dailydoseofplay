@@ -397,6 +397,7 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
     const fl = (facts.flags || []).slice(0, 3);
     while (fl.length < 3) fl.push(null);
     flags.replaceChildren(...fl.map((f) => el("i", { class: f === 1 ? "won" : f === -1 ? "lost" : f === 0 ? "draw" : "open" })));
+    flags.dataset.tipResults = fl.map((f) => (f === null || f === undefined ? "" : String(f))).join(",");
     flags.setAttribute("aria-label", "War on this border: " + fl.map((f, a) => `age ${ROMAN[a]} ${FLAG_WORDS[f ?? null]}`).join(", "));
     const { mine, theirs } = facts.shields;
     const fillBadge = (b, v, whose) => {
@@ -438,10 +439,10 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
     return node;
   };
   // The cart, drawn heading +x, wheels at 0: a box on two wheels with its load piled on top.
-  function cartMarkup(resources) {
+  function cartMarkup(resources, out = false) {
     const body = rr(-8, -8.4, 16, 5.4, 1.3), side2 = rr(-7.4, -4.6, 14.8, 1.5, 0.7), shaft = `M8 -5L13 -3.6L12.8 -2.8L7.8 -3.9Z`;
     const wheels = dot(-4.6, -2.1, 2.1) + dot(4.6, -2.1, 2.1);
-    const flip = right ? ' transform="scale(-1 1)"' : "";
+    const flip = right !== out ? ' transform="scale(-1 1)"' : "";
     let o = `<g${flip}>` + shadowOf(body + wheels) + fill(shaft, "wood-dk") + fill(body, "wood") + fill(side2, "wood-dk") + fill(wheels, "wood-dk") + fill(dot(-4.6, -2.1, 0.7) + dot(4.6, -2.1, 0.7), "wood") + "</g>";
     const load = resources.slice(0, resources.length > 4 ? 3 : 4);
     const sz = 9;
@@ -453,31 +454,33 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
     return o;
   }
 
-  async function run({ resources = [], coins: paid = 0 }) {
+  // out: a purchase the neighbour made from you, the cart going to them and their coins coming to you.
+  async function run({ resources = [], coins: paid = 0, out = false }) {
     if (!resources.length && !paid) return;
     sound("cart", { n: resources.length, coins: paid });
     if (reducedMotion()) return;
     const svg = ensureFx();
     const bridgeUp = facts.raw === 1;
     const dur = bridgeUp ? 1700 : 2500;
-    const cart = g(cartMarkup(resources), "sc-b-cart");
+    const cart = g(cartMarkup(resources, out), "sc-b-cart");
     svg.append(cart);
     const path = bridgeUp
       ? [[80, 47, 0], [93, 41.6, 0.16], [147, 41.6, 0.82], [160, 47, 1]]
       : [[84, 51, 0], [97, 51, 0.12], [112, 53.4, 0.24], [128, 53.4, 0.72], [143, 51, 0.86], [156, 51, 1]];
+    if (out) path.reverse().forEach((pt) => (pt[2] = 1 - pt[2]));
     const frames = path.map(([x, y, o], i) => ({ transform: `translate(${n(X(x))}px, ${n(y)}px)`, opacity: i === 0 || i === path.length - 1 ? 0 : 1, offset: o }));
     frames[1].opacity = 1;
     const anims = [cart.animate(frames, { duration: dur, easing: "ease-in-out", fill: "both" })];
     const raft = art.querySelector(".sc-b-raft");
     if (!bridgeUp && raft)
-      anims.push(raft.animate([{ transform: "translateX(0)" }, { transform: "translateX(-8px)", offset: 0.14 }, { transform: "translateX(-8px)", offset: 0.24 }, { transform: "translateX(8px)", offset: 0.72 }, { transform: "translateX(8px)", offset: 0.84 }, { transform: "translateX(0)" }], { duration: dur, easing: "ease-in-out" }));
+      anims.push(raft.animate([{ transform: "translateX(0)" }, { transform: `translateX(${out ? 8 : -8}px)`, offset: 0.14 }, { transform: `translateX(${out ? 8 : -8}px)`, offset: 0.24 }, { transform: `translateX(${out ? -8 : 8}px)`, offset: 0.72 }, { transform: `translateX(${out ? -8 : 8}px)`, offset: 0.84 }, { transform: "translateX(0)" }], { duration: dur, easing: "ease-in-out" }));
     // The coins arc the other way, from your bank to theirs.
     const k = Math.min(6, Math.max(paid ? 1 : 0, paid));
     for (let i = 0; i < k; i++) {
       const c = g(place(coinSvg(1), 0, 0, 7.4), "sc-b-coin");
       svg.append(c);
       const pts = Array.from({ length: 9 }, (_, j) => {
-        const t = j / 8, x = 172 + (68 - 172) * t, y = 38 - 16 * 4 * t * (1 - t) + (i % 2) * 1.5;
+        const t = j / 8, x = out ? 68 + (172 - 68) * t : 172 + (68 - 172) * t, y = 38 - 16 * 4 * t * (1 - t) + (i % 2) * 1.5;
         return { transform: `translate(${n(X(x))}px, ${n(y)}px)`, opacity: j === 0 ? 0 : j === 8 ? 0 : 1, offset: t };
       });
       anims.push(c.animate(pts, { duration: dur * 0.62, delay: dur * 0.2 + i * 110, easing: "ease-in-out", fill: "both" }));
@@ -489,6 +492,7 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
 
   // Several purchases asked for in one turn travel as one cart.
   function cart(load = {}) {
+    if (load.out) return (queue = queue.then(() => run({ ...load, out: true })));
     if (pending) {
       pending.resources.push(...(load.resources || []));
       pending.coins += load.coins || 0;

@@ -143,7 +143,7 @@ export function matchCost(state, p, cost, buy = null) {
   const out = [];
   res.forEach((n, r) => {
     for (const u of own[r]) out.push({ r, how: "own", source: u.source });
-    for (const u of locked[r]) out.push({ r, how: "either", source: u.source, either: u.either });
+    for (const u of locked[r]) out.push({ r, how: "either", source: u.source, either: u.either, options: u.options.slice() });
     for (const s of SIDES) for (let k = 0; k < bought[s][r]; k++) out.push({ r, how: "buy", side: s, coins: unitPrice(state, p, r, s) });
     const missing = n - own[r].length - locked[r].length - bought.left[r] - bought.right[r];
     for (let k = 0; k < missing; k++) {
@@ -222,7 +222,7 @@ export function matchWords(units, names, { bank = 0 } = {}) {
 }
 
 // The badge a hand card wears, from its pickOptions() (art.js) with its card
-// or id: { kind, coins, label, why?, reason? }. kind: "make" (you make all it
+// or id: { id, kind, coins, label, why?, reason? }. kind: "make" (you make all it
 // needs and it costs no coins), "free" (it costs nothing at all), "chain",
 // "wonder" (only the wonder's free build can build it), "pay" (coins: the
 // cheapest way, bank and neighbours together) or "no" (why: "duplicate",
@@ -230,18 +230,19 @@ export function matchWords(units, names, { bank = 0 } = {}) {
 export function badgeOf(o) {
   const b = o.build;
   const card = o.card ?? CARDS[o.id];
-  if (b.why === "duplicate") return { kind: "no", coins: 0, label: "Already built", why: "duplicate", reason: `You already have ${card?.name ?? "it"}.` };
-  if (b.chain) return { kind: "chain", coins: 0, label: "Chain · free" };
+  const id = o.id ?? card?.id ?? -1;
+  if (b.why === "duplicate") return { id, kind: "no", coins: 0, label: "Already built", why: "duplicate", reason: `You already have ${card?.name ?? "it"}.` };
+  if (b.chain) return { id, kind: "chain", coins: 0, label: "Chain · free" };
   if (b.purchases?.length) {
     const coins = b.purchases[0].coins + (b.coins ?? card?.cost.coins ?? 0);
-    if (coins) return { kind: "pay", coins, label: plural(coins, "coin") };
-    if (card && sum(card.cost.res)) return { kind: "make", coins: 0, label: "You make it" };
-    return { kind: "free", coins: 0, label: "Free" };
+    if (coins) return { id, kind: "pay", coins, label: plural(coins, "coin") };
+    if (card && sum(card.cost.res)) return { id, kind: "make", coins: 0, label: "You make it" };
+    return { id, kind: "free", coins: 0, label: "Free" };
   }
-  if (o.free) return { kind: "wonder", coins: 0, label: "Wonder · free" };
+  if (o.free) return { id, kind: "wonder", coins: 0, label: "Wonder · free" };
   const why = b.why ?? "resources";
   const reason = why === "coins" ? "You haven't the coins to buy what it needs." : why === "unknown" ? "" : "You and your neighbours can't make what it needs.";
-  return { kind: "no", coins: 0, label: "Can't build", why, reason };
+  return { id, kind: "no", coins: 0, label: "Can't build", why, reason };
 }
 
 // ---------- the view ----------
@@ -268,7 +269,7 @@ export function shelfView({ kit, compact = false } = {}) {
         const src = el("small", { class: "sc-slot-src" });
         const mark = el("span", { class: "sc-slot-mark", "aria-hidden": "true", hidden: true });
         mark.innerHTML = TEMPLE;
-        const s = el("span", { class: `sc-slot r-${r}`, tabindex: "-1", dataset: tip("slot", { r }) }, el("span", { class: "sc-slot-ic" }, kit.resEl(r), mark), el("span", { class: "sc-slot-words" }, count, src));
+        const s = el("span", { class: `sc-slot r-${r}`, tabindex: "-1", dataset: { ...tip("make", { res: r }), r } }, el("span", { class: "sc-slot-ic" }, kit.resEl(r), mark), el("span", { class: "sc-slot-words" }, count, src));
         slots[r] = { s, count, src, mark };
         g.append(s);
       }
@@ -302,14 +303,13 @@ export function shelfView({ kit, compact = false } = {}) {
         s.classList.toggle("none", !n);
         s.classList.toggle("wonder", shelf.wonder === r);
         mark.hidden = shelf.wonder !== r;
-        s.dataset.tipP = String(shelf.p);
-        s.dataset.tipN = String(n);
+        s.dataset.tipSeat = String(shelf.p);
         s.setAttribute("aria-label", n ? `${n} ${RESOURCE_NAMES[r]}: ${listOf(shelf.sources[r])}` : `No ${RESOURCE_NAMES[r]}`);
       });
     } else {
       fixed.replaceChildren(
         ...shelf.fixed.flatMap((n, r) =>
-          n ? [el("span", { class: `sc-slot r-${r}`, tabindex: "-1", dataset: tip("slot", { r, p: shelf.p, n }), "aria-label": `${n} ${RESOURCE_NAMES[r]}` }, kit.resEl(r), n > 1 ? el("small", { "aria-hidden": "true" }, `×${n}`) : null)] : [],
+          n ? [el("span", { class: `sc-slot r-${r}`, tabindex: "-1", dataset: { ...tip("make", { res: r, seat: shelf.p }), r }, "aria-label": `${n} ${RESOURCE_NAMES[r]}` }, kit.resEl(r), n > 1 ? el("small", { "aria-hidden": "true" }, `×${n}`) : null)] : [],
         ),
       );
     }
@@ -328,7 +328,7 @@ export function shelfView({ kit, compact = false } = {}) {
           ? [el("span", { class: "sc-either-ics" }, orIcons(kit, e.options)), el("span", { class: "sc-slot-words" }, el("b", { class: "sc-slot-n" }, "1"), el("small", { class: "sc-slot-src" }, e.source))]
           : [...orIcons(kit, e.options), at.length > 1 ? el("small", { "aria-hidden": "true" }, `×${at.length}`) : null];
         const label = own ? `Either ${words}, one a turn: ${e.source}${e.sale ? "" : ", not for sale to your neighbours"}` : `${at.length > 1 ? `${at.length} × ` : ""}${words}`;
-        return el("span", { class: `sc-slot either n${e.options.length}${e.sale ? "" : " kept"}`, tabindex: "-1", dataset: { ...tip("either", { i: at[0], p: shelf.p, options: e.options.join(",") }), e: at.join(" ") }, "aria-label": label }, body);
+        return el("span", { class: `sc-slot either n${e.options.length}${e.sale ? "" : " kept"}`, tabindex: "-1", dataset: { ...tip("either", { seat: shelf.p, res: e.options.join(","), source: e.source }), e: at.join(" ") }, "aria-label": label }, body);
       }),
     );
     node.classList.toggle("has-either", shelf.either.length > 0);
@@ -342,7 +342,7 @@ export function shelfView({ kit, compact = false } = {}) {
     last = key;
     const lit = (list, r) => list.some((x) => String(x) === String(r));
     for (const s of node.querySelectorAll(".sc-slot")) {
-      const keys = s.classList.contains("either") ? s.dataset.e.split(" ").map((i) => `e${i}`) : [s.dataset.tipR];
+      const keys = s.classList.contains("either") ? s.dataset.e.split(" ").map((i) => `e${i}`) : [s.dataset.r];
       const on = (list) => keys.some((k) => lit(list, k));
       s.classList.toggle("use", on(use));
       s.classList.toggle("need", !on(use) && on(need));
@@ -360,29 +360,29 @@ export function costMatchEl(units, names, kit, { bank = 0 } = {}) {
     const r = RESOURCE_NAMES[u.r];
     let text;
     let cls = "own";
-    let data = tip("slot", { r: u.r });
+    let data = tip("make", { res: u.r });
     if (u.how === "own") text = `from ${u.source}`;
     else if (u.how === "either") {
       text = `${u.source} makes ${r} this turn`;
-      data = tip("either", { i: u.either, r: u.r });
+      data = tip("either", { res: (u.options ?? [u.r]).join(","), source: u.source });
     } else if (u.side) {
       cls = u.how === "buy" ? "buy" : "sale";
       text = u.how === "buy" ? `buy from ${names[u.side]} on your ${u.side} · ${plural(u.coins, "coin")}` : `${names[u.side]} on your ${u.side} sells it · ${plural(u.coins, "coin")}`;
-      data = tip("price", { r: u.r, side: u.side, coins: u.coins });
+      data = tip("price", { res: u.r, side: u.side });
     } else {
       cls = "miss";
       text = "nobody near you sells it";
-      data = tip("price", { r: u.r });
+      data = tip("make", { res: u.r });
     }
     return el("span", { class: `sc-unit ${cls}`, role: "listitem", dataset: data }, kit.resEl(u.r), el("span", {}, el("b", {}, r), ` · ${text}`));
   };
   const row = el("div", { class: "sc-unit-row", role: "list", "aria-label": "What it needs" }, ...units.map(chip));
-  if (bank) row.append(el("span", { class: "sc-unit bank", role: "listitem", dataset: tip("coins", { coins: bank }) }, kit.coinEl(), el("span", {}, el("b", {}, plural(bank, "coin")), " · to the bank")));
+  if (bank) row.append(el("span", { class: "sc-unit bank", role: "listitem", dataset: tip("bank", {}) }, kit.coinEl(), el("span", {}, el("b", {}, plural(bank, "coin")), " · to the bank")));
   return el("div", { class: "sc-match" }, units.length || bank ? row : null, el("p", { class: "sc-match-words" }, matchWords(units, names, { bank })));
 }
 
 // A hand card's badge: "You make it", "Free", "Chain · free", a coin price, "Wonder · free" or "Can't build".
 export function badgeEl(badge, kit) {
   const body = badge.kind === "pay" ? [kit.coinEl(), el("span", { "aria-hidden": "true" }, String(badge.coins)), el("span", { class: "sr-only" }, badge.label)] : [badge.label];
-  return el("span", { class: `sc-tag ${badge.kind}`, dataset: tip("badge", { kind: badge.kind, coins: badge.coins, ...(badge.why ? { why: badge.why } : {}) }) }, ...body);
+  return el("span", { class: `sc-tag ${badge.kind}`, dataset: tip("badge", { kind: badge.kind, ...(badge.id >= 0 ? { id: badge.id } : {}) }) }, ...body);
 }
