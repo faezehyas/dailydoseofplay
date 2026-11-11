@@ -428,13 +428,16 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
     fillBadge(mineB, mine, "You:");
     tally.classList.toggle("ahead", theirs > mine);
     tally.classList.toggle("behind", theirs < mine);
+    const warnWas = warn.hidden ? null : warn.textContent;
     warn.hidden = !facts.warn;
-    warn.textContent = facts.warn || "";
+    if (warn.textContent !== (facts.warn || "")) warn.textContent = facts.warn || "";
     warn.className = "sc-border-warn " + (/trail/.test(facts.warn) ? "trail" : /lead/.test(facts.warn) ? "lead" : "level");
     const s = data.sells;
     if (s instanceof Node) { if (sells.firstChild !== s || sells.childNodes.length !== 1) sells.replaceChildren(s); }
     else if (Array.isArray(s) || (s === undefined && Array.isArray(data.sale))) drawSale(s ?? data.sale);
     sells.setAttribute("aria-label", `What ${who} sells you: ${saleWords(saleGroups(saleShown))}`);
+    // The warning takes room from the sale line, or gives it back.
+    if ((warn.hidden ? null : warn.textContent) !== warnWas) fit();
   }
 
   // What they sell, one slim line on their bank: alike units counted (×n),
@@ -478,11 +481,13 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
       more.hidden = false;
     }
   }
+  // The line is as wide as what it shows, so the room it may take is watched: the foot it sits in.
   if (typeof ResizeObserver === "function") {
     let w = 0;
     new ResizeObserver(() => {
-      if (sells.clientWidth !== w) (w = sells.clientWidth), fit();
-    }).observe(sells);
+      const now = sells.parentElement?.clientWidth ?? 0;
+      if (now !== w) (w = now), fit();
+    }).observe(sells.parentElement ?? sells);
   }
 
   // The fx layer: an empty scene of the same viewBox over the art, never mirrored (X() mirrors positions instead).
