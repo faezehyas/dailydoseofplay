@@ -385,3 +385,37 @@
   white-space: nowrap;
 }
 
+/* ---------- small: the ring in a top bar (under 300 px) ---------- */
+@container (max-width: 299px) {
+  .sc-ring-plate {
+    max-width: 31%;
+    gap: 0.2em;
+    padding: 0.2em 0.5em 0.2em 0.2em;
+    font-size: 10px;
+  }
+
+  .sc-ring-plate .sc-mark { width: 1.15em; height: 1.15em; }
+  .sc-ring-dot { width: 17px; }
+  .sc-ring-mid { gap: 2px; }
+
+  .sc-ring-medal {
+    width: 28px;
+    box-shadow: 0 0 0 1.5px var(--sc-ring-medal-rim), 0 0 0 3px var(--sc-ring-felt), 0 3px 6px -2px var(--sc-ring-shade), 0 0 18px 6px var(--sc-ring-glow);
+  }
+
+  .sc-ring-medal small { display: none; }
+  .sc-ring-numeral { font-size: 13px; }
+  .sc-ring-pips { gap: 2.5px; }
+  .sc-ring-pips i { width: 5px; }
+  .sc-ring-dir { font-size: 9.5px; }
+}
+
+/* Smaller still (a phone's top bar): a neighbour's plate is its mark, the
+   way hands go is the arrows round the rim (the hand's heading says it too). */
+@container (max-width: 209px) {
+  .sc-ring-plate:not(.me) { padding: 0.15em; }
+  .sc-ring-plate:not(.me) .nm { display: none; }
+  .sc-ring-plate .sc-mark { width: 1.3em; height: 1.3em; }
+  .sc-ring-dir { display: none; }
+}
+

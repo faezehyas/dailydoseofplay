@@ -176,62 +176,88 @@
   color: var(--sc-muted);
 }
 
-/* ---------- the top bar ---------- */
+/* ---------- the top bar: the seat ring, the status line, the rest of the table ---------- */
 .sc-top {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 256px) minmax(0, 1fr) auto;
+  grid-template-areas: "ring mid side";
   align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
+  gap: 6px 14px;
+  padding: 4px 12px 4px 6px;
   min-height: 52px;
 }
 
-.sc-top-age {
+.sc-top > .sc-me-ring {
+  grid-area: ring;
+  min-width: 0;
+}
+
+.sc-top .sc-ring {
+  min-width: 0;
+  max-width: 236px;
+}
+
+.sc-top-mid {
+  grid-area: mid;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sc-top-mid > .pc-status {
+  margin: 0;
+  max-width: 100%;
+  font-size: 1.15rem;
+  text-wrap: balance;
+}
+
+.sc-top-mid > .sc-explain-slot:empty {
+  display: none;
+}
+
+.sc-top-side {
+  grid-area: side;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   min-width: 0;
 }
 
-.sc-age-badge {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  background: #2a7a76;
-  color: #fff8ea;
-  font: 700 0.95rem var(--font-display);
-  box-shadow: 0 2px 0 rgb(var(--sc-shadow) / 18%);
+/* A phone: the ring and the rest of the table side by side, the status line under them. */
+@media (max-width: 639px) {
+  .sc-top {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "ring side" "mid mid";
+    padding: 2px 8px 6px 2px;
+    gap: 2px 8px;
+  }
+
+  .sc-top .sc-ring {
+    max-width: 200px;
+    margin-inline: 0;
+  }
+
+  .sc-top-side {
+    flex-wrap: wrap;
+    max-width: 170px;
+    gap: 6px;
+  }
+
+  .sc-top-side > .sc-pills {
+    flex-basis: 100%;
+  }
+
+  .sc-top-mid > .pc-status {
+    font-size: 1rem;
+  }
 }
 
-.stonecrown[data-age="1"] .sc-age-badge { background: #b04528; }
-.stonecrown[data-age="3"] .sc-age-badge { background: #553b94; }
-
-.sc-top-words {
-  display: grid;
-  line-height: 1.1;
-}
-
-.sc-age {
-  font: 600 1.05rem var(--font-display);
-}
-
-.sc-turn-line {
-  color: var(--sc-muted);
-  font-size: 0.8rem;
-  white-space: nowrap;
-}
-
-/* A phone has no room for the pass direction up here (the hand's heading says
-   it), nor for the neighbours' wonders by name (their labels and cities say it). */
+/* A phone has no room for the neighbours' wonders by name (their labels and cities say it). */
 @media (max-width: 480px) {
   .sc-seat-wonder {
     display: none;
-  }
-
-  .sc-top-age {
-    margin-right: auto;
   }
 
   .sc-across-stats .sc-ic.coin {
@@ -1310,7 +1336,7 @@
 
 @media (min-width: 1000px) {
   .stonecrown {
-    --sc-cw: clamp(88px, 100svh / 8 - 15px, 104px);
+    --sc-cw: clamp(80px, 100svh / 9 - 12px, 104px);
   }
 
   .sc-hand-area {
@@ -1338,6 +1364,16 @@
 
   .sc-buttons[data-n="4"] {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .sc-buttons .sc-act:not(.link) {
+    min-height: 46px;
+    padding-block: 4px;
+  }
+
+  .sc-hand-area {
+    row-gap: 6px;
+    padding-block: 8px;
   }
 
   .sc-side .sc-detail {
@@ -1818,8 +1854,8 @@
 }
 
 /* While Explain mode's bar is in the top bar, a phone hides what it covers. */
-@media (max-width: 640px) {
-  .sc-explain-on .sc-top :is(.sc-top-age, .sc-pills, .sc-bank, .sc-pile) {
+@media (max-width: 639px) {
+  .sc-explain-on .sc-top-mid > .pc-status {
     display: none;
   }
 }
@@ -1872,8 +1908,7 @@
 /* A phone: the border a fixed strip, the stack small beside the stats. */
 @media (max-width: 999px) {
   .sc-seat > .sc-border {
-    aspect-ratio: auto;
-    height: 68px;
+    aspect-ratio: 11 / 5;
     margin-inline: 6px;
   }
 
@@ -1991,12 +2026,9 @@
   opacity: 0.45;
 }
 
-/* ---------- your shelf over your hand ---------- */
-.sc-hand-area > .sc-shelf.full {
-  padding: 5px 8px 8px;
-  gap: 3px;
-}
-
+/* ---------- your shelf over your hand: one row ---------- */
+/* The seven slots, each its icon and count (its tip, and the card you pick,
+   name where it comes from), the either tokens after them, the label to the left. */
 .sc-hand-words {
   display: grid;
   gap: 1px;
@@ -2008,30 +2040,65 @@
   font-size: 0.8rem;
 }
 
-.sc-hand-area > .sc-shelf .sc-shelf-fixed {
-  grid-template-columns: minmax(0, 4fr) minmax(0, 3fr);
-  gap: 8px;
+.sc-hand-area > .sc-shelf.full {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 5px 8px 4px 10px;
 }
 
-/* Over your hand each slot is its icon and count, where it comes from underneath. */
+.sc-hand-area > .sc-shelf .sc-shelf-head {
+  flex: none;
+  padding: 0 0 4px;
+}
+
+.sc-hand-area > .sc-shelf .sc-shelf-lab {
+  display: block;
+  width: 6.2em;
+  font-size: 0.62rem;
+  line-height: 1.2;
+}
+
+.sc-hand-area > .sc-shelf .sc-shelf-key {
+  display: none;
+}
+
+.sc-hand-area > .sc-shelf .sc-shelf-fixed {
+  flex: 1 1 0;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 3fr);
+  gap: 10px;
+  min-width: 0;
+}
+
 .sc-hand-area > .sc-shelf .sc-shelf-group {
   gap: 4px;
+  padding-bottom: 6px;
 }
 
-.sc-hand-area > .sc-shelf .sc-shelf-group .sc-slot {
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 0 4px;
-  padding: 3px 3px 4px 4px;
+.sc-hand-area > .sc-shelf .sc-shelf-group::after {
+  height: 5px;
 }
 
-.sc-hand-area > .sc-shelf .sc-shelf-group .sc-slot-words {
+.sc-hand-area > .sc-shelf .sc-slot {
+  grid-template-columns: auto auto;
+  justify-content: center;
+  gap: 0 3px;
+  padding: 2px 4px 2px 3px;
+  border-radius: 9px;
+}
+
+.sc-hand-area > .sc-shelf .sc-slot-words {
   display: contents;
 }
 
-.sc-hand-area > .sc-shelf .sc-shelf-group .sc-slot-src {
-  grid-column: 1 / -1;
-  font-size: 0.58rem;
-  letter-spacing: -0.01em;
+.sc-hand-area > .sc-shelf .sc-slot-src {
+  display: none;
+}
+
+.sc-hand-area > .sc-shelf .sc-slot-n {
+  font-size: 1rem;
 }
 
 .sc-hand-area > .sc-shelf .sc-slot-ic > .sc-ic {
@@ -2039,34 +2106,68 @@
   height: 24px;
 }
 
-/* A phone: one row of the seven, each its icon over its count (the tip names where it comes from). */
+.sc-hand-area > .sc-shelf .sc-slot-mark {
+  left: -4px;
+  top: -4px;
+  width: 13px;
+  height: 13px;
+}
+
+/* Either tokens: inline after the seven, a dashed label each. */
+.sc-hand-area > .sc-shelf .sc-shelf-either {
+  flex: 0 1 auto;
+  gap: 4px;
+  padding-bottom: 6px;
+}
+
+.sc-hand-area > .sc-shelf .sc-slot.either {
+  padding: 2px 6px;
+}
+
+.sc-hand-area > .sc-shelf .sc-slot.either .sc-slot-n {
+  display: none;
+}
+
+.sc-hand-area > .sc-shelf .sc-either-ics .sc-ic {
+  width: 20px;
+  height: 20px;
+}
+
+/* A phone: the label a word, the slots as tight as the width asks. */
 @container (max-width: 459px) {
   .sc-hand-area > .sc-shelf .sc-shelf-group {
     gap: 3px;
   }
 
-  .sc-hand-area > .sc-shelf .sc-shelf-group .sc-slot {
-    grid-template-columns: minmax(0, 1fr);
-    justify-items: center;
-    gap: 0;
-    padding: 3px 1px 2px;
+  .sc-hand-area > .sc-shelf .sc-shelf-fixed {
+    gap: 6px;
   }
 
-  .sc-hand-area > .sc-shelf .sc-shelf-group .sc-slot-words {
-    display: contents;
+  .sc-hand-area > .sc-shelf .sc-slot {
+    padding: 2px 2px 2px 1px;
+    gap: 0 1px;
   }
 
-  .sc-hand-area > .sc-shelf .sc-shelf-group .sc-slot-src {
-    display: none;
+  .sc-hand-area > .sc-shelf .sc-slot-ic > .sc-ic {
+    width: 20px;
+    height: 20px;
   }
 
   .sc-hand-area > .sc-shelf .sc-slot-n {
     font-size: 0.9rem;
   }
+}
 
-  .sc-hand-area > .sc-shelf .sc-slot-ic > .sc-ic {
-    width: 24px;
-    height: 24px;
+@media (max-width: 480px) {
+  .sc-hand-area > .sc-shelf.full {
+    gap: 3px 6px;
+    padding: 4px 6px 3px;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-shelf-lab {
+    width: 3.2em;
+    font-size: 0.56rem;
+    letter-spacing: 0.04em;
   }
 }
 
@@ -2079,27 +2180,6 @@
     grid-area: shelf;
     max-width: calc(var(--sc-cw) * 7 + 36px);
   }
-
-  /* On a laptop the shelf is one row, its label to the left. */
-  .sc-hand-area > .sc-shelf.full {
-    display: grid;
-    grid-template-columns: 3.4em minmax(0, 1fr);
-    grid-template-areas: "head fixed" "head either";
-    align-items: center;
-    column-gap: 8px;
-  }
-
-  .sc-hand-area > .sc-shelf .sc-shelf-head {
-    grid-area: head;
-    padding: 0;
-  }
-
-  .sc-hand-area > .sc-shelf .sc-shelf-key {
-    display: none;
-  }
-
-  .sc-hand-area > .sc-shelf .sc-shelf-fixed { grid-area: fixed; }
-  .sc-hand-area > .sc-shelf .sc-shelf-either { grid-area: either; }
 
   /* While you wait for the others, your hand folds to a strip and your city shows. */
   .stonecrown.sc-waiting .sc-hand-area {

@@ -637,7 +637,6 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
     const hand = el("span", { class: "sc-seat-hand" }, slot, pick);
     const cityBox = el("div", { class: "sc-seat-city" });
     const open = el("button", { class: "sc-seat-open", type: "button", onclick: () => onSeat(p) }, arrow, head, wonderName);
-    const sale = shelfView({ kit, compact: true });
     const border = borderView({ side, kit, sound: borderSound(side) });
     border.raw = 2;
     borders.set(side, border);
@@ -646,10 +645,10 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
       { class: `sc-seat p-${p} ${side}`, dataset: { seat: p } },
       el("header", { class: "sc-seat-head" }, open),
       el("div", { class: "sc-seat-stats" }, el("span", { class: "sc-seat-nums" }, stats.coins, stats.shields, stats.tokens, dots), hand),
+      border.node,
       counts,
       wonder,
       el("div", { class: "sc-seat-city-box" }, el("span", { class: "sc-label" }, `${nameOf(p)}'s city`), cityBox),
-      border.node,
     );
     // The whole panel opens the city (but its border); its name is the button keyboards and screen readers use.
     node.addEventListener("click", (e) => !e.target.closest(".sc-seat-open, .sc-border") && onSeat(p));
@@ -685,10 +684,9 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
           c.classList.toggle("none", !cols[i].length);
         });
       }
-      sale.update(saleOf(view, p, me));
       const facts = borderFacts(view, me, side, { wars: wars() });
       border.raw = facts.raw;
-      if (changed("border", JSON.stringify(facts))) border.update({ ...facts, name: nameOf(p), sells: sale.node });
+      if (changed("border", JSON.stringify(facts))) border.update({ ...facts, name: nameOf(p) });
       const label = `${nameOf(p)}, your ${side} neighbour, ${W.name} side ${w.side}, ${seatWords(view, p)}, ${plural(n, "card")} in hand. Show their city`;
       if (changed("label", label)) open.setAttribute("aria-label", label);
     }
@@ -696,7 +694,7 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
       pick: () => rectIn(pick.hidden ? slot : pick),
       coins: () => rectIn(stats.coins),
       // Brown and grey cards go to the shelf on their bank; the rest to their city, or its count on a phone.
-      city: (color) => (color === "brown" || color === "grey" ? rectOn(sale.node, border.node) : rectOn(cityBox.querySelector(`.sc-col.c-${color} .sc-chip:last-child`), counts.children[COLORS.indexOf(color)] ?? counts)),
+      city: (color) => (color === "brown" || color === "grey" ? rectOn(border.sells, border.node) : rectOn(cityBox.querySelector(`.sc-col.c-${color} .sc-chip:last-child`), counts.children[COLORS.indexOf(color)] ?? counts)),
       wonder: () => rectOn(wonder, dots, node),
       tokens: () => rectIn(stats.tokens.lastChild ?? stats.shields),
       seat: () => rectIn(node),
@@ -707,7 +705,7 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
         return { x: r.x, y: r.y + 52, w: r.w, h: 150 };
       },
     };
-    return { p, node, draw, rects, pick, slot, stack, sale, border, city: cityBox };
+    return { p, node, draw, rects, pick, slot, stack, border, city: cityBox };
   }
 
   // Everyone else: a pill with their mark, name, coins and shields, and their hand as a small stack.
@@ -762,7 +760,9 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
   const sci = el("div", { class: "sc-sci", id: "sc-sci", hidden: true, dataset: { tip: "science", tipSeat: me } }, el("span", { class: "sc-label" }, "Science"), sciPiles, sciLine);
   const myCity = el("div", { class: "sc-my-city", role: "img" });
   const cityBox = el("section", { class: "sc-city-box", "aria-label": "Your city" }, el("div", { class: "sc-city-head" }, el("h2", { class: "sc-title" }, "Your city"), sci), myCity);
-  const mine = el("section", { class: "sc-mine", "aria-label": "Your wonder and city" }, el("div", { class: "sc-me-ring" }, ring.node), meStatsRow, boardBox, cityBox);
+  // The ring sits in the top bar (main.js puts ringBox there).
+  const ringBox = el("div", { class: "sc-me-ring" }, ring.node);
+  const mine = el("section", { class: "sc-mine", "aria-label": "Your wonder and city" }, meStatsRow, boardBox, cityBox);
   const myPick = el("span", { class: "sc-pickmark mine", "aria-hidden": "true", hidden: true }, cardEl(null));
   boardBox.append(myPick);
   const mineShown = {};
@@ -1035,6 +1035,7 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
     myCity,
     shelf: shelf.node,
     ring,
+    ringBox,
     war: warView,
     nameBtn,
     bankBox,
@@ -1247,7 +1248,7 @@ export function handView({ onSelect = () => {} } = {}) {
       const id = idOf(slot);
       let b = cards.get(slot);
       if (!b) {
-        b = el("button", { class: "sc-hcard", type: "button", dataset: { slot, dig: String(dig), tip: "card", tipWhere: dig ? "dig" : "hand" } }, turnCardEl(id, age, { down: id < 0 }));
+        b = el("button", { class: "sc-hcard", type: "button", "aria-keyshortcuts": "i", dataset: { slot, dig: String(dig), tip: "card", tipWhere: dig ? "dig" : "hand", tipOn: "hold" } }, turnCardEl(id, age, { down: id < 0 }));
         b.firstChild.dataset.id = String(id);
         cards.set(slot, b);
       }

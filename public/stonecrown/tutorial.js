@@ -9,8 +9,8 @@ import { el } from "../engine/shell.js";
 import { RuleError } from "../engine/turn-match.js";
 import { cardTable } from "../engine/cards/table.js";
 import { CARDS, WONDERS, HAND, deckRanges } from "./cards.js";
-import { makeRules, deckOf, movers, canBuild, canStage, passDir, ROUNDS } from "./rules.js";
-import { PACE, ROMAN, moveFor, pickOptions, warWords, resultWords, viewOf, cityDialog, scoreDialog, explainer, seenAll, tableEl, scTable, scMotion, batches, buildPlan, stagePlan, costMatch, detailNodes, handView, handCaption, actButtons, picksList, scoreSheet } from "./art.js";
+import { makeRules, deckOf, movers, canBuild, canStage, ROUNDS } from "./rules.js";
+import { PACE, moveFor, pickOptions, warWords, resultWords, viewOf, cityDialog, scoreDialog, explainer, seenAll, tableEl, scTable, scMotion, batches, buildPlan, stagePlan, costMatch, detailNodes, handView, handCaption, actButtons, picksList, scoreSheet } from "./art.js";
 import { play as sound } from "./sounds.js";
 import { PLAYERS, WONDER_KEYS, cards } from "./lessons.js";
 
@@ -161,14 +161,10 @@ export function board() {
   const choosing = () => !moving && !!state && state.winner === -1 && movers(state).includes(0) && state.picks[0] === null;
   const idOf = (slot) => DECK[slot] ?? -1;
 
-  // ---------- the top bar ----------
-  const ageBadge = el("span", { class: "sc-age-badge" });
-  const ageLine = el("b", { class: "sc-age" });
-  const turnLine = el("small", { class: "sc-turn-line" });
-  const ageBox = el("div", { class: "sc-top-age", "aria-hidden": "true", dataset: { tip: "turn" } }, ageBadge, el("span", { class: "sc-top-words" }, ageLine, turnLine));
+  // ---------- the top bar: the seat ring, Explain mode's bar, the bank, the pile, "?" ----------
   const explainSlot = el("span", { class: "sc-explain-slot" });
   const askBtn = el("button", { class: "btn sc-ask", type: "button", id: "sc-ask", "aria-pressed": "false", "aria-label": "Explain mode: tap anything to hear what it means (?)", onclick: () => explain() }, "?");
-  const top = el("div", { class: "sc-top" }, ageBox, explainSlot, art.bankBox, art.pile, askBtn);
+  const top = el("div", { class: "sc-top" }, art.ringBox, el("div", { class: "sc-top-mid" }, explainSlot), el("div", { class: "sc-top-side" }, art.bankBox, art.pile, askBtn));
 
   // ---------- your hand, the buttons and the detail strip (art.js's, as in the game) ----------
   const hand = handView({ onSelect: (slot) => select(slot) });
@@ -177,10 +173,10 @@ export function board() {
   const picks = picksList();
   const handArea = el(
     "section",
-    { class: "sc-hand-area", "aria-label": "Your move" },
+    { class: "sc-hand-area", "aria-label": "Your move", dataset: { tipZone: "" } },
     el("div", { class: "sc-hand-head" }, el("div", { class: "sc-hand-words" }, el("h2", { class: "sc-title" }, hand.title), hand.next), picks.node),
     art.shelf,
-    el("div", { class: "sc-hand-wrap", dataset: { tip: "hand" } }, hand.node),
+    el("div", { class: "sc-hand-wrap", dataset: { tip: "hand", tipOn: "hold" } }, hand.node),
     buttons.node,
     el("div", { class: "sc-side" }, detail),
   );
@@ -257,11 +253,7 @@ export function board() {
 
   // ---------- drawing ----------
   function drawTop() {
-    const age = view.age;
-    ageBadge.textContent = ROMAN[age];
-    ageLine.textContent = `Age ${ROMAN[age]}`;
-    turnLine.textContent = `Turn ${Math.min(view.round, ROUNDS)} of ${ROUNDS} · ${passDir(age) > 0 ? "left" : "right"}`;
-    node.dataset.age = String(age);
+    node.dataset.age = String(view.age);
     art.drawPile(view);
   }
 
@@ -375,7 +367,7 @@ export function board() {
       if (c.startsWith("seat-")) return art.panels.get(n).node;
       if (c.startsWith("sells-")) return art.panels.get(n).border.node.querySelector(".sc-border-sells");
       if (c === "total") return sheet?.node.querySelector(`tfoot td:nth-child(${sheetColumn() + 2})`) ?? art.boardBox;
-      return { build: buttons.build, stage: buttons.stage, sell: buttons.sell, detail, board: art.boardBox, city: art.cityBox, coins: art.mine.querySelector(".sc-me-stats .coins"), shields: art.mine.querySelector(".sc-me-stats .shields"), tokens: art.mine.querySelector(".sc-me-stats .sc-tokens"), age: ageBox, pass: art.ring.node, pile: art.pile, picks, shelf: art.shelf, science: art.mine.querySelector(".sc-sci") }[c];
+      return { build: buttons.build, stage: buttons.stage, sell: buttons.sell, detail, board: art.boardBox, city: art.cityBox, coins: art.mine.querySelector(".sc-me-stats .coins"), shields: art.mine.querySelector(".sc-me-stats .shields"), tokens: art.mine.querySelector(".sc-me-stats .sc-tokens"), age: art.ring.node.querySelector(".sc-ring-mid"), pass: art.ring.node, pile: art.pile, picks, shelf: art.shelf, science: art.mine.querySelector(".sc-sci") }[c];
     },
     onMove: (fn) => (moveFn = fn),
     async render(st, played) {

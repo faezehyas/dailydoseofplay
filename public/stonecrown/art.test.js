@@ -245,8 +245,8 @@ test("every tip the views write has words, with the arguments tipWords reads", (
   }
   for (const kind of kinds) assert.ok(TIP_KINDS.includes(kind), `${kind} is a tip kind`);
   const READ = ["seat", "id", "where", "res", "stage", "age", "count", "side", "results", "kind", "source", "bank"];
-  // Written for the ring's own drawing, and read by no tip.
-  const CONTEXT = ["round", "dir"];
+  // Written for the ring's own drawing, or read by the tip layer itself (when and where a tip opens), not by tipWords.
+  const CONTEXT = ["round", "dir", "on", "zone"];
   for (const [arg, where] of args) assert.ok(READ.includes(arg) || CONTEXT.includes(arg), `data-tip-${arg} (${[...new Set(where)].join(", ")}) is an argument tipWords reads`);
   // Each kind, with the arguments the views give it, has words.
   const st = viewOf(table({ cities: [["stone-cut", "riverside-grove", "palisade", "herbalist"], ["ore-seam"], ["clay-bank"]] }));

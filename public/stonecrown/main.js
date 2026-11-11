@@ -142,16 +142,12 @@ function mountGame(session, root, shell) {
   const dialog = seatDialog.node;
   const scoreNow = scoreDialog({ me, nameOf });
 
-  // The top bar: the age and turn at a glance (the ring says them to screen
-  // readers), Explain mode's bar while it is on, the seats beyond your
-  // neighbours, the bank, the discard pile and "?" for Explain mode.
-  const ageBadge = el("span", { class: "sc-age-badge" });
-  const ageLine = el("b", { class: "sc-age" });
-  const turnLine = el("small", { class: "sc-turn-line" });
-  const ageBox = el("div", { class: "sc-top-age", "aria-hidden": "true", dataset: { tip: "turn" } }, ageBadge, el("span", { class: "sc-top-words" }, ageLine, turnLine));
+  // The top bar: the seat ring (every seat, the age, its turns and the way
+  // hands go), the status line and Explain mode's bar while it is on, the
+  // seats beyond your neighbours, the bank, the discard pile and "?".
   const explainSlot = el("span", { class: "sc-explain-slot" });
   const askBtn = el("button", { class: "btn sc-ask", type: "button", id: "sc-ask", "aria-pressed": "false", "aria-label": "Explain mode: tap anything to hear what it means (?)", onclick: () => explain() }, "?");
-  const top = el("div", { class: "sc-top", id: "sc-top" }, ageBox, explainSlot, art.pillBox, art.bankBox, art.pile, askBtn);
+  const top = el("div", { class: "sc-top", id: "sc-top" }, art.ringBox, el("div", { class: "sc-top-mid" }, status, explainSlot), el("div", { class: "sc-top-side" }, art.pillBox, art.bankBox, art.pile, askBtn));
 
   // Your hand with the shelf of what you make above it, the buttons for the card you pick, and what it would do.
   const hand = handView({ onSelect: (slot) => select(slot) });
@@ -164,10 +160,10 @@ function mountGame(session, root, shell) {
   const detail = el("div", { class: "sc-detail", id: "sc-detail", "aria-live": "polite" });
   const handArea = el(
     "section",
-    { class: "sc-hand-area", "aria-label": "Your move" },
+    { class: "sc-hand-area", "aria-label": "Your move", dataset: { tipZone: "" } },
     el("div", { class: "sc-hand-head" }, el("div", { class: "sc-hand-words" }, el("h2", { class: "sc-title" }, hand.title), hand.next), picks.node),
     art.shelf,
-    el("div", { class: "sc-hand-wrap", dataset: { tip: "hand" } }, hand.node, deck, table.busyChip),
+    el("div", { class: "sc-hand-wrap", dataset: { tip: "hand", tipOn: "hold" } }, hand.node, deck, table.busyChip),
     buttons.node,
     el("div", { class: "sc-side" }, timer, detail),
   );
@@ -190,7 +186,6 @@ function mountGame(session, root, shell) {
     tableEl(),
     bar.node,
     top,
-    status,
     el("div", { class: "sc-main" }, art.panels.get(around.left)?.node, art.mine, art.panels.get(around.right)?.node, handArea),
     logBox,
     configLine,
@@ -637,9 +632,6 @@ function mountGame(session, root, shell) {
     const key = `${age}:${view?.round}`;
     if (key !== topKey) {
       topKey = key;
-      ageBadge.textContent = age ? ROMAN[age] : "·";
-      ageLine.textContent = age ? `Age ${ROMAN[age]}` : "Stonecrown";
-      turnLine.textContent = age ? `Turn ${Math.min(view.round, ROUNDS)} of ${ROUNDS} · ${passDir(age) > 0 ? "left" : "right"}` : "Dealing soon";
       rootBox.dataset.age = String(age);
     }
     if (view) art.drawPile(view);
