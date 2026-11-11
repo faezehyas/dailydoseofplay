@@ -1351,7 +1351,8 @@ export function actButtons({ onAct = () => {} } = {}) {
   const all = { build: make("build", "primary"), free: make("free", "primary free"), stage: make("stage", ""), sell: make("sell", "", coinEl(3)), dig: make("dig", "primary"), nothing: make("nothing", "") };
   const node = el("div", { class: "sc-buttons", id: "sc-buttons", role: "group", "aria-label": "What to do with the card", hidden: true }, Object.values(all).map((x) => x.b));
   function show(kinds) {
-    for (const [kind, x] of Object.entries(all)) x.b.hidden = !kinds.includes(kind);
+    // A hidden button keeps no words: they could name a card since passed on.
+    for (const [kind, x] of Object.entries(all)) if ((x.b.hidden = !kinds.includes(kind))) x.set(x.b.querySelector(".lbl").textContent);
     node.dataset.n = String(kinds.length);
     node.hidden = !kinds.length;
     // Focus on a button that has just gone goes to the first one left.
@@ -1451,6 +1452,7 @@ export function scMotion(table, art, ctx) {
   const sideOf = (p) => (p === art.around.left ? "left" : p === art.around.right ? "right" : null);
   // Borders move only where someone can see them.
   const border = (side) => (document.hidden ? null : art.borders.get(side));
+  const layKind = (trade) => (trade.kinds.includes(RAW[0]) ? "bridge" : "stall");
 
   // The builds turn face up together, a neighbour's staying a beat with what
   // it means for you; then each card flies to its place (a city, the shelf,
@@ -1504,6 +1506,7 @@ export function scMotion(table, art, ctx) {
         const card = CARDS[x.id];
         sound("build", { color: card.color, how: x.how }, at(delay));
         if (p === me && card.trade) laid.push(card.trade);
+        if (p === me && card.trade) for (const s of card.trade.sides) border(s)?.expect(layKind(card.trade));
         flights.push(art.flyCard(x.id, v.age, start, to, { ...opts, ms: PACE.fly * k, width: p === me ? null : (start?.w ?? 40) }).then(() => {
           v.city[p].push({ slot: x.slot, id: x.id });
           if (x.how === "dig") v.discard = v.discard.filter((s) => s !== x.slot);
@@ -1514,6 +1517,7 @@ export function scMotion(table, art, ctx) {
         onTuck(x.slot, v.age);
         const stage = stagesOf(v, p)[x.n];
         if (p === me && stage?.trade) laid.push(stage.trade);
+        if (p === me && stage?.trade) for (const s of stage.trade.sides) border(s)?.expect(layKind(stage.trade));
         flights.push(art.flyCard(mine, v.age, start, to, { ...opts, ms: PACE.stage * k, turn: mine >= 0 ? "down" : null, width: p === me ? null : 36 }).then(() => {
           v.stages[p].push(x.slot);
           draw();
@@ -1534,7 +1538,7 @@ export function scMotion(table, art, ctx) {
     if (!live(g)) return;
     leaving.clear();
     // A road lays a bridge on its side; a market puts up a stall.
-    for (const trade of laid) for (const s of trade.sides) border(s)?.lay(trade.kinds.includes(RAW[0]) ? "bridge" : "stall");
+    for (const trade of laid) for (const s of trade.sides) border(s)?.lay(layKind(trade));
     await gains(ev.gains, list, g, k);
   }
 

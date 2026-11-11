@@ -369,7 +369,7 @@ const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(pre
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const finished = (anims) => Promise.all(anims.map((a) => a.finished.catch(() => {})));
 
-// borderView({ side, kit, sound }) → { node, update(facts), cart({ resources, coins }), lay(kind) }.
+// borderView({ side, kit, sound }) → { node, sells, update(facts), cart({ resources, coins }), lay(kind), expect(kind) }.
 // update takes borderFacts' fields plus name (the neighbour's) and sells: a
 // node (the compact sale shelf) or, failing that, the sale units.
 export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
@@ -389,12 +389,17 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
   let drawn = "";
   let queue = Promise.resolve();
   let pending = null;
+  // A bridge or stall about to be laid (expect()): the strip shows the old
+  // crossing and prices until lay() builds it.
+  const expecting = new Set();
+  const rawOf = () => (expecting.has("bridge") ? Math.max(2, facts.raw) : facts.raw);
+  const goodsOf = () => (expecting.has("stall") ? Math.max(2, facts.goods) : facts.goods);
 
   const draw = () => {
-    const key = [facts.raw, facts.goods, wallLevel(facts.shields.theirs), wallLevel(facts.shields.mine), facts.seat, facts.me].join();
+    const key = [rawOf(), goodsOf(), wallLevel(facts.shields.theirs), wallLevel(facts.shields.mine), facts.seat, facts.me].join();
     if (key === drawn) return;
     drawn = key;
-    art.innerHTML = borderSvg({ side, raw: facts.raw, goods: facts.goods, walls: [facts.shields.theirs, facts.shields.mine], seats: [facts.seat, facts.me] });
+    art.innerHTML = borderSvg({ side, raw: rawOf(), goods: goodsOf(), walls: [facts.shields.theirs, facts.shields.mine], seats: [facts.seat, facts.me] });
   };
   const coinOf = () => (kit.coinEl ? kit.coinEl() : el("span", { class: "sc-border-coin" }));
   const priceRow = (label, v) => el("span", { class: "sc-border-price" }, label ? el("small", {}, label) : null, el("b", {}, String(v)), coinOf());
@@ -404,7 +409,8 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
     const who = facts.name || "your neighbour";
     node.setAttribute("aria-label", `Your ${side} border, with ${who}`);
     draw();
-    const { raw, goods } = facts;
+    const raw = rawOf();
+    const goods = goodsOf();
     sign.classList.toggle("split", raw !== goods);
     sign.replaceChildren(...(raw === goods ? [priceRow("", raw), el("span", { class: "sc-border-each" }, "each")] : [priceRow("raw", raw), priceRow("goods", goods)]));
     sign.setAttribute("aria-label", raw === goods ? `${raw} coin${raw === 1 ? "" : "s"} a resource from ${who}` : `From ${who}: raw materials ${raw} coin${raw === 1 ? "" : "s"} each, goods ${goods} coin${goods === 1 ? "" : "s"} each`);
@@ -515,9 +521,9 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
     sound("cart", { n: resources.length, coins: paid });
     if (reducedMotion()) return;
     const svg = ensureFx();
-    const bridgeUp = facts.raw === 1;
+    const bridgeUp = rawOf() === 1;
     const dur = bridgeUp ? 1700 : 2500;
-    const cart = g(cartMarkup(resources, out), "sc-b-cart");
+    const cart = g(`<g transform="scale(1.3)">${cartMarkup(resources, out)}</g>`, "sc-b-cart");
     svg.append(cart);
     const path = bridgeUp
       ? [[80, 47, 0], [93, 41.6, 0.16], [147, 41.6, 0.82], [160, 47, 1]]
@@ -565,8 +571,10 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
   // Builds the bridge or the stall in: stones drop into the arches and the lanterns light, or the stall goes up and its awning unrolls.
   function lay(kind) {
     return (queue = queue.then(async () => {
+      expecting.delete(kind);
       if (kind === "bridge" && facts.raw !== 1) update({ raw: 1 });
-      if (kind === "stall" && facts.goods !== 1) update({ goods: 1 });
+      else if (kind === "stall" && facts.goods !== 1) update({ goods: 1 });
+      else update({});
       const root = art.querySelector(kind === "bridge" ? ".sc-b-bridge" : ".sc-b-stall");
       if (!root) return;
       sound("lay", { kind });
@@ -592,5 +600,10 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
   }
 
   update({});
-  return { node, sells, update, cart, lay };
+  // A lay that never comes (the table moved on) lets the strip catch up anyway.
+  function expect(kind) {
+    expecting.add(kind);
+    setTimeout(() => expecting.delete(kind) && update({}), 8000);
+  }
+  return { node, sells, update, cart, lay, expect };
 }
