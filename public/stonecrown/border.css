@@ -296,7 +296,7 @@
   grid-template-areas:
     ". sign flags"
     "tally tally tally"
-    "sells . warn";
+    "foot foot foot";
   gap: 2px;
   padding: 3px 4px 4px;
   font-size: clamp(9.5px, 4.8cqw, 12px);
@@ -308,8 +308,22 @@
   grid-template-areas:
     "flags sign ."
     "tally tally tally"
-    "warn . sells";
+    "foot foot foot";
 }
+
+/* The foot of the strip: what they sell low on their bank, the warning on
+   yours; the sale gives way (its "+n" grows) when the warning comes. */
+.sc-border-foot {
+  grid-area: foot;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.sc-border-right .sc-border-foot { flex-direction: row-reverse; }
+.sc-border-foot > * { pointer-events: auto; }
 
 .sc-border-ui > * {
   pointer-events: auto;
@@ -474,12 +488,10 @@
   box-shadow: 0 0 0 1.5px var(--sc-b-flag-won), 0 2px 3px rgb(60 30 30 / 12%);
 }
 
-/* The warning, from turn 5: on your bank, free to reach over the water's foot. */
+/* The warning, from turn 5: on your bank. */
 .sc-border-warn {
-  grid-area: warn;
-  grid-column: 2 / 4;
-  justify-self: end;
-  align-self: end;
+  flex: none;
+  margin-left: auto;
   padding: 0.25em 0.55em;
   font-weight: 600;
   white-space: nowrap;
@@ -487,16 +499,16 @@
 }
 
 .sc-border-warn[hidden] { display: none; }
-.sc-border-right .sc-border-warn { grid-column: 1 / 3; justify-self: start; }
+.sc-border-right .sc-border-warn { margin-left: 0; margin-right: auto; }
 .sc-border-warn.trail { color: var(--sc-b-trail); }
 .sc-border-warn.lead { color: var(--sc-b-lead); }
 .sc-border-warn.level { color: var(--sc-b-muted); }
 
 /* What they sell: one slim line low on their bank, the rest counted on "+n". */
 .sc-border-sells {
-  grid-area: sells;
-  justify-self: start;
-  align-self: end;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 64%;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
@@ -509,7 +521,6 @@
   cursor: help;
 }
 
-.sc-border-right .sc-border-sells { justify-self: end; }
 .sc-border-sells:empty { display: none; }
 
 .sc-border-unit {

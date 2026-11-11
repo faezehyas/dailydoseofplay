@@ -383,7 +383,7 @@ export function borderView({ side = "left", kit = {}, sound = () => {} } = {}) {
   const tally = el("div", { class: "sc-border-tally" }, theirsB, mineB);
   const warn = el("div", { class: "sc-border-warn", "data-tip": "warn", "data-tip-side": side, tabindex: "0", hidden: true });
   const sells = el("div", { class: "sc-border-sells", "data-tip": "sells", "data-tip-side": side, tabindex: "0" });
-  const ui = el("div", { class: "sc-border-ui" }, sign, flags, tally, sells, warn);
+  const ui = el("div", { class: "sc-border-ui" }, sign, flags, tally, el("div", { class: "sc-border-foot" }, sells, warn));
   const node = el("div", { class: `sc-border sc-border-${right ? "right" : "left"}`, "data-side": side, role: "group" }, art, ui, fx);
   let facts = { name: "", raw: 2, goods: 2, shields: { mine: 0, theirs: 0 }, flags: [null, null, null], warn: null, seat: right ? 2 : 1, me: 0 };
   let drawn = "";
