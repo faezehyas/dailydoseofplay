@@ -18,10 +18,12 @@
 // Cells: your hand's cards ("card-<slot>", hand(name)), the buttons
 // ("build", "stage", "sell"), the card's detail ("detail"), your wonder
 // ("board"), city ("city"), coins, shields and war tokens ("coins",
-// "shields", "tokens"), a built card in your city ("chip-<id>", chip(name)),
-// a neighbour's panel and what it sells ("seat-1", "sells-1"), the top bar's
-// "age" and "pass", the discard "pile", "picks" (who has picked) and your
-// score sheet "total".
+// "shields", "tokens"), a built card in your city, or on your shelf for a
+// brown or grey one ("chip-<id>", chip(name)),
+// a neighbour's panel and what it sells on its bank of your border ("seat-1",
+// "sells-1"), the top bar's "age", the seat ring with the way hands go
+// ("pass"), your "shelf" of what you make, your "science" tracker, the
+// discard "pile", "picks" (who has picked) and your score sheet "total".
 import { CARDS } from "./cards.js";
 import { deckOf } from "./rules.js";
 
@@ -49,13 +51,13 @@ export const lessons = [
     title: "Picking and building",
     steps: [
       {
-        text: "Everyone picks a card at the same time: Teal and Violet have chosen theirs. Your wonder makes a stone every turn, and Hot Springs costs one stone. Tap it, then Build.",
+        text: "Everyone picks a card at the same time: Teal and Violet have chosen theirs. Your wonder makes a stone every turn and Hot Springs costs one, so its badge says You make it. Tap it, then Build.",
         position: {
           age: 1,
           round: 1,
           hands: ["hot-springs shrine amphitheatre east-road glass-kiln herbalist copy-house", "palisade ore-seam stone-cut red-hollow weavers-hall artisans-row guard-post", "hillside-clearing woodcutters-camp clay-bank west-road reed-press tinkers-shed watchtower"],
         },
-        highlight: [hand("hot-springs"), "board"],
+        highlight: [hand("hot-springs"), "shelf"],
         expect: build("hot-springs"),
         others: [build("ore-seam"), build("woodcutters-camp")],
       },
@@ -66,7 +68,7 @@ export const lessons = [
         others: [build("shrine"), build("stone-cut")],
       },
       {
-        text: "Resources aren't used up: they make the same again every turn. Palisade costs a wood, and your clearing makes one. Build it for a shield.",
+        text: "Resources aren't used up: your shelf makes the same again every turn. Palisade costs a wood, and your clearing makes one, there on your shelf. Build Palisade for a shield.",
         highlight: [hand("palisade"), chip("hillside-clearing")],
         expect: build("palisade"),
         others: [build("clay-bank"), build("east-road")],
@@ -77,7 +79,7 @@ export const lessons = [
     title: "Buying and chains",
     steps: [
       {
-        text: "Watchtower needs clay, which you don't make. Buy it from a neighbour for 2 coins, or 1 from Teal with your West Road. Build picks the cheapest way: build Watchtower.",
+        text: "Watchtower needs clay, which you don't make. Teal sells it across your left river, where your West Road built a bridge: 1 coin, not 2. Build picks the cheapest way: build Watchtower.",
         position: {
           age: 1,
           round: 2,
@@ -144,7 +146,7 @@ export const lessons = [
     title: "Passing hands and war",
     steps: [
       {
-        text: "Hands go left to Teal in ages I and III, and right to Violet in age II, so think about what you pass on. Build Guard Post for a shield, then watch the hands move.",
+        text: "Hands go left to Teal in ages I and III, and right to Violet in age II: the ring shows the way. Build Guard Post for a shield, then watch your leftover cards slide to Teal.",
         position: {
           age: 1,
           round: 5,
@@ -156,7 +158,7 @@ export const lessons = [
         others: [build("east-road"), build("weavers-hall")],
       },
       {
-        text: "The last turn of the age: you keep one of your two cards, and the other is discarded. Then each neighbour's shields are compared with yours, and more wins. Build Palisade to beat both!",
+        text: "The last turn of the age: you keep one of your two cards, and the other is discarded. Then each neighbour's shields are compared with yours, and more wins. Build Palisade to beat both, then Continue!",
         highlight: [hand("palisade"), "shields"],
         expect: build("palisade"),
         others: [build("artisans-row"), build("red-hollow")],
@@ -182,7 +184,7 @@ export const lessons = [
           tokens: [[1, 1, 3, 3], [-1, 1, -1, -1], [-1, -1, 3, -1]],
           discard: "artisans-row caravan-yard tutors-court horse-paddock",
         },
-        highlight: [hand("thinkers-nook"), chip("herbalist"), chip("copy-house"), chip("scroll-hall")],
+        highlight: [hand("thinkers-nook"), "science", chip("herbalist"), chip("copy-house"), chip("scroll-hall")],
         expect: build("thinkers-nook"),
         others: [sell("judges-guild"), sell("masons-guild")],
       },

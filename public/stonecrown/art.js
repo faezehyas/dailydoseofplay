@@ -565,7 +565,7 @@ export function recapWords(view, me, x) {
 
 // ---------- tips ----------
 // The legend's border pieces, cut from the real border art.
-const CROPS = { ferry: "86 28 68 34", bridge: "86 28 68 34", stall: "40 18 64 34", walls: "0 12 76 40" };
+const CROPS = { ferry: "86 28 68 34", bridge: "86 28 68 34", stall: "44 30 56 28", walls: "0 14 72 36" };
 function borderCrop(name) {
   if (name === "flags") return el("span", { class: "sc-border-flags sc-legend-flags", "aria-hidden": "true" }, el("i", { class: "won" }), el("i", { class: "lost" }), el("i", { class: "open" }));
   if (!CROPS[name]) return null;
@@ -578,6 +578,12 @@ function borderCrop(name) {
   return node;
 }
 const BADGE_LABELS = { make: "You make it", free: "Free", chain: "Chain · free", wonder: "Wonder · free", pay: "3 coins", no: "Can't build" };
+// A badge as in your hand, but one the legend shows rather than explains.
+function legendBadge(kind) {
+  const node = badgeEl({ kind, coins: 3, label: BADGE_LABELS[kind] ?? "" }, kit);
+  for (const k of Object.keys(node.dataset)) delete node.dataset[k];
+  return node;
+}
 
 // One tip layer over a table: every data-tip under root explains itself from
 // the table as drawn (view()); bar: where Explain mode's bar sits; memory:
@@ -589,7 +595,7 @@ export function explainer(root, { view, me, nameOf, bar = true, memory = hints()
     bar,
     hints: memory,
     onExplain,
-    legendIcons: { badge: (kind) => badgeEl({ kind, coins: 3, label: BADGE_LABELS[kind] ?? "" }, kit), art: borderCrop },
+    legendIcons: { badge: legendBadge, art: borderCrop },
   });
 }
 export const seenAll = { seen: () => true, mark() {} };
@@ -639,7 +645,7 @@ export function scTable(table, { me, players, nameOf, onSeat = () => {}, onScore
       "section",
       { class: `sc-seat p-${p} ${side}`, dataset: { seat: p } },
       el("header", { class: "sc-seat-head" }, open),
-      el("div", { class: "sc-seat-stats" }, stats.coins, stats.shields, stats.tokens, dots, hand),
+      el("div", { class: "sc-seat-stats" }, el("span", { class: "sc-seat-nums" }, stats.coins, stats.shields, stats.tokens, dots), hand),
       counts,
       wonder,
       el("div", { class: "sc-seat-city-box" }, el("span", { class: "sc-label" }, `${nameOf(p)}'s city`), cityBox),

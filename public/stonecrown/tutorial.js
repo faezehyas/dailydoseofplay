@@ -375,7 +375,7 @@ export function board() {
       if (c.startsWith("seat-")) return art.panels.get(n).node;
       if (c.startsWith("sells-")) return art.panels.get(n).border.node.querySelector(".sc-border-sells");
       if (c === "total") return sheet?.node.querySelector(`tfoot td:nth-child(${sheetColumn() + 2})`) ?? art.boardBox;
-      return { build: buttons.build, stage: buttons.stage, sell: buttons.sell, detail, board: art.boardBox, city: art.cityBox, coins: art.mine.querySelector(".sc-me-stats .coins"), shields: art.mine.querySelector(".sc-me-stats .shields"), tokens: art.mine.querySelector(".sc-me-stats .sc-tokens"), age: ageBox, pass: art.ring.node, pile: art.pile, picks, shelf: art.shelf }[c];
+      return { build: buttons.build, stage: buttons.stage, sell: buttons.sell, detail, board: art.boardBox, city: art.cityBox, coins: art.mine.querySelector(".sc-me-stats .coins"), shields: art.mine.querySelector(".sc-me-stats .shields"), tokens: art.mine.querySelector(".sc-me-stats .sc-tokens"), age: ageBox, pass: art.ring.node, pile: art.pile, picks, shelf: art.shelf, science: art.mine.querySelector(".sc-sci") }[c];
     },
     onMove: (fn) => (moveFn = fn),
     async render(st, played) {

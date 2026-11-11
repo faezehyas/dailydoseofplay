@@ -1830,6 +1830,15 @@
   min-height: 46px;
 }
 
+.sc-seat-nums {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+}
+
 .sc-seat-hand {
   position: relative;
   flex: none;

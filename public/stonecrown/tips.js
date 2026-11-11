@@ -678,7 +678,8 @@ const GLYPHS = {
 const BADGES = { make: ["ok", "Free"], free: ["ok", "Free"], chain: ["gold", "Chain · free"], wonder: ["gold", "Wonder · free"], pay: ["gold", "3"], no: ["bad", "Can't"] };
 
 function legendIcon([kind, v], kit, extra) {
-  if (extra[kind]) return extra[kind](v);
+  const own = extra[kind]?.(v);
+  if (own) return own;
   const art = (markup, cls = "") => {
     const node = el("span", { class: `sc-glyph ${cls}`, "aria-hidden": "true" });
     node.innerHTML = markup;

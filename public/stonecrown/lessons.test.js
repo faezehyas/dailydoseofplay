@@ -9,7 +9,7 @@ import { card, PLAYERS } from "./lessons.js";
 import { CARDS } from "./cards.js";
 import { deckOf, movers, canBuild, canStage, score, shields, purchases } from "./rules.js";
 
-const NAMED = new Set(["build", "stage", "sell", "detail", "board", "city", "coins", "shields", "tokens", "age", "pass", "pile", "picks", "total"]);
+const NAMED = new Set(["build", "stage", "sell", "detail", "board", "city", "coins", "shields", "tokens", "age", "pass", "shelf", "science", "pile", "picks", "total"]);
 // A cell the board has in this state: a card in your hand, a card in your city, a neighbour, or one of the named parts.
 function isCell(state, c) {
   const m = /^(card|chip|seat|sells)-(\d+)$/.exec(c);
