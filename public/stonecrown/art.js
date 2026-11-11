@@ -1274,7 +1274,7 @@ export function handView({ onSelect = () => {} } = {}) {
       const o = !dig && id >= 0 ? options(slot) : null;
       const can = dig ? !!legal?.has(slot) : !!o && (o.build.ok || o.free);
       // Its badge: kept while the table moves (no options then), gone with its face.
-      const badge = id < 0 ? null : dig ? (legal ? (can ? { id, kind: "free", coins: 0, label: "Free" } : { id, kind: "no", coins: 0, label: "Already built" }) : undefined) : o ? badgeOf({ ...o, id }) : undefined;
+      const badge = id < 0 ? null : dig ? (legal ? (can ? { id, kind: "free", coins: 0, label: "Free", where: "dig" } : { id, kind: "no", coins: 0, label: "Already built", where: "dig" }) : undefined) : o ? badgeOf({ ...o, id }) : undefined;
       const bkey = badge ? `${badge.kind}:${badge.coins}:${badge.label}` : badge === null ? "" : b.dataset.badge ?? "";
       if (b.dataset.badge !== bkey) {
         b.dataset.badge = bkey;
@@ -1327,7 +1327,8 @@ export function handCaption(view, me, nameIn) {
   const from = (me - dir + n) % n;
   const arrow = dir > 0 ? "◂" : "▸";
   const whose = view.round <= 1 ? `the ${plural(count, "card")} dealt to you` : `the ${plural(count, "card")} ${nameIn(from)} did not pick`;
-  const then = count > 1 && view.round < ROUNDS ? ` · then to ${nameIn(to)} ${arrow}` : count > 1 ? " · the last is discarded" : "";
+  const playsLast = stagesOf(view, me).slice(0, view.stages[me].length).some((x) => x.playLast);
+  const then = count > 1 && view.round < ROUNDS ? ` · then to ${nameIn(to)} ${arrow}` : count > 1 ? (playsLast ? " · your wonder plays the last" : " · the last is discarded") : "";
   return `${whose}${then}`;
 }
 

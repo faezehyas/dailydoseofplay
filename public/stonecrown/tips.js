@@ -102,19 +102,21 @@ const beatWords = (r, who, age) => (r > 0 ? `beat ${who} (+${VICTORY[age - 1]})`
 // Who sells you what, and the card or stage of yours that makes it cheaper.
 const discountOf = (c, r, side) => [...cardsOf(c.state, c.me), ...builtStages(c.state, c.me)].find((x) => x.trade && x.trade.kinds.includes(r) && x.trade.sides.includes(side));
 const sourceName = (x) => (x?.name ? `your ${x.name}` : "your wonder");
+// Each discount is credited to the card or stage that gives it.
 function priceWords(c, rs, side) {
-  const byPrice = new Map();
+  const dear = [];
+  const cheap = new Map();
   for (const r of rs) {
-    const p = unitPrice(c.state, c.me, r, side);
-    if (!byPrice.has(p)) byPrice.set(p, []);
-    byPrice.get(p).push(r);
+    if (unitPrice(c.state, c.me, r, side) >= TRADE_COST) {
+      dear.push(r);
+      continue;
+    }
+    const src = sourceName(discountOf(c, r, side));
+    cheap.set(src, [...(cheap.get(src) ?? []), r]);
   }
-  if (byPrice.size === 1) {
-    const [[p, list]] = byPrice;
-    return p < TRADE_COST ? `${coins(p)} a unit, thanks to ${sourceName(discountOf(c, list[0], side))}` : `${coins(p)} a unit`;
-  }
-  const cheap = byPrice.get(1);
-  return `${coins(1)} for ${kindWords(cheap)} (${sourceName(discountOf(c, cheap[0], side))}) and ${TRADE_COST} for ${kindWords(byPrice.get(TRADE_COST))}`;
+  if (!cheap.size) return `${coins(TRADE_COST)} a unit`;
+  if (!dear.length) return `${coins(1)} a unit, thanks to ${listOf([...cheap.keys()])}`;
+  return `${coins(1)} for ${listOf([...cheap].map(([src, list]) => `${kindWords(list)} (${src})`))} and ${TRADE_COST} for ${kindWords(dear)}`;
 }
 // What a seat sells, alike units counted, in the order they come: "2 papyrus, wood or clay and ore".
 function saleWords(units) {
@@ -131,6 +133,8 @@ function saleWords(units) {
 }
 // The resources in units, each once, in the order they come.
 const resOf = (units) => [...new Set(units.flat())];
+// A seat whose wonder plays the seventh card of each age instead of discarding it.
+const playsLast = (c, p) => builtStages(c.state, p).some((x) => x.playLast);
 
 // ---------- a card, for whoever holds it ----------
 const thingWords = (per, n) => (per === "stage" ? plural(n, "wonder stage") : per === "defeat" ? plural(n, "defeat token") : `${n} ${listOf([per].flat(), "or")} card${n === 1 ? "" : "s"}`);
@@ -173,7 +177,7 @@ function meaning(card, q, hypo, c) {
   if (card.shields) {
     const k = card.shields;
     const m = shields(st, me);
-    if (hypo) return `+${k}: you'd have ${m + k} shields to ${c.nameOf(c.L)}'s ${shields(st, c.L)} and ${c.nameOf(c.R)}'s ${shields(st, c.R)}.`;
+    if (hypo) return `+${k}: you'd have ${plural(m + k, "shield")} to ${c.nameOf(c.L)}'s ${shields(st, c.L)} and ${c.nameOf(c.R)}'s ${shields(st, c.R)}.`;
     if (mine) return `Gives you ${plural(k, "shield")}; you have ${m} in all.`;
     const t = shields(st, q);
     if (c.side(q)) return `${cap(plural(k, "shield"))} for ${N}: they have ${t} to your ${m}.`;
@@ -258,7 +262,7 @@ const WORDS = {
     const q = seatOf(a, c);
     const t = c.state.tokens[q];
     const who = c.Name(q);
-    if (!t.length) return { title: "War tokens", body: `${q === c.me ? "You have" : `${who} has`} no war tokens yet. At the end of each age, more shields than a neighbour wins ${VICTORY[c.age - 1]} points and fewer loses 1.` };
+    if (!t.length) return { title: "War tokens", body: `${q === c.me ? "You have" : `${who} has`} no war tokens yet. At the end of each age, more shields than a neighbour wins ${plural(VICTORY[c.age - 1], "point")} and fewer loses 1.` };
     const won = VICTORY.flatMap((v, i) => {
       const k = t.filter((x) => x === v).length;
       return k ? [`${plural(v, "point")} ${k > 1 ? "from each border " : ""}in age ${ROMAN[i + 1]}`] : [];
@@ -308,7 +312,8 @@ const WORDS = {
     if (!card) return { title: "A card", body: "A card you haven't seen." };
     const hypo = a.where === "hand" || a.where === "dig" || a.seat === undefined || a.seat === "";
     const q = hypo ? c.me : seatOf(a, c);
-    const more = [cardText(card.id), hypo ? chainWords(card, c) : ""].filter(Boolean);
+    // While digging the card is free anyway, chain or not.
+    const more = [cardText(card.id), hypo && a.where !== "dig" ? chainWords(card, c) : ""].filter(Boolean);
     return { title: card.name, body: meaning(card, q, hypo, c), card: card.id, more };
   },
 
@@ -320,8 +325,8 @@ const WORDS = {
     if (a.where === "stack") {
       const n = intOf(a.count, c.state.hands[q]?.length ?? 0);
       const to = (q + passDir(c.age) + c.n) % c.n;
-      const last = c.state.round >= ROUNDS;
-      return { title: `${c.Whose(q)} hand`, body: `${plural(n, "card")}, face down. ${last ? "After this turn the last card is discarded." : `After this turn ${q === c.me ? "it goes" : "they go"} to ${c.name(to)}.`}` };
+      const then = c.state.round < ROUNDS ? `After this turn ${q === c.me ? "it goes" : "they go"} to ${c.name(to)}.` : playsLast(c, q) ? `${q === c.me ? "Your" : "Their"} wonder plays the last card instead of discarding it.` : "After this turn the last card is discarded.";
+      return { title: `${c.Whose(q)} hand`, body: `${plural(n, "card")}, face down. ${then}` };
     }
     return { title: `An age ${ROMAN[age]} card`, body: "Face down. You see a card's face only when it's in your hand or built." };
   },
@@ -400,7 +405,7 @@ const WORDS = {
     const q = a.seat !== undefined ? seatOf(a, c) : a.side === "right" ? c.R : c.L;
     const { m, t } = fight(c, q);
     const win = VICTORY[c.age - 1];
-    const head = `${c.Name(q)} has ${t} shields and you have ${m}.`;
+    const head = `${c.Name(q)} has ${plural(t, "shield")} and you have ${m}.`;
     if (m > t) return { title: `You lead by ${m - t}`, body: `${head} If the age ended now you'd win +${win} at this border.` };
     if (m === t) return { title: "Level", body: `${head} One more shield would win you +${win} at this border; as it is, nobody takes a token.` };
     const need = t - m + 1;
@@ -431,7 +436,8 @@ const WORDS = {
     if (c.over) return { title: "The end", body: "The game is over: every card is played and the score sheet is in." };
     if (!st.age) return { title: "Dealing", body: "Each age deals seven cards to every seat." };
     const r = Math.min(st.round, ROUNDS);
-    const body = r < ROUNDS ? `${plural(ROUNDS - r, "more turn")} after this one, then war with your neighbours and ${st.age < 3 ? `age ${ROMAN[st.age + 1]}` : "the final count"}.` : "The last turn of the age: your seventh card is discarded, then war with your neighbours.";
+    const seventh = playsLast(c, c.me) ? "your wonder lets you play your seventh card too" : "your seventh card is discarded";
+    const body = r < ROUNDS ? `${plural(ROUNDS - r, "more turn")} after this one, then war with your neighbours and ${st.age < 3 ? `age ${ROMAN[st.age + 1]}` : "the final count"}.` : `The last turn of the age: ${seventh}, then war with your neighbours.`;
     return { title: `Age ${ROMAN[st.age]} · turn ${r} of ${ROUNDS}`, body };
   },
 
@@ -453,6 +459,7 @@ const WORDS = {
     const b = canBuild(st, c.me, card.id);
     const cost = card.cost;
     if (b.why === "duplicate") return { title: "Can't build", body: `You already built ${card.name}, and a city holds only one of each.` };
+    if (a.where === "dig") return { title: "Free from the discards", body: `Your wonder lets you build one card from the discard pile without paying anything, ${card.name} included.` };
     if (b.chain) {
       const src = card.from.filter((k) => st.city[c.me].some((x) => CARDS[x.id].key === k)).map((k) => NAMES[k]);
       return { title: "Chain · free", body: `Your ${listOf(src)} chains to it, so you build it without paying anything.` };
@@ -534,8 +541,9 @@ const WORDS = {
       return { title: name, body: `${head} ${buy}` };
     }
     const s = c.side(q);
-    const sold = production(c.state, q).sale.some((u) => u.includes(r));
-    const tail = s && sold ? ` You can buy one a turn for ${coins(unitPrice(c.state, c.me, r, s))}.` : "";
+    const forSale = s ? production(c.state, q).sale.filter((u) => u.includes(r)).length : 0;
+    const each = forSale ? coins(unitPrice(c.state, c.me, r, s)) : "";
+    const tail = forSale > 1 ? ` You can buy up to ${forSale} a turn for ${each} each.` : forSale ? ` You can buy one a turn for ${each}.` : "";
     return { title: name, body: single ? `${c.Name(q)} makes ${single} a turn: ${listOf(sources)}.${orToo}${tail}` : `${c.Name(q)} doesn't make ${RES[r]}.${orToo}${tail}` };
   },
 
@@ -545,7 +553,9 @@ const WORDS = {
     const from = (c.me - dir + c.n) % c.n;
     const to = (c.me + dir + c.n) % c.n;
     if (!c.state.age || c.state.round <= 1) return { title: "Your hand", body: `${cap(plural(n, "card"))}, dealt to you for age ${ROMAN[c.age]}. Pick one; the rest go to ${c.nameOf(to)} after this turn.` };
-    return { title: "Your hand", body: `${cap(plural(n, "card"))}: ${c.nameOf(from)}'s leftovers. Pick one; the rest go to ${c.nameOf(to)}${c.state.round >= ROUNDS ? ", except the last, which is discarded" : ""}.` };
+    if (c.state.phase === "last" && c.state.lastSeat === c.me) return { title: "Your seventh card", body: "Your wonder lets you play it instead of discarding it: build it, raise a stage with it or sell it." };
+    const then = c.state.round < ROUNDS ? `the rest go to ${c.nameOf(to)}` : playsLast(c, c.me) ? "your wonder lets you play the other one too" : "the other is discarded";
+    return { title: "Your hand", body: `${cap(plural(n, "card"))}: ${c.nameOf(from)}'s leftovers. Pick one; ${then}.` };
   },
 };
 

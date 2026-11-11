@@ -384,5 +384,5 @@ export function costMatchEl(units, names, kit, { bank = 0 } = {}) {
 // A hand card's badge: "You make it", "Free", "Chain · free", a coin price, "Wonder · free" or "Can't build".
 export function badgeEl(badge, kit) {
   const body = badge.kind === "pay" ? [kit.coinEl(), el("span", { "aria-hidden": "true" }, String(badge.coins)), el("span", { class: "sr-only" }, badge.label)] : [badge.label];
-  return el("span", { class: `sc-tag ${badge.kind}`, dataset: tip("badge", { kind: badge.kind, ...(badge.id >= 0 ? { id: badge.id } : {}) }) }, ...body);
+  return el("span", { class: `sc-tag ${badge.kind}`, dataset: tip("badge", { kind: badge.kind, ...(badge.id >= 0 ? { id: badge.id } : {}), ...(badge.where ? { where: badge.where } : {}) }) }, ...body);
 }

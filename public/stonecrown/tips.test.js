@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { KnownDeck, settleAll } from "../../test/fixtures/known-deck.js";
 import { rngFromSeed } from "../engine/rng.js";
 import { CARDS, WONDERS } from "./cards.js";
-import { makeRules, deckOf, legalMoves, movers, canBuild, sideCoins, sciencePoints, ROUNDS } from "./rules.js";
+import { makeRules, deckOf, legalMoves, movers, canBuild, sideCoins, sciencePoints, purchases, ROUNDS } from "./rules.js";
 import { viewOf, costWords as artCostWords } from "./art.js";
 import { tipWords, TIP_KINDS, LEGEND, HINT_WORDS, HINTS_KEY, hints, argsOf, costWords } from "./tips.js";
 
@@ -112,7 +112,11 @@ test("prices follow your trade cards: a road on one side, Artisans' Row for good
   t.city(0, "west-road", "artisans-row");
   t.city(1, "stone-cut", "glass-kiln");
   assert.match(say(t.st, "sells", { seat: 1 }).body, /^2 stone and glass: /);
-  assert.match(say(t.st, "sells", { seat: 1 }).body, /1 coin a unit, thanks to your West Road/);
+  // Stone is cheap through the road, glass through Artisans' Row: each card is credited.
+  assert.match(say(t.st, "sells", { seat: 1 }).body, /1 coin a unit, thanks to your West Road and your Artisans' Row\./);
+  assert.match(say(t.st, "price", { seat: 1, res: 4 }).body, /costs you 1 coin a unit thanks to your Artisans' Row\./);
+  t.city(0, "artisans-row");
+  assert.match(say(t.st, "sells", { seat: 1 }).body, /1 coin for glass \(your Artisans' Row\) and 2 for stone\./);
   assert.match(say(t.st, "price", { seat: 2 }).body, /1 coin for glass, cloth and papyrus \(your Artisans' Row\) and 2 for wood, stone, clay and ore/);
   assert.match(say(t.st, "crossing", { seat: 2 }).body, /Your Artisans' Row set up the market stall/);
 });
@@ -212,6 +216,57 @@ test("coins, score, walls, stage slots and what you make", () => {
   assert.equal(say(t.st, "make", { res: 3 }).body, "You don't make ore. Robot 1 sells it for 2 coins.");
   assert.equal(say(t.st, "make", { res: 3, seat: 1 }).body, "Robot 1 makes 1 a turn: their wonder. You can buy one a turn for 2 coins.");
   assert.equal(say(t.st, "either", { res: "0,2" }).body, "Makes wood or clay, one a turn, from your Riverside Grove. You choose which each time you pay.");
+});
+
+test("a neighbour's Timber Mill sells both its wood in one turn, as rules.purchases allows", () => {
+  const t = table({ wonders: [["ephesus"], ["rhodes"], ["giza"]] });
+  t.city(1, "timber-mill");
+  assert.equal(say(t.st, "make", { res: 0, seat: 1 }).body, "Robot 1 makes 2 a turn: Timber Mill (2). You can buy up to 2 a turn for 2 coins each.");
+  assert.equal(purchases(viewOf(t.st), 0, [2, 0, 0, 0, 0, 0, 0]).some((b) => b.left[0] === 2), true, "both wood from the left in one turn");
+  assert.equal(say(t.st, "make", { res: 3, seat: 1 }).body, "Robot 1 makes 1 a turn: their wonder. You can buy one a turn for 2 coins.");
+  assert.equal(say(t.st, "make", { res: 0, seat: 2 }).body, "Robot 2 doesn't make wood.");
+});
+
+test("one shield, one point: live numbers in the singular", () => {
+  const t = table({ wonders: [["rhodes"], ["giza"], ["ephesus"]] });
+  t.city(1, "palisade");
+  assert.equal(say(t.st, "warn", { seat: 1 }).body.split(".")[0], "Robot 1 has 1 shield and you have 0");
+  assert.match(say(t.st, "card", { id: ID("palisade"), where: "hand" }).body, /^\+1: you'd have 1 shield to Robot 1's 1 and Robot 2's 0\.$/);
+  t.st.age = 1;
+  assert.match(say(t.st, "tokens").body, /wins 1 point and fewer loses 1\./);
+});
+
+test("Babylon B with stage II plays its seventh card: no tip says it is discarded", () => {
+  const t = table({ wonders: [["babylon", "B"], ["giza"], ["ephesus"]] });
+  t.st.age = 1;
+  t.st.round = ROUNDS;
+  t.stages(0, 2);
+  t.st.hands[0] = t.st.hands[0].slice(0, 2);
+  assert.equal(say(t.st, "turn").body, "The last turn of the age: your wonder lets you play your seventh card too, then war with your neighbours.");
+  assert.equal(say(t.st, "hand", { count: 2 }).body, "2 cards: Robot 2's leftovers. Pick one; your wonder lets you play the other one too.");
+  assert.equal(say(t.st, "back", { where: "stack", seat: 0, count: 2 }).body, "2 cards, face down. Your wonder plays the last card instead of discarding it.");
+  assert.equal(say(t.st, "back", { where: "stack", seat: 0, count: 2 }, 1).body, "2 cards, face down. Their wonder plays the last card instead of discarding it.");
+  assert.equal(say(t.st, "back", { where: "stack", seat: 1, count: 2 }).body, "2 cards, face down. After this turn the last card is discarded.");
+  t.st.phase = "last";
+  t.st.lastSeat = 0;
+  assert.equal(say(t.st, "hand", { count: 1 }).title, "Your seventh card");
+  // Without the stage, the seventh card goes.
+  t.stages(0, 1);
+  t.st.phase = "pick";
+  assert.match(say(t.st, "turn").body, /your seventh card is discarded/);
+  assert.equal(say(t.st, "hand", { count: 2 }).body, "2 cards: Robot 2's leftovers. Pick one; the other is discarded.");
+});
+
+test("digging the discards: the Free badge says the dig builds it free, never a price", () => {
+  const t = table({ wonders: [["halicarnassus"], ["giza"], ["ephesus"]] });
+  t.stages(0, 2);
+  t.st.coins[0] = 0;
+  const ramparts = ID("ramparts");
+  assert.equal(say(t.st, "badge", { id: ramparts }).title, "Can't build");
+  assert.deepEqual(say(t.st, "badge", { id: ramparts, kind: "free", where: "dig" }), { title: "Free from the discards", body: "Your wonder lets you build one card from the discard pile without paying anything, Ramparts included." });
+  t.city(0, "ramparts");
+  assert.equal(say(t.st, "badge", { id: ramparts, kind: "no", where: "dig" }).body, "You already built Ramparts, and a city holds only one of each.");
+  assert.equal(say(t.st, "card", { id: ID("water-channel"), where: "dig" }).more.length, 1, "no chain sentence while the card is free anyway");
 });
 
 test("every kind over whole games at 3 and 4 seats: plain words, no undefined or NaN", () => {

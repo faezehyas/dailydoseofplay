@@ -210,6 +210,10 @@ test("your hand's caption says whose cards they are and where they go", () => {
   st.round = 6;
   st.hands[0] = [1, 2];
   assert.equal(handCaption(st, 0, nameIn), "the 2 cards Ana did not pick · the last is discarded");
+  // Babylon B with stage II built plays its seventh card (rules.next).
+  st.wonders[0] = { w: WONDERS.findIndex((w) => w.key === "babylon"), side: "B" };
+  st.stages[0] = [200, 201];
+  assert.equal(handCaption(st, 0, nameIn), "the 2 cards Ana did not pick · your wonder plays the last");
 });
 
 test("war tokens after a war: each seat's left result, then its right", () => {
