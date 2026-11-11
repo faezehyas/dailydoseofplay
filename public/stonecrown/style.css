@@ -223,36 +223,10 @@
   white-space: nowrap;
 }
 
-.sc-pass {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-inline: auto;
-  color: var(--sc-muted);
-  font-size: 0.88rem;
-  white-space: nowrap;
-}
-
-.sc-pass-arrow {
-  width: 18px;
-  height: 12px;
-  background: currentColor;
-  clip-path: polygon(0 50%, 45% 0, 45% 30%, 100% 30%, 100% 70%, 45% 70%, 45% 100%);
-}
-
-.sc-pass-arrow.right {
-  transform: scaleX(-1);
-}
-
 /* A phone has no room for the pass direction up here (the hand's heading says
    it), nor for the neighbours' wonders by name (their labels and cities say it). */
 @media (max-width: 480px) {
   .sc-seat-wonder {
-    display: none;
-  }
-
-  .sc-top .sc-pass {
     display: none;
   }
 
@@ -309,17 +283,6 @@
   gap: 4px;
   font-weight: 700;
   font-size: 0.85rem;
-}
-
-.sc-across-stats .sc-sh::before {
-  content: "";
-  display: inline-block;
-  width: 11px;
-  height: 13px;
-  margin-right: 2px;
-  vertical-align: -2px;
-  background: var(--sc-red);
-  clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%);
 }
 
 .sc-pile {
@@ -410,7 +373,7 @@
 
 .sc-seat.left { grid-area: left; align-self: stretch; }
 .sc-seat.right { grid-area: right; align-self: stretch; }
-.sc-seat.across { display: none; }
+
 .sc-mine { grid-area: mine; }
 .sc-hand-area { grid-area: hand; }
 
@@ -458,19 +421,6 @@
     grid-template-columns: 250px minmax(0, 1fr) 250px;
     grid-template-areas: "left mine right" "hand hand hand";
     gap: 12px 14px;
-  }
-
-  .stonecrown[data-players="4"] .sc-main {
-    grid-template-areas: "left across right" "left mine right" "hand hand hand";
-  }
-
-  .sc-seat.across {
-    display: grid;
-    grid-area: across;
-  }
-
-  .sc-across-pill {
-    display: none;
   }
 
   .sc-seat.left,
@@ -569,7 +519,6 @@
 }
 
 .sc-seat-stats,
-.sc-seat-sells,
 .sc-counts {
   display: flex;
   flex-wrap: wrap;
@@ -624,24 +573,6 @@
 .sc-stage-dots i.on {
   background: var(--sc-gold);
   box-shadow: 0 0 0 2px rgb(255 201 74 / 30%);
-}
-
-.sc-sells {
-  min-width: 0;
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-}
-
-.sc-sell {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
-}
-
-.sc-sell small {
-  font-weight: 700;
-  font-size: 0.75rem;
 }
 
 .sc-counts {
@@ -726,50 +657,16 @@
     display: none;
   }
 
-  .sc-seat.across {
-    grid-template-columns: auto auto 1fr;
-    align-items: center;
-    padding: 0 10px 0 0;
-    gap: 8px;
-  }
-
-  .sc-seat.across .sc-seat-head {
-    align-self: stretch;
-    display: flex;
-    align-items: center;
-    border-radius: 18px 0 0 18px;
-  }
-
-  .sc-seat.across .sc-seat-open {
-    height: 100%;
-    mask: none;
-    -webkit-mask: none;
-  }
-
-  .sc-seat.across .sc-seat-board,
-  .sc-seat.across .sc-seat-city-box,
-  .sc-seat.across .sc-seat-sells {
-    display: none;
-  }
-
-  .sc-seat.across .sc-seat-stats,
-  .sc-seat.across .sc-counts {
-    padding: 8px 0;
-    flex-wrap: nowrap;
-  }
-
-  .sc-seat.across .sc-counts {
-    justify-content: flex-end;
-    padding-right: 18px;
-  }
 }
 
 /* ---------- city chips: a built card's colour and effect ---------- */
 .sc-city {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr));
   gap: 4px;
 }
+
+.sc-city[data-cols="7"] { --cols: 7; }
 
 .sc-col {
   display: grid;
@@ -808,22 +705,30 @@
   opacity: 0.4;
 }
 
+/* Its whole name, on up to two lines. */
 .sc-chip-name {
-  display: none;
+  display: -webkit-box;
   max-width: 100%;
-  padding-inline: 3px;
+  min-height: 2.2em;
+  padding-inline: 1px;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--sc-ink);
-  font: 600 0.62rem/1.1 var(--font-display);
+  font: 600 0.6rem/1.1 var(--font-display);
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.sc-seat-city .sc-chip-name {
+  display: none;
 }
 
 @media (min-width: 640px) {
   .sc-city.mine .sc-chip-name,
   .sc-city.big .sc-chip-name {
-    display: block;
+    font-size: 0.66rem;
   }
 }
 
@@ -1112,25 +1017,6 @@
 .sc-hcard.dim {
   opacity: 0.45;
   filter: saturate(0.6);
-}
-
-/* A card you can build gets a small gold lantern in its corner. */
-.sc-hand.choosing .sc-hcard.can::before {
-  content: "";
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  z-index: 2;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--sc-gold);
-  box-shadow: 0 0 0 2px var(--sc-paper), 0 0 8px var(--sc-lamp);
-}
-
-.sc-hand.choosing .sc-hcard.chain::before {
-  background: var(--sc-green);
-  box-shadow: 0 0 0 2px var(--sc-paper), 0 0 8px var(--sc-green);
 }
 
 .sc-cardbox {
@@ -1535,8 +1421,7 @@
 
 /* ---------- flying cards, coins and tokens ---------- */
 .sc-fly > .sc-fly-card,
-.sc-fly > .sc-fly-coin,
-.sc-fly > .sc-fly-token {
+.sc-fly > .sc-fly-coin {
   position: absolute;
   top: 0;
   left: 0;
@@ -1548,20 +1433,13 @@
   height: 22px;
 }
 
-.sc-fly-coin svg,
-.sc-fly-token svg {
+.sc-fly-coin svg {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.sc-fly-token {
-  width: 26px;
-  height: 30px;
-}
-
 /* ---------- the war ---------- */
-.sc-war,
 .sc-final {
   position: absolute;
   left: 50%;
@@ -1578,64 +1456,10 @@
   transform: translate(-50%, -50%);
 }
 
-.sc-war-title,
 .sc-final-title {
   margin: 0;
   text-align: center;
   font: 600 1.15rem var(--font-display);
-}
-
-.sc-war-row {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 6px;
-  border-radius: 12px;
-  opacity: 0.6;
-  transition: opacity var(--dur-med);
-}
-
-.sc-war-row.clash {
-  opacity: 1;
-  background: var(--sc-paper-2);
-}
-
-.sc-war-side {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 700;
-}
-
-.sc-war-side:last-child {
-  justify-content: flex-end;
-}
-
-.sc-war-side .nm {
-  color: var(--c-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sc-war-side .sc-ic {
-  width: 18px;
-  height: 18px;
-}
-
-.sc-war-row.clash .sc-war-side.win b {
-  color: var(--ok);
-}
-
-.sc-war-row.clash .sc-war-side.lose b,
-.sc-war-row.clash .sc-war-side.lose .sc-ic {
-  opacity: 0.6;
-}
-
-.sc-war-x {
-  color: var(--sc-red);
-  font-size: 1.2rem;
 }
 
 /* ---------- the score sheet ---------- */
@@ -1928,4 +1752,394 @@
   .tut-stage .sc-board {
     max-width: max(300px, calc(100svh - 560px));
   }
+}
+
+/* ---------- the top bar: Explain mode, the seats beyond your neighbours ---------- */
+.sc-explain-slot {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+.sc-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sc-pills:empty {
+  display: none;
+}
+
+.sc-across-pill {
+  position: relative;
+  padding-right: 4px;
+}
+
+.sc-across-stats .sc-stat {
+  font-size: 0.82rem;
+}
+
+.sc-across-stats .sc-stat .sc-ic {
+  width: 16px;
+  height: 16px;
+}
+
+.sc-across-pill .sc-stack-slot.sm {
+  width: 30px;
+  height: 30px;
+  border-width: 0;
+}
+
+.sc-across-pill .sc-pickmark.pill {
+  top: -7px;
+  right: -4px;
+  width: 15px;
+}
+
+.sc-ask {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  font: 700 1.15rem/1 var(--font-display);
+}
+
+.sc-ask[aria-pressed="true"] {
+  background: var(--sc-gold);
+  color: #3b2400;
+  box-shadow: 0 0 0 3px rgb(255 201 74 / 35%);
+}
+
+/* While Explain mode's bar is in the top bar, a phone hides what it covers. */
+@media (max-width: 640px) {
+  .sc-explain-on .sc-top :is(.sc-top-age, .sc-pills, .sc-bank, .sc-pile) {
+    display: none;
+  }
+}
+
+/* ---------- a neighbour's panel: their hand as a stack, their border ---------- */
+.sc-seat-stats {
+  flex-wrap: nowrap;
+  min-height: 46px;
+}
+
+.sc-seat-hand {
+  position: relative;
+  flex: none;
+  display: inline-grid;
+  margin-left: auto;
+}
+
+.sc-seat .sc-pickmark {
+  top: -6px;
+  right: -9px;
+  width: 22px;
+}
+
+/* The stack coming to you next, once you have picked: ringed in coral. */
+.sc-stack-slot.coming {
+  border-style: solid;
+  border-color: var(--sc-ring-coral);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sc-ring-coral) 28%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sc-stack-slot.coming {
+    animation: sc-ring-call 1.4s ease-in-out infinite;
+  }
+}
+
+.sc-seat > .sc-border {
+  margin: 2px 8px 0;
+}
+
+/* A phone: the border a fixed strip, the stack small beside the stats. */
+@media (max-width: 999px) {
+  .sc-seat > .sc-border {
+    aspect-ratio: auto;
+    height: 68px;
+    margin-inline: 6px;
+  }
+
+  .sc-seat-stats {
+    min-height: 36px;
+    gap: 4px;
+    padding-inline: 8px;
+  }
+
+  .sc-seat .sc-stack-slot.md {
+    width: 34px;
+    height: 36px;
+  }
+}
+
+.sc-seat .sc-counts,
+.sc-seat .sc-seat-board {
+  cursor: help;
+}
+
+/* ---------- your wonder, the ring, your science ---------- */
+.sc-me-ring {
+  display: grid;
+  justify-items: center;
+}
+
+.sc-me-ring .sc-ring {
+  max-width: 340px;
+}
+
+.sc-me-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 2px 12px 2px 3px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sc-paper-2);
+  color: var(--sc-ink);
+  font: 600 1rem var(--font-display);
+  cursor: pointer;
+}
+
+.sc-me-name:hover {
+  background: var(--sc-rule);
+}
+
+.sc-me-name:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.sc-me-name .sc-mark {
+  width: 24px;
+  height: 24px;
+}
+
+.sc-me-score {
+  color: var(--sc-muted);
+  font: 600 0.78rem var(--font-display);
+}
+
+.sc-me-score:not(:empty)::before {
+  content: "· ";
+}
+
+.sc-city-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.sc-sci {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-left: auto;
+  padding: 3px 10px 3px 6px;
+  border-radius: 999px;
+  background: var(--sc-green-lt);
+  color: var(--sc-green-ink);
+  font-size: 0.8rem;
+  cursor: help;
+}
+
+.sc-sci[hidden] {
+  display: none;
+}
+
+.sc-sci .sc-label {
+  display: none;
+}
+
+.sc-sci-piles {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.sc-sci-pile {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font: 700 0.9rem var(--font-display);
+}
+
+.sc-sci-pile .sc-ic {
+  width: 20px;
+  height: 20px;
+}
+
+.sc-sci-pile.none {
+  opacity: 0.45;
+}
+
+/* ---------- your shelf over your hand ---------- */
+.sc-hand-area > .sc-shelf.full {
+  padding: 5px 8px 8px;
+  gap: 3px;
+}
+
+.sc-hand-words {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sc-hand-words .sc-hand-next {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.sc-hand-area > .sc-shelf .sc-shelf-fixed {
+  grid-template-columns: minmax(0, 4fr) minmax(0, 3fr);
+  gap: 8px;
+}
+
+/* Over your hand each slot is its icon and count, where it comes from underneath. */
+.sc-hand-area > .sc-shelf .sc-shelf-group {
+  gap: 4px;
+}
+
+.sc-hand-area > .sc-shelf .sc-shelf-group .sc-slot {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0 4px;
+  padding: 3px 3px 4px 4px;
+}
+
+.sc-hand-area > .sc-shelf .sc-shelf-group .sc-slot-words {
+  display: contents;
+}
+
+.sc-hand-area > .sc-shelf .sc-shelf-group .sc-slot-src {
+  grid-column: 1 / -1;
+  font-size: 0.58rem;
+  letter-spacing: -0.01em;
+}
+
+.sc-hand-area > .sc-shelf .sc-slot-ic > .sc-ic {
+  width: 24px;
+  height: 24px;
+}
+
+/* A phone: one row of the seven, each its icon over its count (the tip names where it comes from). */
+@container (max-width: 459px) {
+  .sc-hand-area > .sc-shelf .sc-shelf-group {
+    gap: 3px;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-shelf-group .sc-slot {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    gap: 0;
+    padding: 3px 1px 2px;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-shelf-group .sc-slot-words {
+    display: contents;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-shelf-group .sc-slot-src {
+    display: none;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-slot-n {
+    font-size: 0.9rem;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-slot-ic > .sc-ic {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+@media (min-width: 1000px) {
+  .sc-hand-area {
+    grid-template-areas: "head head" "shelf side" "hand side" "buttons side";
+  }
+
+  .sc-hand-area > .sc-shelf {
+    grid-area: shelf;
+    max-width: calc(var(--sc-cw) * 7 + 36px);
+  }
+
+  /* On a laptop the shelf is one row, its label to the left. */
+  .sc-hand-area > .sc-shelf.full {
+    display: grid;
+    grid-template-columns: 3.4em minmax(0, 1fr);
+    grid-template-areas: "head fixed" "head either";
+    align-items: center;
+    column-gap: 8px;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-shelf-head {
+    grid-area: head;
+    padding: 0;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-shelf-key {
+    display: none;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-shelf-fixed { grid-area: fixed; }
+  .sc-hand-area > .sc-shelf .sc-shelf-either { grid-area: either; }
+
+  /* While you wait for the others, your hand folds to a strip and your city shows. */
+  .stonecrown.sc-waiting .sc-hand-area {
+    grid-template-areas: "head";
+    grid-template-columns: minmax(0, 1fr);
+    padding-block: 6px;
+  }
+
+  .stonecrown.sc-waiting .sc-hand-area > :not(.sc-hand-head) {
+    display: none;
+  }
+}
+
+/* ---------- a neighbour's pick, turned over, with what it means for you ---------- */
+.sc-fly > .sc-recap {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  padding: 5px 9px;
+  border-radius: 10px;
+  background: var(--sc-ink);
+  color: var(--sc-paper);
+  font: 600 0.8rem/1.2 var(--font-display);
+  text-align: center;
+  box-shadow: 0 6px 14px rgb(var(--sc-shadow) / 30%);
+}
+
+/* ---------- the dialogs: a seat's city, the score so far ---------- */
+.sc-dialog-shelf {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.sc-dialog-makes {
+  color: var(--sc-muted);
+  font-size: 0.8rem;
+}
+
+.sc-score-now .sc-sheet-box {
+  overflow-x: auto;
+}
+
+.sc-score-now .sc-sheet {
+  width: 100%;
+}
+
+/* ---------- Explain mode: anything that explains itself is marked ---------- */
+.sc-explaining [data-tip] {
+  cursor: help;
 }

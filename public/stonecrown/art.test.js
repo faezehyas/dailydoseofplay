@@ -5,7 +5,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { CARDS, WONDERS, DISCARD_COINS } from "./cards.js";
 import { sideCoins } from "./rules.js";
-import { costWords, effectWords, cardWords, chainsFrom, chainsTo, stageWords, payWords, buyWords, moveFor, pickOptions, warWords, warPairs, pairWords, resultWords, viewOf, seatsAround, cityColumns, sells, turnWords, seatWords } from "./art.js";
+import { readFileSync } from "node:fs";
+import { costWords, effectWords, cardWords, chainsFrom, chainsTo, stageWords, payWords, buyWords, moveFor, pickOptions, warWords, warPairs, pairWords, resultWords, viewOf, seatsAround, cityColumns, sells, turnWords, seatWords, recapWords, handCaption, tokensAfter, scienceWords, CITY_COLORS, kit } from "./art.js";
+import { TIP_KINDS, tipWords } from "./tips.js";
 
 const idOf = (key) => CARDS.find((c) => c.key === key).id;
 const zero = () => [0, 0, 0, 0, 0, 0, 0];
@@ -174,4 +176,119 @@ test("the turn line and a seat's facts", () => {
   const st = table({ cities: [["palisade", "shrine"], [], []], coins: [5, 3, 3] });
   st.tokens[0] = [1, -1];
   assert.equal(seatWords(viewOf(st), 0), "5 coins, 1 shield, war tokens +1 −1, wonder 0 of 3 stages, 2 cards built");
+});
+
+test("what a neighbour's pick means for you, in a line", () => {
+  // Seat 0's left is seat 1, its right seat 2.
+  const st = viewOf(table());
+  const build = (p, key, bought = { left: 0, right: 0 }) => ({ type: "build", p, id: idOf(key), bought });
+  assert.equal(recapWords(st, 0, build(1, "palisade")), "+1 shield on your left border");
+  assert.equal(recapWords(st, 0, build(2, "ore-seam")), "now sells ore");
+  assert.equal(recapWords(st, 0, build(1, "riverside-grove")), "now sells wood or clay");
+  assert.equal(recapWords(st, 0, build(2, "herbalist")), "a star for their science");
+  // Seat 1 buys from its left (seat 2) and its right (seat 0, you): it paid you 2.
+  assert.equal(recapWords(st, 0, build(1, "town-well", { left: 0, right: 2 })), "3 points for them at the end · pays you 2 coins");
+  // A road toward you, and one the other way.
+  assert.equal(recapWords(st, 0, build(1, "east-road")), "buys your raw materials for 1 coin now");
+  assert.equal(recapWords(st, 0, build(2, "east-road")), "buys raw materials cheaper on its other side");
+  assert.equal(recapWords(st, 0, { type: "stage", p: 1, n: 0 }), "", "a stage hides its card");
+  const four = viewOf(table({ wonders: [6, 0, 4, 1], cities: [[], [], [], []] }));
+  assert.equal(recapWords(four, 0, build(2, "palisade")), "", "across the table: nothing to say");
+});
+
+test("your hand's caption says whose cards they are and where they go", () => {
+  const st = table();
+  st.age = 1;
+  st.hands = [[1, 2, 3, 4, 5, 6, 7], [], []];
+  const nameIn = (p) => ["you", "Ana", "Ben"][p];
+  assert.equal(handCaption(st, 0, nameIn), "the 7 cards dealt to you · then to Ana ◂");
+  st.round = 3;
+  st.hands[0] = [1, 2, 3, 4, 5];
+  assert.equal(handCaption(st, 0, nameIn), "the 5 cards Ben did not pick · then to Ana ◂");
+  st.age = 2;
+  assert.equal(handCaption(st, 0, nameIn), "the 5 cards Ana did not pick · then to Ben ▸");
+  st.round = 6;
+  st.hands[0] = [1, 2];
+  assert.equal(handCaption(st, 0, nameIn), "the 2 cards Ana did not pick · the last is discarded");
+});
+
+test("war tokens after a war: each seat's left result, then its right", () => {
+  assert.deepEqual(tokensAfter([[], [1], []], [[1, -1], [0, -1], [1, 0]], 2), [[3, -1], [1, -1], [3]]);
+});
+
+test("the science tracker's line: piles, points now and what the next symbol adds", () => {
+  // A star and a quill: 2 points; any next symbol adds 3, and the cog completes a set (3 + 7).
+  const st = table({ cities: [["herbalist", "scroll-hall"], [], []] });
+  const s = scienceWords(st, 0);
+  assert.deepEqual([s.counts, s.wilds, s.now], [[1, 0, 1], 0, 2]);
+  assert.equal(s.line, "2 points now, the next cog adds 8");
+});
+
+test("city chips leave the brown and grey cards to the shelf; the kit the view modules take", () => {
+  assert.deepEqual(CITY_COLORS, ["blue", "yellow", "red", "green", "purple"]);
+  for (const k of ["resEl", "sciEl", "coinEl", "shieldEl", "pointsEl", "tokenEl", "seatMark", "cardEl", "chipEl", "boardEl"]) assert.equal(typeof kit[k], "function", k);
+});
+
+// Every data-tip the views write (its kind and its data-tip-* arguments)
+// is one tips.js explains, with arguments it reads, and has words.
+test("every tip the views write has words, with the arguments tipWords reads", () => {
+  const files = ["art.js", "main.js", "tutorial.js", "store.js", "border.js", "war.js", "ring.js"];
+  const kinds = new Set();
+  const args = new Map();
+  const note = (arg, file) => args.set(arg, [...(args.get(arg) ?? []), file]);
+  for (const file of files) {
+    const src = readFileSync(new URL(`./${file}`, import.meta.url), "utf8");
+    for (const m of src.matchAll(/"data-tip": "(\w+)"|data-tip="(\w+)"|\btip: "(\w+)"|\btip\("(\w+)"/g)) kinds.add(m[1] ?? m[2] ?? m[3] ?? m[4]);
+    for (const m of src.matchAll(/"?data-tip-([a-z]+)"?[:=]/g)) note(m[1], file);
+    for (const m of src.matchAll(/\btip([A-Z][a-z]+)\b(?=\s*[:=])/g)) note(m[1].toLowerCase(), file);
+    for (const m of src.matchAll(/\btip\("\w+", \{([^}]*)\}/g)) for (const part of m[1].split(",")) if (/^\s*\w+\s*(:|$)/.test(part)) note(part.split(":")[0].trim(), file);
+  }
+  for (const kind of kinds) assert.ok(TIP_KINDS.includes(kind), `${kind} is a tip kind`);
+  const READ = ["seat", "id", "where", "res", "stage", "age", "count", "side", "results", "kind", "source", "bank"];
+  // Written for the ring's own drawing, and read by no tip.
+  const CONTEXT = ["round", "dir"];
+  for (const [arg, where] of args) assert.ok(READ.includes(arg) || CONTEXT.includes(arg), `data-tip-${arg} (${[...new Set(where)].join(", ")}) is an argument tipWords reads`);
+  // Each kind, with the arguments the views give it, has words.
+  const st = viewOf(table({ cities: [["stone-cut", "riverside-grove", "palisade", "herbalist"], ["ore-seam"], ["clay-bank"]] }));
+  st.round = 2;
+  st.hands = [[1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12], [13, 14, 15, 16, 17, 18]];
+  const ctx = { state: st, me: 0, nameOf: (p) => ["You", "Ana", "Ben"][p] };
+  const samples = {
+    coins: [{ seat: "1" }, { seat: "0" }],
+    shields: [{ seat: "2" }],
+    tokens: [{ seat: "0" }, {}],
+    stages: [{ seat: "1" }],
+    counts: [{ seat: "1" }],
+    sells: [{ side: "left" }, { side: "right" }],
+    card: [{ id: String(idOf("palisade")), seat: "0" }, { id: String(idOf("shrine")), where: "hand" }, { id: String(idOf("shrine")), where: "dig" }],
+    back: [{ seat: "1", where: "stack", count: "6" }, { seat: "2", where: "pick" }],
+    slot: [{ seat: "0", stage: "0" }],
+    make: [{ res: "0" }, { res: "1", seat: "0" }, { res: "3", seat: "1" }],
+    either: [{ seat: "0", res: "0,2", source: "Riverside Grove" }, { res: "0,2", source: "Riverside Grove" }],
+    price: [{ res: "3", side: "left" }, { side: "right" }],
+    crossing: [{ side: "left" }],
+    flags: [{ side: "left", results: "1,-1," }, { side: "right", results: ",," }],
+    warn: [{ side: "right" }],
+    wall: [{ side: "left", bank: "theirs" }, { side: "left", bank: "mine" }],
+    seat: [{ seat: "0" }, { seat: "1" }],
+    direction: [{ age: "2", dir: "-1" }],
+    turn: [{ age: "1", round: "2" }],
+    bank: [{}],
+    discard: [{}],
+    badge: [{ id: String(idOf("shrine")), kind: "free" }, { kind: "pay" }],
+    science: [{ seat: "0" }],
+    score: [{ seat: "0" }, { seat: "2" }],
+    hand: [{}, { count: "6" }],
+  };
+  for (const kind of TIP_KINDS) assert.ok(samples[kind], `a sample for ${kind}`);
+  for (const [kind, list] of Object.entries(samples)) {
+    for (const a of list) {
+      const w = tipWords(kind, a, ctx);
+      assert.ok(w?.title && w?.body, `${kind} ${JSON.stringify(a)} has words`);
+    }
+  }
+  // The wall on your own bank is yours; theirs is the neighbour's. A border's sells are the neighbour's.
+  assert.match(tipWords("wall", { side: "left", bank: "mine" }, ctx).body, /^1 shield/);
+  assert.match(tipWords("wall", { side: "left", bank: "theirs" }, ctx).body, /no shields/);
+  assert.match(tipWords("sells", { side: "right" }, ctx).body, /clay: what Ben's/);
 });

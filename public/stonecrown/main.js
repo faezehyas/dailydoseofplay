@@ -1,14 +1,17 @@
 // Stonecrown page: mounts the engine shell and renders a CardMatch. The rules
 // live in rules.js, the data in cards.js, the art in card-art.js and
-// pieces.js, and the table they make (the neighbours' panels, your wonder
-// and city, and their motion) in art.js, which the tutorial shares. This
-// file is the view: your hand and what a card in it can do, who has picked,
-// the seventh card and the dig, the top bar, the log, the clock, the score
-// sheet and the result. The match state never waits for the screen: every
-// event is queued and played out in order, faster when they pile up, and at
-// once with reduced motion or a hidden tab. Nothing hidden reaches the page:
-// another seat's picks, tucked and sold cards show only as backs, even when
-// this browser knows a face from holding the card before.
+// pieces.js, and the table they make (the neighbours' panels with their
+// borders, your wonder, the seat ring and your city, the shelf of what you
+// make, and their motion: the hand-off, the carts, the war scene) in art.js,
+// which the tutorial shares. This file is the view: your hand and what a
+// card in it can do, who has picked, the seventh card and the dig, the top
+// bar, the tips and first-time hints, the log, the clock, the score sheet
+// and the result. The match state never waits for the screen: every event
+// is queued and played out in order, faster when they pile up, and at once
+// with reduced motion or a hidden tab (but for the war, which waits for
+// Continue). Nothing hidden reaches the page: another seat's picks, tucked
+// and sold cards show only as backs, even when this browser knows a face
+// from holding the card before.
 import { startGameShell } from "../engine/lobby.js";
 import { matchRouter } from "../engine/session.js";
 import { CardMatch } from "../engine/card-match.js";
@@ -21,8 +24,9 @@ import { humanPause, startPacedRobot } from "../engine/cards/paced-robot.js";
 import { robotPause } from "../engine/robot-pace.js";
 import { leaveNotice, abortText, verdictText as verdictOf } from "../engine/cards/leave-notice.js";
 import { CARDS, WONDERS, HAND } from "./cards.js";
-import { makeRules, normalizeConfig, forcedMove, legalMoves, designOf, passDir, stagesOf, shields, score, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
-import { PACE, ROMAN, plural, listOf, effectWords, payWords, moveFor, pickOptions, warWords, warPairs, pairWords, resultWords, viewOf, turnWords, seatWords, cardEl, coinEl, seatMark, cityDialog, tableEl, scTable, scMotion, batches, buildPlan, stagePlan, detailNodes, handView, actButtons, picksList, scoreSheet } from "./art.js";
+import { makeRules, normalizeConfig, forcedMove, legalMoves, designOf, passDir, stagesOf, score, ROUNDS, MIN_PLAYERS, MAX_PLAYERS } from "./rules.js";
+import { PACE, ROMAN, plural, listOf, effectWords, payWords, moveFor, pickOptions, warWords, warPairs, pairWords, resultWords, viewOf, cardEl, seatMark, cityDialog, scoreDialog, explainer, tableEl, scTable, scMotion, batches, buildPlan, stagePlan, costMatch, detailNodes, handView, handCaption, actButtons, picksList, scoreSheet } from "./art.js";
+import { warSummary } from "./war.js";
 import { settings } from "./settings.js";
 import { play } from "./sounds.js";
 import { howToPlay } from "./how-to-play.js";
@@ -33,6 +37,8 @@ const ROBOT_PACE = { pick: 1700, last: 1300, dig: 1600, spread: 1400 };
 // would look: an instant one would tell everyone the discards hold nothing for you.
 const FORCED_MS = [1400, 3200];
 const CLAIM_GRACE_MS = 6000; // past a player's time before we say their browser is quiet
+// With a move clock the war scene goes on by itself after this long.
+const WAR_CLOCK_MS = 4000;
 const LEVEL_NAME = { easy: "Easy", medium: "Medium", hard: "Hard" };
 const SIDE_NAME = { A: "A sides", B: "B sides", random: "Mixed sides" };
 // Robot games: robots wait for the screen to finish replaying. The view sets this.
@@ -100,9 +106,11 @@ function mountGame(session, root, shell) {
   let previous = null; // the match before a rematch, whose verdict may still be on its way
   let lastVerdict = "";
   let finalScores = null;
+  let warLine = ""; // the war being shown, in words
   // Your choices on the way to a move.
   let sel = null; // { slot, build: purchase index, stage: purchase index }
-  let picked = null; // { key, slot, kind, id } once you have chosen this turn
+  let picked = null; // { key, slot, kind, id, buy } once you have chosen this turn
+  let light = {}; // the shelf's slots the card you look at lights
   const revealing = new Set(); // seats whose pick marks stay up while their picks turn over
   const leaving = new Set(); // your hand's slots on their way out
   const arriving = new Set(); // your hand's slots on their way in
@@ -125,20 +133,27 @@ function mountGame(session, root, shell) {
   // The age of each card tucked under a wonder, as its stage was built (its back shows it).
   const tuckedAge = new Map();
   const ageOf = (slot) => tuckedAge.get(slot) ?? 1;
-  const art = scTable(table, { me, players: count, nameOf, ageOf, onSeat: (p) => openSeat(p) });
+  // Each war's results by age, once the screen has shown it: the borders' flags.
+  const wars = [];
+  const art = scTable(table, { me, players: count, nameOf, ageOf, sound: play, wars: () => wars, onSeat: (p) => openSeat(p), onScore: () => scoreNow.open(view) });
   const { around } = art;
-  const seatDialog = cityDialog({ nameOf, ageOf, whereOf: (p) => (p === around.left ? "your left neighbour" : p === around.right ? "your right neighbour" : "across the table") });
+  const whereOf = (p) => (p === me ? "you" : p === around.left ? "your left neighbour" : p === around.right ? "your right neighbour" : p === around.across ? "across the table" : "further round the table");
+  const seatDialog = cityDialog({ nameOf, ageOf, me, whereOf });
   const dialog = seatDialog.node;
+  const scoreNow = scoreDialog({ me, nameOf });
 
-  // The top bar: the age and turn, which way hands go, the discard pile, and with four, the player across.
-  const ageBadge = el("span", { class: "sc-age-badge", "aria-hidden": "true" });
+  // The top bar: the age and turn at a glance (the ring says them to screen
+  // readers), Explain mode's bar while it is on, the seats beyond your
+  // neighbours, the bank, the discard pile and "?" for Explain mode.
+  const ageBadge = el("span", { class: "sc-age-badge" });
   const ageLine = el("b", { class: "sc-age" });
   const turnLine = el("small", { class: "sc-turn-line" });
-  const passLine = el("span", { class: "sc-pass" });
-  const acrossPill = around.across >= 0 ? el("button", { class: `sc-across-pill p-${around.across}`, type: "button", id: "sc-across", onclick: () => openSeat(around.across) }) : null;
-  const top = el("div", { class: "sc-top", id: "sc-top" }, el("div", { class: "sc-top-age", role: "group", "aria-label": "Age and turn" }, ageBadge, el("span", { class: "sc-top-words" }, ageLine, turnLine)), passLine, acrossPill, art.bankBox, art.pile);
+  const ageBox = el("div", { class: "sc-top-age", "aria-hidden": "true", dataset: { tip: "turn" } }, ageBadge, el("span", { class: "sc-top-words" }, ageLine, turnLine));
+  const explainSlot = el("span", { class: "sc-explain-slot" });
+  const askBtn = el("button", { class: "btn sc-ask", type: "button", id: "sc-ask", "aria-pressed": "false", "aria-label": "Explain mode: tap anything to hear what it means (?)", onclick: () => explain() }, "?");
+  const top = el("div", { class: "sc-top", id: "sc-top" }, ageBox, explainSlot, art.pillBox, art.bankBox, art.pile, askBtn);
 
-  // Your hand, the buttons for the card you pick, and what it would do.
+  // Your hand with the shelf of what you make above it, the buttons for the card you pick, and what it would do.
   const hand = handView({ onSelect: (slot) => select(slot) });
   const deck = el("div", { class: "sc-deck", hidden: true, "aria-hidden": "true" }, [0, 1, 2, 3, 4].map(() => el("span", { class: "sc-deck-card" })));
   const picks = picksList();
@@ -150,8 +165,9 @@ function mountGame(session, root, shell) {
   const handArea = el(
     "section",
     { class: "sc-hand-area", "aria-label": "Your move" },
-    el("div", { class: "sc-hand-head" }, el("h2", { class: "sc-title" }, hand.title), picks.node, hand.next),
-    el("div", { class: "sc-hand-wrap" }, hand.node, deck, table.busyChip),
+    el("div", { class: "sc-hand-head" }, el("div", { class: "sc-hand-words" }, el("h2", { class: "sc-title" }, hand.title), hand.next), picks.node),
+    art.shelf,
+    el("div", { class: "sc-hand-wrap", dataset: { tip: "hand" } }, hand.node, deck, table.busyChip),
     buttons.node,
     el("div", { class: "sc-side" }, timer, detail),
   );
@@ -168,9 +184,6 @@ function mountGame(session, root, shell) {
     onShow: ({ outcome }) => outcome && celebrate({ outcome, flavour: "paper", highlight: winnerNodes(), board: art.mine }),
   });
 
-  const left = art.panels.get(around.left);
-  const right = art.panels.get(around.right);
-  const across = art.panels.get(around.across);
   const rootBox = el(
     "div",
     { class: "stonecrown pc-game", dataset: { seat: me, players: count } },
@@ -178,15 +191,30 @@ function mountGame(session, root, shell) {
     bar.node,
     top,
     status,
-    el("div", { class: "sc-main" }, left?.node, across?.node, art.mine, right?.node, handArea),
+    el("div", { class: "sc-main" }, art.panels.get(around.left)?.node, art.mine, art.panels.get(around.right)?.node, handArea),
     logBox,
     configLine,
     note,
     result.node,
     dialog,
+    scoreNow.node,
+    art.war.node,
     table.flyLayer,
   );
   root.append(rootBox);
+
+  // Everything on the table explains itself: hover, focus, press and hold, or a tap in Explain mode.
+  const tips = explainer(rootBox, { view: () => view, me, nameOf, bar: explainSlot, onExplain: () => syncAsk() });
+  function syncAsk() {
+    askBtn.setAttribute("aria-pressed", String(tips.explaining()));
+    rootBox.classList.toggle("sc-explain-on", tips.explaining());
+  }
+  function explain() {
+    tips.explain();
+    syncAsk();
+  }
+  // A first-time hint, once ever, pointing at what it names.
+  const coach = (id, target) => !fast() && target?.isConnected && target.getClientRects().length > 0 && tips.coach(id, target);
 
   // ---------- whose decision it is ----------
   function decision() {
@@ -224,7 +252,11 @@ function mountGame(session, root, shell) {
     seats,
     view: () => view,
     idOf,
-    handRect: (slot) => (hand.card(slot) ? table.rectIn(hand.card(slot)) : art.rectsOf(me).pick()),
+    // A card in your hand, or while the hand is folded, the strip it folded to.
+    handRect: (slot) => {
+      const r = hand.card(slot) ? table.rectIn(hand.card(slot)) : null;
+      return r?.w ? r : r ? table.rectIn(handArea) : art.rectsOf(me).pick();
+    },
     handBox: () => hand.node,
     leaving,
     arriving,
@@ -233,7 +265,25 @@ function mountGame(session, root, shell) {
     sound: play,
     onTuck: (slot, age) => tuckedAge.set(slot, age),
     said,
+    buyOf: () => picked?.buy ?? null,
+    warWait: () => (config?.moveSeconds ? WAR_CLOCK_MS : 0),
+    onWar,
+    onPass: (ev) => coach("pass", art.panels.get(ev.dir > 0 ? around.left : around.right)?.slot),
   });
+
+  // The war scene is the war's one announcement: the status line says it too, quietly.
+  function onWar(ev, facts, done) {
+    if (!done) {
+      warLine = warSummary(facts, nameIn);
+      status.setAttribute("aria-live", "off");
+      const g = table.gen;
+      setTimeout(() => live(g) && !art.war.node.hidden && coach("war", art.war.node.querySelector(".ws-stakes")), 700);
+      return;
+    }
+    wars[ev.age - 1] = ev.results;
+    render();
+    status.setAttribute("aria-live", "polite");
+  }
 
   async function animate(ev, g) {
     const k = table.pace();
@@ -266,11 +316,12 @@ function mountGame(session, root, shell) {
     await wait(PACE.between * k, g);
   }
 
-  // The log's line for each thing the table shows happening.
-  function said(kind, x) {
+  // The log's line for each thing the table shows happening; a neighbour's
+  // build says what it means for you.
+  function said(kind, x, recap = "") {
     if (kind === "pick") {
       const p = x.p;
-      if (x.type === "build") return addLog({ player: p, kind: "build", text: buildWords(x) });
+      if (x.type === "build") return addLog({ player: p, kind: "build", text: `${buildWords(x)}${recap ? `: ${recap}` : ""}` });
       if (x.type === "stage") {
         const stage = stagesOf(view, p)[x.n];
         const id = p === me ? idOf(x.slot) : -1;
@@ -341,7 +392,7 @@ function mountGame(session, root, shell) {
   const st = () => match.state;
   function send(move, kind) {
     const slot = move.build ?? move.stage ?? move.discard ?? move.dig;
-    picked = { key: turnKey(), slot, kind, id: slot >= 0 ? idOf(slot) : -1 };
+    picked = { key: turnKey(), slot, kind, id: slot >= 0 ? idOf(slot) : -1, buy: move.buy ?? null };
     sel = null;
     play("pick");
     match.play(move);
@@ -371,10 +422,11 @@ function mountGame(session, root, shell) {
     if (myChoice() && !buttons.node.hidden) buttons.node.scrollIntoView({ block: "nearest", behavior: fast() ? "auto" : "smooth" });
   }
 
-  function optionsFor(slot) {
+  // What a card in your hand offers: now, or out of your turn as the table is drawn.
+  function optionsFor(slot, state = st()) {
     const id = idOf(slot);
     if (id < 0) return null;
-    return { id, card: CARDS[id], ...pickOptions(st(), me, id) };
+    return { id, card: CARDS[id], ...pickOptions(state, me, id) };
   }
   const names = () => ({ left: session.players[around.left].name, right: session.players[around.right].name });
   const plans = (o) => [buildPlan(st(), me, o, sel.slot, sel.build, names()), stagePlan(st(), me, o, sel.slot, sel.stage, names())];
@@ -400,9 +452,13 @@ function mountGame(session, root, shell) {
     table.shake(node);
   }
 
-  // Esc lets go of the card; B, W and S build, raise a stage or sell it.
+  // Esc lets go of the card; B, W and S build, raise a stage or sell it; ? turns Explain mode on and off.
   function onKey(e) {
-    if (e.target.closest?.("input, textarea, dialog") || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if (e.target.closest?.("input, textarea, dialog, .ws") || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if (e.key === "?") {
+      e.preventDefault();
+      return explain();
+    }
     if (e.key === "Escape" && sel) {
       const slot = sel.slot;
       sel = null;
@@ -429,13 +485,11 @@ function mountGame(session, root, shell) {
     // Your pick stays marked until it turns over with everyone's.
     const shown = done ?? (picked && table.pending ? picked : null);
     if (sel && !slots.includes(sel.slot)) sel = null;
-    const n = view?.hands[me]?.length ?? 0;
-    const to = view && passDir(view.age) > 0 ? around.left : around.right;
     hand.draw({
       slots,
       age: Math.max(1, view?.age ?? 1),
       idOf,
-      options: (slot) => (s && view && !table.pending ? optionsFor(slot) : null),
+      options: (slot) => (s && view && !table.pending ? optionsFor(slot, choice ? s : view) : null),
       choosing: !!choice,
       dig,
       legal: dig ? new Set(legalMoves(s, me, faceOf).filter((x) => x.dig >= 0).map((x) => x.dig)) : null,
@@ -443,8 +497,8 @@ function mountGame(session, root, shell) {
       picked: shown ? shown.slot : null,
       hidden: (slot) => leaving.has(slot) || arriving.has(slot),
       fast: fast(),
-      title: dig ? "The discards · build one free" : !view?.age ? "Your hand" : choice === "last" ? "Your seventh card" : done ? "Your hand · picked" : choice ? "Your hand · pick one" : "Your hand",
-      next: view?.age && !dig && n > 1 && view.round < 6 ? `then passes to ${nameIn(to)} ${passDir(view.age) > 0 ? "◂" : "▸"}` : "",
+      title: dig ? "The discards · build one free" : !view?.age ? "Your hand" : choice === "last" ? "Your seventh card" : done ? `Your hand · picked: ${pickedWords(done)}` : choice ? "Your hand · pick one" : "Your hand",
+      next: dig ? "" : handCaption(view, me, nameIn),
     });
   }
 
@@ -460,10 +514,12 @@ function mountGame(session, root, shell) {
     if (key === shownKey) return;
     shownKey = key;
     const focused = detail.contains(document.activeElement) ? document.activeElement.id : null;
+    light = {};
     detail.replaceChildren(...sideNodes());
     detail.hidden = !detail.childNodes.length;
     renderPicks();
     if (focused) (document.getElementById(focused) ?? buttons.node.querySelector("button:not([hidden]):not([disabled])") ?? status).focus({ preventScroll: true });
+    hintFor();
   }
 
   const hint = (text, cls = "") => el("p", { class: `sc-hint ${cls}` }, text);
@@ -471,7 +527,7 @@ function mountGame(session, root, shell) {
     sel[kind] += 1;
     render();
   };
-  // Sets the buttons and returns the detail strip's lines.
+  // Sets the buttons and the shelf's lights, and returns the detail strip's lines.
   function sideNodes() {
     const s = match?.state;
     if (!match || ended || match.phase !== "playing" || !s || !view) return (buttons.none(), []);
@@ -491,22 +547,39 @@ function mountGame(session, root, shell) {
       if (!o) return (buttons.none(), [hint("That card's face is still on its way…")]);
       const [b, st2] = plans(o);
       buttons.pick(o, b, st2);
-      return detailNodes(o, b, st2, names(), { onOther: other });
+      light = costMatch(s, me, o, b, st2)?.light ?? {};
+      return detailNodes(o, b, st2, names(), { onOther: other, state: s, me });
     }
     if (choice) {
       buttons.idle();
-      return [hint(choice === "last" ? "Your wonder lets you play your seventh card: build it, raise a stage with it, or sell it." : "Tap a card to see what you can do with it. When you have to buy from a neighbour, the cheapest way is picked, and you can choose another.")];
+      return [hint(choice === "last" ? "Your wonder lets you play your seventh card: build it, raise a stage with it, or sell it." : "Tap a card to see what you can do with it. Its badge says what building it takes; your shelf shows what you make.")];
     }
     buttons.none();
-    if (done) {
-      const name = CARDS[done.id]?.name ?? "it";
-      const what = { build: `build ${name}`, free: `build ${name}`, stage: `raise a wonder stage with ${name}`, sell: `sell ${name} for 3`, dig: `build ${name} from the discards` }[done.kind] ?? "build nothing";
-      return [el("p", { class: "sc-hint sc-done" }, el("strong", {}, "Picked: "), what, ". It happens when everyone has chosen.")];
-    }
+    if (done) return [el("p", { class: "sc-hint sc-done" }, el("strong", {}, "Picked: "), pickedWords(done), ". It happens when everyone has chosen.")];
     if (s.phase === "dig" && s.digger !== me) return [hint(`${nameOf(s.digger)} is digging through the discards for a card to build free.`)];
     if (s.phase === "last" && s.lastSeat !== me) return [hint(`${nameOf(s.lastSeat)}'s wonder plays the seventh card of the age.`)];
-    if (sel) return detailNodes(optionsFor(sel.slot), null, null, names());
+    if (sel) {
+      const o = optionsFor(sel.slot, view);
+      light = costMatch(view, me, o, null, null)?.light ?? {};
+      return detailNodes(o, null, null, names(), { state: view, me });
+    }
     return [];
+  }
+
+  // "build Barracks", "sell Loom for 3": what you picked this turn.
+  function pickedWords(done) {
+    const name = CARDS[done.id]?.name ?? "it";
+    return { build: `build ${name}`, free: `build ${name}`, stage: `raise a wonder stage with ${name}`, sell: `sell ${name} for 3`, dig: `build ${name} from the discards` }[done.kind] ?? "build nothing";
+  }
+
+  // The first purchase and the first chain each get a hint, once ever.
+  function hintFor() {
+    if (!sel || !myChoice() || myChoice() === "dig") return;
+    const o = optionsFor(sel.slot);
+    if (!o) return;
+    if (o.build.chain) return coach("chain", buttons.build);
+    const [b] = plans(o);
+    if (b.ok && b.buy && [...b.buy.left, ...b.buy.right].some(Boolean)) coach("buy", detail.querySelector(".sc-unit.buy") ?? buttons.build);
   }
 
   // Who has chosen this turn: everyone's mark, ticked once they've picked (a commitment, public).
@@ -530,7 +603,7 @@ function mountGame(session, root, shell) {
     if (ev.type === "pass") return `Hands pass ${ev.dir > 0 ? "left" : "right"}`;
     if (ev.type === "age") return `Age ${ROMAN[ev.age]}: ${HAND} cards each`;
     if (ev.type === "sevenths") return "Last cards discarded";
-    if (ev.type === "war") return warWords(ev.results, me, ev.age, nameIn);
+    if (ev.type === "war") return warLine || warWords(ev.results, me, ev.age, nameIn);
     if (ev.type === "over") return "Final scores";
     if (ev.type === "last") return ev.p === me ? "Play your seventh card" : `${nameOf(ev.p)} plays a seventh card`;
     if (ev.type === "dig") return ev.p === me ? "Dig through the discards: build one free" : `${nameOf(ev.p)} is digging through the discards`;
@@ -558,20 +631,16 @@ function mountGame(session, root, shell) {
     return mine(d) ? "…" : waiting.length ? `Waiting for ${listOf(waiting.map(nameOf))}` : "Everyone has picked";
   }
 
+  let topKey = "";
   function renderTop() {
     const age = view?.age ?? 0;
-    ageBadge.textContent = age ? ROMAN[age] : "·";
-    ageLine.textContent = age ? `Age ${ROMAN[age]}` : "Stonecrown";
-    turnLine.textContent = age ? `Turn ${Math.min(view.round, 6)} of 6` : "Dealing soon";
-    top.querySelector(".sc-top-age").setAttribute("aria-label", age ? turnWords(age, view.round) : "Before the first age");
-    rootBox.dataset.age = String(age);
-    const dir = age ? passDir(age) : 1;
-    passLine.replaceChildren(el("span", { class: `sc-pass-arrow ${dir > 0 ? "left" : "right"}`, "aria-hidden": "true" }), el("span", {}, el("span", { class: "sc-pass-word" }, "pass "), age ? (dir > 0 ? "left" : "right") : ""));
-    passLine.setAttribute("aria-label", age ? `Hands pass ${dir > 0 ? "left" : "right"}, to ${nameIn(dir > 0 ? around.left : around.right)}` : "");
-    if (acrossPill && view) {
-      const q = around.across;
-      acrossPill.replaceChildren(seatMark(q), el("span", { class: "sc-across-words" }, el("b", {}, nameOf(q)), el("small", {}, "across")), el("span", { class: "sc-across-stats", "aria-hidden": "true" }, coinEl(view.coins[q]), el("span", { class: "sc-sh" }, String(shields(view, q)))));
-      acrossPill.setAttribute("aria-label", `${nameOf(q)}, across the table (not a neighbour), ${seatWords(view, q)}. Show their city`);
+    const key = `${age}:${view?.round}`;
+    if (key !== topKey) {
+      topKey = key;
+      ageBadge.textContent = age ? ROMAN[age] : "·";
+      ageLine.textContent = age ? `Age ${ROMAN[age]}` : "Stonecrown";
+      turnLine.textContent = age ? `Turn ${Math.min(view.round, ROUNDS)} of ${ROUNDS} · ${passDir(age) > 0 ? "left" : "right"}` : "Dealing soon";
+      rootBox.dataset.age = String(age);
     }
     if (view) art.drawPile(view);
     art.pile.classList.toggle("dig", view?.phase === "dig");
@@ -580,9 +649,14 @@ function mountGame(session, root, shell) {
   function renderTable() {
     if (!view) return;
     const step = match?.step;
-    for (const [p, panel] of art.panels) panel.draw(view, { picked: (!!step?.commits[p] && !table.pending) || revealing.has(p) });
+    // Once you have picked, the stack coming to you next is ringed.
+    const done = picked?.key === turnKey() && !table.pending;
+    const coming = done && view.age && view.round < ROUNDS && view.phase === "pick" ? (passDir(view.age) > 0 ? around.right : around.left) : null;
+    art.drawSeats(view, { picked: (p) => (!!step?.commits[p] && !table.pending) || revealing.has(p), coming });
     art.drawMine(view);
+    art.drawRing(view);
     seatDialog.draw(view);
+    scoreNow.draw(view);
   }
 
   function renderDeck() {
@@ -628,9 +702,14 @@ function mountGame(session, root, shell) {
     renderDeck();
     renderHand();
     renderSide();
-    status.textContent = table.dealtLine(match, statusText());
+    if (view) art.drawShelf(view, light);
+    const text = table.dealtLine(match, statusText());
+    if (status.textContent !== text) status.textContent = text;
     status.className = `${table.cls("status")} ${choice ? `mine p-${me}` : ""}`;
     rootBox.classList.toggle("my-turn", !!choice);
+    // While you wait for the others and their picks turn over, your hand
+    // folds to a strip, so your city and the borders show on a laptop.
+    rootBox.classList.toggle("sc-waiting", !choice && match?.phase === "playing" && !!view?.hands[me]?.length && (!table.pending || current?.type === "picks"));
     renderTimer();
     renderResult();
     setTabAlert(choice ? "Your pick" : null);
@@ -784,11 +863,18 @@ function mountGame(session, root, shell) {
     sheet = null;
     sel = null;
     picked = null;
+    light = {};
+    warLine = "";
+    wars.length = 0;
     revealing.clear();
     leaving.clear();
     arriving.clear();
     hand.clear();
     seatDialog.close();
+    scoreNow.close();
+    art.war.close();
+    tips.hide();
+    status.setAttribute("aria-live", "polite");
     tuckedAge.clear();
     logList.replaceChildren();
     const opponents = listOf(seats.filter((p) => p !== me).map((p) => session.players[p].name));
@@ -857,6 +943,7 @@ function mountGame(session, root, shell) {
     clearTimeout(autoTimer);
     table.shuffling(false);
     drawDeck(false);
+    art.war.close();
     const judged = match?.phase === "starting" && previous ? previous : match;
     leaveNotice({ root, session, seat: seatLeft, match: judged, prefix: "sc", game: "Stonecrown", nameOf, facts: (s, p) => (s.age ? `${plural(score(s, p).total, "point")} so far` : "the game hadn't started") });
     render();
@@ -885,6 +972,10 @@ function mountGame(session, root, shell) {
       removeEventListener("keydown", onKey);
       document.removeEventListener("visibilitychange", onVisible);
       seatDialog.close();
+      scoreNow.close();
+      art.war.close();
+      art.war.node.remove();
+      tips.destroy();
       for (const off of offs) off();
     },
   };

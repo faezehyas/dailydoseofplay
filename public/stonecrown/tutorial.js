@@ -10,7 +10,7 @@ import { RuleError } from "../engine/turn-match.js";
 import { cardTable } from "../engine/cards/table.js";
 import { CARDS, WONDERS, HAND, deckRanges } from "./cards.js";
 import { makeRules, deckOf, movers, canBuild, canStage, passDir, ROUNDS } from "./rules.js";
-import { PACE, ROMAN, moveFor, pickOptions, warWords, resultWords, viewOf, turnWords, cityDialog, tableEl, scTable, scMotion, batches, buildPlan, stagePlan, detailNodes, handView, actButtons, picksList, scoreSheet } from "./art.js";
+import { PACE, ROMAN, moveFor, pickOptions, warWords, resultWords, viewOf, cityDialog, scoreDialog, explainer, seenAll, tableEl, scTable, scMotion, batches, buildPlan, stagePlan, costMatch, detailNodes, handView, handCaption, actButtons, picksList, scoreSheet } from "./art.js";
 import { play as sound } from "./sounds.js";
 import { PLAYERS, WONDER_KEYS, cards } from "./lessons.js";
 
@@ -132,19 +132,25 @@ const names = { left: NAMES[1], right: NAMES[2] };
 const nameOf = (p) => NAMES[p];
 const nameIn = (p) => (p ? NAMES[p] : "you");
 
-// The game's table, as in main.js: the top bar, your neighbours either side,
-// your wonder and city, your hand and what the card you tap can do. Tap a
-// card (or the arrow keys and Enter), then Build, Wonder stage or Sell for 3
-// (or B, W, S; Esc lets go). Everything moves and sounds as in the game.
+// The game's table, as in main.js: the top bar, your neighbours either side
+// with the borders between you, your wonder, the seat ring and your city,
+// your shelf and hand and what the card you tap can do. Tap a card (or the
+// arrow keys and Enter), then Build, Wonder stage or Sell for 3 (or B, W,
+// S; Esc lets go). Everything moves, sounds and explains itself as in the
+// game, but for the first-time hints, which the lessons make unneeded.
 export function board() {
   const table = cardTable({ prefix: "sc", play: sound, animate: () => {}, done: () => {} });
   const { live, fast, wait } = table;
-  const art = scTable(table, { me: 0, players: PLAYERS, nameOf, ageOf, onSeat: (p) => seatDialog.open(p, view) });
-  const seatDialog = cityDialog({ nameOf, ageOf, whereOf: (p) => (p === art.around.left ? "your left neighbour" : "your right neighbour") });
+  const wars = [];
+  const art = scTable(table, { me: 0, players: PLAYERS, nameOf, ageOf, sound, wars: () => wars, onSeat: (p) => seatDialog.open(p, view), onScore: () => scoreNow.open(view) });
+  const seatDialog = cityDialog({ nameOf, ageOf, me: 0, whereOf: (p) => (p === art.around.left ? "your left neighbour" : "your right neighbour") });
+  const scoreNow = scoreDialog({ me: 0, nameOf });
   let state = null;
   let view = null; // the table as drawn
   let moving = false;
   let sel = null; // { slot, build: purchase index, stage: purchase index }
+  let sent = null; // your last move, for what it bought
+  let light = {};
   const revealing = new Set(); // the others' pick marks stay up while the picks turn over
   const leaving = new Set();
   const arriving = new Set();
@@ -156,12 +162,13 @@ export function board() {
   const idOf = (slot) => DECK[slot] ?? -1;
 
   // ---------- the top bar ----------
-  const ageBadge = el("span", { class: "sc-age-badge", "aria-hidden": "true" });
+  const ageBadge = el("span", { class: "sc-age-badge" });
   const ageLine = el("b", { class: "sc-age" });
   const turnLine = el("small", { class: "sc-turn-line" });
-  const ageBox = el("div", { class: "sc-top-age", role: "group" }, ageBadge, el("span", { class: "sc-top-words" }, ageLine, turnLine));
-  const passLine = el("span", { class: "sc-pass" });
-  const top = el("div", { class: "sc-top" }, ageBox, passLine, art.bankBox, art.pile);
+  const ageBox = el("div", { class: "sc-top-age", "aria-hidden": "true", dataset: { tip: "turn" } }, ageBadge, el("span", { class: "sc-top-words" }, ageLine, turnLine));
+  const explainSlot = el("span", { class: "sc-explain-slot" });
+  const askBtn = el("button", { class: "btn sc-ask", type: "button", id: "sc-ask", "aria-pressed": "false", "aria-label": "Explain mode: tap anything to hear what it means (?)", onclick: () => explain() }, "?");
+  const top = el("div", { class: "sc-top" }, ageBox, explainSlot, art.bankBox, art.pile, askBtn);
 
   // ---------- your hand, the buttons and the detail strip (art.js's, as in the game) ----------
   const hand = handView({ onSelect: (slot) => select(slot) });
@@ -171,8 +178,9 @@ export function board() {
   const handArea = el(
     "section",
     { class: "sc-hand-area", "aria-label": "Your move" },
-    el("div", { class: "sc-hand-head" }, el("h2", { class: "sc-title" }, hand.title), picks.node, hand.next),
-    el("div", { class: "sc-hand-wrap" }, hand.node),
+    el("div", { class: "sc-hand-head" }, el("div", { class: "sc-hand-words" }, el("h2", { class: "sc-title" }, hand.title), hand.next), picks.node),
+    art.shelf,
+    el("div", { class: "sc-hand-wrap", dataset: { tip: "hand" } }, hand.node),
     buttons.node,
     el("div", { class: "sc-side" }, detail),
   );
@@ -185,12 +193,24 @@ export function board() {
     top,
     el("div", { class: "sc-main" }, art.panels.get(art.around.left).node, art.mine, art.panels.get(art.around.right).node, handArea),
     seatDialog.node,
+    scoreNow.node,
+    art.war.node,
     warLine,
     table.flyLayer,
   );
+  const tips = explainer(node, { view: () => view, me: 0, nameOf, bar: explainSlot, memory: seenAll, onExplain: () => syncAsk() });
+  function syncAsk() {
+    askBtn.setAttribute("aria-pressed", String(tips.explaining()));
+    node.classList.toggle("sc-explain-on", tips.explaining());
+  }
+  function explain() {
+    tips.explain();
+    syncAsk();
+  }
 
   // ---------- your choices ----------
   const send = (move) => {
+    sent = move;
     sound("pick");
     moveFn(move);
   };
@@ -214,9 +234,13 @@ export function board() {
     send(plan.move);
   }
 
-  // B, W and S build, raise a stage or sell; Esc lets go of the card.
+  // B, W and S build, raise a stage or sell; Esc lets go of the card; ? turns Explain mode on and off.
   addEventListener("keydown", (e) => {
-    if (!node.isConnected || e.target.closest?.("input, textarea, dialog") || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if (!node.isConnected || e.target.closest?.("input, textarea, dialog, .ws") || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if (e.key === "?") {
+      e.preventDefault();
+      return explain();
+    }
     if (e.key === "Escape" && sel) {
       const slot = sel.slot;
       sel = null;
@@ -236,12 +260,8 @@ export function board() {
     const age = view.age;
     ageBadge.textContent = ROMAN[age];
     ageLine.textContent = `Age ${ROMAN[age]}`;
-    turnLine.textContent = `Turn ${Math.min(view.round, ROUNDS)} of ${ROUNDS}`;
-    ageBox.setAttribute("aria-label", turnWords(age, view.round));
+    turnLine.textContent = `Turn ${Math.min(view.round, ROUNDS)} of ${ROUNDS} · ${passDir(age) > 0 ? "left" : "right"}`;
     node.dataset.age = String(age);
-    const dir = passDir(age);
-    passLine.replaceChildren(el("span", { class: `sc-pass-arrow ${dir > 0 ? "left" : "right"}`, "aria-hidden": "true" }), el("span", {}, el("span", { class: "sc-pass-word" }, "pass "), dir > 0 ? "left" : "right"));
-    passLine.setAttribute("aria-label", `Hands pass ${dir > 0 ? "left" : "right"}, to ${nameIn(dir > 0 ? art.around.left : art.around.right)}`);
     art.drawPile(view);
   }
 
@@ -249,7 +269,6 @@ export function board() {
     const slots = view.hands[0];
     const can = choosing();
     if (sel && !slots.includes(sel.slot)) sel = null;
-    const to = passDir(view.age) > 0 ? art.around.left : art.around.right;
     hand.draw({
       slots,
       age: view.age,
@@ -260,23 +279,25 @@ export function board() {
       hidden: (slot) => leaving.has(slot) || arriving.has(slot),
       fast: fast(),
       title: state.winner !== -1 ? "Your hand" : view.round === ROUNDS && slots.length === 2 && can ? "Your hand · last turn of the age" : can ? "Your hand · pick one" : "Your hand",
-      next: slots.length > 1 && view.round < ROUNDS ? `then passes to ${nameIn(to)} ${passDir(view.age) > 0 ? "◂" : "▸"}` : "",
+      next: handCaption(view, 0, nameIn),
     });
   }
 
   function drawSide() {
     const can = choosing();
+    light = {};
     if (!can) {
       buttons.none();
       detail.replaceChildren();
     } else if (!sel) {
       buttons.idle();
-      detail.replaceChildren(el("p", { class: "sc-hint" }, "Tap a card to see what you can do with it."));
+      detail.replaceChildren(el("p", { class: "sc-hint" }, "Tap a card to see what you can do with it. Its badge says what building it takes."));
     } else {
       const o = optionsFor(sel.slot);
       const [b, s] = plans(o);
       buttons.pick(o, b, s);
-      detail.replaceChildren(...detailNodes(o, b, s, names, { onOther: (kind) => ((sel[kind] += 1), draw()) }));
+      light = costMatch(state, 0, o, b, s)?.light ?? {};
+      detail.replaceChildren(...detailNodes(o, b, s, names, { onOther: (kind) => ((sel[kind] += 1), draw()), state, me: 0 }));
     }
     detail.hidden = !detail.childNodes.length;
     // Teal and Violet have picked already: they wait for you.
@@ -285,11 +306,14 @@ export function board() {
 
   function draw() {
     drawTop();
-    for (const [p, panel] of art.panels) panel.draw(view, { picked: (choosing() || revealing.has(p)) && p !== 0 });
+    art.drawSeats(view, { picked: (p) => (choosing() || revealing.has(p)) && p !== 0 });
     art.drawMine(view);
+    art.drawRing(view);
     drawHand();
     drawSide();
+    art.drawShelf(view, light);
     seatDialog.draw(view);
+    scoreNow.draw(view);
   }
 
   // ---------- motion: the game's (art.js), for the events a lesson has ----------
@@ -305,6 +329,10 @@ export function board() {
     revealing,
     draw,
     sound,
+    buyOf: () => sent?.buy ?? null,
+    onWar: (ev, facts, done) => {
+      if (done) wars[ev.age - 1] = ev.results;
+    },
     said: (kind, ev) => kind === "war" && (warLine.textContent = warWords(ev.results, 0, ev.age, nameIn)),
   });
 
@@ -343,17 +371,19 @@ export function board() {
     cell(c) {
       const n = Number(c.split("-").at(-1));
       if (c.startsWith("card-")) return hand.card(n) ?? hand.node;
-      if (c.startsWith("chip-")) return art.cityBox.querySelector(`.sc-chip[data-id="${n}"]`) ?? art.cityBox;
+      if (c.startsWith("chip-")) return art.chipFor(n);
       if (c.startsWith("seat-")) return art.panels.get(n).node;
-      if (c.startsWith("sells-")) return art.panels.get(n).node.querySelector(".sc-seat-sells");
+      if (c.startsWith("sells-")) return art.panels.get(n).border.node.querySelector(".sc-border-sells");
       if (c === "total") return sheet?.node.querySelector(`tfoot td:nth-child(${sheetColumn() + 2})`) ?? art.boardBox;
-      return { build: buttons.build, stage: buttons.stage, sell: buttons.sell, detail, board: art.boardBox, city: art.cityBox, coins: art.mine.querySelector(".sc-me-stats .coins"), shields: art.mine.querySelector(".sc-me-stats .shields"), tokens: art.mine.querySelector(".sc-me-stats .sc-tokens"), age: ageBox, pass: passLine, pile: art.pile, picks }[c];
+      return { build: buttons.build, stage: buttons.stage, sell: buttons.sell, detail, board: art.boardBox, city: art.cityBox, coins: art.mine.querySelector(".sc-me-stats .coins"), shields: art.mine.querySelector(".sc-me-stats .shields"), tokens: art.mine.querySelector(".sc-me-stats .sc-tokens"), age: ageBox, pass: art.ring.node, pile: art.pile, picks, shelf: art.shelf }[c];
     },
     onMove: (fn) => (moveFn = fn),
     async render(st, played) {
       if (st !== state) sel = null;
       if (!played) {
         table.reset();
+        art.war.close();
+        tips.hide();
         finalBox?.remove();
         sheet = finalBox = null;
         state = st;
@@ -361,6 +391,7 @@ export function board() {
         revealing.clear();
         leaving.clear();
         arriving.clear();
+        wars.length = 0;
         view = viewOf(st);
         return draw();
       }
