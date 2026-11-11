@@ -138,6 +138,11 @@ flowchart TB
     g_pieces["pieces.js<br>Hexlands and Stonecrown"]
     g_card_art["card-art.js<br>Hexlands and Stonecrown"]
     g_cards["cards.js<br>Stonecrown only"]
+    g_tips["tips.js<br>Stonecrown only"]
+    g_store["store.js<br>Stonecrown only"]
+    g_border["border.js<br>Stonecrown only"]
+    g_war["war.js<br>Stonecrown only"]
+    g_ring["ring.js<br>Stonecrown only"]
   end
   subgraph engine ["Engine: public/engine/"]
     e_boot["boot.js<br>static pages"]
@@ -270,6 +275,24 @@ flowchart TB
   g_tiles --> g_board
   g_tiles --> g_card_art
   g_pieces --> g_board
+  g_tips --> e_shell
+  g_tips --> g_cards
+  g_tips --> g_rules
+  g_tips --> g_card_art
+  g_store --> e_shell
+  g_store --> g_cards
+  g_store --> g_rules
+  g_border --> e_shell
+  g_border --> g_cards
+  g_border --> g_card_art
+  g_border --> g_pieces
+  g_border --> g_rules
+  g_war --> e_shell
+  g_war --> g_cards
+  g_war --> g_rules
+  g_ring --> e_shell
+  g_ring --> g_card_art
+  g_ring --> g_rules
   g_rules --> g_cards
   g_robot --> g_cards
   g_card_art --> g_cards
