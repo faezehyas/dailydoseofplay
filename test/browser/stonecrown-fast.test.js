@@ -156,3 +156,100 @@ test("Stonecrown's Halicarnassus digs through the discards by tapping: a card bu
   assert.ok(!digs.includes("Build nothing did nothing"), "Build nothing works before a card is tapped");
   assertNoErrors();
 });
+
+// The tip layer on its own, over a few targets of its own: a hover or a hold
+// whose target leaves the page opens nothing and says nothing; an open tip is
+// not rebuilt while unrelated parts of the page change, and closes at once
+// when its target goes; Explain mode makes stops only of what a screen reader
+// can name, explains them on Enter, and hands focus back when Done is pressed.
+test("Stonecrown's tips: gone targets open nothing, open tips aren't rebuilt, Explain mode's stops and Done", { skip, timeout: 60_000 }, async (t) => {
+  const { srv, open, assertNoErrors } = await openBrowser(t);
+  const page = await open("tips", { viewport: { width: 1000, height: 700 }, hasTouch: true });
+  await page.goto(`${srv.base}/privacy/`);
+  const out = await page.evaluate(async () => {
+    const { tipLayer } = await import("/stonecrown/tips.js");
+    const { kit } = await import("/stonecrown/art.js");
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const root = document.createElement("div");
+    root.innerHTML = `<button id="toggle">?</button><span id="bar"></span><p id="clock">30 s</p>
+      <button id="card" data-tip="card" data-tip-on="hold" style="display:inline-block;width:80px;height:100px">card</button>
+      <span id="plain" data-tip="coins" style="display:inline-block;width:40px;height:20px">3</span>
+      <span aria-hidden="true"><span id="muted" data-tip="coins">3</span></span>
+      <span role="img" aria-label="a picture"><span id="inimg" data-tip="coins">3</span></span>
+      <button id="host"><span id="inbutton" data-tip="coins">3</span></button>`;
+    document.body.append(root);
+    const $ = (id) => document.getElementById(id);
+    let built = 0;
+    const layer = tipLayer(root, {
+      words: (kind) => (built++, kind === "card" ? { title: "Ramparts", body: "Two shields.", card: 1 } : { title: "Coins", body: "Three coins." }),
+      kit,
+      bar: $("bar"),
+      focusBack: $("toggle"),
+      holdMs: 120,
+    });
+    const bubble = () => document.querySelector(".sc-tip");
+    const live = () => root.querySelector("[aria-live]").textContent;
+    const shown = () => !!bubble() && !bubble().hidden;
+    const r = {};
+    const at = (node, type, pointerType = "touch") => {
+      const b = node.getBoundingClientRect();
+      node.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerType, clientX: b.x + 5, clientY: b.y + 5, button: 0 }));
+    };
+    // A hold whose card leaves (a hand passed on) before the hold is up.
+    const card = $("card");
+    at(card, "pointerdown");
+    card.remove();
+    await sleep(250);
+    r.holdGone = { shown: shown(), live: live() };
+    root.append(card);
+    // A hover whose target leaves before the hover delay.
+    const plain = $("plain");
+    at(plain, "pointermove", "mouse");
+    plain.remove();
+    await sleep(400);
+    r.hoverGone = { shown: shown(), live: live() };
+    root.append(plain);
+    // A held card opens its zoom; ticks of an unrelated clock leave it as it is.
+    at(card, "pointerdown");
+    await sleep(250);
+    at(card, "pointerup");
+    const zoom = bubble()?.querySelector(".sc-tip-card");
+    r.opened = { shown: shown(), zoom: !!zoom, live: live() };
+    for (let i = 0; i < 6; i++) {
+      $("clock").textContent = `${29 - i} s`;
+      await frame();
+    }
+    r.kept = bubble()?.querySelector(".sc-tip-card") === zoom;
+    // Its card leaves the page: the tip closes at once, its words gone.
+    card.remove();
+    await Promise.resolve();
+    r.closed = { shown: shown(), text: bubble()?.textContent ?? "", live: live() };
+    // Explain mode: stops only where a screen reader can name them.
+    layer.explain(true);
+    r.stops = Object.fromEntries(["plain", "muted", "inimg", "inbutton"].map((id) => [id, $(id).getAttribute("tabindex")]));
+    $("plain").focus();
+    $("plain").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    r.enter = { shown: shown(), live: live() };
+    // Done, pressed from the keyboard, gives focus back to the toggle.
+    const done = [...root.querySelectorAll(".sc-explain-bar button")].find((b) => b.textContent === "Done");
+    done.focus();
+    done.click();
+    r.done = { explaining: layer.explaining(), focus: document.activeElement?.id || document.activeElement?.tagName, bar: !!root.querySelector(".sc-explain-bar") };
+    layer.destroy();
+    root.remove();
+    return r;
+  });
+  assert.deepEqual(out.holdGone, { shown: false, live: "" }, "a hold on a card passed on opens and says nothing");
+  assert.deepEqual(out.hoverGone, { shown: false, live: "" }, "a hover on a target gone opens nothing");
+  assert.equal(out.opened.shown, true);
+  assert.equal(out.opened.zoom, true);
+  assert.match(out.opened.live, /Ramparts/);
+  assert.equal(out.kept, true, "the card's zoom is not rebuilt while the clock ticks");
+  assert.deepEqual(out.closed, { shown: false, text: "", live: "" }, "the tip and its words leave with the card");
+  assert.deepEqual(out.stops, { plain: "0", muted: null, inimg: null, inbutton: null }, "no silent stops in Explain mode");
+  assert.equal(out.enter.shown, true, "Enter explains a stop");
+  assert.match(out.enter.live, /Three coins/);
+  assert.deepEqual(out.done, { explaining: false, focus: "toggle", bar: false }, "Done hands focus back to the toggle");
+  assertNoErrors();
+});

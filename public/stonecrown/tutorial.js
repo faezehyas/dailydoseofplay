@@ -194,7 +194,7 @@ export function board() {
     warLine,
     table.flyLayer,
   );
-  const tips = explainer(node, { view: () => view, me: 0, nameOf, bar: explainSlot, memory: seenAll, onExplain: () => syncAsk() });
+  const tips = explainer(node, { view: () => view, me: 0, nameOf, bar: explainSlot, memory: seenAll, focusBack: askBtn, onExplain: () => syncAsk() });
   function syncAsk() {
     askBtn.setAttribute("aria-pressed", String(tips.explaining()));
     node.classList.toggle("sc-explain-on", tips.explaining());

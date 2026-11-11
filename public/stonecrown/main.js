@@ -199,7 +199,7 @@ function mountGame(session, root, shell) {
   root.append(rootBox);
 
   // Everything on the table explains itself: hover, focus, press and hold, or a tap in Explain mode.
-  const tips = explainer(rootBox, { view: () => view, me, nameOf, bar: explainSlot, onExplain: () => syncAsk() });
+  const tips = explainer(rootBox, { view: () => view, me, nameOf, bar: explainSlot, focusBack: askBtn, onExplain: () => syncAsk() });
   function syncAsk() {
     askBtn.setAttribute("aria-pressed", String(tips.explaining()));
     rootBox.classList.toggle("sc-explain-on", tips.explaining());

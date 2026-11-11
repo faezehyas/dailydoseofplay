@@ -588,8 +588,9 @@ function legendBadge(kind) {
 // One tip layer over a table: every data-tip under root explains itself from
 // the table as drawn (view()); bar: where Explain mode's bar sits; memory:
 // the first-time hints' store (tips.js hints()), or one that has seen them all.
-export function explainer(root, { view, me, nameOf, bar = true, memory = hints(), onExplain = () => {} }) {
+export function explainer(root, { view, me, nameOf, bar = true, memory = hints(), onExplain = () => {}, focusBack = null }) {
   return tipLayer(root, {
+    focusBack,
     words: (kind, t) => (view() ? tipWords(kind, argsOf(t), { state: view(), me, nameOf }) : null),
     kit,
     bar,

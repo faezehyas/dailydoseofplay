@@ -721,7 +721,9 @@ let made = 0;
 // legendIcons: { kind: (value) → Node } to draw a legend icon your own way.
 // bar: Explain mode's bar (Tap to explain · All icons · Done): true floats it at
 // the top of the screen, an element holds it in place there, false leaves it out.
-export function tipLayer(root, { words, kit = null, hints: memory = hints(), onExplain = () => {}, legendIcons = {}, holdMs = 450, bar = true } = {}) {
+// focusBack: where focus goes (an element, or a function giving one) when
+// Explain mode ends while focus is in its bar or on a target it made focusable.
+export function tipLayer(root, { words, kit = null, hints: memory = hints(), onExplain = () => {}, legendIcons = {}, holdMs = 450, bar = true, focusBack = null } = {}) {
   const doc = root.ownerDocument;
   const win = doc.defaultView;
   const id = `sc-tip-${++made}`;
@@ -735,6 +737,8 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
   let hover = 0;
   let hold = 0;
   let held = null;
+  let holding = null;
+  let filled = "";
   let swallow = false;
   let swallowTimer = 0;
   let legendDialog = null;
@@ -815,14 +819,19 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
     }
   }
 
+  // A target gone from the page (a hand passed on while a timer ran) opens nothing.
   function show(t, via, quiet = false) {
     clearTimeout(hover);
+    if (!t.isConnected) return hide();
     const w = wordsFor(t);
     if (!w) return hide();
     if (target && target !== t) unmark(target);
     target = t;
     how = via;
-    fill(w);
+    // The same words stay as they are: a card's zoom doesn't start again.
+    const key = JSON.stringify([w.title, w.body, w.more ?? [], w.card ?? null]);
+    if (key !== filled || bubble.hidden) fill(w);
+    filled = key;
     const host = hostOf(t);
     if (bubble.parentNode !== host) host.append(bubble);
     bubble.hidden = false;
@@ -844,6 +853,7 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
     bubble.hidden = true;
     // Words about a card in a hand passed on must not stay in the page.
     bubble.replaceChildren();
+    filled = "";
     live.textContent = "";
   }
   // The same thing redrawn (a new turn): follow it, and refresh its words.
@@ -860,9 +870,12 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
     }
     show(target, how, true);
   }
+  // A stop only where a screen reader can name it: not inside something
+  // hidden from it, a picture or another control.
+  const silent = (t) => t.getAttribute("aria-hidden") === "true" || !!t.parentElement?.closest('[aria-hidden="true"], [role="img"], button, a[href]');
   function tag(on) {
     for (const t of root.querySelectorAll("[data-tip]")) {
-      if (on && !t.matches(FOCUSABLE)) {
+      if (on && !t.matches(FOCUSABLE) && !silent(t)) {
         t.setAttribute("tabindex", "0");
         t.setAttribute("data-tip-tab", "");
       } else if (!on && t.hasAttribute("data-tip-tab")) {
@@ -877,6 +890,15 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
   const watch = new MutationObserver((records) => {
     if (!records.some(relevant)) return;
     if (explaining) tag(true);
+    // A hover or a hold waiting on a target that has left opens nothing.
+    if (pending && !pending.isConnected) {
+      clearTimeout(hover);
+      pending = null;
+    }
+    if (holding && !holding.isConnected) {
+      clearTimeout(hold);
+      held = holding = null;
+    }
     // A target gone from the page (a hand passed on) takes its words with it at once.
     if (target && !target.isConnected) {
       if (frame) win.cancelAnimationFrame(frame);
@@ -910,7 +932,10 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
       pending = null;
       if (!t || holdOnly(t)) return void (how === "hover" && hide());
       pending = t;
-      hover = setTimeout(() => ((pending = null), show(t, "hover")), target ? 60 : 220);
+      hover = setTimeout(() => {
+        pending = null;
+        if (t.isConnected) show(t, "hover");
+      }, target ? 60 : 220);
     }),
     on(root, "pointerout", (e) => {
       if (e.pointerType !== "mouse") return;
@@ -941,8 +966,10 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
       if (!t || (e.pointerType === "mouse" && (!holdOnly(t) || e.button !== 0))) return;
       clearTimeout(hold);
       held = { x: e.clientX, y: e.clientY };
+      holding = t;
       hold = setTimeout(() => {
-        held = null;
+        held = holding = null;
+        if (!t.isConnected) return;
         swallow = true;
         clearTimeout(swallowTimer);
         swallowTimer = setTimeout(() => (swallow = false), 900);
@@ -952,11 +979,11 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
     on(root, "pointermove", (e) => {
       if (held && Math.hypot(e.clientX - held.x, e.clientY - held.y) > 10) {
         clearTimeout(hold);
-        held = null;
+        held = holding = null;
       }
     }),
-    on(root, "pointerup", () => (clearTimeout(hold), (held = null))),
-    on(root, "pointercancel", () => (clearTimeout(hold), (held = null))),
+    on(root, "pointerup", () => (clearTimeout(hold), (held = holding = null))),
+    on(root, "pointercancel", () => (clearTimeout(hold), (held = holding = null))),
     on(root, "contextmenu", (e) => {
       if (tipOf(e.target) && (held || swallow || explaining)) e.preventDefault();
     }),
@@ -981,10 +1008,11 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
       },
       true,
     ),
+    // Enter or Space on a target that isn't a control explains it (a control's click is caught above).
     on(root, "keydown", (e) => {
       if (!explaining || (e.key !== "Enter" && e.key !== " ")) return;
       const t = tipOf(e.target);
-      if (!t || e.target !== t || !t.hasAttribute("data-tip-tab")) return;
+      if (!t || e.target !== t || t.matches("button, a[href], input, select, textarea, summary")) return;
       e.preventDefault();
       if (target === t && how === "tap") hide();
       else show(t, "tap");
@@ -1044,6 +1072,9 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
     if (next === explaining) return explaining;
     explaining = next;
     root.classList.toggle("sc-explaining", explaining);
+    // Focus in the bar, or on a stop that is about to stop being one, goes back to the toggle.
+    const f = doc.activeElement;
+    if (!explaining && f && (barNode?.contains(f) || f.hasAttribute?.("data-tip-tab"))) (typeof focusBack === "function" ? focusBack() : focusBack)?.focus({ preventScroll: true });
     tag(explaining);
     if (!explaining && how === "tap") hide();
     if (bar) {
@@ -1144,8 +1175,9 @@ export function tipLayer(root, { words, kit = null, hints: memory = hints(), onE
     if (frame) win.cancelAnimationFrame(frame);
     watch.disconnect();
     for (const f of off) f();
-    coaching?.close();
+    // The queue empties first, so closing the open hint shows no next one.
     for (const job of coachQueue.splice(0)) job.resolve(false);
+    coaching?.close();
     bubble.remove();
     live.remove();
     barNode?.remove();
