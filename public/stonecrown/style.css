@@ -2084,10 +2084,9 @@
 }
 
 .sc-hand-area > .sc-shelf .sc-shelf-fixed {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   grid-template-columns: minmax(0, 4fr) minmax(0, 3fr);
   gap: 10px;
-  min-width: 0;
 }
 
 .sc-hand-area > .sc-shelf .sc-shelf-group {
@@ -2173,6 +2172,48 @@
 
   .sc-hand-area > .sc-shelf .sc-slot-n {
     font-size: 0.9rem;
+  }
+
+  /* Each slot as wide as it needs: what you don't make is its dimmed icon alone. */
+  .sc-hand-area > .sc-shelf .sc-shelf-fixed,
+  .sc-hand-area > .sc-shelf .sc-shelf-group {
+    display: flex;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-shelf-group {
+    flex: 1 1 auto;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-slot {
+    flex: 1 1 auto;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-slot.none {
+    grid-template-columns: auto;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-slot.none .sc-slot-n {
+    display: none;
+  }
+}
+
+/* The narrowest phones: smaller icons, so seven slots with counts still fit. */
+@container (max-width: 330px) {
+  .sc-hand-area > .sc-shelf .sc-shelf-group {
+    gap: 2px;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-slot {
+    padding: 1px;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-slot-ic > .sc-ic {
+    width: 17px;
+    height: 17px;
+  }
+
+  .sc-hand-area > .sc-shelf .sc-slot-n {
+    font-size: 0.8rem;
   }
 }
 
