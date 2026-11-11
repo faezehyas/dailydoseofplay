@@ -565,7 +565,7 @@ export function recapWords(view, me, x) {
 
 // ---------- tips ----------
 // The legend's border pieces, cut from the real border art.
-const CROPS = { ferry: "86 28 68 34", bridge: "86 28 68 34", stall: "44 30 56 28", walls: "0 14 72 36" };
+const CROPS = { ferry: "86 28 68 34", bridge: "86 28 68 34", stall: "44 30 56 28", walls: "28 12 76 38" };
 function borderCrop(name) {
   if (name === "flags") return el("span", { class: "sc-border-flags sc-legend-flags", "aria-hidden": "true" }, el("i", { class: "won" }), el("i", { class: "lost" }), el("i", { class: "open" }));
   if (!CROPS[name]) return null;

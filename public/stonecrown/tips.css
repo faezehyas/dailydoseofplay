@@ -649,9 +649,16 @@
     grid-template-columns: 70px minmax(0, 1fr);
   }
 
-  .sc-legend-ic .sc-tip-badge {
+  .sc-legend-ic .sc-tip-badge,
+  .sc-legend-ic .sc-tag {
     padding: 3px 6px;
-    font-size: 0.68rem;
+    font-size: 0.62rem;
+  }
+
+  .sc-legend-ic .sc-tag {
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
   }
 
   .sc-legend-body {
