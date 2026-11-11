@@ -252,7 +252,7 @@ function mountGame(session, root, shell) {
       const r = hand.card(slot) ? table.rectIn(hand.card(slot)) : null;
       return r?.w ? r : r ? table.rectIn(handArea) : art.rectsOf(me).pick();
     },
-    handBox: () => hand.node,
+    handBox: () => (hand.node.getClientRects().length ? hand.node : handArea),
     leaving,
     arriving,
     revealing,
@@ -699,9 +699,10 @@ function mountGame(session, root, shell) {
     if (status.textContent !== text) status.textContent = text;
     status.className = `${table.cls("status")} ${choice ? `mine p-${me}` : ""}`;
     rootBox.classList.toggle("my-turn", !!choice);
-    // While you wait for the others and their picks turn over, your hand
-    // folds to a strip, so your city and the borders show on a laptop.
-    rootBox.classList.toggle("sc-waiting", !choice && match?.phase === "playing" && !!view?.hands[me]?.length && (!table.pending || current?.type === "picks"));
+    // While you wait for the others, their picks turn over and the hands
+    // pass, your hand folds to a strip, so your city and the borders show on
+    // a laptop; it opens as the cards passed to you land.
+    rootBox.classList.toggle("sc-waiting", !choice && match?.phase === "playing" && !!view?.hands[me]?.length && (!table.pending || current?.type === "picks" || (current?.type === "pass" && !arriving.size)));
     renderTimer();
     renderResult();
     setTabAlert(choice ? "Your pick" : null);
