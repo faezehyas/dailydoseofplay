@@ -302,6 +302,9 @@ export async function createApp({
   const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
   wss.on("connection", (ws, req) => signaling.handleConnection(ws, req));
   server.on("upgrade", (req, socket, head) => {
+    // Node hands this socket over with no "error" listener: a client that hangs
+    // up while we refuse it would otherwise stop the server.
+    socket.on("error", () => socket.destroy());
     if (pathOf(req.url) !== "/ws") return socket.destroy();
     if (!wsOriginAllowed(req.headers, extraOrigins)) {
       socket.once("finish", () => socket.destroy());

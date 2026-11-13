@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { once } from "node:events";
+import { EventEmitter, once } from "node:events";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -319,6 +319,26 @@ test("lobby socket: ALLOWED_ORIGINS is read from the environment", async (t) => 
   const wsUrl = `ws://127.0.0.1:${server.address().port}/ws`;
   assert.equal(await handshake(wsUrl, { origin: "https://staging.example" }), 101);
   assert.equal(await handshake(wsUrl, { origin: "https://other.example" }), 403);
+});
+
+test("lobby socket: a connection that breaks during a refused handshake doesn't stop the server", async (t) => {
+  const { server } = await createApp({ accounts: { off: true }, log: () => {} });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const { port } = server.address();
+  // Node hands over the socket of an upgrade request with no "error" listener,
+  // and an "error" nobody listens for ends the process.
+  const refused = [
+    { url: "/ws", headers: { host: `127.0.0.1:${port}`, origin: "https://evil.example" } },
+    { url: "/elsewhere", headers: { host: `127.0.0.1:${port}` } },
+  ];
+  for (const req of refused) {
+    const socket = Object.assign(new EventEmitter(), { destroyed: false, end() {}, destroy() { this.destroyed = true; } });
+    server.emit("upgrade", req, socket, Buffer.alloc(0));
+    assert.doesNotThrow(() => socket.emit("error", Object.assign(new Error("write EPIPE"), { code: "EPIPE" })), req.url);
+    assert.ok(socket.destroyed, `${req.url}: the socket is closed`);
+  }
+  assert.equal((await fetch(`http://127.0.0.1:${port}/healthz`)).status, 200);
 });
 
 test("wsOriginAllowed: whole-host match, rewritten Host plus X-Forwarded-Host", () => {
