@@ -56,9 +56,10 @@ const random = (bytes) => randomBytes(bytes).toString("base64url");
 const same = (a, b) => typeof a === "string" && typeof b === "string" && a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const publicUser = (user) => ({ id: user.id, name: user.name, email: user.email });
 
-// A path on this site to come back to after signing in, else "/".
+// A path on this site to come back to after signing in, else "/". Printable
+// ASCII only: it goes into a Location header, which can't carry anything else.
 function safeReturn(value) {
-  return typeof value === "string" && value.length <= 300 && /^\/(?![/\\])[^\s\\]*$/.test(value) ? value : "/";
+  return typeof value === "string" && value.length <= 300 && /^\/(?![/\\])[!-[\]-~]*$/.test(value) ? value : "/";
 }
 
 function cookieJar(req) {
@@ -316,16 +317,24 @@ export function createAccounts({ config = accountsConfig(), store, google: googl
   }
 
   return {
+    // Never rejects: nothing awaits it, and a rejection nobody handles stops the server.
     async handle(req, res, pathname) {
-      const { status, body, location, allow, cookies = [] } = await route(req, pathname);
-      res.writeHead(status, {
-        ...headers,
-        "Cache-Control": "no-store",
-        ...(cookies.length ? { "Set-Cookie": cookies } : {}),
-        ...(allow ? { Allow: allow } : {}),
-        ...(location ? { Location: location } : { "Content-Type": "application/json; charset=utf-8" }),
-      });
-      res.end(location ? undefined : JSON.stringify(body));
+      try {
+        const { status, body, location, allow, cookies = [] } = await route(req, pathname);
+        res.writeHead(status, {
+          ...headers,
+          "Cache-Control": "no-store",
+          ...(cookies.length ? { "Set-Cookie": cookies } : {}),
+          ...(allow ? { Allow: allow } : {}),
+          ...(location ? { Location: location } : { "Content-Type": "application/json; charset=utf-8" }),
+        });
+        res.end(location ? undefined : JSON.stringify(body));
+      } catch (err) {
+        log(`accounts: request failed (${err.code || err.name})`);
+        if (res.headersSent) return res.destroy();
+        res.writeHead(500, { ...headers, "Cache-Control": "no-store", "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ error: "server_error" }));
+      }
     },
     // Forgets old rate-limit entries and used states; expired sessions go once an hour.
     sweep() {

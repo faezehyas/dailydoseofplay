@@ -331,7 +331,14 @@ test("return path: only a path on this site", async (t) => {
   for (const back of ["//evil.example/", "https://evil.example/", "/\\evil.example", "javascript:alert(1)", "/a b"]) {
     assert.equal((await b.signIn(back)).headers.get("location"), "/", back);
   }
+  // A Location header can't carry these: left in, the redirect would throw.
+  for (const [back, why] of [["/ludo/\u20ac", "outside ASCII"], ["/ludo/\u0001", "a control character"], ["/ludo/\u007f", "delete"]]) {
+    const res = await b.signIn(back);
+    assert.equal(res.status, 302, why);
+    assert.equal(res.headers.get("location"), "/", why);
+  }
   assert.equal((await b.signIn("/hearts/?room=ABCD&key=k")).headers.get("location"), "/hearts/?room=ABCD&key=k");
+  assert.equal((await b.signIn("/ludo/%E2%82%AC")).headers.get("location"), "/ludo/%E2%82%AC", "an encoded path is plain text");
 });
 
 test("rate limits: 10 auth requests a minute per address, 5 new accounts an hour", async (t) => {
