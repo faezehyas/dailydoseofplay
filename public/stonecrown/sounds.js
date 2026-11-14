@@ -451,12 +451,20 @@ const SYNTH = {
       lyre(a, o, t + 0.38, note(7), 0.085, 0.8);
       return;
     }
-    for (const [at, pitch, k] of [[0, 0.92, 0.6], [0.15, 1.08, 0.68], [0.29, 0.98, 0.76], [0.42, 1.14, 0.85]]) block(a, o, t + vary(at, 0.04), 0.15 * k, vary(pitch, 0.03));
+    // Stone meets stone with a small bright chip, which a phone's speaker
+    // carries when it can't carry the weight.
+    const chip = (at, gain) => noise(a, o, at, { dur: 0.012, gain, freq: vary(2300, 0.08), q: 1.4 });
+    for (const [at, pitch, k] of [[0, 0.92, 0.6], [0.15, 1.08, 0.68], [0.29, 0.98, 0.76], [0.42, 1.14, 0.85]]) {
+      const set = t + vary(at, 0.04);
+      block(a, o, set, 0.15 * k, vary(pitch, 0.03));
+      chip(set, 0.1 * k);
+    }
     wash(a, o, t + 0.55, { freq: 2100, to: 1100, q: 2.2, dur: 0.09, gain: 0.04, rise: 0.6 });
     block(a, o, t + 0.64, 0.22, 0.78);
+    chip(t + 0.64, 0.12);
     tone(a, o, t + 0.64, { freq: 120, to: 80, dur: 0.12, gain: 0.08, attack: 0.005 });
     lyre(a, o, t + 0.66, note(-2), 0.085, 1.4);
-    lyre(a, o, t + 0.66, note(3), 0.03, 1);
+    lyre(a, o, t + 0.66, note(3), 0.05, 1);
   },
   // The stacks of hands dragged round to the next seat: the weight of a
   // stack on the table, its pitch climbing going left and falling going
@@ -493,10 +501,12 @@ const SYNTH = {
     shieldTap(a, o, t, vary(0.12, 0.08), vary(1 + 0.025 * step, 0.01));
   },
   // The result stamped on a border: the block comes down on the paper and
-  // the table under it. A win rings a bright fifth, a loss a low string, a
-  // draw only knocks. The token's own fanfare or thud follows.
+  // the table under it. A win rings a bright fifth, a loss a low string and
+  // its octave, a draw only knocks twice. The token's own fanfare or thud
+  // follows.
   stamp: (a, o, t, { result = 0 } = {}) => {
-    noise(a, o, t, { dur: 0.03, gain: 0.2, freq: 1100, q: 1 });
+    noise(a, o, t, { dur: 0.03, gain: 0.3, freq: 1100, q: 1 });
+    noise(a, o, t, { dur: 0.024, gain: 0.17, freq: 2000, q: 1.2 });
     noise(a, o, t, { dur: 0.012, gain: 0.05, type: "highpass", freq: 3800 });
     tone(a, o, t, { freq: 340, to: 240, dur: 0.05, gain: 0.14 });
     tone(a, o, t, { freq: 165, to: 90, dur: 0.1, gain: 0.16, attack: 0.004 });
@@ -504,8 +514,13 @@ const SYNTH = {
     if (result > 0) {
       lyre(a, o, t + 0.03, note(5), 0.055, 0.6);
       lyre(a, o, t + 0.06, note(8), 0.05, 0.7);
-    } else if (result < 0) lyre(a, o, t + 0.03, note(-5), 0.075, 0.7);
-    else knock(a, o, t + 0.09, 0.11, 0.85);
+    } else if (result < 0) {
+      lyre(a, o, t + 0.03, note(-5), 0.075, 0.7);
+      lyre(a, o, t + 0.03, note(0), 0.045, 0.5);
+    } else {
+      knock(a, o, t + 0.09, 0.19, 0.85);
+      knock(a, o, t + 0.17, 0.13, 1.5);
+    }
   },
   // A victory token: a quick brass "ta-ta-taa" over a bright string, the
   // bigger the token the higher it climbs.
@@ -561,11 +576,11 @@ export const sounds = defineSounds({
   coins: sound("coins", "action", 0.07, 6.9),
   trade: sound("trade", "action", 0.08, 7.5),
   cart: sound("cart", "action", 0.2, 11, -5),
-  lay: sound("lay", "action", 0.15, 5.6),
+  lay: sound("lay", "action", 0.15, 5.2),
   pass: sound("pass", "action", 0.1, 10.2, -4),
   war: sound("war", "highlight", 0.3, 0.9),
   shield: sound("shield", "ui", 0.06, 10.2),
-  stamp: sound("stamp", "action", 0.12, 5),
+  stamp: sound("stamp", "action", 0.12, 4.2),
   victory: sound("victory", "highlight", 0.45, 11),
   defeat: sound("defeat", "highlight", 0.3, 3.6, -3),
   dig: sound("dig", "action", 0.2, 19.2, -2),

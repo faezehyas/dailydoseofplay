@@ -62,7 +62,7 @@
     },
     "stonecrown": {
       "modules": 58,
-      "bytes": 865424
+      "bytes": 865999
     },
     "tic-tac-toe": {
       "modules": 37,
@@ -224,7 +224,7 @@
     "stonecrown/ring.js": 16508,
     "stonecrown/rules.js": 26535,
     "stonecrown/settings.js": 1348,
-    "stonecrown/sounds.js": 27903,
+    "stonecrown/sounds.js": 28425,
     "stonecrown/store.js": 20932,
     "stonecrown/tips.js": 64565,
     "stonecrown/war.js": 16649,
