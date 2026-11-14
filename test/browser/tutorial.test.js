@@ -517,6 +517,19 @@ const PLAY = {
     if (await button.isVisible()) await pressKey(button);
     await spot(kind, id);
   },
+  // Enter on a card in the hand picks it, then B builds it, W raises a wonder stage with it and S sells it.
+  // The war scene at the end of an age waits for Continue, which Enter presses once it has focus.
+  async stonecrown(page, move) {
+    await page.evaluate(() => {
+      clearInterval(window.__scWar);
+      window.__scWar = setInterval(() => {
+        const go = document.querySelector(".ws:not([hidden]) .ws-go");
+        if (go && document.activeElement === go) go.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      }, 100);
+    });
+    await pressKey(stage(page, `.sc-hcard[data-slot="${move.build ?? move.stage ?? move.discard}"]`));
+    await page.keyboard.press(move.build !== undefined ? "b" : move.stage !== undefined ? "w" : "s");
+  },
 };
 
 test("every lesson of every game plays to its end through its expected moves", { skip, timeout: 600_000 }, async (t) => {

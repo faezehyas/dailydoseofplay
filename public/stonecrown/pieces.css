@@ -1,0 +1,513 @@
+/* Stonecrown's table pieces (pieces.js): wonder boards, coins, military
+   tokens and the table, in cut paper. Every colour is a --sc-p-* token with a
+   night value: by night the sky turns indigo, and windows, lanterns and
+   finished stages glow (.sc-night parts show only then). */
+:root {
+  --sc-p-cream: #fff8ea;
+  --sc-p-shade: #efdcc0;
+  --sc-p-stone: #fbe6bb;
+  --sc-p-stone-dk: #e9bd74;
+  --sc-p-stone-line: #ecd09c;
+  --sc-p-trim: #e6cfac;
+  --sc-p-win: #54405e;
+  --sc-p-inner: #8b7394;
+  --sc-p-cella: #7d6587;
+  --sc-p-lantern: #f2885a;
+  --sc-p-lamp: #ffd66b;
+  --sc-p-fire: #ffb63c;
+  --sc-p-gold: #ffc94a;
+  --sc-p-gold-dk: #d99a1e;
+  --sc-p-bronze: #c4863f;
+  --sc-p-bronze-lt: #e8b273;
+  --sc-p-bronze-dk: #8e5a2c;
+  --sc-p-leaf: #5fae5e;
+  --sc-p-leaf-dk: #3d8048;
+  --sc-p-sun: #fffaf0;
+  --sc-p-cloud: #fffaf2;
+  --sc-p-ghost: #3b2f45;
+  --sc-p-scaffold: #8f6440;
+  --sc-p-string: #6f5a62;
+  --sc-p-wave: #ffffff;
+  --sc-p-shadow: #5a3a3a;
+  --sc-p-ink: #3b2f45;
+  --sc-p-card: #fff8ea;
+  --sc-p-coral: #ff6b4a;
+  --sc-p-tile: #fff8ea;
+  --sc-p-tile-band: #f1e2c9;
+  --sc-p-tile-ink: #3b2f45;
+  --sc-p-built-ink: #6a3c00;
+  --sc-p-built-band: #f6b938;
+  --sc-p-back1: #d9643f;
+  --sc-p-back1-dk: #9c3d22;
+  --sc-p-back2: #3fa59c;
+  --sc-p-back2-dk: #226b67;
+  --sc-p-back3: #7c5cc0;
+  --sc-p-back3-dk: #4c3486;
+  --sc-p-sci-ring: #ffc94a;
+  --sc-p-sci-disc: #e3f4dd;
+  --sc-p-pile: #9a8fae;
+  --sc-p-pile-dk: #6a6080;
+  --sc-p-gift: #2e8994;
+  --sc-p-seventh: #d9643f;
+  --sc-p-guild: #8a62c8;
+  --sc-p-guild-dk: #5d3d99;
+  --sc-p-arrow: #6f6378;
+  --sc-p-glint: #ffffff;
+  --sc-p-coin1: #f0a466;
+  --sc-p-coin1-dk: #c4703a;
+  --sc-p-coin1-ink: #6e300c;
+  --sc-p-coin3: #ffcc4a;
+  --sc-p-coin3-dk: #d99a1e;
+  --sc-p-coin3-ink: #6a4200;
+  --sc-p-victory1: #e9955a;
+  --sc-p-victory1-dk: #c26f37;
+  --sc-p-victory3: #b9c6da;
+  --sc-p-victory3-dk: #8494ad;
+  --sc-p-victory5: #ffc94a;
+  --sc-p-victory5-dk: #d99a1e;
+  --sc-p-flag-ink: #3b2f45;
+  --sc-p-defeat: #8a8090;
+  --sc-p-defeat-dk: #6c6374;
+  --sc-p-defeat-ink: #fff8ea;
+  --sc-p-table: #f6ebdb;
+  --sc-p-table-cloud: #fffaf2;
+  --sc-p-hill1: #f0d6c0;
+  --sc-p-hill2: #e8c3ad;
+  --sc-p-hill3: #dcae9c;
+  --sc-p-rhodes-0: #e6ebfc;
+  --sc-p-rhodes-1: #b9c4f2;
+  --sc-p-rhodes-2: #8394dc;
+  --sc-p-rhodes-3: #5363b3;
+  --sc-p-rhodes-4: #343f80;
+  --sc-p-alexandria-0: #def4f2;
+  --sc-p-alexandria-1: #a7dddc;
+  --sc-p-alexandria-2: #5fb9bd;
+  --sc-p-alexandria-3: #2e8994;
+  --sc-p-alexandria-4: #1c5d6a;
+  --sc-p-ephesus-0: #eef4dc;
+  --sc-p-ephesus-1: #d0e2a8;
+  --sc-p-ephesus-2: #a3c46e;
+  --sc-p-ephesus-3: #6f9a45;
+  --sc-p-ephesus-4: #456b2c;
+  --sc-p-babylon-0: #fde9da;
+  --sc-p-babylon-1: #f6c09a;
+  --sc-p-babylon-2: #e48d5c;
+  --sc-p-babylon-3: #b45e36;
+  --sc-p-babylon-4: #7a3a20;
+  --sc-p-olympia-0: #fce6ec;
+  --sc-p-olympia-1: #f2b4c5;
+  --sc-p-olympia-2: #de7f9b;
+  --sc-p-olympia-3: #b0506f;
+  --sc-p-olympia-4: #78304a;
+  --sc-p-halicarnassus-0: #efe7fb;
+  --sc-p-halicarnassus-1: #cfbcf0;
+  --sc-p-halicarnassus-2: #a68bdc;
+  --sc-p-halicarnassus-3: #7559b4;
+  --sc-p-halicarnassus-4: #4b3680;
+  --sc-p-giza-0: #fff0d2;
+  --sc-p-giza-1: #f8d595;
+  --sc-p-giza-2: #ecb25c;
+  --sc-p-giza-3: #c4863a;
+  --sc-p-giza-4: #875520;
+  --sc-p-night: 0;
+  --sc-p-cloud-o: 0.9;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --sc-p-cream: #fff2d8;
+    --sc-p-shade: #e2c9a4;
+    --sc-p-stone: #f3dfb6;
+    --sc-p-stone-dk: #cfa565;
+    --sc-p-stone-line: #e3c995;
+    --sc-p-trim: #d7bd94;
+    --sc-p-win: #ffcf5c;
+    --sc-p-inner: #f2b54c;
+    --sc-p-cella: #4a3a5e;
+    --sc-p-lantern: #ffd36b;
+    --sc-p-lamp: #ffcf5c;
+    --sc-p-fire: #ffd36b;
+    --sc-p-gold: #ffc94a;
+    --sc-p-gold-dk: #d99a1e;
+    --sc-p-bronze: #cf9450;
+    --sc-p-bronze-lt: #ebb877;
+    --sc-p-bronze-dk: #94602f;
+    --sc-p-leaf: #62a865;
+    --sc-p-leaf-dk: #3f7f4b;
+    --sc-p-sun: #fff4d6;
+    --sc-p-cloud: #bdb8e6;
+    --sc-p-ghost: #fff2d8;
+    --sc-p-scaffold: #d8b487;
+    --sc-p-string: #d8b487;
+    --sc-p-wave: #c9c4ec;
+    --sc-p-shadow: #000000;
+    --sc-p-ink: #3b2f45;
+    --sc-p-card: #fff4dc;
+    --sc-p-coral: #ff7a5c;
+    --sc-p-tile: #3d3a72;
+    --sc-p-tile-band: #d8cab3;
+    --sc-p-tile-ink: #f3ebff;
+    --sc-p-built-ink: #6a3c00;
+    --sc-p-built-band: #f6b938;
+    --sc-p-back1: #c95c3a;
+    --sc-p-back1-dk: #8f3920;
+    --sc-p-back2: #3a9890;
+    --sc-p-back2-dk: #20625f;
+    --sc-p-back3: #7457b4;
+    --sc-p-back3-dk: #46307c;
+    --sc-p-sci-ring: #ffc94a;
+    --sc-p-sci-disc: #e3f4dd;
+    --sc-p-pile: #a59bbb;
+    --sc-p-pile-dk: #776d8e;
+    --sc-p-gift: #38a0aa;
+    --sc-p-seventh: #e06a45;
+    --sc-p-guild: #9b78d6;
+    --sc-p-guild-dk: #6c4cae;
+    --sc-p-arrow: #6f6378;
+    --sc-p-glint: #ffffff;
+    --sc-p-coin1: #f0a466;
+    --sc-p-coin1-dk: #c4703a;
+    --sc-p-coin1-ink: #6e300c;
+    --sc-p-coin3: #ffcc4a;
+    --sc-p-coin3-dk: #d99a1e;
+    --sc-p-coin3-ink: #6a4200;
+    --sc-p-victory1: #e9955a;
+    --sc-p-victory1-dk: #c26f37;
+    --sc-p-victory3: #b9c6da;
+    --sc-p-victory3-dk: #8494ad;
+    --sc-p-victory5: #ffc94a;
+    --sc-p-victory5-dk: #d99a1e;
+    --sc-p-flag-ink: #3b2f45;
+    --sc-p-defeat: #8a8090;
+    --sc-p-defeat-dk: #6c6374;
+    --sc-p-defeat-ink: #fff8ea;
+    --sc-p-table: #17163a;
+    --sc-p-table-cloud: #2a2858;
+    --sc-p-hill1: #221f4e;
+    --sc-p-hill2: #2b2760;
+    --sc-p-hill3: #36306f;
+    --sc-p-rhodes-0: #4b4c6c;
+    --sc-p-rhodes-1: #565a84;
+    --sc-p-rhodes-2: #4c548b;
+    --sc-p-rhodes-3: #394280;
+    --sc-p-rhodes-4: #282f65;
+    --sc-p-alexandria-0: #494e6a;
+    --sc-p-alexandria-1: #4f647b;
+    --sc-p-alexandria-2: #3a677c;
+    --sc-p-alexandria-3: #23586e;
+    --sc-p-alexandria-4: #194158;
+    --sc-p-ephesus-0: #4d4e64;
+    --sc-p-ephesus-1: #5f6666;
+    --sc-p-ephesus-2: #5c6c54;
+    --sc-p-ephesus-3: #496240;
+    --sc-p-ephesus-4: #324a31;
+    --sc-p-babylon-0: #514b64;
+    --sc-p-babylon-1: #6e5960;
+    --sc-p-babylon-2: #7c514b;
+    --sc-p-babylon-3: #713f38;
+    --sc-p-babylon-4: #532c2a;
+    --sc-p-olympia-0: #504b68;
+    --sc-p-olympia-1: #6d5472;
+    --sc-p-olympia-2: #794a6b;
+    --sc-p-olympia-3: #6e3759;
+    --sc-p-olympia-4: #522544;
+    --sc-p-halicarnassus-0: #4d4b6c;
+    --sc-p-halicarnassus-1: #5f5783;
+    --sc-p-halicarnassus-2: #5d508b;
+    --sc-p-halicarnassus-3: #4c3c81;
+    --sc-p-halicarnassus-4: #362965;
+    --sc-p-giza-0: #514d62;
+    --sc-p-giza-1: #6f615e;
+    --sc-p-giza-2: #80634b;
+    --sc-p-giza-3: #7a563a;
+    --sc-p-giza-4: #5b3c2a;
+    --sc-p-night: 1;
+    --sc-p-cloud-o: 0.28;
+  }
+}
+
+:root[data-theme="dark"] {
+  --sc-p-cream: #fff2d8;
+  --sc-p-shade: #e2c9a4;
+  --sc-p-stone: #f3dfb6;
+  --sc-p-stone-dk: #cfa565;
+  --sc-p-stone-line: #e3c995;
+  --sc-p-trim: #d7bd94;
+  --sc-p-win: #ffcf5c;
+  --sc-p-inner: #f2b54c;
+  --sc-p-cella: #4a3a5e;
+  --sc-p-lantern: #ffd36b;
+  --sc-p-lamp: #ffcf5c;
+  --sc-p-fire: #ffd36b;
+  --sc-p-gold: #ffc94a;
+  --sc-p-gold-dk: #d99a1e;
+  --sc-p-bronze: #cf9450;
+  --sc-p-bronze-lt: #ebb877;
+  --sc-p-bronze-dk: #94602f;
+  --sc-p-leaf: #62a865;
+  --sc-p-leaf-dk: #3f7f4b;
+  --sc-p-sun: #fff4d6;
+  --sc-p-cloud: #bdb8e6;
+  --sc-p-ghost: #fff2d8;
+  --sc-p-scaffold: #d8b487;
+  --sc-p-string: #d8b487;
+  --sc-p-wave: #c9c4ec;
+  --sc-p-shadow: #000000;
+  --sc-p-ink: #3b2f45;
+  --sc-p-card: #fff4dc;
+  --sc-p-coral: #ff7a5c;
+  --sc-p-tile: #3d3a72;
+  --sc-p-tile-band: #d8cab3;
+  --sc-p-tile-ink: #f3ebff;
+  --sc-p-built-ink: #6a3c00;
+  --sc-p-built-band: #f6b938;
+  --sc-p-back1: #c95c3a;
+  --sc-p-back1-dk: #8f3920;
+  --sc-p-back2: #3a9890;
+  --sc-p-back2-dk: #20625f;
+  --sc-p-back3: #7457b4;
+  --sc-p-back3-dk: #46307c;
+  --sc-p-sci-ring: #ffc94a;
+  --sc-p-sci-disc: #e3f4dd;
+  --sc-p-pile: #a59bbb;
+  --sc-p-pile-dk: #776d8e;
+  --sc-p-gift: #38a0aa;
+  --sc-p-seventh: #e06a45;
+  --sc-p-guild: #9b78d6;
+  --sc-p-guild-dk: #6c4cae;
+  --sc-p-arrow: #6f6378;
+  --sc-p-glint: #ffffff;
+  --sc-p-coin1: #f0a466;
+  --sc-p-coin1-dk: #c4703a;
+  --sc-p-coin1-ink: #6e300c;
+  --sc-p-coin3: #ffcc4a;
+  --sc-p-coin3-dk: #d99a1e;
+  --sc-p-coin3-ink: #6a4200;
+  --sc-p-victory1: #e9955a;
+  --sc-p-victory1-dk: #c26f37;
+  --sc-p-victory3: #b9c6da;
+  --sc-p-victory3-dk: #8494ad;
+  --sc-p-victory5: #ffc94a;
+  --sc-p-victory5-dk: #d99a1e;
+  --sc-p-flag-ink: #3b2f45;
+  --sc-p-defeat: #8a8090;
+  --sc-p-defeat-dk: #6c6374;
+  --sc-p-defeat-ink: #fff8ea;
+  --sc-p-table: #17163a;
+  --sc-p-table-cloud: #2a2858;
+  --sc-p-hill1: #221f4e;
+  --sc-p-hill2: #2b2760;
+  --sc-p-hill3: #36306f;
+  --sc-p-rhodes-0: #4b4c6c;
+  --sc-p-rhodes-1: #565a84;
+  --sc-p-rhodes-2: #4c548b;
+  --sc-p-rhodes-3: #394280;
+  --sc-p-rhodes-4: #282f65;
+  --sc-p-alexandria-0: #494e6a;
+  --sc-p-alexandria-1: #4f647b;
+  --sc-p-alexandria-2: #3a677c;
+  --sc-p-alexandria-3: #23586e;
+  --sc-p-alexandria-4: #194158;
+  --sc-p-ephesus-0: #4d4e64;
+  --sc-p-ephesus-1: #5f6666;
+  --sc-p-ephesus-2: #5c6c54;
+  --sc-p-ephesus-3: #496240;
+  --sc-p-ephesus-4: #324a31;
+  --sc-p-babylon-0: #514b64;
+  --sc-p-babylon-1: #6e5960;
+  --sc-p-babylon-2: #7c514b;
+  --sc-p-babylon-3: #713f38;
+  --sc-p-babylon-4: #532c2a;
+  --sc-p-olympia-0: #504b68;
+  --sc-p-olympia-1: #6d5472;
+  --sc-p-olympia-2: #794a6b;
+  --sc-p-olympia-3: #6e3759;
+  --sc-p-olympia-4: #522544;
+  --sc-p-halicarnassus-0: #4d4b6c;
+  --sc-p-halicarnassus-1: #5f5783;
+  --sc-p-halicarnassus-2: #5d508b;
+  --sc-p-halicarnassus-3: #4c3c81;
+  --sc-p-halicarnassus-4: #362965;
+  --sc-p-giza-0: #514d62;
+  --sc-p-giza-1: #6f615e;
+  --sc-p-giza-2: #80634b;
+  --sc-p-giza-3: #7a563a;
+  --sc-p-giza-4: #5b3c2a;
+  --sc-p-night: 1;
+  --sc-p-cloud-o: 0.28;
+}
+
+.sc-wonder,
+.sc-wonder-mini {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.sc-coin,
+.sc-token {
+  display: inline-block;
+  width: 1.5em;
+  height: 1.5em;
+  vertical-align: middle;
+  overflow: visible;
+}
+
+.sc-table {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sc-p-text {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.sc-night {
+  opacity: var(--sc-p-night);
+}
+
+.sc-cloud {
+  opacity: var(--sc-p-cloud-o);
+}
+
+/* Paints */
+.sc-pf-cream { fill: var(--sc-p-cream); }
+.sc-pf-shade { fill: var(--sc-p-shade); }
+.sc-pf-stone { fill: var(--sc-p-stone); }
+.sc-pf-stone-dk { fill: var(--sc-p-stone-dk); }
+.sc-pf-stone-line { fill: var(--sc-p-stone-line); }
+.sc-pf-trim { fill: var(--sc-p-trim); }
+.sc-pf-win { fill: var(--sc-p-win); }
+.sc-pf-inner { fill: var(--sc-p-inner); }
+.sc-pf-cella { fill: var(--sc-p-cella); }
+.sc-pf-lantern { fill: var(--sc-p-lantern); }
+.sc-pf-lamp { fill: var(--sc-p-lamp); }
+.sc-pf-fire { fill: var(--sc-p-fire); }
+.sc-pf-gold { fill: var(--sc-p-gold); }
+.sc-pf-gold-dk { fill: var(--sc-p-gold-dk); }
+.sc-pf-bronze { fill: var(--sc-p-bronze); }
+.sc-pf-bronze-lt { fill: var(--sc-p-bronze-lt); }
+.sc-pf-bronze-dk { fill: var(--sc-p-bronze-dk); }
+.sc-pf-leaf { fill: var(--sc-p-leaf); }
+.sc-pf-leaf-dk { fill: var(--sc-p-leaf-dk); }
+.sc-pf-sun { fill: var(--sc-p-sun); }
+.sc-pf-cloud { fill: var(--sc-p-cloud); }
+.sc-pf-ghost { fill: var(--sc-p-ghost); }
+.sc-pf-scaffold { fill: var(--sc-p-scaffold); }
+.sc-pf-string { fill: var(--sc-p-string); }
+.sc-pf-wave { fill: var(--sc-p-wave); }
+.sc-pf-shadow { fill: var(--sc-p-shadow); }
+.sc-pf-ink { fill: var(--sc-p-ink); }
+.sc-pf-card { fill: var(--sc-p-card); }
+.sc-pf-coral { fill: var(--sc-p-coral); }
+.sc-pf-tile { fill: var(--sc-p-tile); }
+.sc-pf-tile-band { fill: var(--sc-p-tile-band); }
+.sc-pf-tile-ink { fill: var(--sc-p-tile-ink); }
+.sc-pf-built-ink { fill: var(--sc-p-built-ink); }
+.sc-pf-built-band { fill: var(--sc-p-built-band); }
+.sc-pf-back1 { fill: var(--sc-p-back1); }
+.sc-pf-back1-dk { fill: var(--sc-p-back1-dk); }
+.sc-pf-back2 { fill: var(--sc-p-back2); }
+.sc-pf-back2-dk { fill: var(--sc-p-back2-dk); }
+.sc-pf-back3 { fill: var(--sc-p-back3); }
+.sc-pf-back3-dk { fill: var(--sc-p-back3-dk); }
+.sc-pf-sci-ring { fill: var(--sc-p-sci-ring); }
+.sc-pf-sci-disc { fill: var(--sc-p-sci-disc); }
+.sc-pf-pile { fill: var(--sc-p-pile); }
+.sc-pf-pile-dk { fill: var(--sc-p-pile-dk); }
+.sc-pf-gift { fill: var(--sc-p-gift); }
+.sc-pf-seventh { fill: var(--sc-p-seventh); }
+.sc-pf-guild { fill: var(--sc-p-guild); }
+.sc-pf-guild-dk { fill: var(--sc-p-guild-dk); }
+.sc-pf-arrow { fill: var(--sc-p-arrow); }
+.sc-pf-glint { fill: var(--sc-p-glint); }
+.sc-pf-coin1 { fill: var(--sc-p-coin1); }
+.sc-pf-coin1-dk { fill: var(--sc-p-coin1-dk); }
+.sc-pf-coin1-ink { fill: var(--sc-p-coin1-ink); }
+.sc-pf-coin3 { fill: var(--sc-p-coin3); }
+.sc-pf-coin3-dk { fill: var(--sc-p-coin3-dk); }
+.sc-pf-coin3-ink { fill: var(--sc-p-coin3-ink); }
+.sc-pf-victory1 { fill: var(--sc-p-victory1); }
+.sc-pf-victory1-dk { fill: var(--sc-p-victory1-dk); }
+.sc-pf-victory3 { fill: var(--sc-p-victory3); }
+.sc-pf-victory3-dk { fill: var(--sc-p-victory3-dk); }
+.sc-pf-victory5 { fill: var(--sc-p-victory5); }
+.sc-pf-victory5-dk { fill: var(--sc-p-victory5-dk); }
+.sc-pf-flag-ink { fill: var(--sc-p-flag-ink); }
+.sc-pf-defeat { fill: var(--sc-p-defeat); }
+.sc-pf-defeat-dk { fill: var(--sc-p-defeat-dk); }
+.sc-pf-defeat-ink { fill: var(--sc-p-defeat-ink); }
+.sc-pf-table { fill: var(--sc-p-table); }
+.sc-pf-table-cloud { fill: var(--sc-p-table-cloud); }
+.sc-pf-hill1 { fill: var(--sc-p-hill1); }
+.sc-pf-hill2 { fill: var(--sc-p-hill2); }
+.sc-pf-hill3 { fill: var(--sc-p-hill3); }
+.sc-pf-rhodes-0 { fill: var(--sc-p-rhodes-0); }
+.sc-pf-rhodes-1 { fill: var(--sc-p-rhodes-1); }
+.sc-pf-rhodes-2 { fill: var(--sc-p-rhodes-2); }
+.sc-pf-rhodes-3 { fill: var(--sc-p-rhodes-3); }
+.sc-pf-rhodes-4 { fill: var(--sc-p-rhodes-4); }
+.sc-pf-alexandria-0 { fill: var(--sc-p-alexandria-0); }
+.sc-pf-alexandria-1 { fill: var(--sc-p-alexandria-1); }
+.sc-pf-alexandria-2 { fill: var(--sc-p-alexandria-2); }
+.sc-pf-alexandria-3 { fill: var(--sc-p-alexandria-3); }
+.sc-pf-alexandria-4 { fill: var(--sc-p-alexandria-4); }
+.sc-pf-ephesus-0 { fill: var(--sc-p-ephesus-0); }
+.sc-pf-ephesus-1 { fill: var(--sc-p-ephesus-1); }
+.sc-pf-ephesus-2 { fill: var(--sc-p-ephesus-2); }
+.sc-pf-ephesus-3 { fill: var(--sc-p-ephesus-3); }
+.sc-pf-ephesus-4 { fill: var(--sc-p-ephesus-4); }
+.sc-pf-babylon-0 { fill: var(--sc-p-babylon-0); }
+.sc-pf-babylon-1 { fill: var(--sc-p-babylon-1); }
+.sc-pf-babylon-2 { fill: var(--sc-p-babylon-2); }
+.sc-pf-babylon-3 { fill: var(--sc-p-babylon-3); }
+.sc-pf-babylon-4 { fill: var(--sc-p-babylon-4); }
+.sc-pf-olympia-0 { fill: var(--sc-p-olympia-0); }
+.sc-pf-olympia-1 { fill: var(--sc-p-olympia-1); }
+.sc-pf-olympia-2 { fill: var(--sc-p-olympia-2); }
+.sc-pf-olympia-3 { fill: var(--sc-p-olympia-3); }
+.sc-pf-olympia-4 { fill: var(--sc-p-olympia-4); }
+.sc-pf-halicarnassus-0 { fill: var(--sc-p-halicarnassus-0); }
+.sc-pf-halicarnassus-1 { fill: var(--sc-p-halicarnassus-1); }
+.sc-pf-halicarnassus-2 { fill: var(--sc-p-halicarnassus-2); }
+.sc-pf-halicarnassus-3 { fill: var(--sc-p-halicarnassus-3); }
+.sc-pf-halicarnassus-4 { fill: var(--sc-p-halicarnassus-4); }
+.sc-pf-giza-0 { fill: var(--sc-p-giza-0); }
+.sc-pf-giza-1 { fill: var(--sc-p-giza-1); }
+.sc-pf-giza-2 { fill: var(--sc-p-giza-2); }
+.sc-pf-giza-3 { fill: var(--sc-p-giza-3); }
+.sc-pf-giza-4 { fill: var(--sc-p-giza-4); }
+.sc-ps-ink { stroke: var(--sc-p-ink); }
+.sc-ps-ghost { stroke: var(--sc-p-ghost); }
+.sc-ps-scaffold { stroke: var(--sc-p-scaffold); }
+.sc-ps-string { stroke: var(--sc-p-string); }
+.sc-ps-wave { stroke: var(--sc-p-wave); }
+.sc-ps-lamp { stroke: var(--sc-p-lamp); }
+.sc-ps-coral { stroke: var(--sc-p-coral); }
+.sc-ps-glint { stroke: var(--sc-p-glint); }
+.sc-ps-gold { stroke: var(--sc-p-gold); }
+.sc-ps-tile { stroke: var(--sc-p-tile); }
+.sc-ps-tile-ink { stroke: var(--sc-p-tile-ink); }
+
+/* A stage just built lifts in; its glow breathes by night. */
+@media (prefers-reduced-motion: no-preference) {
+  .sc-stage.sc-new {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: sc-stage-pop 520ms cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  }
+
+  @keyframes sc-stage-pop {
+    0% {
+      transform: translateY(6px) scale(0.92);
+      opacity: 0;
+    }
+    100% {
+      transform: none;
+      opacity: 1;
+    }
+  }
+}

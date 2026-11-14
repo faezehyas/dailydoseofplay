@@ -122,7 +122,11 @@ Pass three cards, follow suit, duck the queen of spades, or take every heart and
 <b><a href="https://www.dailydoseofplay.com/hexlands/">Hexlands</a></b> · 3–4 players<br>
 Settle an island of 19 hexes laid out at random: roll for wood, brick, wool, grain and ore, trade with the bank, the harbours and each other, and build roads, settlements and cities; the robber steals on a 7, development cards bring knights, free roads, plenty and monopolies, and longest road and largest army are worth 2 points each; first to 10 wins. Every resource is a real hidden card with no dealer, as in the other card games: only the thief sees a stolen card, every roll is drawn by all the browsers after the move is sent, trade answers are sealed until all are in, and the audit catches anyone who held cards back from a Monopoly. Room settings for a game to 8 and a move timer; 2–3 robots at three levels.
 </td>
-<td width="50%" valign="top"></td>
+<td width="50%" valign="top">
+<a href="https://www.dailydoseofplay.com/stonecrown/"><img src="public/stonecrown/icon.svg" width="320" alt=""></a><br>
+<b><a href="https://www.dailydoseofplay.com/stonecrown/">Stonecrown</a></b> · 3–4 players<br>
+Draft a city over three ages: everyone picks a card at once from the hand in front of them, then passes the rest on. Build it with your own resources or ones bought from your neighbours, get it free through a chain from an earlier card, tuck it face down under the next stage of your wonder, or sell it for 3 coins; shields fight your neighbours at the end of each age, science scores in sets, guilds reward what your neighbours built, and each of the seven wonders has two sides. Every card is a real hidden card with no dealer, as in the other card games: picks are sealed until everyone has chosen, passed hands are sealed to their new holder, and tucked and sold cards, the discard pile and the guilds left out stay face down to the end. Room settings for the wonder sides and a move timer; 2–3 robots at three levels.
+</td>
 </tr>
 </table>
 
@@ -262,7 +266,7 @@ Who made each game, from the `credits` in `public/games.json`
 
 <!-- credits:start -->
 - [@Faezehyas](https://github.com/Faezehyas): Sea Battle, Tic Tac Toe, Connect 4, Gomoku, Chess, Checkers, Backgammon
-- [@maminrayej](https://github.com/maminrayej): Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts, Hexlands
+- [@maminrayej](https://github.com/maminrayej): Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts, Hexlands, Stonecrown
 <!-- credits:end -->
 
 ## Credits and license

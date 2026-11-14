@@ -1,0 +1,434 @@
+/* The seat ring (a small table seen from above, every seat with its stack,
+   the age and turn in the middle) and the hand-off pieces: a stack of backs,
+   the dashed slot it rests in, a stack sliding. Paper Lantern: a cut-paper
+   table with layered soft shadows; at night an indigo cloth. Seat colours
+   0–3 come from /engine/cards/cards.css; 4–6 are here for a bigger table. */
+:where(.stonecrown, .sc-ring, .sc-stack, .sc-stack-slot) {
+  --sc-seat-4: #3569b5;
+  --sc-seat-5: #b0436f;
+  --sc-seat-6: #3f7f2a;
+  --sc-ring-felt: #f1e3c4;
+  --sc-ring-sheen: #f8eedb;
+  --sc-ring-rim: #e0c79c;
+  --sc-ring-rim-2: #c4a271;
+  --sc-ring-shade: rgb(90 58 30 / 22%);
+  --sc-ring-lane: #c9ae7c;
+  --sc-ring-chev: #a8874f;
+  --sc-ring-tie: #d99a1e;
+  --sc-ring-punch: rgb(255 250 235 / 75%);
+  --sc-ring-coral: #ff6b4a;
+  --sc-ring-text: #4f4459;
+  --sc-ring-medal: #fffaf0;
+  --sc-ring-medal-2: #f3dfb4;
+  --sc-ring-medal-rim: #d99a1e;
+  --sc-ring-glow: rgb(255 214 107 / 0%);
+  --sc-ring-ink: #3b2f45;
+  --sc-ring-badge: #3b2f45;
+  --sc-ring-badge-ink: #fffaf0;
+  --sc-ring-card-shade: rgb(70 40 20 / 28%);
+  --sc-ring-card-edge: rgb(255 250 240 / 0%);
+  --sc-ring-ink-on: #241a2c;
+  --sc-ring-light-on: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :where(.stonecrown, .sc-ring, .sc-stack, .sc-stack-slot) {
+    --sc-seat-4: #6fa0ee;
+    --sc-seat-5: #e98bb2;
+    --sc-seat-6: #86c766;
+    --sc-ring-felt: #2c2c5e;
+    --sc-ring-sheen: #34356c;
+    --sc-ring-rim: #3c3d7a;
+    --sc-ring-rim-2: #1d1d42;
+    --sc-ring-shade: rgb(0 0 0 / 40%);
+    --sc-ring-lane: #5f62a6;
+    --sc-ring-chev: #a3a7e6;
+    --sc-ring-tie: #ffcf5c;
+    --sc-ring-punch: rgb(255 230 180 / 22%);
+    --sc-ring-coral: #ff7a5c;
+    --sc-ring-text: #d3caea;
+    --sc-ring-medal: #3a3a78;
+    --sc-ring-medal-2: #26265a;
+    --sc-ring-medal-rim: #ffcf5c;
+    --sc-ring-glow: rgb(255 207 92 / 20%);
+    --sc-ring-ink: #f3ebff;
+    --sc-ring-badge: #f3ebff;
+    --sc-ring-badge-ink: #241a2c;
+    --sc-ring-card-shade: rgb(0 0 0 / 45%);
+    --sc-ring-card-edge: rgb(255 240 210 / 35%);
+    --sc-ring-light-on: #241a2c;
+  }
+}
+
+:root[data-theme="dark"] :where(.stonecrown, .sc-ring, .sc-stack, .sc-stack-slot) {
+  --sc-seat-4: #6fa0ee;
+  --sc-seat-5: #e98bb2;
+  --sc-seat-6: #86c766;
+  --sc-ring-felt: #2c2c5e;
+  --sc-ring-sheen: #34356c;
+  --sc-ring-rim: #3c3d7a;
+  --sc-ring-rim-2: #1d1d42;
+  --sc-ring-shade: rgb(0 0 0 / 40%);
+  --sc-ring-lane: #5f62a6;
+  --sc-ring-chev: #a3a7e6;
+  --sc-ring-tie: #ffcf5c;
+  --sc-ring-punch: rgb(255 230 180 / 22%);
+  --sc-ring-coral: #ff7a5c;
+  --sc-ring-text: #d3caea;
+  --sc-ring-medal: #3a3a78;
+  --sc-ring-medal-2: #26265a;
+  --sc-ring-medal-rim: #ffcf5c;
+  --sc-ring-glow: rgb(255 207 92 / 20%);
+  --sc-ring-ink: #f3ebff;
+  --sc-ring-badge: #f3ebff;
+  --sc-ring-badge-ink: #241a2c;
+  --sc-ring-card-shade: rgb(0 0 0 / 45%);
+  --sc-ring-card-edge: rgb(255 240 210 / 35%);
+  --sc-ring-light-on: #241a2c;
+}
+
+:where(.stonecrown, .sc-ring) .p-4 { --c: var(--sc-seat-4); --c-ink: var(--sc-seat-4); }
+:where(.stonecrown, .sc-ring) .p-5 { --c: var(--sc-seat-5); --c-ink: var(--sc-seat-5); }
+:where(.stonecrown, .sc-ring) .p-6 { --c: var(--sc-seat-6); --c-ink: var(--sc-seat-6); }
+
+/* ---------- a stack of backs, its slot, a slide ---------- */
+.sc-stack {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 46px;
+  aspect-ratio: 1;
+  vertical-align: middle;
+  container-type: inline-size;
+}
+
+.sc-stack-card {
+  position: absolute;
+  left: 27%;
+  top: 4%;
+  width: 46%;
+  aspect-ratio: 100 / 140;
+  border-radius: 10%;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--sc-ring-card-edge), 0 1px 0 var(--sc-ring-card-shade), 0 3px 6px -2px var(--sc-ring-card-shade);
+  transform-origin: 50% 115%;
+}
+
+.sc-stack-card svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sc-stack-card:nth-child(1) { transform: rotate(-15deg); }
+.sc-stack-card:nth-child(3) { transform: rotate(15deg); }
+
+.sc-stack-n {
+  position: absolute;
+  right: 2%;
+  bottom: 2%;
+  min-width: 1.7em;
+  padding: 0.22em 0.4em;
+  border-radius: 999px;
+  background: var(--sc-ring-badge);
+  color: var(--sc-ring-badge-ink);
+  font: 700 clamp(9px, 25cqw, 13px) / 1 var(--font-display);
+  text-align: center;
+  box-shadow: 0 0 0 1.5px var(--sc-ring-felt);
+}
+
+.sc-stack[data-count="0"] { visibility: hidden; }
+
+.sc-stack-slot {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 52px;
+  height: 58px;
+  border: 2px dashed var(--sc-ring-lane);
+  border-radius: 10px;
+}
+
+.sc-stack-slot.sm { width: 28px; height: 30px; border-width: 1.5px; border-radius: 7px; }
+.sc-stack-slot.lg { width: 76px; height: 80px; }
+.sc-stack-slot > .sc-stack { width: 92%; }
+
+@media (max-width: 560px) {
+  .sc-stack-slot { width: 40px; height: 46px; }
+  .sc-stack-slot.lg { width: 60px; height: 64px; }
+}
+
+.sc-stack.sc-sliding {
+  z-index: 6;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* ---------- the ring ---------- */
+.sc-ring {
+  position: relative;
+  container-type: inline-size;
+  width: 100%;
+  min-width: min(300px, 100%);
+  max-width: 520px;
+  aspect-ratio: 800 / 470;
+  margin-inline: auto;
+  color: var(--sc-ring-ink);
+}
+
+.sc-ring-words {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.sc-ring-felt-box,
+.sc-ring-ties,
+.sc-ring-felt {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sc-ring-felt .sh { fill: var(--sc-ring-shade); }
+.sc-ring-felt .rim-2 { fill: var(--sc-ring-rim-2); }
+.sc-ring-felt .rim { fill: var(--sc-ring-rim); }
+.sc-ring-felt .top { fill: var(--sc-ring-felt); }
+.sc-ring-felt .sheen { fill: var(--sc-ring-sheen); opacity: 0.7; }
+.sc-ring-felt .rim-dots { fill: none; stroke: var(--sc-ring-punch); stroke-width: 3.2; stroke-linecap: round; stroke-dasharray: 0.1 13; }
+.sc-ring-felt .lane { fill: none; stroke: var(--sc-ring-lane); stroke-width: 34; opacity: 0.26; }
+.sc-ring-felt .lane-edge { fill: none; stroke: var(--sc-ring-lane); stroke-width: 1.6; stroke-dasharray: 2 7; stroke-linecap: round; opacity: 0.55; }
+.sc-ring-felt .chev { fill: none; stroke: var(--sc-ring-chev); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.sc-ring-ties .tie { fill: none; stroke: var(--sc-ring-tie); stroke-width: 5; stroke-linecap: round; stroke-dasharray: 0.1 12; }
+
+.sc-ring-seats,
+.sc-ring-stacks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sc-ring-seats > *,
+.sc-ring-stack { pointer-events: auto; }
+
+.sc-ring-plate,
+.sc-ring-dot {
+  position: absolute;
+  z-index: 30;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 0 var(--sc-ring-shade), 0 4px 10px -4px var(--sc-ring-shade);
+}
+
+.sc-ring-plate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  max-width: 25%;
+  padding: 0.3em 0.75em 0.3em 0.3em;
+  border-radius: 999px;
+  background: var(--sc-plate, var(--c));
+  color: var(--sc-plate-on, var(--sc-ring-light-on));
+  font: 600 clamp(11px, 2.5cqw, 14px) / 1.1 var(--font-display);
+  white-space: nowrap;
+}
+
+.sc-ring-plate .nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sc-ring-plate .sc-mark {
+  width: 1.25em;
+  height: 1.25em;
+}
+
+/* Plate fills dark enough for white names in the light theme, light enough for dark ones at night. */
+.sc-ring-plate.p-0,
+.sc-ring-plate.p-3 { --sc-plate-on: var(--sc-ring-ink-on); }
+.sc-ring-plate.p-1 { --sc-plate: #1d7373; }
+.sc-ring-plate.p-2 { --sc-plate: #6640d0; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .sc-ring-plate:is(.p-1, .p-2) { --sc-plate: var(--c); }
+}
+
+:root[data-theme="dark"] .sc-ring-plate:is(.p-1, .p-2) { --sc-plate: var(--c); }
+
+.sc-ring-plate.me {
+  box-shadow: 0 0 0 2.5px var(--sc-ring-felt), 0 0 0 4.5px var(--sc-ring-coral), 0 4px 10px -4px var(--sc-ring-shade);
+}
+
+.sc-ring-dot {
+  display: grid;
+  width: clamp(22px, 5.6cqw, 30px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  cursor: default;
+}
+
+.sc-ring-dot .sc-mark {
+  width: 100%;
+  height: 100%;
+}
+
+.sc-ring-dot:focus-visible,
+.sc-ring-plate:focus-visible {
+  outline: 3px solid var(--focus, #2f6fed);
+  outline-offset: 2px;
+}
+
+.sc-ring-stack {
+  position: absolute;
+  width: 9.5%;
+  transform: translate(-50%, -56%);
+}
+
+.sc-ring[data-players="5"] .sc-ring-stack { width: 8.5%; }
+.sc-ring:is([data-players="6"], [data-players="7"]) .sc-ring-stack { width: 7.5%; }
+
+.sc-ring-stack .sc-stack {
+  display: block;
+  width: 100%;
+}
+
+/* The stack about to come to you. */
+.sc-ring-stack.coming::before {
+  content: "";
+  position: absolute;
+  inset: -12% -12% -2%;
+  border: 3px solid var(--sc-ring-coral);
+  border-radius: 50%;
+  box-shadow: 0 0 10px 1px color-mix(in srgb, var(--sc-ring-coral) 45%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sc-ring-stack.coming::before { animation: sc-ring-call 1.4s ease-in-out infinite; }
+  .sc-ring.passing .chev { animation: sc-ring-chev 0.9s ease-in-out; animation-delay: calc(var(--k) * 25ms); }
+}
+
+@keyframes sc-ring-call {
+  50% { transform: scale(1.07); opacity: 0.7; }
+}
+
+@keyframes sc-ring-chev {
+  40% { stroke: var(--sc-ring-coral); }
+}
+
+/* ---------- the middle: the age, its turns, the way hands go ---------- */
+.sc-ring-mid {
+  position: absolute;
+  left: 50%;
+  top: var(--sc-ring-mid-y, 48%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(3px, 1cqw, 6px);
+  transform: translate(-50%, -50%);
+  font-family: var(--font-display);
+  pointer-events: none;
+}
+
+.sc-ring-mid > * { pointer-events: auto; }
+
+.sc-ring-medal {
+  display: grid;
+  place-content: center;
+  width: clamp(36px, 10.5cqw, 56px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, var(--sc-ring-medal) 55%, var(--sc-ring-medal-2));
+  box-shadow: 0 0 0 2px var(--sc-ring-medal-rim), 0 0 0 5px var(--sc-ring-felt), 0 0 0 6px color-mix(in srgb, var(--sc-ring-medal-rim) 50%, transparent), 0 4px 8px -2px var(--sc-ring-shade), 0 0 26px 8px var(--sc-ring-glow);
+  color: var(--sc-ring-ink);
+  text-align: center;
+  line-height: 1;
+}
+
+.sc-ring-medal small {
+  font-size: clamp(7.5px, 1.6cqw, 9px);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.sc-ring-numeral {
+  font-size: clamp(14px, 4.2cqw, 23px);
+  font-weight: 700;
+}
+
+.sc-ring-pips {
+  display: flex;
+  gap: clamp(3px, 0.9cqw, 5px);
+}
+
+.sc-ring-pips i {
+  width: clamp(6px, 1.5cqw, 9px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sc-ring-lane) 55%, transparent);
+}
+
+.sc-ring-pips i.done { background: color-mix(in srgb, var(--sc-ring-coral) 55%, var(--sc-ring-felt)); }
+.sc-ring-pips i.now { background: var(--sc-ring-coral); box-shadow: 0 0 0 2px color-mix(in srgb, var(--sc-ring-coral) 30%, transparent); transform: scale(1.3); }
+
+.sc-ring-dir {
+  color: var(--sc-ring-text);
+  font-size: clamp(11px, 2.4cqw, 13px);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ---------- small: the ring in a top bar (under 300 px) ---------- */
+@container (max-width: 299px) {
+  .sc-ring-plate {
+    max-width: 31%;
+    gap: 0.2em;
+    padding: 0.2em 0.5em 0.2em 0.2em;
+    font-size: 10px;
+  }
+
+  .sc-ring-plate .sc-mark { width: 1.15em; height: 1.15em; }
+  .sc-ring-dot { width: 17px; }
+  .sc-ring-mid { gap: 2px; }
+
+  .sc-ring-medal {
+    width: 28px;
+    box-shadow: 0 0 0 1.5px var(--sc-ring-medal-rim), 0 0 0 3px var(--sc-ring-felt), 0 3px 6px -2px var(--sc-ring-shade), 0 0 18px 6px var(--sc-ring-glow);
+  }
+
+  .sc-ring-medal small { display: none; }
+  .sc-ring-numeral { font-size: 13px; }
+  .sc-ring-pips { gap: 2.5px; }
+  .sc-ring-pips i { width: 5px; }
+  .sc-ring-dir { font-size: 9.5px; }
+}
+
+/* Smaller still (a phone's top bar): a neighbour's plate is its mark, the
+   way hands go is the arrows round the rim (the hand's heading says it too). */
+@container (max-width: 209px) {
+  .sc-ring-plate:not(.me) { padding: 0.15em; }
+  .sc-ring-plate:not(.me) .nm { display: none; }
+  .sc-ring-plate .sc-mark { width: 1.3em; height: 1.3em; }
+  .sc-ring-dir { display: none; }
+
+  /* The middle shrinks to keep clear of the stacks above and below it. */
+  .sc-ring-mid { gap: 3px; }
+
+  .sc-ring-medal {
+    width: 22px;
+    box-shadow: 0 0 0 1.5px var(--sc-ring-medal-rim), 0 2px 4px -1px var(--sc-ring-shade), 0 0 12px 4px var(--sc-ring-glow);
+  }
+
+  .sc-ring-numeral { font-size: 11px; }
+  .sc-ring-pips { gap: 2px; }
+  .sc-ring-pips i { width: 4px; }
+  .sc-ring-pips i.now { transform: scale(1.25); }
+}
+

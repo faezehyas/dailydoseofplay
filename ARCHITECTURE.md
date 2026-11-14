@@ -1,7 +1,7 @@
 # Architecture
 
 Daily Dose of Play is a free site of browser games for two or more players,
-and playing never needs an account (Chutes and Ladders, Ludo, Crazy Eights, Go Fish, Hearts and Hexlands seat up to four). One small Node server
+and playing never needs an account (Chutes and Ladders, Ludo, Crazy Eights, Go Fish, Hearts, Hexlands and Stonecrown seat up to four). One small Node server
 on Wasmer Edge serves the pages and introduces players to each other. The games
 themselves run browser to browser over WebRTC DataChannels: with more than
 two players, every guest connects to the room creator's browser, which
@@ -135,8 +135,14 @@ flowchart TB
     g_board_view["board-view.js<br>Ludo only"]
     g_board["board.js<br>Hexlands only"]
     g_tiles["tiles.js<br>Hexlands only"]
-    g_pieces["pieces.js<br>Hexlands only"]
-    g_card_art["card-art.js<br>Hexlands only"]
+    g_pieces["pieces.js<br>Hexlands and Stonecrown"]
+    g_card_art["card-art.js<br>Hexlands and Stonecrown"]
+    g_cards["cards.js<br>Stonecrown only"]
+    g_tips["tips.js<br>Stonecrown only"]
+    g_store["store.js<br>Stonecrown only"]
+    g_border["border.js<br>Stonecrown only"]
+    g_war["war.js<br>Stonecrown only"]
+    g_ring["ring.js<br>Stonecrown only"]
   end
   subgraph engine ["Engine: public/engine/"]
     e_boot["boot.js<br>static pages"]
@@ -269,6 +275,40 @@ flowchart TB
   g_tiles --> g_board
   g_tiles --> g_card_art
   g_pieces --> g_board
+  g_art --> g_store
+  g_art --> g_border
+  g_art --> g_war
+  g_art --> g_ring
+  g_art --> g_tips
+  p_main --> g_war
+  g_tips --> e_shell
+  g_tips --> g_cards
+  g_tips --> g_rules
+  g_tips --> g_card_art
+  g_store --> e_shell
+  g_store --> g_cards
+  g_store --> g_rules
+  g_border --> e_shell
+  g_border --> g_cards
+  g_border --> g_card_art
+  g_border --> g_pieces
+  g_border --> g_rules
+  g_war --> e_shell
+  g_war --> g_cards
+  g_war --> g_rules
+  g_ring --> e_shell
+  g_ring --> g_card_art
+  g_ring --> g_rules
+  g_rules --> g_cards
+  g_robot --> g_cards
+  g_card_art --> g_cards
+  g_pieces --> g_cards
+  g_pieces --> g_card_art
+  g_sounds --> g_cards
+  g_art --> g_cards
+  g_art --> g_card_art
+  g_art --> g_pieces
+  p_main --> g_cards
   g_rules --> g_board
   g_robot --> e_robot_pace
   g_robot --> e_session
@@ -1009,7 +1049,7 @@ its largest message, with four players and a 108-card deck, is 3063 (a part
 of a `shuffle`); Crazy Eights' (four players, 52 cards) is about the same,
 3063 to 3065 as reshuffles add digits to the round number, Go Fish's
 3063, Gin Rummy's 3064 to 3065 (two players, the deck shuffled again every
-hand), Hearts' 3064 (four players, a game to 50) and Hexlands' 3064 (four players, the development cards' shuffle). A pass's sealed cards go
+hand), Hearts' 3064 (four players, a game to 50) Hexlands' 3064 (four players, the development cards' shuffle) and Stonecrown's 3064 (four players, an age's shuffle). A pass's sealed cards go
 in a `seal` message of about 704 characters (three cards, four players).
 
 **Why a pre-negotiated channel.** With the default in-band handshake, the
@@ -1187,7 +1227,7 @@ the lobby cards:
 | Lobby, invite, waiting room | 520 px | all |
 | Game, `layout: "narrow"` | 520 px | Tic Tac Toe, Connect 4, Chess, Checkers |
 | Game, `layout: "medium"` | 640 px | Gomoku, Backgammon |
-| Game, `layout: "wide"` (the default) | 980 px | Sea Battle, Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts, Hexlands |
+| Game, `layout: "wide"` (the default) | 980 px | Sea Battle, Chutes and Ladders, Dots and Boxes, Ludo, Crazy Eights, Go Fish, Gin Rummy, Hearts, Hexlands, Stonecrown |
 
 Below that width the column is the page's width less its 16 px gutters. A
 game's own top-level box has no `max-width`, so it fills `#game`. The default
@@ -1312,10 +1352,10 @@ Checkers, the last checker borne off in Backgammon, the last ship sunk in
 Sea Battle (once its shell lands), the pawn on 100 in Chutes and Ladders,
 the last box in Dots and Boxes, the winner's tokens home in Ludo, the
 winners' books in Go Fish, the winner's melds on the table in Gin Rummy, and the
-winner's pill and tricks in Hearts, and the winner's buildings in Hexlands. The
+winner's pill and tricks in Hearts, and the winner's buildings in Hexlands, and the winner's city in Stonecrown. The
 chimes (`chimes.js`) are one melody, a C-major pentatonic jingle, in a
 timbre that fits the game's pieces (`flavour`): `wood` for Chess, Checkers,
-Backgammon, Ludo and Hexlands; `paper` for Tic Tac Toe, Gomoku, Dots and Boxes and Gin Rummy;
+Backgammon, Ludo and Hexlands; `paper` for Tic Tac Toe, Gomoku, Dots and Boxes, Gin Rummy and Stonecrown;
 `plastic` for Connect 4; `bell` for Chutes and Ladders and Hearts; `water` (a bubble
 under the bell) for Sea Battle and Go Fish. They are synthesized, at the `fanfare`
 level, and follow the mute toggle. With `prefers-reduced-motion` only the
@@ -1445,8 +1485,10 @@ rank, an 8 naming the suit, drawing, going out), Go Fish (asking for a rank,
 Go fish and a lucky catch, a book, the most books wins), Gin Rummy (sets and
 runs, drawing and discarding, deadwood, knocking, gin) and Hearts (following
 suit, passing three cards, the queen of spades, breaking hearts, shooting the
-moon) and Hexlands (settling, rolling for resources, roads and settlements,
-cities and development cards, the robber and knights, trading and winning). Sea Battle's runs in the page with both fleets fixed and
+moon), Hexlands (settling, rolling for resources, roads and settlements,
+cities and development cards, the robber and knights, trading and winning)
+and Stonecrown (picking and building, buying and chains, wonder stages and
+selling, passing hands and war, science and the score sheet). Sea Battle's runs in the page with both fleets fixed and
 known to it, firing through `rules.js` alone; `match.js` and its
 commitments don't come into it. The card games' run on
 `cards/lesson-deck.js`: fixed hands and a deck whose every card is known, so
@@ -1531,7 +1573,7 @@ checks that no game opens its own audio context or output.
 | `icon.svg` | Card art for the home page (16:10) |
 | `preview.svg` | Optional: the tile's short animated preview (see **Tile previews**) |
 | `tutorial.js`, `lessons.js` | Optional: the tutorial (see **Tutorials**). `lessons.js` is its lessons as data; `tutorial.js` exports them with the adapter the engine plays them through, and `main.js` passes `tutorial: () => import("./tutorial.js")`. |
-| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo; Chutes and Ladders, with its spinner and its pawns' hops, climbs and slides), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces, Gomoku's grid and point names, Checkers' crown, Dots and Boxes' paper, lines and boxes, Backgammon's cells, checkers and dice, Sea Battle's boards, ships, ship dragging and the shells' flight and landing; Crazy Eights' pace, discard pile, suit badge, an 8's burst and suit picker; Go Fish's seats, books, ask and the motion of asking, fishing and books; Gin Rummy's table with its melds, buttons, lay-offs and score card; Hearts' table with its seats, trick, pass and tally; Hexlands' island table, spots, hand, bank, points tokens, discard parts and the motion the tutorial shares) |
+| `art.js` | Optional: the game's drawing: its board's art and geometry (Ludo; Chutes and Ladders, with its spinner and its pawns' hops, climbs and slides), or what the view shares with the tutorial's board (Tic Tac Toe's marks, Chess's pieces, Gomoku's grid and point names, Checkers' crown, Dots and Boxes' paper, lines and boxes, Backgammon's cells, checkers and dice, Sea Battle's boards, ships, ship dragging and the shells' flight and landing; Crazy Eights' pace, discard pile, suit badge, an 8's burst and suit picker; Go Fish's seats, books, ask and the motion of asking, fishing and books; Gin Rummy's table with its melds, buttons, lay-offs and score card; Hearts' table with its seats, trick, pass and tally; Hexlands' island table, spots, hand, bank, points tokens, discard parts and the motion the tutorial shares; Stonecrown's table with its neighbour panels, wonder, city, hand, pick buttons, war moment and score sheet) |
 | `motion.js` | Optional: the move motion the view shares with the tutorial, with its sounds (Chess's slide and capture and its drag, Backgammon's checker flights and drag, Dots and Boxes' pencil strokes and boxes) |
 | `pick.js`, `board-view.js` | Checkers' picking of a move square by square (and one tap for a whole multi-jump); Ludo's token motion, rolling die and move choices. Both shared by the view and the tutorial. |
 
@@ -1542,9 +1584,10 @@ that started the room, and has no dealer. `engine/card-match.js` does it with
 mental poker: every player holds a share of the deck's key, and a card can
 only be read with every share. With three or more players, a modified host
 can still read a hand (see **A modified host** below). The rules contract is
-at the top of that file; Crazy Eights, Go Fish, Gin Rummy, Hearts and Hexlands
-use it (see **Crazy Eights in depth**, **Go Fish in depth**, **Gin Rummy in
-depth**, **Hearts in depth** and **Hexlands in depth**).
+at the top of that file; Crazy Eights, Go Fish, Gin Rummy, Hearts, Hexlands
+and Stonecrown use it (see **Crazy Eights in depth**, **Go Fish in depth**,
+**Gin Rummy in depth**, **Hearts in depth**, **Hexlands in depth** and
+**Stonecrown in depth**).
 
 **How a match runs.** Every message carries `m`, as in `TurnMatch`.
 
@@ -1758,7 +1801,7 @@ table's pieces and motion, the robots' pacing and the leaving notice. A game
 builds its own layout from those pieces, keeps its own rules, robot and
 special moments, and links `cards/cards.css` after `theme.css`. Each part
 carries the class `pc-<part>` for the shared styles and `<prefix>-<part>`
-(`ce-` for Crazy Eights, `gf-` for Go Fish, `gr-` for Gin Rummy, `hr-` for Hearts, `hx-` for Hexlands) for the
+(`ce-` for Crazy Eights, `gf-` for Go Fish, `gr-` for Gin Rummy, `hr-` for Hearts, `hx-` for Hexlands, `sc-` for Stonecrown) for the
 game's own styles and tests.
 
 **Sizes.** A card is 66 bytes, a share 131. A shuffle message is 66 bytes a
@@ -3091,6 +3134,217 @@ so a friend joining a room doesn't download it.
 `offer { p, give, want }`, `answer { p, accept }` (the slots, or `false`), `trade { from, to, gave,
 got }`, `nodeal { p }`, `longest { p, size }`, `army { p, size }`,
 `turn { p }`, `claim { p, slots }`, `over { winner, points }` (`points`: everyone's public points).
+
+## Stonecrown in depth
+
+Stonecrown is a card-drafting game for three or four players (the rules and
+data cover three to seven), on `CardMatch` (see **Card games**). Over three
+ages of six turns, everyone picks a card from their hand at the same time,
+then hands go round to a neighbour. A pick builds the card into your city,
+builds a stage of your wonder with the card tucked face down, or sells it
+for 3 coins. The richest civilisation in points wins. Every card is a real
+card in the deck, so hands, picks, tucked cards and the discard pile stay
+hidden as at a real table.
+
+**The data** (`cards.js`): resources wood, stone, clay, ore (raw) and glass,
+cloth, papyrus (goods), `0` to `6`; colours brown (raw materials), grey
+(goods), blue (points), yellow (commerce), red (shields), green (science)
+and purple (guilds); science symbols star, cog and quill, `0` to `2`.
+`CARDS` holds every design with its age, colour, cost (`{ res: [7 counts],
+coins }`), one effect, the keys of earlier cards that build it free
+(`from`), and `players`: the player counts from which each copy is in the
+game. Two designs share a `key` when they are the same building in two ages
+(the grey cards); a city holds at most one card of a key. `WONDERS` holds
+the seven wonders: the resource each produces from the start and the stages
+of sides A and B. Neighbours: **left is seat p + 1, right is seat p − 1**.
+
+**The deck**: `deckFor(players)` maps each face to a design: the age I
+cards, then age II, then age III without guilds, then all 10 guilds
+(`deckRanges(players)` gives each range). 7 cards a player an age, so 88
+faces with four players and 148 with seven. Age III deals `players + 2`
+guilds with its other cards.
+
+**Hidden cards as moves.**
+
+- **Ages.** The rules set `openFaces = deckSize`: every card starts face up
+  in face order, which shows nothing. At the start of each age, `settle()`
+  shuffles that age's faces (`deck.shuffle()`, which hides them) and deals 7
+  to each seat. For age III it first shuffles the 10 guilds and keeps the
+  first `players + 2` new slots, unseen, then shuffles those with the age's
+  other cards and deals; the guilds left out are never seen until the audit,
+  so nobody knows which guilds are in play.
+- **Picks** are a step (see **Steps**): every seat with a hand moves at
+  once, unseen until all have chosen. A build shows its card (`reveals()`).
+  A wonder stage or a sale doesn't: the card stays in its holder's hand,
+  hidden, recorded in the state as tucked or discarded, and the state never
+  depends on its face.
+- **Passing.** After a turn, every card left in each hand goes to the
+  neighbour with `deck.pass()`: to the left in ages I and III, to the right
+  in age II. Only the receiver (and the giver) sees it.
+- **The seventh card** of each hand is discarded, hidden, at the end of the
+  age, except for a Babylon B player who has built its second stage (below).
+- **Digging the discards** (Halicarnassus): when a stage with `dig` is
+  built, at the end of that turn every card in the discard pile not already
+  theirs is passed to that player, who sees them all and may build one free.
+  The cards stay in the discard pile in the state; the one built is shown.
+
+**Turn order of business.** Picks are only recorded by `applyMove()`
+(`state.picks`); the step's one `settle()` resolves them all, in seat
+order, from the state at the start of the turn. So each pick is legal
+whatever the others chose, and nobody can buy from a card built this turn,
+as in the real game.
+
+1. Every seat pays its card's coins to the bank and its purchases to its
+   neighbours, and builds, tucks or discards. Coins received (purchases,
+   sales, yellow cards, wonder stages) arrive after everyone has paid, so
+   they can't be spent this turn.
+2. Yellow cards with `income` count what is in the cities after all of this
+   turn's builds.
+3. In the sixth turn, every last card is discarded except a Babylon B
+   seat's with `playLast`.
+4. A seat that built a `dig` stage this turn digs (phase `dig`), unless the
+   discard pile is empty.
+5. In the sixth turn, the Babylon B seat then plays its last card (phase
+   `last`), as a seventh turn of its own: after the dig, so the digger never
+   sees it, and from a state that includes what the digger built.
+6. Hands pass, or after the sixth turn the age ends: military, then the next
+   age is dealt, or the game is scored.
+
+**Paying for a card or a stage.** A cost is coins (paid to the bank) and
+resources. Resources come from your city's brown and grey cards, your
+wonder's own resource, yellow cards and wonder stages that produce a choice
+(one unit a turn each), and purchases. You may buy from either neighbour the
+units their brown and grey cards and their wonder's own resource produce,
+each unit once a turn, at 2 coins each, or 1 with a matching `trade` effect
+(the two roads and Artisans' Row, Olympia B's first stage). Buying doesn't
+use up the neighbour's resources. A card is free with no purchase when your
+city holds a card whose key is in its `from` (a chain). A move's purchase
+must be one the neighbour can produce at once (choice cards count once),
+must cover the cost together with your own production, and must be minimal:
+dropping any one unit bought must leave the cost uncovered. You can't build
+a card whose key your city already holds, nor stages out of order or beyond
+the last; selling is always allowed.
+
+**Wonder stage effects**: points, shields, coins (once, when built), a
+resource choice (not for sale), a wild science symbol, `dig`, `free` (once
+an age, build a card free), `trade`, `copyGuild` (at the end, score one
+neighbour's guild as your own) and `playLast`.
+
+**Military.** At the end of age a (1 to 3), each seat compares shields with
+each neighbour: more takes a victory token of 1, 3 or 5 points, fewer takes
+a defeat token of −1, a tie takes nothing.
+
+**Scoring** (the score sheet, by seat): military (tokens), coins (1 point a
+3 coins), wonder (stage points), civic (blue cards), commerce (yellow
+`score`), guilds (purple `score`, and Olympia B's copied guild), science
+(for each symbol, its count squared, plus 7 a set of all three), and the
+total. Wild symbols and the copied guild take whatever scores best. The
+highest total wins; a tie goes to the most coins, and a tie on both is
+shared (`winner` −2, `winners` the seats).
+
+**Settings**: `side`: `"A"` (default), `"B"` or `"random"` (each seat its
+own); `moveSeconds` and the robot `level` as in Hexlands. `newState` deals
+each seat a wonder at random from its `rng` (see **Rolls**), in the open, as
+at a real table.
+
+**The state** (`rules.js`):
+
+| Field | |
+|---|---|
+| `players`, `first`, `turn`, `winner`, `winners`, `moves` | As in every card game; `turn` is always −1, every phase being a step |
+| `side` | The setting |
+| `wonders` | By seat: `{ w, side }`, `w` an index into `WONDERS` |
+| `age`, `round` | 1 to 3, and the turn in the age, 1 to 6 |
+| `phase` | `"pick"`, `"last"`, `"dig"` or `"over"` |
+| `hands` | By seat: the slots of its hand, hidden |
+| `city` | By seat: `[{ slot, id }]`, the cards built, `id` a design |
+| `stages` | By seat: the slots tucked under its built stages, hidden |
+| `coins` | By seat |
+| `tokens` | By seat: its military tokens, e.g. `[1, -1, 3]` |
+| `discard` | The slots of the discard pile, hidden |
+| `picks` | By seat: the move it picked this turn, or `null` |
+| `freeAge` | By seat: the age it last used `free` in, or 0 |
+| `digger`, `lastSeat` | The seat digging or playing its last card, or −1 |
+| `pool` | The slots of the guilds not dealt, hidden |
+| `piles` | By age: the face-up slots of that age not yet dealt |
+
+**Moves** (every phase is a step; `buy` is `{ left: [7 counts], right: [7
+counts] }`, omitted or all zeros when nothing is bought; a move has exactly
+one of `build`, `stage`, `discard` or `dig`):
+
+| Phase | Who moves | Moves |
+|---|---|---|
+| `pick` | Every seat | `{ build: slot, buy }`, `{ build: slot, free: true }` (the `free` stage, once an age), `{ stage: slot, buy }` (the next stage of its wonder), `{ discard: slot }` (3 coins) |
+| `last` | `lastSeat` | The same, with its last card |
+| `dig` | `digger` | `{ dig: slot }` (a discard pile slot, built free) or `{ dig: -1 }` |
+
+**The robot** (`robot.js`) sees the public state (cities, stage counts,
+coins, tokens) and its own `face()`: its hand, the cards it held before
+passing them on (as a player remembers them) and, while digging, the
+discards. Easy builds what it can afford cheaply with some chance and sells
+when stuck; Medium weighs each outcome by points now, the resources its
+wonder and the next age need, chains, science sets, this age's war and
+coins; Hard estimates the final score of each outcome, counting every war
+still to fight, guilds against what neighbours will build, and stage
+effects, and it tucks or sells the card the next seat clearly wants. Over
+600 games, Hard wins 84–89% against Easy robots and about 60% against
+Medium ones; a choice takes well under 10 ms. A test reshuffles every card
+the robot couldn't have seen and checks its choice doesn't change.
+
+**Events** (`applyMove()` and `settle()` return them, for the view):
+`age { age }` (dealt), `build { p, slot, id, how, coins, bought: { left,
+right } }` (`how`: `"paid"`, `"chain"`, `"free"` or `"dig"`; `coins` paid to
+the bank; `bought` the coins paid each side), `stage { p, slot, n, bought }` (the
+stage index), `discard { p, slot, seventh }` (`seventh` for a last card),
+`gain { p, coins, why, from }` (`why`: `"sale"`, `"card"`, `"stage"`,
+`"trade"`; `from` the buyer, for a trade), `last { p }`, `dig { p }`,
+`pass { dir }` (1 left, −1 right), `war { age, results: by seat [left,
+right] }` (each `1`, `0` or `-1`), `over { winners, scores }` (`scores` by
+seat: `{ military, coins, wonder, civic, commerce, guilds, science, total,
+copied }`, `copied` the guild Olympia B copied, or −1).
+
+**The view.** The table is built to explain itself, from five modules beside
+`art.js`. Each takes art.js's element makers as a `kit` (so none imports
+`art.js`), keeps its facts and words in pure functions that read the rules'
+state, and marks every explainable element with `data-tip="<kind>"` and
+`data-tip-*` arguments.
+
+- `store.js`, **the storehouse**: one shelf of the seven resources with what
+  you make each turn and where it comes from, choice producers as "either"
+  tokens. Selecting a hand card matches its cost against the shelf (have,
+  buy from whom at what price, nobody sells), and every hand card wears a
+  badge before it is tapped: Free, You make it, Chain, a coin price, Can't
+  build.
+- `border.js`, **the two borders**: under each neighbour's name runs a river
+  strip drawn from the state: a ferry and "2 each" until a trade card turns
+  it into a stone bridge (raw materials at 1) or adds a market stall (goods
+  at 1), walls that grow with each side's shields, what the neighbour sells
+  on their bank, one flag per age, and from turn 5 "you trail by 2". A
+  purchase is a cart crossing with the resources while the coins go the
+  other way; a card that pays per counted card flashes each one.
+- `war.js`, **the war scene**: at the end of an age, shields line up across
+  each border one by one, a stamp lands on each ("You won +3"), then this
+  age's sum, the war so far and the rest of the table. It waits for
+  Continue, or closes by itself when a move clock runs.
+- `ring.js`, **the seat ring and the hand-off**: a small ring in the top bar
+  with every seat's stack, this age's direction, the age and six turn pips.
+  You and your neighbours have name plates, other seats a dot in their
+  colour with their seat mark, so it holds for seven. After the flip your
+  hand folds to a stack that slides into one neighbour's panel while the
+  other's slides to you.
+- `tips.js`, **tips**: one delegated layer for hover, focus, press and hold,
+  and an Explain mode where a tap explains instead of acting. `tipWords()`
+  writes one or two sentences from the live state ("Robot 1 has 4 shields and
+  you have 2…"). Hand cards open large only on hold or `I`, and a tip for
+  anything in the hand tray (`data-tip-zone`) opens above it. The legend
+  sits behind "?", and four first-time hints (purchase, chain, war, pass)
+  show once, remembered under `ddp-stonecrown-hints`.
+
+After each flip the neighbours' picks show large for a beat with what they
+mean for you; the hand tray folds to a strip while you wait, so your city
+shows (it stays open while keyboard focus is inside it). Tips, shelves, borders and the recap are written only from the public
+state and your own `face()`, and a name leaves the page with its card: the
+browser tests scan every page for the name of a card that page can't know.
 
 ## Differences from the reference (wasmerio/edge-multiplayer-games)
 

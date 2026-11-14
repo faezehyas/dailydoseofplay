@@ -1,0 +1,745 @@
+/* The war scene (war.js): a paper card over the table with a ribbon banner,
+   one strip of three armies split by two slices of river, the stamps that
+   land on them, the sums and Continue. Its colours are --ws-* tokens with
+   night values, so the scene looks right wherever it is mounted. */
+.ws {
+  --ws-scrim: rgb(59 47 69 / 46%);
+  --ws-paper: #fffaf0;
+  --ws-field: #f3e4cc;
+  --ws-ink: #3b2f45;
+  --ws-muted: #6f6378;
+  --ws-rule: #d6bf9c;
+  --ws-shadow: 90 58 58;
+  --ws-ribbon: #c4432f;
+  --ws-ribbon-dk: #8c2a1c;
+  --ws-ribbon-ink: #fff8ea;
+  --ws-win: #1f7a52;
+  --ws-loss: #b2382a;
+  --ws-glow: rgb(255 214 107 / 38%);
+  --ws-water: #bfe0ee;
+  --ws-deep: #93c6dd;
+  --ws-current: #e3f3fa;
+  --ws-wave: #ffffff;
+  --ws-bank: #d5e5bf;
+  --ws-reed: #5f9e5c;
+  --ws-bank-shade: #5a3a3a;
+  --ws-glint: #ffd66b;
+  --ws-gate: 78px;
+  --ws-sh: 26px;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  overflow-y: auto;
+  background: var(--ws-scrim);
+  color: var(--ws-ink);
+  opacity: 0;
+  transition: opacity 0.22s ease-out;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ws {
+    --ws-scrim: rgb(8 6 26 / 62%);
+    --ws-paper: #2e2b5a;
+    --ws-field: #221f48;
+    --ws-ink: #f3ebff;
+    --ws-muted: #c3b8da;
+    --ws-rule: #4d4889;
+    --ws-shadow: 0 0 0;
+    --ws-ribbon: #b23c2b;
+    --ws-ribbon-dk: #6e2419;
+    --ws-ribbon-ink: #fff3e6;
+    --ws-win: #63d39d;
+    --ws-loss: #ff9a88;
+    --ws-glow: rgb(255 207 92 / 15%);
+    --ws-water: #24497a;
+    --ws-deep: #1b3966;
+    --ws-current: #355f92;
+    --ws-wave: #8fb8e2;
+    --ws-bank: #2b4650;
+    --ws-reed: #5f9e80;
+    --ws-bank-shade: #000000;
+    --ws-glint: #ffcf5c;
+  }
+}
+
+:root[data-theme="dark"] .ws {
+  --ws-scrim: rgb(8 6 26 / 62%);
+  --ws-paper: #2e2b5a;
+  --ws-field: #221f48;
+  --ws-ink: #f3ebff;
+  --ws-muted: #c3b8da;
+  --ws-rule: #4d4889;
+  --ws-shadow: 0 0 0;
+  --ws-ribbon: #b23c2b;
+  --ws-ribbon-dk: #6e2419;
+  --ws-ribbon-ink: #fff3e6;
+  --ws-win: #63d39d;
+  --ws-loss: #ff9a88;
+  --ws-glow: rgb(255 207 92 / 15%);
+  --ws-water: #24497a;
+  --ws-deep: #1b3966;
+  --ws-current: #355f92;
+  --ws-wave: #8fb8e2;
+  --ws-bank: #2b4650;
+  --ws-reed: #5f9e80;
+  --ws-bank-shade: #000000;
+  --ws-glint: #ffcf5c;
+}
+
+.ws[hidden] {
+  display: none;
+}
+
+.ws.on {
+  opacity: 1;
+}
+
+.ws-card {
+  display: grid;
+  gap: 14px;
+  width: min(740px, 100%);
+  padding: 18px 18px 16px;
+  border-radius: 22px;
+  background: var(--ws-paper);
+  box-shadow: 0 1.5px 0 rgb(var(--ws-shadow) / 10%), 0 4px 0 rgb(var(--ws-shadow) / 6%), 0 18px 40px rgb(var(--ws-shadow) / 22%);
+  transform: translateY(14px) scale(0.97);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ws.on .ws-card {
+  transform: none;
+}
+
+/* ---------- the banner ---------- */
+.ws-banner {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+  isolation: isolate;
+}
+
+.ws-ribbon {
+  position: relative;
+  padding: 6px 24px 7px;
+  background: var(--ws-ribbon);
+  color: var(--ws-ribbon-ink);
+  box-shadow: 0 2px 0 rgb(var(--ws-shadow) / 14%);
+}
+
+.ws-ribbon::before,
+.ws-ribbon::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  z-index: -1;
+  width: 22px;
+  height: 100%;
+  background: var(--ws-ribbon-dk);
+}
+
+.ws-ribbon::before {
+  left: -15px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 38% 50%);
+}
+
+.ws-ribbon::after {
+  right: -15px;
+  clip-path: polygon(0 0, 100% 0, 62% 50%, 100% 100%, 0 100%);
+}
+
+.ws-title {
+  margin: 0;
+  font: 600 1.25rem/1.15 var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+.ws-stakes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font: 500 0.92rem/1.3 var(--font-display);
+  color: var(--ws-muted);
+}
+
+.ws-stakes .sc-tok {
+  width: 20px;
+  height: 22px;
+}
+
+.ws-dot {
+  margin: 0 4px;
+}
+
+/* ---------- the front: three armies, two rivers ---------- */
+.ws-front {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--ws-gate) minmax(0, 1.12fr) var(--ws-gate) minmax(0, 1fr);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--ws-field);
+  box-shadow: inset 0 2px 0 rgb(var(--ws-shadow) / 6%);
+}
+
+.ws-army {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 8px 14px;
+  text-align: center;
+  transition: opacity 0.45s, filter 0.45s;
+}
+
+.ws-mid {
+  background: radial-gradient(ellipse 80% 60% at 50% 34%, var(--ws-glow), transparent 75%);
+}
+
+.ws-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  font: 600 0.98rem/1.15 var(--font-display);
+  color: var(--c-ink);
+}
+
+.ws-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-num {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  margin: 2px 0;
+  border-radius: 50%;
+  background: var(--ws-paper);
+  box-shadow: inset 0 0 0 3px var(--c), inset 0 0 0 6px var(--ws-paper), inset 0 0 0 7px var(--ws-rule), 0 1.5px 0 rgb(var(--ws-shadow) / 12%), 0 6px 12px rgb(var(--ws-shadow) / 14%);
+  font: 700 2.2rem/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.45s, filter 0.45s;
+}
+
+.ws-num.tick {
+  animation: ws-tick 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes ws-tick {
+  40% {
+    transform: scale(1.18);
+  }
+}
+
+.ws-shields {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-height: var(--ws-sh);
+  border-radius: 8px;
+  transition: opacity 0.45s, filter 0.45s;
+}
+
+.ws-shields.many {
+  --ws-sh: 20px;
+}
+
+.ws-five {
+  display: flex;
+  gap: 2px;
+}
+
+.ws-shields .sc-ic {
+  width: var(--ws-sh);
+  height: var(--ws-sh);
+  transition: transform 0.3s cubic-bezier(0.34, 1.7, 0.64, 1), opacity 0.16s;
+}
+
+.ws-none {
+  align-self: center;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--ws-muted);
+}
+
+.ws-from {
+  display: grid;
+  gap: 1px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.76rem;
+  line-height: 1.2;
+  color: var(--ws-muted);
+}
+
+.ws-from i {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--ws-ink);
+}
+
+.ws-nothing {
+  font-style: italic;
+}
+
+/* An army waiting for its border to be fought. */
+.ws-wait .ws-num,
+.ws-wait .ws-shields .sc-ic {
+  opacity: 0.45;
+}
+
+/* A beaten army's shields and count fade; its name and sources stay readable.
+   Yours fade toward the border you lost. */
+.ws-lost .ws-num,
+.ws-lost .ws-shields .sc-ic,
+.ws-lost-left.ws-lost-right .ws-num,
+.ws-lost-left.ws-lost-right .ws-shields .sc-ic {
+  opacity: 0.42;
+  filter: grayscale(0.8);
+}
+
+.ws-lost .ws-who .sc-mark {
+  filter: grayscale(0.8);
+}
+
+.ws-lost-left:not(.ws-lost-right) :is(.ws-num, .ws-shields) {
+  mask-image: linear-gradient(to right, rgb(0 0 0 / 30%) 10%, #000 75%);
+}
+
+.ws-lost-right:not(.ws-lost-left) :is(.ws-num, .ws-shields) {
+  mask-image: linear-gradient(to left, rgb(0 0 0 / 30%) 10%, #000 75%);
+}
+
+/* ---------- a border ---------- */
+.ws-gate {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+
+.ws-river {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ws-f-water { fill: var(--ws-water); }
+.ws-f-deep { fill: var(--ws-deep); }
+.ws-f-bank { fill: var(--ws-bank); }
+.ws-f-shade { fill: var(--ws-bank-shade); }
+.ws-f-glint { fill: var(--ws-glint); opacity: 0.8; }
+.ws-s-current { fill: none; stroke: var(--ws-current); stroke-width: 7; stroke-linecap: round; opacity: 0.7; }
+.ws-s-wave { fill: none; stroke: var(--ws-wave); stroke-width: 1.8; stroke-linecap: round; opacity: 0.85; }
+.ws-s-reed { fill: none; stroke: var(--ws-reed); stroke-width: 1.6; stroke-linecap: round; }
+
+.ws-night {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ws-night {
+    display: inline;
+  }
+}
+
+:root[data-theme="dark"] .ws-night {
+  display: inline;
+}
+
+.ws-stamp {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 70px;
+  padding: 7px 3px 6px;
+  border-radius: 12px;
+  background: var(--ws-paper);
+  color: var(--ws-muted);
+  box-shadow: 0 1.5px 0 rgb(var(--ws-shadow) / 14%), 0 6px 12px rgb(var(--ws-shadow) / 18%);
+  outline: 1.5px dashed currentColor;
+  outline-offset: -5px;
+  text-align: center;
+  transform: rotate(-5deg);
+  transition: transform 0.34s cubic-bezier(0.3, 1.45, 0.6, 1), opacity 0.14s;
+}
+
+.ws-gate.right .ws-stamp {
+  transform: rotate(4deg);
+}
+
+.ws-stamp.win { color: var(--ws-win); }
+.ws-stamp.loss { color: var(--ws-loss); }
+
+.ws-stamp b {
+  font: 700 0.8rem/1.05 var(--font-display);
+}
+
+.ws-stamp > span:last-child {
+  font: 700 1rem/1.1 var(--font-display);
+}
+
+.ws-stamp.draw > span:last-child {
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.ws-stamp .sc-tok {
+  width: 30px;
+  height: 32px;
+  margin-bottom: 2px;
+}
+
+.ws-even {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 3px;
+  border: 2px dashed currentColor;
+  border-radius: 50%;
+  font: 700 1rem/1 var(--font-display);
+}
+
+/* The thud as a stamp lands: a ring of dust. */
+.ws-stamp::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 14px;
+  border: 2px solid currentColor;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ws-stamp:not(.ws-off)::before {
+  animation: ws-thud 0.6s 0.2s ease-out;
+}
+
+@keyframes ws-thud {
+  from {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.45);
+  }
+}
+
+.ws-gate .ws-stamp.ws-off {
+  opacity: 0;
+  transform: scale(1.9) rotate(-16deg);
+}
+
+.ws-shields .ws-off {
+  opacity: 0;
+  transform: scale(0);
+}
+
+/* ---------- the sums ---------- */
+.ws-sums {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ws-sum {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1.5px dashed var(--ws-rule);
+  border-radius: 14px;
+}
+
+.ws-sum small {
+  font: 600 0.7rem/1.2 var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ws-muted);
+}
+
+.ws-sum b {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font: 600 1.1rem/1.3 var(--font-display);
+}
+
+.ws-sum b.ws-quiet {
+  font-weight: 500;
+  color: var(--ws-muted);
+}
+
+.ws-toks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+}
+
+.ws-toks .sc-tok {
+  width: 26px;
+  height: 28px;
+}
+
+.ws-op {
+  color: var(--ws-muted);
+}
+
+.ws-else {
+  margin: -2px 2px 0;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  color: var(--ws-muted);
+}
+
+.ws-step {
+  transition: opacity 0.4s, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ws-step.ws-off {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+/* The sums' frames and the elsewhere line's lead stand from the start, so
+   the card keeps its size and Continue stays put: only what they hold comes in. */
+.ws-sum.ws-step,
+.ws-else.ws-step {
+  transition: none;
+}
+
+.ws-sum.ws-step.ws-off,
+.ws-else.ws-step.ws-off {
+  opacity: 1;
+  transform: none;
+}
+
+.ws-sum > b,
+.ws-else-v {
+  transition: opacity 0.4s, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ws-sum.ws-off > b,
+.ws-else.ws-off .ws-else-v {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.ws-else-v {
+  display: inline-block;
+}
+
+/* ---------- Continue ---------- */
+.ws-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ws-go {
+  position: relative;
+  overflow: hidden;
+  min-width: 150px;
+}
+
+.ws-count {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  background: currentColor;
+  opacity: 0.55;
+  transform-origin: left;
+}
+
+.ws-go.counting .ws-count {
+  display: block;
+  animation: ws-count var(--ws-wait, 4s) linear forwards;
+}
+
+@keyframes ws-count {
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* ---------- without movement: things only appear, in the same order ---------- */
+.ws.ws-still .ws-card,
+.ws.ws-still .ws-step.ws-off,
+.ws.ws-still .ws-sum.ws-off > b,
+.ws.ws-still .ws-else.ws-off .ws-else-v,
+.ws.ws-still .ws-shields .ws-off,
+.ws.ws-still .ws-gate .ws-stamp.ws-off {
+  transform: none;
+}
+
+.ws.ws-still .ws-gate.left .ws-stamp,
+.ws.ws-still .ws-gate.right .ws-stamp {
+  transition: opacity 0.2s;
+}
+
+.ws.ws-still .ws-stamp::before,
+.ws.ws-still .ws-num.tick,
+.ws.ws-still .ws-go.counting .ws-count {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-card,
+  .ws-step.ws-off,
+  .ws-sum.ws-off > b,
+  .ws-else.ws-off .ws-else-v,
+  .ws-shields .ws-off,
+  .ws-gate .ws-stamp.ws-off {
+    transform: none;
+  }
+
+  .ws-stamp::before,
+  .ws-num.tick,
+  .ws-go.counting .ws-count {
+    animation: none;
+  }
+}
+
+/* ---------- a phone ---------- */
+@media (max-width: 560px) {
+  .ws {
+    --ws-gate: 50px;
+    --ws-sh: 12px;
+    padding: 8px;
+  }
+
+  .ws-card {
+    gap: 12px;
+    padding: 14px 10px 12px;
+    border-radius: 18px;
+  }
+
+  .ws-title {
+    font-size: 1.08rem;
+  }
+
+  .ws-stakes {
+    font-size: 0.8rem;
+  }
+
+  .ws-front {
+    border-radius: 14px;
+  }
+
+  .ws-army {
+    gap: 4px;
+    padding: 10px 3px 12px;
+  }
+
+  .ws-who {
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.8rem;
+  }
+
+  .ws-who .sc-mark {
+    width: 13px;
+    height: 13px;
+  }
+
+  .ws-num {
+    width: 46px;
+    height: 46px;
+    box-shadow: inset 0 0 0 2.5px var(--c), inset 0 0 0 4.5px var(--ws-paper), inset 0 0 0 5.5px var(--ws-rule), 0 1px 0 rgb(var(--ws-shadow) / 12%), 0 4px 8px rgb(var(--ws-shadow) / 14%);
+    font-size: 1.55rem;
+  }
+
+  .ws-shields.many {
+    --ws-sh: 11px;
+  }
+
+  .ws-from li {
+    text-wrap: balance;
+  }
+
+  .ws-five {
+    gap: 1px;
+  }
+
+  .ws-from {
+    font-size: 0.66rem;
+  }
+
+  .ws-stamp {
+    width: 54px;
+    padding: 6px 2px 5px;
+    outline-offset: -4px;
+  }
+
+  .ws-stamp b {
+    font-size: 0.66rem;
+  }
+
+  .ws-stamp > span:last-child {
+    font-size: 0.86rem;
+  }
+
+  .ws-stamp.draw > span:last-child {
+    font-size: 0.6rem;
+  }
+
+  .ws-stamp .sc-tok {
+    width: 22px;
+    height: 24px;
+  }
+
+  .ws-even {
+    width: 20px;
+    height: 20px;
+    font-size: 0.8rem;
+  }
+
+  .ws-sums {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .ws-sum b {
+    font-size: 1rem;
+  }
+
+  .ws-toks .sc-tok {
+    width: 22px;
+    height: 24px;
+  }
+
+  .ws-else {
+    font-size: 0.84rem;
+  }
+
+  .ws-foot {
+    justify-content: stretch;
+  }
+
+  .ws-go {
+    flex: 1;
+  }
+}

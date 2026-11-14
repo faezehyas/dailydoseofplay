@@ -1,0 +1,544 @@
+/* The storehouse (store.js): your shelf of the seven resources on a wooden
+   plank, cream paper labels for each slot with the count and where it comes
+   from, "either" tokens below; the compact shelf in a neighbour's panel; a
+   hand card's cost matched unit by unit; the badge every hand card wears.
+   Green: you make it. Gold: you buy it. Red: nobody near you sells it. */
+.stonecrown {
+  --sc-st-ok: #23845a;
+  --sc-st-ok-bg: #e0f3e5;
+  --sc-st-ok-ink: #ffffff;
+  --sc-st-buy: #d99a1e;
+  --sc-st-buy-bg: #fdefc8;
+  --sc-st-buy-fill: #f6c24a;
+  --sc-st-buy-ink: #4a3200;
+  --sc-st-bad: #c2402e;
+  --sc-st-bad-bg: #fbe2dc;
+  --sc-st-bad-ink: #ffffff;
+  --sc-st-plank: #c48a55;
+  --sc-st-plank-2: #9c623a;
+  --sc-st-shelf: #f3e3c9;
+  --sc-st-label: #fffaf0;
+  --sc-st-temple: #b07a12;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .stonecrown {
+    --sc-st-ok: #63d39d;
+    --sc-st-ok-bg: #1d4a3c;
+    --sc-st-ok-ink: #101223;
+    --sc-st-buy: #f4bd3c;
+    --sc-st-buy-bg: #4a3f2a;
+    --sc-st-buy-fill: #f4bd3c;
+    --sc-st-buy-ink: #2e1f00;
+    --sc-st-bad: #ff9a88;
+    --sc-st-bad-bg: #57283a;
+    --sc-st-bad-ink: #101223;
+    --sc-st-plank: #7a5634;
+    --sc-st-plank-2: #573a22;
+    --sc-st-shelf: #262352;
+    --sc-st-label: #34316a;
+    --sc-st-temple: #ffcf5c;
+  }
+}
+
+:root[data-theme="dark"] .stonecrown {
+  --sc-st-ok: #63d39d;
+  --sc-st-ok-bg: #1d4a3c;
+  --sc-st-ok-ink: #101223;
+  --sc-st-buy: #f4bd3c;
+  --sc-st-buy-bg: #4a3f2a;
+  --sc-st-buy-fill: #f4bd3c;
+  --sc-st-buy-ink: #2e1f00;
+  --sc-st-bad: #ff9a88;
+  --sc-st-bad-bg: #57283a;
+  --sc-st-bad-ink: #101223;
+  --sc-st-plank: #7a5634;
+  --sc-st-plank-2: #573a22;
+  --sc-st-shelf: #262352;
+  --sc-st-label: #34316a;
+  --sc-st-temple: #ffcf5c;
+}
+
+/* ---------- your shelf ---------- */
+.sc-shelf.full {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px 10px;
+  border-radius: 16px;
+  background: var(--sc-st-shelf);
+  box-shadow: inset 0 0 0 1px rgb(var(--sc-shadow) / 6%), 0 1.5px 0 rgb(var(--sc-shadow) / 10%);
+}
+
+.sc-shelf-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+  padding-inline: 2px;
+}
+
+.sc-shelf-lab {
+  font: 600 0.7rem/1.2 var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sc-muted);
+}
+
+.sc-shelf-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--sc-muted);
+}
+
+.sc-shelf-key i {
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border-radius: 3px;
+  border: 2px solid var(--sc-st-ok);
+  background: var(--sc-st-ok-bg);
+}
+
+.sc-shelf-key i.buy {
+  border-color: var(--sc-st-buy);
+  background: var(--sc-st-buy-bg);
+}
+
+.sc-shelf-key i.need {
+  border-color: var(--sc-st-bad);
+  background: var(--sc-st-bad-bg);
+}
+
+/* Raw materials and goods each stand on a plank. */
+.sc-shelf-fixed {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.sc-shelf-group {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding-bottom: 7px;
+}
+
+.sc-shelf-group.goods {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sc-shelf-group::after {
+  content: "";
+  position: absolute;
+  inset: auto -4px 0;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(var(--sc-st-plank), var(--sc-st-plank-2));
+  box-shadow: 0 2px 0 rgb(var(--sc-shadow) / 14%);
+}
+
+@container (min-width: 600px) {
+  .sc-shelf-fixed {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 3fr);
+    gap: 14px;
+  }
+}
+
+.sc-slot {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 2px 6px;
+  min-width: 0;
+  padding: 5px 7px 5px 5px;
+  border: 2px solid transparent;
+  border-radius: 11px;
+  background: var(--sc-st-label);
+  color: var(--sc-ink);
+  box-shadow: 0 2px 0 rgb(var(--sc-shadow) / 12%);
+  outline: none;
+}
+
+.sc-slot:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.sc-slot-ic {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.sc-shelf.full .sc-slot-ic > .sc-ic {
+  width: 30px;
+  height: 30px;
+}
+
+.sc-slot-words {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sc-slot-n {
+  font: 700 1.1rem/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-slot-src {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 0.7rem;
+  line-height: 1.15;
+  color: var(--sc-muted);
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.sc-slot-src:empty {
+  display: none;
+}
+
+.sc-slot.none {
+  background: transparent;
+  border: 2px dashed rgb(var(--sc-shadow) / 18%);
+  box-shadow: none;
+}
+
+.sc-slot.none .sc-slot-ic,
+.sc-slot.none .sc-slot-n {
+  opacity: 0.45;
+}
+
+.sc-slot.none .sc-slot-n {
+  font-weight: 500;
+}
+
+/* The wonder's own resource: a small gold temple on its icon. */
+.sc-slot-mark {
+  position: absolute;
+  left: -5px;
+  top: -5px;
+  width: 15px;
+  height: 15px;
+  padding: 1px;
+  border-radius: 50%;
+  background: var(--sc-st-label);
+  box-shadow: 0 0 0 1.5px var(--sc-st-temple);
+  fill: var(--sc-st-temple);
+}
+
+.sc-slot-mark[hidden] {
+  display: none;
+}
+
+.sc-slot-mark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A phone: the count beside the icon, where it comes from underneath. */
+@media (max-width: 480px) {
+  .sc-shelf.full {
+    padding-inline: 6px;
+  }
+}
+
+@container (max-width: 459px) {
+  .sc-shelf.full .sc-shelf-group {
+    gap: 4px;
+  }
+
+  .sc-shelf.full .sc-shelf-group .sc-slot {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 4px 3px 5px 4px;
+  }
+
+  .sc-shelf.full .sc-shelf-group .sc-slot-words {
+    display: contents;
+  }
+
+  .sc-shelf.full .sc-shelf-group .sc-slot-src {
+    grid-column: 1 / -1;
+    font-size: 0.58rem;
+    letter-spacing: -0.01em;
+  }
+
+  .sc-shelf.full .sc-slot-ic > .sc-ic {
+    width: 26px;
+    height: 26px;
+  }
+
+  .sc-shelf-key {
+    display: none;
+  }
+
+  .sc-shelf.full .sc-slot.either {
+    padding: 4px 7px;
+  }
+
+  .sc-shelf.full .sc-slot.either .sc-slot-n {
+    display: none;
+  }
+
+  .sc-shelf.full .sc-either-ics .sc-ic,
+  .sc-shelf.full .either.n3 .sc-either-ics .sc-ic,
+  .sc-shelf.full .either.n4 .sc-either-ics .sc-ic {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* Either tokens: one of several, chosen each turn as needed. */
+.sc-shelf-either {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sc-shelf.full .sc-shelf-either:empty {
+  display: none;
+}
+
+.sc-shelf.full .sc-slot.either {
+  grid-template-columns: auto auto;
+  padding-left: 8px;
+  border-style: dashed;
+  border-color: rgb(var(--sc-shadow) / 22%);
+}
+
+.sc-either-ics {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.sc-shelf.full .sc-either-ics .sc-ic {
+  width: 26px;
+  height: 26px;
+}
+
+.sc-shelf.full .either.n3 .sc-either-ics .sc-ic,
+.sc-shelf.full .either.n4 .sc-either-ics .sc-ic {
+  width: 21px;
+  height: 21px;
+}
+
+.sc-shelf .sc-or {
+  padding-inline: 1px;
+  font: 600 0.75rem/1 var(--font-display);
+  color: var(--sc-muted);
+  opacity: 1;
+}
+
+/* What a card would use: green you have, gold you buy, red nobody sells. */
+.sc-shelf .sc-slot.use,
+.sc-shelf .sc-slot.buy,
+.sc-shelf .sc-slot.need {
+  border-style: solid;
+  background: var(--sc-st-ok-bg);
+  border-color: var(--sc-st-ok);
+}
+
+.sc-shelf .sc-slot.buy {
+  background: var(--sc-st-buy-bg);
+  border-color: var(--sc-st-buy);
+}
+
+.sc-shelf .sc-slot.need {
+  background: var(--sc-st-bad-bg);
+  border-color: var(--sc-st-bad);
+}
+
+.sc-shelf .sc-slot.use .sc-slot-ic,
+.sc-shelf .sc-slot.use .sc-slot-n,
+.sc-shelf .sc-slot.buy .sc-slot-ic,
+.sc-shelf .sc-slot.buy .sc-slot-n,
+.sc-shelf .sc-slot.need .sc-slot-ic,
+.sc-shelf .sc-slot.need .sc-slot-n {
+  opacity: 1;
+}
+
+/* ---------- a neighbour's shelf, compact ---------- */
+.sc-shelf.compact {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.sc-shelf.compact .sc-shelf-fixed,
+.sc-shelf.compact .sc-shelf-either {
+  display: contents;
+}
+
+.sc-shelf.compact .sc-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px 3px;
+  border-width: 1.5px;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+}
+
+.sc-shelf.compact .sc-slot .sc-ic {
+  width: 20px;
+  height: 20px;
+}
+
+.sc-shelf.compact .sc-slot small {
+  font: 700 0.75rem/1 var(--font-display);
+}
+
+.sc-shelf.compact .sc-slot.either {
+  padding-inline: 4px;
+  background: var(--sc-st-label);
+  box-shadow: 0 1px 0 rgb(var(--sc-shadow) / 12%);
+}
+
+/* ---------- a cost matched against the shelf ---------- */
+.sc-match {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sc-unit-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sc-unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 10px 4px 6px;
+  border-left: 5px solid var(--sc-st-ok);
+  border-radius: 11px;
+  background: var(--sc-st-label);
+  color: var(--sc-ink);
+  font-size: 0.86rem;
+  line-height: 1.25;
+  box-shadow: 0 2px 0 rgb(var(--sc-shadow) / 12%);
+}
+
+.sc-unit .sc-ic {
+  width: 26px;
+  height: 26px;
+}
+
+.sc-unit b {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.sc-unit.buy,
+.sc-unit.sale,
+.sc-unit.bank {
+  border-left-color: var(--sc-st-buy);
+}
+
+.sc-unit.miss {
+  border-left-color: var(--sc-st-bad);
+  background: var(--sc-st-bad-bg);
+}
+
+.sc-match-words {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.sc-match-words:empty {
+  display: none;
+}
+
+/* ---------- a hand card's badge ---------- */
+.sc-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0.38em 0.7em;
+  border-radius: 999px;
+  background: var(--sc-st-ok);
+  color: var(--sc-st-ok-ink);
+  font: 700 0.74rem/1 var(--font-display);
+  white-space: nowrap;
+  box-shadow: 0 2px 0 rgb(var(--sc-shadow) / 22%);
+}
+
+.sc-tag .sc-ic {
+  width: 1.35em;
+  height: 1.35em;
+  margin-block: -0.15em;
+}
+
+.sc-tag.pay {
+  padding-left: 0.4em;
+  background: var(--sc-st-buy-fill);
+  color: var(--sc-st-buy-ink);
+}
+
+.sc-tag.no {
+  background: var(--sc-st-bad);
+  color: var(--sc-st-bad-ink);
+}
+
+.sc-tag.wonder {
+  background: var(--sc-st-label);
+  color: var(--sc-ink);
+  box-shadow: inset 0 0 0 2px var(--sc-st-ok), 0 2px 0 rgb(var(--sc-shadow) / 22%);
+}
+
+/* On a card in your hand: centred on its top edge. */
+.sc-hcard > .sc-tag {
+  position: absolute;
+  z-index: 1;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% + 8px);
+  padding-inline: 0.45em;
+  font-size: clamp(0.56rem, 1.6vw, 0.72rem);
+  /* A long label on a narrow card takes two lines rather than lose its end. */
+  white-space: normal;
+  text-align: center;
+  text-wrap: balance;
+  line-height: 1.05;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sc-slot {
+    transition: border-color var(--dur-med) var(--ease-out), background-color var(--dur-med) var(--ease-out);
+  }
+
+  .sc-slot.use,
+  .sc-slot.buy,
+  .sc-slot.need {
+    animation: sc-slot-lit var(--dur-slow) var(--ease-spring);
+  }
+}
+
+@keyframes sc-slot-lit {
+  from {
+    transform: scale(0.94);
+  }
+}

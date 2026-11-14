@@ -27,6 +27,7 @@ export function noiseBuf(a, kind = "white") {
 // A gain that rises to `peak` in `attack` seconds, then fades out by `dur`.
 export function decay(a, o, t, peak, dur, attack = 0.003) {
   const g = a.createGain();
+  g.gain.value = 0.0001; // a gain starts at 1, and a start between two samples would click before the envelope
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(peak, t + attack);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
